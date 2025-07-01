@@ -12,7 +12,7 @@ import google.generativeai as genai
 # הגדרות
 
 פ
-TELEGRAM_TOKEN = os.getenv(“7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4”)
+TELEGRAM_TOKEN = os.getenv(“TELEGRAM_TOKEN“ ,“7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4”)
 GEMINI_API_KEY = “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”
 
 # הגדרת Gemini
