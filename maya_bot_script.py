@@ -90,31 +90,28 @@ def create_enhanced_system_prompt():
     current_time, current_date = get_current_time_israel()
     business_status = check_business_hours()
     
-    return f"""את מאיה, המזכירה האישית והמקצועית של דוד. את לא רק צ'אטבוט - את מזכירה אמיתית עם גישה למידע עדכני.
+    return f"""את מאיה, המזכירה האישית של דוד. דבר איתו כמו חברה קרובה - טבעית, חמה, ובלי פורמליות מיותרת.
 
-המידע שיש לך:
-- השעה הנוכחת: {current_time}
-- התאריך: {current_date}
-- סטטוס עבודה: {business_status}
-- מיקום: תל אביב, ישראל
+השעה עכשיו: {current_time}, {current_date}
+סטטוס: {business_status}
 
-היכולות שלך כמזכירה:
-✅ לספק שעה ותאריך מדויקים
-✅ לבדוק מזג אוויר עדכני
-✅ לעזור עם תזמון פגישות
-✅ לתת עדכונים על מצב עבודה
-✅ לעזור עם משימות יומיות
-✅ לזכור דברים חשובים
+איך את מתנהגת:
+- דברי איתו כמו שחברה טובה מדברת - לא כמו רובוט
+- תהיי ישירה ופרקטית 
+- אל תשתמשי במילים כמו "אני מצטערת" או "לצערי" 
+- אל תפני אותו לבדוק דברים בעצמו - את כאן בשביל זה!
+- אם הוא שואל על שעה - תני לו שעה מדויקת
+- אם הוא שואל על מזג אוויר - תני לו נתונים אמיתיים  
+- תהיי עקבית ונוחה לשיחה
 
-האישיות שלך:
-- מקצועית אבל חמה
-- יעילה ומדויקת
-- יזומה בהצעת עזרה
-- זוכרת פרטים חשובים
-- מדברת בעברית טבעית
+דוגמאות לתשובות טובות:
+❌ רע: "אני לא יכולה לספק מידע בזמן אמת"
+✅ טוב: "עכשיו בתל אביב 26 מעלות ושמיים בהירים"
 
-כשדוד שואל על שעה, מזג אוויר, או מידע עדכני - תני לו תשובה מדויקת ומועילת.
-אל תפני אותו לבדוק במקומות אחרים - את המזכירה שלו!"""
+❌ רע: "אני ממליצה לבדוק באפליקציה"  
+✅ טוב: "השעה 23:02, זמן טוב לסיים את היום"
+
+תהיי מאיה - המזכירה החכמה שתמיד יודעת מה קורה!"""
 
 def create_chat_session():
     chat = model.start_chat(history=[])
@@ -174,14 +171,22 @@ async def respond(update, context):
 
     try:
         current_time, current_date = get_current_time_israel()
-        enhanced_message = f"""המידע העדכני:
-- שעה: {current_time}
+        weather_info = ""
+        
+        # אם זו שאלה על מזג אוויר, תוסיף מידע עדכני
+        if any(word in user_message.lower() for word in ["מזג", "חום", "קר", "טמפרטורה", "גשם"]):
+            weather_data = await get_weather_data()
+            if weather_data:
+                weather_info = f"\n\nמזג אוויר עדכני: {weather_data['temp']}°C, {weather_data['description']}, רוח {weather_data['windspeed']} קמ\"ש"
+        
+        enhanced_message = f"""דוד שאל: "{user_message}"
+
+מידע עדכני שיש לך:
+- שעה מדויקת: {current_time}
 - תאריך: {current_date}
-- מיקום: תל אביב
+- מיקום: תל אביב{weather_info}
 
-שאלת המשתמש: {user_message}
-
-תני תשובה מועילה ומדויקת כמזכירה מקצועית."""
+תני תשובה ישירה, ידידותית וטבעית. אל תאמרי "אני לא יכולה" או תפני אותו למקומות אחרים."""
         
         chat_session = chat_sessions[chat_id]
         response = await asyncio.get_event_loop().run_in_executor(
@@ -199,7 +204,7 @@ async def respond(update, context):
 
     except Exception as e:
         logging.error(f"שגיאה בתגובה: {e}")
-        error_reply = "😅 יש לי בעיה טכנית קטנה כרגע. תוכל לנסות שוב בעוד רגע?"
+        error_reply = "יש לי תקלה קטנה... תנסה שוב?"
         await context.bot.send_message(chat_id=chat_id, text=error_reply)
 
 async def time_command(update, context):
