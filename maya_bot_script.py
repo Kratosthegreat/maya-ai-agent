@@ -40,9 +40,40 @@ def get_current_time_israel():
     now = datetime.now(israel_tz)
     return now.strftime("%H:%M:%S"), now.strftime("%A, %d %B %Y"), now
 
-async def get_weather_data():
+async def get_weather_data(city="תל אביב"):
+    """מביא נתוני מזג אוויר לעיר מבוקשת"""
     try:
-        lat, lon = 32.0853, 34.7818
+        # קואורדינטות של ערים בישראל
+        city_coords = {
+            "תל אביב": (32.0853, 34.7818),
+            "ירושלים": (31.7683, 35.2137),
+            "חיפה": (32.7940, 34.9896),
+            "באר שבע": (31.2518, 34.7915),
+            "עפולה": (32.6098, 35.2897),
+            "נתניה": (32.3215, 34.8532),
+            "אשדוד": (31.7940, 34.6436),
+            "פתח תקווה": (32.0878, 34.8878),
+            "ראשון לציון": (31.9730, 34.7925),
+            "חולון": (32.0178, 34.7925)
+        }
+        
+        # מציאת העיר המתאימה
+        city_lower = city.lower()
+        matched_city = None
+        matched_coords = None
+        
+        for city_name, coords in city_coords.items():
+            if city_lower in city_name.lower() or city_name.lower() in city_lower:
+                matched_city = city_name
+                matched_coords = coords
+                break
+        
+        # אם לא מצאנו, נשתמש בתל אביב
+        if not matched_coords:
+            matched_city = "תל אביב"
+            matched_coords = city_coords["תל אביב"]
+        
+        lat, lon = matched_coords
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=Asia/Jerusalem"
         
         async with httpx.AsyncClient() as client:
@@ -68,7 +99,7 @@ async def get_weather_data():
                     "temp": temp,
                     "windspeed": windspeed,
                     "description": description,
-                    "city": "תל אביב"
+                    "city": matched_city
                 }
     except Exception as e:
         logging.error(f"שגיאה בקבלת מזג אוויר: {e}")
@@ -209,24 +240,20 @@ def parse_meeting_request(message):
 def create_enhanced_system_prompt():
     current_time, current_date, current_dt = get_current_time_israel()
     
-    return f"""את מאיה, המזכירה האישית של דוד. עכשיו את מחוברת ליומן Google שלו!
+    return f"""את מאיה, המזכירה האישית של דוד. דברי איתו טבעית וחכמה.
 
 השעה עכשיו: {current_time}, {current_date}
 
-מה שאת יכולה עכשיו:
-✅ לספר שעה ומזג אוויר
-✅ לקבוע פגישות ביומן Google
-✅ לראות אירועים קרובים
-✅ לזכור דברים במהלך השיחה
-✅ לעזור עם כתיבה ותכנון
+תהיי חכמה ומבינה:
+- אם דוד שואל על מזג אוויר בעיר מסוימת - תני לו בדיוק מה שהוא ביקש
+- אם הוא לא מבין למה נתת לו מידע על עיר אחרת - תסבירי ותתקני
+- אל תגידי "אני לא מבינה" - נסי להבין מההקשר
+- תהיי ישירה ומועילה
 
-כשדוד מבקש לקבוע פגישה - תנתחי מה הוא אמר ותקבעי בפועל!
+דוגמה: אם הוא שואל "למה ת״א??" אחרי שנתת מזג אוויר לתל אביב כשהוא ביקש עפולה - תגידי משהו כמו:
+"אה סליחה! אתה ביקשת מזג אוויר לעפולה ולא לתל אביב. בוא אבדוק לך את עפולה..."
 
-דוגמה:
-"קבעי לי פגישה מחר ב8:00 עם amit@company.com"
-→ תקבעי אירוע ביומן מ8:00-9:00 מחר עם amit@company.com
-
-תהיי ישירה, יעילה ואמיתית!"""
+תהיי מאיה החכמה שמבינה ומתקנת טעויות!"""
 
 def create_chat_session():
     chat = model.start_chat(history=[])
@@ -301,11 +328,20 @@ async def respond(update, context):
     
     # מזג אוויר
     if any(word in user_message.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר", "גשם", "מזג"]):
-        weather_data = await get_weather_data()
+        # חיפוש עיר בהודעה
+        cities = ["עפולה", "תל אביב", "ירושלים", "חיפה", "באר שבע", "נתניה", "אשדוד", "פתח תקווה", "ראשון לציון", "חולון"]
+        requested_city = "תל אביב"  # ברירת מחדל
+        
+        for city in cities:
+            if city in user_message:
+                requested_city = city
+                break
+        
+        weather_data = await get_weather_data(requested_city)
         if weather_data:
-            reply = f"🌤️ מזג האוויר בתל אביב:\n🌡️ {weather_data['temp']}°C\n💨 רוח: {weather_data['windspeed']} קמ\"ש\n☁️ {weather_data['description']}"
+            reply = f"🌤️ מזג האוויר ב{weather_data['city']}:\n🌡️ {weather_data['temp']}°C\n💨 רוח: {weather_data['windspeed']} קמ\"ש\n☁️ {weather_data['description']}"
         else:
-            reply = "לא הצלחתי לקבל נתוני מזג אוויר כרגע"
+            reply = f"לא הצלחתי לקבל נתוני מזג אוויר עבור {requested_city} כרגע"
         await context.bot.send_message(chat_id=chat_id, text=reply)
         return
 
