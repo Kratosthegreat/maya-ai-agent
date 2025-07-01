@@ -17,7 +17,7 @@ from googleapiclient.discovery import build
 import pickle
 
 # הגדרות
-TELEGRAM_TOKEN = "YOUR_NEW_TELEGRAM_TOKEN"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4")
 GEMINI_API_KEY = "AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM"
 
 # Google Calendar הגדרות
