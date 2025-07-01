@@ -10,10 +10,20 @@ import pytz
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
 import google.generativeai as genai
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+import pickle
 
 # הגדרות
-TELEGRAM_TOKEN = "7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4"
+TELEGRAM_TOKEN = "YOUR_NEW_TELEGRAM_TOKEN"
 GEMINI_API_KEY = "AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM"
+
+# Google Calendar הגדרות
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+CREDENTIALS_FILE = 'credentials.json'  # תצטרך להעלות את זה
+TOKEN_FILE = 'token.pickle'
 
 # הגדרת Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -22,10 +32,13 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 # היסטוריית שיחה
 chat_sessions = {}
 
+# Google Calendar Service
+calendar_service = None
+
 def get_current_time_israel():
     israel_tz = pytz.timezone("Asia/Jerusalem")
     now = datetime.now(israel_tz)
-    return now.strftime("%H:%M:%S"), now.strftime("%A, %d %B %Y")
+    return now.strftime("%H:%M:%S"), now.strftime("%A, %d %B %Y"), now
 
 async def get_weather_data():
     try:
@@ -42,21 +55,11 @@ async def get_weather_data():
                 windspeed = current["windspeed"]
                 
                 weather_codes = {
-                    0: "שמיים בהירים",
-                    1: "בהיר ברובו", 
-                    2: "חלקית מעונן",
-                    3: "מעונן",
-                    45: "ערפל",
-                    48: "ערפל קפוא",
-                    51: "טפטוף קל",
-                    53: "טפטוף בינוני", 
-                    55: "טפטוף חזק",
-                    61: "גשם קל",
-                    63: "גשם בינוני",
-                    65: "גשם חזק",
-                    80: "ממטרים קלים",
-                    81: "ממטרים חזקים",
-                    95: "סופת רעמים"
+                    0: "שמיים בהירים", 1: "בהיר ברובו", 2: "חלקית מעונן",
+                    3: "מעונן", 45: "ערפל", 48: "ערפל קפוא",
+                    51: "טפטוף קל", 53: "טפטוף בינוני", 55: "טפטוף חזק",
+                    61: "גשם קל", 63: "גשם בינוני", 65: "גשם חזק",
+                    80: "ממטרים קלים", 81: "ממטרים חזקים", 95: "סופת רעמים"
                 }
                 
                 description = weather_codes.get(current["weathercode"], "מזג אוויר משתנה")
@@ -71,47 +74,159 @@ async def get_weather_data():
         logging.error(f"שגיאה בקבלת מזג אוויר: {e}")
     return None
 
-def check_business_hours():
-    israel_tz = pytz.timezone("Asia/Jerusalem")
-    now = datetime.now(israel_tz)
-    hour = now.hour
-    weekday = now.weekday()
+def authenticate_google_calendar():
+    """אימות Google Calendar"""
+    global calendar_service
+    creds = None
     
-    if weekday < 5 and 8 <= hour <= 18:
-        return "שעות עבודה"
-    elif weekday == 4 and hour >= 15:
-        return "כמעט סוף השבוע"
-    elif weekday >= 5:
-        return "סוף שבוע"
-    else:
-        return "מחוץ לשעות עבודה"
+    # טוען credentials קיימים
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'rb') as token:
+            creds = pickle.load(token)
+    
+    # אם אין credentials תקפים
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # צריך אימות ראשוני
+            if os.path.exists(CREDENTIALS_FILE):
+                flow = Flow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
+                flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+                auth_url, _ = flow.authorization_url(prompt='consent')
+                
+                print(f"לך לקישור הזה לאימות: {auth_url}")
+                print("העתק את הקוד ממסך האישור ותכניס אותו כאן:")
+                code = input("קוד אישור: ")
+                
+                flow.fetch_token(code=code)
+                creds = flow.credentials
+            else:
+                print("אין קובץ credentials.json")
+                return None
+    
+    # שמירת הcredentials
+    with open(TOKEN_FILE, 'wb') as token:
+        pickle.dump(creds, token)
+    
+    calendar_service = build('calendar', 'v3', credentials=creds)
+    return calendar_service
+
+async def create_calendar_event(summary, start_datetime, end_datetime, attendee_email=None):
+    """יוצר אירוע חדש ביומן"""
+    try:
+        if not calendar_service:
+            return "אני לא מחוברת ליומן כרגע"
+        
+        # הכנת האירוע
+        event = {
+            'summary': summary,
+            'start': {
+                'dateTime': start_datetime.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+            'end': {
+                'dateTime': end_datetime.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+        }
+        
+        # הוספת משתתף אם צוין
+        if attendee_email:
+            event['attendees'] = [{'email': attendee_email}]
+        
+        # יצירת האירוע
+        created_event = calendar_service.events().insert(calendarId='primary', body=event).execute()
+        
+        return f"נקבע! ישיבה עם {attendee_email or 'ללא משתתפים'} ב{start_datetime.strftime('%d/%m/%Y בשעה %H:%M')}"
+        
+    except Exception as e:
+        logging.error(f"שגיאה ביצירת אירוע: {e}")
+        return "היתה בעיה ביצירת האירוע ביומן"
+
+async def get_upcoming_events(max_results=10):
+    """מביא אירועים קרובים"""
+    try:
+        if not calendar_service:
+            return "אני לא מחוברת ליומן כרגע"
+        
+        now = datetime.utcnow().isoformat() + 'Z'
+        events_result = calendar_service.events().list(
+            calendarId='primary', timeMin=now, maxResults=max_results,
+            singleEvents=True, orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        if not events:
+            return "אין אירועים קרובים ביומן"
+        
+        events_text = "האירועים הקרובים:\n\n"
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            summary = event.get('summary', 'ללא כותרת')
+            events_text += f"• {summary} - {start}\n"
+        
+        return events_text
+        
+    except Exception as e:
+        logging.error(f"שגיאה בקבלת אירועים: {e}")
+        return "היתה בעיה בקבלת האירועים מהיומן"
+
+def parse_meeting_request(message):
+    """מנתח בקשה לקביעת פגישה"""
+    import re
+    
+    # חיפוש שעה (8:00, 09:30, וכו')
+    time_match = re.search(r'(\d{1,2}):?(\d{0,2})', message)
+    
+    # חיפוש אימייל או שם
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', message)
+    name_match = re.search(r'עם (.+?)(?:\s|$)', message)
+    
+    # חיפוש יום (מחר, היום, תאריך ספציפי)
+    day_patterns = {
+        'מחר': 1,
+        'היום': 0,
+        'מחרתיים': 2,
+        'ביום ראשון': None,
+        'ביום שני': None,
+    }
+    
+    target_day = 1  # ברירת מחדל - מחר
+    for day_word, day_offset in day_patterns.items():
+        if day_word in message and day_offset is not None:
+            target_day = day_offset
+            break
+    
+    return {
+        'time_match': time_match,
+        'email': email_match.group() if email_match else None,
+        'name': name_match.group(1) if name_match else None,
+        'day_offset': target_day
+    }
 
 def create_enhanced_system_prompt():
-    current_time, current_date = get_current_time_israel()
-    business_status = check_business_hours()
+    current_time, current_date, current_dt = get_current_time_israel()
     
-    return f"""את מאיה, המזכירה האישית של דוד. דבר איתו כמו חברה קרובה - טבעית, חמה, ובלי פורמליות מיותרת.
+    return f"""את מאיה, המזכירה האישית של דוד. עכשיו את מחוברת ליומן Google שלו!
 
 השעה עכשיו: {current_time}, {current_date}
-סטטוס: {business_status}
 
-איך את מתנהגת:
-- דברי איתו כמו שחברה טובה מדברת - לא כמו רובוט
-- תהיי ישירה ופרקטית 
-- אל תשתמשי במילים כמו "אני מצטערת" או "לצערי" 
-- אל תפני אותו לבדוק דברים בעצמו - את כאן בשביל זה!
-- אם הוא שואל על שעה - תני לו שעה מדויקת
-- אם הוא שואל על מזג אוויר - תני לו נתונים אמיתיים  
-- תהיי עקבית ונוחה לשיחה
+מה שאת יכולה עכשיו:
+✅ לספר שעה ומזג אוויר
+✅ לקבוע פגישות ביומן Google
+✅ לראות אירועים קרובים
+✅ לזכור דברים במהלך השיחה
+✅ לעזור עם כתיבה ותכנון
 
-דוגמאות לתשובות טובות:
-❌ רע: "אני לא יכולה לספק מידע בזמן אמת"
-✅ טוב: "עכשיו בתל אביב 26 מעלות ושמיים בהירים"
+כשדוד מבקש לקבוע פגישה - תנתחי מה הוא אמר ותקבעי בפועל!
 
-❌ רע: "אני ממליצה לבדוק באפליקציה"  
-✅ טוב: "השעה 23:02, זמן טוב לסיים את היום"
+דוגמה:
+"קבעי לי פגישה מחר ב8:00 עם amit@company.com"
+→ תקבעי אירוע ביומן מ8:00-9:00 מחר עם amit@company.com
 
-תהיי מאיה - המזכירה החכמה שתמיד יודעת מה קורה!"""
+תהיי ישירה, יעילה ואמיתית!"""
 
 def create_chat_session():
     chat = model.start_chat(history=[])
@@ -120,12 +235,11 @@ def create_chat_session():
     return chat
 
 quick_replies = [
-    "בוקר טוב דוד! איך אפשר לעזור היום? 😊",
-    "היי! מה בתוכנית היום?",
-    "שלום דוד! יש לי עדכונים בשבילך או שאתה צריך משהו?",
-    "אהלן! איך אני יכולה לעזור לך להיות יותר יעיל היום?",
-    "היי! רוצה שאבדוק לך משהו? מזג אוויר? פגישות?",
-    "בוקר טוב! מה החשוב ביותר שעליי לדעת היום?"
+    "בוקר טוב דוד! מה בתוכנית היום? 📅",
+    "היי! רוצה שאבדוק מה יש לך ביומן?",
+    "שלום! איך אפשר לעזור? לקבוע פגישה?",
+    "אהלן! יש לי גישה ליומן שלך עכשיו! 🗓️",
+    "היי! מה נקבע היום?",
 ]
 
 def is_quick_message(msg):
@@ -136,57 +250,80 @@ async def respond(update, context):
     chat_id = update.message.chat_id
 
     if is_quick_message(user_message):
-        current_time, current_date = get_current_time_israel()
-        business_status = check_business_hours()
-        
+        current_time, current_date, _ = get_current_time_israel()
         reply = random.choice(quick_replies)
-        reply += f"\n\n🕐 השעה: {current_time}\n📅 {current_date}\n💼 {business_status}"
-        
+        reply += f"\n\n🕐 השעה: {current_time}\n📅 {current_date}"
         await context.bot.send_message(chat_id=chat_id, text=reply)
         return
 
     await context.bot.send_chat_action(chat_id=chat_id, action="typing")
 
+    # בדיקה אם זו בקשה לקביעת פגישה
+    if any(word in user_message.lower() for word in ["קבע", "פגישה", "ישיבה", "מפגש"]):
+        parsed = parse_meeting_request(user_message)
+        
+        if parsed['time_match']:
+            try:
+                # חישוב התאריך והשעה
+                _, _, current_dt = get_current_time_israel()
+                target_date = current_dt + timedelta(days=parsed['day_offset'])
+                
+                hour = int(parsed['time_match'].group(1))
+                minute = int(parsed['time_match'].group(2)) if parsed['time_match'].group(2) else 0
+                
+                start_time = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                end_time = start_time + timedelta(hours=1)  # פגישה של שעה
+                
+                # יצירת הפגישה
+                attendee = parsed['email'] or parsed['name']
+                summary = f"פגישה עם {attendee}" if attendee else "פגישה"
+                
+                result = await create_calendar_event(summary, start_time, end_time, parsed['email'])
+                await context.bot.send_message(chat_id=chat_id, text=f"✅ {result}")
+                return
+                
+            except Exception as e:
+                await context.bot.send_message(chat_id=chat_id, text="היתה בעיה בקביעת הפגישה. תוכל לנסח אחרת?")
+                return
+
+    # בדיקה אם זו בקשה לראות יומן
+    if any(word in user_message.lower() for word in ["יומן", "לוח", "אירועים", "פגישות שלי"]):
+        events = await get_upcoming_events()
+        await context.bot.send_message(chat_id=chat_id, text=events)
+        return
+
+    # שעה
     if any(word in user_message.lower() for word in ["שעה", "זמן", "מתי", "איזה שעה"]):
-        current_time, current_date = get_current_time_israel()
+        current_time, current_date, _ = get_current_time_israel()
         reply = f"🕐 השעה עכשיו: {current_time}\n📅 התאריך: {current_date}"
         await context.bot.send_message(chat_id=chat_id, text=reply)
         return
     
+    # מזג אוויר
     if any(word in user_message.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר", "גשם", "מזג"]):
         weather_data = await get_weather_data()
         if weather_data:
-            reply = f"🌤️ מזג האוויר בתל אביב:\n"
-            reply += f"🌡️ טמפרטורה: {weather_data['temp']}°C\n"
-            reply += f"💨 רוח: {weather_data['windspeed']} קמ\"ש\n"
-            reply += f"☁️ מצב: {weather_data['description']}"
+            reply = f"🌤️ מזג האוויר בתל אביב:\n🌡️ {weather_data['temp']}°C\n💨 רוח: {weather_data['windspeed']} קמ\"ש\n☁️ {weather_data['description']}"
         else:
-            reply = "😅 מצטערת, יש לי בעיה לקבל נתוני מזג אוויר כרגע. תוכל לבדוק באפליקציית מזג האוויר?"
-        
+            reply = "לא הצלחתי לקבל נתוני מזג אוויר כרגע"
         await context.bot.send_message(chat_id=chat_id, text=reply)
         return
 
+    # תגובה כללית עם Gemini
     if chat_id not in chat_sessions:
         chat_sessions[chat_id] = create_chat_session()
 
     try:
-        current_time, current_date = get_current_time_israel()
-        weather_info = ""
+        current_time, current_date, _ = get_current_time_israel()
         
-        # אם זו שאלה על מזג אוויר, תוסיף מידע עדכני
-        if any(word in user_message.lower() for word in ["מזג", "חום", "קר", "טמפרטורה", "גשם"]):
-            weather_data = await get_weather_data()
-            if weather_data:
-                weather_info = f"\n\nמזג אוויר עדכני: {weather_data['temp']}°C, {weather_data['description']}, רוח {weather_data['windspeed']} קמ\"ש"
-        
-        enhanced_message = f"""דוד שאל: "{user_message}"
+        enhanced_message = f"""דוד אמר: "{user_message}"
 
-מידע עדכני שיש לך:
-- שעה מדויקת: {current_time}
+מידע עדכני:
+- שעה: {current_time}
 - תאריך: {current_date}
-- מיקום: תל אביב{weather_info}
+- יש לי גישה ליומן Google שלו
 
-תני תשובה ישירה, ידידותית וטבעית. אל תאמרי "אני לא יכולה" או תפני אותו למקומות אחרים."""
+תני תשובה מועילה וטבעית."""
         
         chat_session = chat_sessions[chat_id]
         response = await asyncio.get_event_loop().run_in_executor(
@@ -194,88 +331,49 @@ async def respond(update, context):
         )
         
         reply = response.text
-        
-        if len(reply) > 4096:
-            for i in range(0, len(reply), 4096):
-                chunk = reply[i:i+4096]
-                await context.bot.send_message(chat_id=chat_id, text=chunk)
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=reply)
+        await context.bot.send_message(chat_id=chat_id, text=reply)
 
     except Exception as e:
         logging.error(f"שגיאה בתגובה: {e}")
-        error_reply = "יש לי תקלה קטנה... תנסה שוב?"
-        await context.bot.send_message(chat_id=chat_id, text=error_reply)
+        await context.bot.send_message(chat_id=chat_id, text="יש לי תקלה קטנה... תנסה שוב?")
+
+async def calendar_command(update, context):
+    """פקודה לראות יומן"""
+    events = await get_upcoming_events()
+    await context.bot.send_message(chat_id=update.message.chat_id, text=events)
 
 async def time_command(update, context):
-    current_time, current_date = get_current_time_israel()
-    business_status = check_business_hours()
-    
-    reply = f"🕐 השעה: {current_time}\n📅 {current_date}\n💼 {business_status}"
+    current_time, current_date, _ = get_current_time_israel()
+    reply = f"🕐 השעה: {current_time}\n📅 {current_date}"
     await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
 
 async def weather_command(update, context):
     weather_data = await get_weather_data()
     if weather_data:
-        reply = f"🌤️ מזג האוויר בתל אביב:\n"
-        reply += f"🌡️ {weather_data['temp']}°C\n"
-        reply += f"💨 רוח: {weather_data['windspeed']} קמ\"ש\n"
-        reply += f"☁️ {weather_data['description']}"
+        reply = f"🌤️ מזג האוויר בתל אביב:\n🌡️ {weather_data['temp']}°C\n💨 רוח: {weather_data['windspeed']} קמ\"ש\n☁️ {weather_data['description']}"
     else:
-        reply = "😅 לא ניתן לקבל נתוני מזג אוויר כרגע"
-    
+        reply = "לא ניתן לקבל נתוני מזג אוויר כרגע"
     await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
-
-async def clear_history(update, context):
-    chat_id = update.message.chat_id
-    chat_sessions[chat_id] = create_chat_session()
-    
-    clear_messages = [
-        "נוקה! התחלנו שיחה חדשה 🧹",
-        "מחקתי הכל! מה נעשה עכשיו? ✨",
-        "היסטוריה נמחקה! איך אפשר לעזור? 🎉"
-    ]
-    reply = random.choice(clear_messages)
-    await context.bot.send_message(chat_id=chat_id, text=reply)
-
-async def info_command(update, context):
-    current_time, current_date = get_current_time_israel()
-    
-    info_text = f"""🤖 מאיה - המזכירה החכמה שלך
-
-🕐 זמן עדכני: {current_time}
-📅 תאריך: {current_date}
-
-💼 מה אני יכולה לעזור:
-• 🕐 לתת שעה ותאריך מדויקים
-• 🌤️ לבדוק מזג אוויר
-• 📅 לעזור עם תזמון ותכנון
-• 📝 לכתוב ולערוך טקסטים
-• 🌍 לתרגם בין שפות
-• 🧠 לענות על שאלות מורכבות
-
-🎯 פקודות מהירות:
-/time - שעה נוכחית
-/weather - מזג אוויר
-/clear - ניקוי היסטוריה
-/info - המידע הזה
-
-פשוט דבר איתי כמו עם מזכירה אמיתית! 😊"""
-    
-    await context.bot.send_message(chat_id=update.message.chat_id, text=info_text)
 
 def main():
     logging.basicConfig(level=logging.INFO)
     
+    # אימות Google Calendar
+    print("מתחבר ל-Google Calendar...")
+    auth_result = authenticate_google_calendar()
+    if auth_result:
+        print("✅ מחובר ל-Google Calendar!")
+    else:
+        print("❌ בעיה בחיבור ל-Google Calendar")
+    
     app = Application.builder().token(TELEGRAM_TOKEN).build()
     
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respond))
+    app.add_handler(CommandHandler("calendar", calendar_command))
     app.add_handler(CommandHandler("time", time_command))
     app.add_handler(CommandHandler("weather", weather_command))
-    app.add_handler(CommandHandler("clear", clear_history))
-    app.add_handler(CommandHandler("info", info_command))
     
-    print("🤖 מאיה המזכירה החכמה מוכנה!")
+    print("🤖 מאיה עם Google Calendar מוכנה!")
     app.run_polling()
 
 if __name__ == "__main__":
