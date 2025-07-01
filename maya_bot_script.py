@@ -13,9 +13,9 @@ import google.generativeai as genai
 
 # ==== הגדרות מסביבת העבודה ====
 
-TELEGRAM_TOKEN = os.getenv(‘TELEGRAM_TOKEN’, “7876544988:AAGbjUJ6PNh1JH_HYzZ6MQpMoZNAWMYrssE”)
-GEMINI_API_KEY = os.getenv(‘GEMINI_API_KEY’, “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”)
-WEATHER_API_KEY = os.getenv(‘WEATHER_API_KEY’, “”)  # לא צריך למזג אוויר Open-Meteo
+TELEGRAM_TOKEN = “7876544988:AAGbjUJ6PNh1JH_HYzZ6MQpMoZNAWMYrssE”
+GEMINI_API_KEY = “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”
+WEATHER_API_KEY = “" 
 
 
 # הגדרת Gemini
