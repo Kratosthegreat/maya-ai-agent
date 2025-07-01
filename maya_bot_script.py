@@ -17,6 +17,7 @@ TELEGRAM_TOKEN = os.getenv(‘TELEGRAM_TOKEN’, “7876544988:AAGbjUJ6PNh1JH_HY
 GEMINI_API_KEY = os.getenv(‘GEMINI_API_KEY’, “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”)
 WEATHER_API_KEY = os.getenv(‘WEATHER_API_KEY’, “”)  # לא צריך למזג אוויר Open-Meteo
 
+
 # הגדרת Gemini
 
 genai.configure(api_key=GEMINI_API_KEY)
