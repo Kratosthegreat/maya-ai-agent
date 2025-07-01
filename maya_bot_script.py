@@ -12,7 +12,7 @@ from telegram.ext import Application, ContextTypes, MessageHandler, filters, Com
 import google.generativeai as genai
 
 # הגדרות
-TELEGRAM_TOKEN = "7876544988:AAGbjUJ6PNh1JH_HYzZ6MQpMoZNAWMYrssE"
+TELEGRAM_TOKEN = "7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4"
 GEMINI_API_KEY = "AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM"
 
 # הגדרת Gemini
