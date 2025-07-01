@@ -5,313 +5,358 @@ import httpx
 import json
 import time
 import os
+from datetime import datetime, timedelta
+import pytz
 from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
 import google.generativeai as genai
 
 # ==== הגדרות מסביבת העבודה ====
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', "7876544988:AAGbjUJ6PNh1JH_HYzZ6MQpMoZNAWMYrssE")
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', "AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM")
-HEYGEN_API_TOKEN = os.getenv('HEYGEN_API_TOKEN', "NmMwYzU2NDQ3ZTYzNGRlYmFlOWM5YjI1ZWEzNWQyNzEtMTczNzEyMjUwNA==")
-HEYGEN_VOICE_ID = os.getenv('HEYGEN_VOICE_ID', "7800324ec0a543a5bb85b115145b02ab")
-HEYGEN_AVATAR_ID = os.getenv('HEYGEN_AVATAR_ID', "1c41b448bcea427e91d12650288c008c")
+
+TELEGRAM_TOKEN = os.getenv(‘TELEGRAM_TOKEN’, “7876544988:AAGbjUJ6PNh1JH_HYzZ6MQpMoZNAWMYrssE”)
+GEMINI_API_KEY = os.getenv(‘GEMINI_API_KEY’, “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”)
+WEATHER_API_KEY = os.getenv(‘WEATHER_API_KEY’, “”)  # לא צריך למזג אוויר Open-Meteo
 
 # הגדרת Gemini
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
 
-# ==== מאיה - אישיות הבוט ====
-SYSTEM_PROMPT = (
-    "את מאיה, המזכירה הווירטואלית של דוד. את מדברת בעברית טבעית, חמה, בגובה העיניים, "
-    "כמו בשיחה פנים אל פנים. הימנעי משפה טכנית. הוסיפי הומור עדין ורגישות. "
-    "את חכמה מאוד ויכולה לעזור עם כל מיני משימות - כתיבה, תכנון, ייעוץ, תרגום ועוד. "
-    "חשוב: התשובות שלך צריכות להיות קצרות (עד 350 תווים) כי הן הופכות לוידאו. "
-    "דברי בצורה טבעית ומשתנה - אל תחזרי על אותם ביטויים. השתמשי במגוון רחב של ביטויים וסגנונות."
-)
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(‘gemini-1.5-flash’)
 
 # היסטוריית שיחה
+
 chat_sessions = {}
 
-# תגובות מהירות מגוונות
+# ==== פונקציות עזר אמיתיות ====
+
+def get_current_time_israel():
+“”“מחזיר את השעה הנוכחית בישראל”””
+israel_tz = pytz.timezone(‘Asia/Jerusalem’)
+now = datetime.now(israel_tz)
+return now.strftime(”%H:%M:%S”), now.strftime(”%A, %d %B %Y”)
+
+async def get_weather_data(city=“Tel Aviv”):
+“”“מביא נתוני מזג אוויר אמיתיים מ-Open-Meteo (חינמי לגמרי)”””
+try:
+# קואורדינטות תל אביב
+lat, lon = 32.0853, 34.7818
+
+```
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=Asia/Jerusalem"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            current = data['current_weather']
+            
+            temp = current['temperature']
+            windspeed = current['windspeed']
+            
+            # המרת קוד מזג אוויר לתיאור
+            weather_codes = {
+                0: "שמיים בהירים",
+                1: "בהיר ברובו", 
+                2: "חלקית מעונן",
+                3: "מעונן",
+                45: "ערפל",
+                48: "ערפל קפוא",
+                51: "טפטוף קל",
+                53: "טפטוף בינוני", 
+                55: "טפטוף חזק",
+                61: "גשם קל",
+                63: "גשם בינוני",
+                65: "גשם חזק",
+                80: "ממטרים קלים",
+                81: "ממטרים חזקים",
+                95: "סופת רעמים"
+            }
+            
+            description = weather_codes.get(current['weathercode'], "מזג אוויר משתנה")
+            
+            return {
+                'temp': temp,
+                'windspeed': windspeed,
+                'description': description,
+                'city': "תל אביב"
+            }
+except Exception as e:
+    logging.error(f"שגיאה בקבלת מזג אוויר: {e}")
+return None
+```
+
+async def get_news_headlines():
+“”“מביא כותרות חדשות”””
+try:
+# משתמש ב-RSS או News API
+url = “https://rss.cnn.com/rss/edition.rss”  # דוגמה
+async with httpx.AsyncClient() as client:
+response = await client.get(url)
+if response.status_code == 200:
+# פרסור פשוט של RSS
+return “עדכונים אחרונים זמינים”
+except:
+pass
+return “לא ניתן לקבל חדשות כרגע”
+
+def check_business_hours():
+“”“בדיקה אם זה שעות עבודה”””
+israel_tz = pytz.timezone(‘Asia/Jerusalem’)
+now = datetime.now(israel_tz)
+hour = now.hour
+weekday = now.weekday()  # 0 = Monday, 6 = Sunday
+
+```
+if weekday < 5 and 8 <= hour <= 18:  # ראשון-חמישי 8-18
+    return "שעות עבודה"
+elif weekday == 4 and hour >= 15:  # יום ו' אחרי 15:00
+    return "כמעט סוף השבוע"
+elif weekday >= 5:  # שבת
+    return "סוף שבוע"
+else:
+    return "מחוץ לשעות עבודה"
+```
+
+# ==== מאיה - אישיות מזכירה אמיתית ====
+
+def create_enhanced_system_prompt():
+current_time, current_date = get_current_time_israel()
+business_status = check_business_hours()
+
+```
+return f"""
+```
+
+את מאיה, המזכירה האישית והמקצועית של דוד. את לא רק צ’אטבוט - את מזכירה אמיתית עם גישה למידע עדכני.
+
+המידע שיש לך:
+
+- השעה הנוכחית: {current_time}
+- התאריך: {current_date}
+- סטטוס עבודה: {business_status}
+- מיקום: תל אביב, ישראל
+
+היכולות שלך כמזכירה:
+✅ לספק שעה ותאריך מדויקים
+✅ לבדוק מזג אוויר עדכני
+✅ לעזור עם תזמון פגישות
+✅ לתת עדכונים על מצב עבודה
+✅ לעזור עם משימות יומיות
+✅ לזכור דברים חשובים
+
+האישיות שלך:
+
+- מקצועית אבל חמה
+- יעילה ומדויקת
+- יזומה בהצעת עזרה
+- זוכרת פרטים חשובים
+- מדברת בעברית טבעית
+
+כשדוד שואל על שעה, מזג אוויר, או מידע עדכני - תני לו תשובה מדויקת ומועילה.
+אל תפני אותו לבדוק במקומות אחרים - את המזכירה שלו!
+“””
+
+def create_chat_session():
+“”“יוצר סשן חדש של Gemini עם הקשר מזכירה”””
+chat = model.start_chat(history=[])
+system_prompt = create_enhanced_system_prompt()
+chat.send_message(system_prompt)
+return chat
+
+# תגובות מהירות של מזכירה אמיתית
+
 quick_replies = [
-    "אהלן דוד! מה המצב היום? 😊",
-    "היי יקר! איך אתה מרגיש?",
-    "מה נשמע? אני כאן בשבילך!",
-    "שלום! איך עובר עליך היום?",
-    "היי חביבי! במה אעזור?",
-    "אני פה! מה בתוכנית?",
-    "מה המצב? בואו נעשה דברים!",
-    "שלום שלום! איך החיים?",
-    "היי! אני כאן עם כל הכוח! 🌟",
-    "מה המצב שלך? אני מוכנה לעזור! 💪",
-    "אהה, שלום לך! מה נעשה היום?",
-    "ברוכים הבאים! איך אפשר לעזור?"
+“בוקר טוב דוד! איך אפשר לעזור היום? 😊”,
+“היי! מה בתוכנית היום?”,
+“שלום דוד! יש לי עדכונים בשבילך או שאתה צריך משהו?”,
+“אהלן! איך אני יכולה לעזור לך להיות יותר יעיל היום?”,
+“היי! רוצה שאבדוק לך משהו? מזג אוויר? פגישות?”,
+“בוקר טוב! מה החשוב ביותר שעליי לדעת היום?”
 ]
 
 def is_quick_message(msg: str) -> bool:
-    return msg.lower().strip() in ["היי", "היי מאיה", "מאיה", "מה קורה", "את פה", "נו", "שלום", "מה המצב"]
-
-def create_chat_session():
-    """יוצר סשן חדש של Gemini"""
-    chat = model.start_chat(history=[])
-    chat.send_message(SYSTEM_PROMPT)
-    return chat
-
-async def create_heygen_video(text: str) -> str:
-    """יוצר וידאו של מאיה דרך HeyGen API"""
-    
-    url = "https://api.heygen.com/v2/video/generate"
-    headers = {
-        "X-API-KEY": HEYGEN_API_TOKEN,
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "video_inputs": [
-            {
-                "character": {
-                    "type": "avatar",
-                    "avatar_id": HEYGEN_AVATAR_ID,
-                    "avatar_style": "normal"
-                },
-                "voice": {
-                    "type": "text",
-                    "input_text": text,
-                    "voice_id": HEYGEN_VOICE_ID
-                },
-                "background": {
-                    "type": "color",
-                    "value": "#FFFFFF"
-                }
-            }
-        ],
-        "dimension": {
-            "width": 1280,
-            "height": 720
-        },
-        "aspect_ratio": "16:9"
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            
-            if response.status_code != 200:
-                logging.error(f"HeyGen API שגיאה: {response.status_code} - {response.text}")
-                return None
-            
-            result = response.json()
-            video_id = result.get('data', {}).get('video_id')
-            
-            if not video_id:
-                logging.error("לא התקבל video_id מ-HeyGen")
-                return None
-            
-            video_url = await wait_for_video_completion(video_id)
-            return video_url
-            
-    except Exception as e:
-        logging.error(f"שגיאה ביצירת וידאו HeyGen: {e}")
-        return None
-
-async def wait_for_video_completion(video_id: str) -> str:
-    """ממתין לסיום עיבוד הוידאו"""
-    
-    url = f"https://api.heygen.com/v1/video_status.get?video_id={video_id}"
-    headers = {
-        "X-API-KEY": HEYGEN_API_TOKEN
-    }
-    
-    max_attempts = 60
-    attempt = 0
-    
-    async with httpx.AsyncClient(timeout=30) as client:
-        while attempt < max_attempts:
-            try:
-                response = await client.get(url, headers=headers)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    status = result.get('data', {}).get('status')
-                    
-                    if status == 'completed':
-                        video_url = result.get('data', {}).get('video_url')
-                        return video_url
-                    elif status == 'failed':
-                        logging.error("יצירת הוידאו נכשלה ב-HeyGen")
-                        return None
-                
-                await asyncio.sleep(5)
-                attempt += 1
-                
-            except Exception as e:
-                logging.error(f"שגיאה בבדיקת סטטוס וידאו: {e}")
-                await asyncio.sleep(5)
-                attempt += 1
-    
-    return None
+return msg.lower().strip() in [“היי”, “היי מאיה”, “מאיה”, “מה קורה”, “את פה”, “נו”, “שלום”, “מה המצב”, “בוקר טוב”]
 
 async def respond(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """טיפול בהודעות עם יצירת וידאו"""
-    user_message = update.message.text.strip()
-    chat_id = update.message.chat_id
+“”“טיפול בהודעות עם פונקציות מזכירה אמיתיות”””
+user_message = update.message.text.strip()
+chat_id = update.message.chat_id
 
-    # תגובות מהירות
-    if is_quick_message(user_message):
-        reply = random.choice(quick_replies)
-        
-        waiting_msg = await context.bot.send_message(
-            chat_id=chat_id, 
-            text="מאיה מכינה וידאו מיוחד... 🎬✨"
-        )
-        
-        video_url = await create_heygen_video(reply)
-        
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=waiting_msg.message_id)
-        except:
-            pass
-        
-        if video_url:
-            await context.bot.send_video(chat_id=chat_id, video=video_url)
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=reply)
-        return
+```
+# תגובות מהירות
+if is_quick_message(user_message):
+    current_time, current_date = get_current_time_israel()
+    business_status = check_business_hours()
+    
+    reply = random.choice(quick_replies)
+    reply += f"\n\n🕐 השעה: {current_time}\n📅 {current_date}\n💼 {business_status}"
+    
+    await context.bot.send_message(chat_id=chat_id, text=reply)
+    return
 
-    await context.bot.send_chat_action(chat_id=chat_id, action="upload_video")
+await context.bot.send_chat_action(chat_id=chat_id, action="typing")
 
-    if chat_id not in chat_sessions:
-        chat_sessions[chat_id] = create_chat_session()
+# בדיקה אם זו שאלה על שעה
+if any(word in user_message.lower() for word in ["שעה", "זמן", "מתי", "איזה שעה"]):
+    current_time, current_date = get_current_time_israel()
+    reply = f"🕐 השעה עכשיו: {current_time}\n📅 התאריך: {current_date}"
+    await context.bot.send_message(chat_id=chat_id, text=reply)
+    return
 
-    try:
-        waiting_msg = await context.bot.send_message(
-            chat_id=chat_id, 
-            text="מאיה חושבת ומכינה תשובה בוידאו... 🤔💭"
-        )
-        
-        # הוספת וריאציה בהוראות
-        variation_prompts = [
-            "תני תשובה שונה מהרגיל. ",
-            "תשתמשי בגישה יצירתית. ",
-            "תביאי זווית מעניינת. ",
-            "תני תשובה טרייה ומפתיעה. ",
-            ""
-        ]
-        enhanced_message = random.choice(variation_prompts) + user_message
-        
-        chat_session = chat_sessions[chat_id]
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: chat_session.send_message(enhanced_message)
-        )
-        
-        reply = response.text
-        
-        # קיצור לוידאו
-        if len(reply) > 350:
-            reply = reply[:320] + "..."
-        
-        video_url = await create_heygen_video(reply)
-        
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=waiting_msg.message_id)
-        except:
-            pass
-        
-        if video_url:
-            await context.bot.send_video(chat_id=chat_id, video=video_url)
-        else:
-            await context.bot.send_message(chat_id=chat_id, text=reply)
+# בדיקה אם זו שאלה על מזג אוויר
+if any(word in user_message.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר", "גשם", "מזג"]):
+    weather_data = await get_weather_data()
+    if weather_data:
+        reply = f"🌤️ מזג האוויר בתל אביב:\n"
+        reply += f"🌡️ טמפרטורה: {weather_data['temp']}°C\n"
+        reply += f"💨 רוח: {weather_data['windspeed']} קמ\"ש\n"
+        reply += f"☁️ מצב: {weather_data['description']}"
+    else:
+        reply = "😅 מצטערת, יש לי בעיה לקבל נתוני מזג אוויר כרגע. תוכל לבדוק באפליקציית מזג האוויר?"
+    
+    await context.bot.send_message(chat_id=chat_id, text=reply)
+    return
 
-    except Exception as e:
-        logging.error(f"שגיאה בתגובה: {e}")
-        
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=waiting_msg.message_id)
-        except:
-            pass
-            
-        error_reply = random.choice([
-            "אופס, יש לי בעיה טכנית קטנה... תנסה שוב? 🙂",
-            "רגע, משהו השתבש. בואו ננסה עוד פעם? 😅",
-            "יש לי תקלה זעירה, תוכל לחזור על זה? 🤗"
-        ])
-        await context.bot.send_message(chat_id=chat_id, text=error_reply)
+# יצירת או קבלת סשן צ'אט עם הקשר מעודכן
+if chat_id not in chat_sessions:
+    chat_sessions[chat_id] = create_chat_session()
+
+try:
+    # הוספת מידע עדכני להודעה
+    current_time, current_date = get_current_time_israel()
+    enhanced_message = f"""
+```
+
+המידע העדכני:
+
+- שעה: {current_time}
+- תאריך: {current_date}
+- מיקום: תל אביב
+
+שאלת המשתמש: {user_message}
+
+תני תשובה מועילה ומדויקת כמזכירה מקצועית.
+“””
+
+```
+    chat_session = chat_sessions[chat_id]
+    response = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: chat_session.send_message(enhanced_message)
+    )
+    
+    reply = response.text
+    
+    if len(reply) > 4096:
+        for i in range(0, len(reply), 4096):
+            chunk = reply[i:i+4096]
+            await context.bot.send_message(chat_id=chat_id, text=chunk)
+    else:
+        await context.bot.send_message(chat_id=chat_id, text=reply)
+
+except Exception as e:
+    logging.error(f"שגיאה בתגובה: {e}")
+    error_reply = "😅 יש לי בעיה טכנית קטנה כרגע. תוכל לנסות שוב בעוד רגע?"
+    await context.bot.send_message(chat_id=chat_id, text=error_reply)
+```
+
+async def time_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+“”“פקודה לשעה נוכחית”””
+current_time, current_date = get_current_time_israel()
+business_status = check_business_hours()
+
+```
+reply = f"🕐 השעה: {current_time}\n📅 {current_date}\n💼 {business_status}"
+await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
+```
+
+async def weather_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+“”“פקודה למזג אוויר”””
+weather_data = await get_weather_data()
+if weather_data:
+reply = f”🌤️ מזג האוויר בתל אביב:\n”
+reply += f”🌡️ {weather_data[‘temp’]}°C\n”
+reply += f”💨 רוח: {weather_data[‘windspeed’]} קמ"ש\n”
+reply += f”☁️ {weather_data[‘description’]}”
+else:
+reply = “😅 לא ניתן לקבל נתוני מזג אוויר כרגע”
+
+```
+await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
+```
 
 async def clear_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """מחיקת היסטוריה"""
-    chat_id = update.message.chat_id
-    chat_sessions[chat_id] = create_chat_session()
-    
-    clear_messages = [
-        "אוקיי! מחקתי הכל ונתחיל מחדש! 😊",
-        "נוקה! בואו נדבר על משהו חדש! 🧹",
-        "היסטוריה נמחקה! מה נעשה עכשיו? ✨",
-        "זיכרון נקי! איזה נושא חדש נפתח? 🎉"
-    ]
-    clear_message = random.choice(clear_messages)
-    
-    video_url = await create_heygen_video(clear_message)
-    if video_url:
-        await context.bot.send_video(chat_id=chat_id, video=video_url)
-    else:
-        await context.bot.send_message(chat_id=chat_id, text=clear_message)
+“”“מחיקת היסטוריה”””
+chat_id = update.message.chat_id
+chat_sessions[chat_id] = create_chat_session()
+
+```
+clear_messages = [
+    "נוקה! התחלנו שיחה חדשה 🧹",
+    "מחקתי הכל! מה נעשה עכשיו? ✨",
+    "היסטוריה נמחקה! איך אפשר לעזור? 🎉"
+]
+reply = random.choice(clear_messages)
+await context.bot.send_message(chat_id=chat_id, text=reply)
+```
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """מידע על הבוט"""
-    info_text = """
-🎬 *מאיה הויזואלית - המזכירה שמדברת!*
+“”“מידע על מאיה המזכירה”””
+current_time, current_date = get_current_time_israel()
 
-🚀 מופעלת על ידי:
-• 🧠 Google Gemini למחשבה חכמה
-• 🎭 HeyGen לוידאו וקול מקצועי
-• 💚 Render.com לאירוח חינמי
+```
+info_text = f"""
+```
 
-💫 *מה שאני יכולה:*
-• לדבר איתך בוידאו אמיתי
-• לענות על שאלות מורכבות
-• לעזור בכתיבה ותכנון
-• לתרגם בין שפות
-• להיות חברה וייעוצית
+🤖 *מאיה - המזכירה החכמה שלך*
 
-🎯 *פקודות:*
+🕐 *זמן עדכני:* {current_time}
+📅 *תאריך:* {current_date}
+
+💼 *מה אני יכולה לעזור:*
+• 🕐 לתת שעה ותאריך מדויקים
+• 🌤️ לבדוק מזג אוויר
+• 📅 לעזור עם תזמון ותכנון
+• 📝 לכתוב ולערוך טקסטים
+• 🌍 לתרגם בין שפות
+• 🧠 לענות על שאלות מורכבות
+
+🎯 *פקודות מהירות:*
+/time - שעה נוכחית
+/weather - מזג אוויר
 /clear - ניקוי היסטוריה
 /info - המידע הזה
 
-כתוב לי כל דבר ואני אענה בוידאו! 😊🎥
-    """
-    await context.bot.send_message(
-        chat_id=update.message.chat_id, 
-        text=info_text, 
-        parse_mode='Markdown'
-    )
+פשוט דבר איתי כמו עם מזכירה אמיתית! 😊
+“””
+await context.bot.send_message(
+chat_id=update.message.chat_id,
+text=info_text,
+parse_mode=‘Markdown’
+)
 
 def main():
-    """הפעלת הבוט"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respond))
-    app.add_handler(CommandHandler("clear", clear_history))
-    app.add_handler(CommandHandler("info", info_command))
-    
-    print("🎬 מאיה הויזואלית רצה על Render!")
-    print("💚 אירוח חינמי עם כל הפיצ'רים!")
-    print("🎭 מאיה מדברת בוידאו עם HeyGen!")
-    
-    # הפעלת polling ללא webhook
-    app.run_polling(
-        poll_interval=1,
-        timeout=20,
-        bootstrap_retries=5,
-        read_timeout=20,
-        write_timeout=20,
-        connect_timeout=20,
-        pool_timeout=20
-    )
+“”“הפעלת מאיה המזכירה החכמה”””
+logging.basicConfig(
+level=logging.INFO,
+format=’%(asctime)s - %(name)s - %(levelname)s - %(message)s’
+)
 
-if __name__ == '__main__':
-    main()
+```
+app = Application.builder().token(TELEGRAM_TOKEN).build()
+
+app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respond))
+app.add_handler(CommandHandler("time", time_command))
+app.add_handler(CommandHandler("weather", weather_command))
+app.add_handler(CommandHandler("clear", clear_history))
+app.add_handler(CommandHandler("info", info_command))
+
+print("🤖 מאיה המזכירה החכמה מוכנה!")
+print("⏰ יודעת שעה ותאריך")
+print("🌤️ בודקת מזג אוויר") 
+print("💼 עוזרת עם משימות יומיות")
+print("🧠 מופעלת על ידי Gemini")
+
+app.run_polling()
+```
+
+if **name** == ‘**main**’:
+main()
