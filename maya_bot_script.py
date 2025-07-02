@@ -10,8 +10,6 @@ from telegram import Update, Bot
 from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
 from telegram.ext import JobQueue
 import google.generativeai as genai
-from aiohttp import web
-import aiohttp
 import threading
 
 # === הגדרות מאובטחות ===
@@ -239,15 +237,26 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📅 תאריך: {get_current_time_israel()[1]}"""
     await update.message.reply_text(stats_text)
 
-# === שרת בריאות (Health Check) ===
-async def health_check(request):
-    return web.Response(text="✅ מאיה פועלת בהצלחה!")
+# === שרת בריאות פשוט (Health Check) ===
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b"Maya Bot is running!")
+    
+    def log_message(self, format, *args):
+        # מונע הדפסת לוגים מיותרים
+        pass
 
 def start_health_server():
-    app = web.Application()
-    app.router.add_get('/', health_check)
     port = int(os.environ.get("PORT", 10000))
-    web.run_app(app, host="0.0.0.0", port=port)
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    print(f"✅ שרת בריאות הופעל על פורט {port}")
+    server.serve_forever()
 
 # === הפעלה ראשית ===
 def main():
@@ -272,7 +281,6 @@ def main():
     # הפעלת שרת הבריאות בthread נפרד
     health_thread = threading.Thread(target=start_health_server, daemon=True)
     health_thread.start()
-    print(f"✅ שרת בריאות הופעל על פורט {os.environ.get('PORT', 10000)}")
 
     # בניית האפליקציה
     app = Application.builder().token(TELEGRAM_TOKEN).build()
@@ -285,16 +293,14 @@ def main():
 
     # הוספת משימות מתוזמנות
     try:
-        job_queue = app.job_queue
-        
         # הודעת בוקר יומית ב-8:00
-        job_queue.run_daily(
+        app.job_queue.run_daily(
             morning_message, 
             time=time(8, 0, 0, tzinfo=pytz.timezone('Asia/Jerusalem'))
         )
         
         # תזכורת אחה"צ ב-14:00
-        job_queue.run_daily(
+        app.job_queue.run_daily(
             reminder_message, 
             time=time(14, 0, 0, tzinfo=pytz.timezone('Asia/Jerusalem'))
         )
