@@ -1,6 +1,6 @@
-python-telegram-bot[job-queue]==20.3
+python-telegram-bot[job-queue]==20.7
 google-generativeai==0.3.2
-pytz
+pytz==2023.3
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
