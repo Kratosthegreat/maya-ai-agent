@@ -10,7 +10,7 @@ from telegram.ext import Application, ContextTypes, MessageHandler, filters, Com
 import google.generativeai as genai
 
 # Settings
-TELEGRAM_TOKEN = '7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4'
+TELEGRAM_TOKEN = '7876544988:AAEc3nM2OmGv6WCvpAc_KinW2Ka0WNGCWJ8'
 GEMINI_API_KEY = 'AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM'
 
 # Setup Gemini
