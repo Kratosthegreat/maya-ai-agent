@@ -14,7 +14,7 @@ import google.generativeai as genai
 import weakref
 
 # Settings
-TELEGRAM_TOKEN = '7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4'
+TELEGRAM_TOKEN = '7876544988:AAF-VOPUSRcYF54LjLtrbPdR51-zoK0Xz6A'
 GEMINI_API_KEY = 'AIzaSyBoIvgf3WlDQj1gDfGySUOi_JxqR-8GdcM'
 
 # Setup Gemini
