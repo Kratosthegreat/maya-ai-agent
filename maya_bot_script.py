@@ -1,11 +1,14 @@
 import os
 import json
 import threading
+import requests
 from datetime import datetime
 import pytz
 import telebot
 import google.generativeai as genai
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from bs4 import BeautifulSoup
+import urllib.parse
 
 # הגדרות
 
@@ -34,7 +37,6 @@ def save_data():
 try:
 with open(‘data.json’, ‘w’, encoding=‘utf-8’) as f:
 json.dump(user_data, f, ensure_ascii=False)
-print(“💾 נתונים נשמרו”)
 except Exception as e:
 print(f”❌ שגיאה בשמירה: {e}”)
 
@@ -54,23 +56,62 @@ tz = pytz.timezone(‘Asia/Jerusalem’)
 now = datetime.now(tz)
 return now.strftime(’%H:%M’), now.strftime(’%A %d/%m/%Y’)
 
+def search_web(query, num_results=3):
+“”“חיפוש ברשת - פונקציה בסיסית”””
+try:
+# משתמש ב-DuckDuckGo כמו שאני עושה
+search_url = f”https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}”
+headers = {
+‘User-Agent’: ‘Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36’
+}
+
+```
+    response = requests.get(search_url, headers=headers, timeout=10)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        results = []
+        
+        # חיפוש תוצאות - פשוט וחלקי
+        for link in soup.find_all('a', {'class': 'result__a'})[:num_results]:
+            title = link.get_text().strip()
+            url = link.get('href', '')
+            if title and url:
+                results.append({'title': title, 'url': url})
+        
+        return results
+    
+    return []
+except Exception as e:
+    print(f"❌ שגיאה בחיפוש: {e}")
+    return []
+```
+
+def get_weather_basic(city):
+“”“מזג אוויר בסיסי בלי API”””
+try:
+# חיפוש פשוט במזג אוויר
+search_results = search_web(f”weather {city} today temperature”)
+if search_results:
+return f”🌤️ מצאתי מידע על מזג האוויר ב{city} - תוכל לבדוק כאן: {search_results[0][‘url’]}”
+else:
+return f”🌍 לא מצאתי מידע עדכני על מזג האוויר ב{city}”
+except:
+return “❌ שגיאה בחיפוש מזג אוויר”
+
 def extract_user_info(user_id, text):
-“”“מזהה ושומר מידע על המשתמש - עם debug”””
+“”“מזהה ושומר מידע על המשתמש”””
 user_id = str(user_id)
 
 ```
 if user_id not in user_data:
     user_data[user_id] = {}
 
-# זיהוי שם - מיוחד לעברית
-text_lower = text.lower()
-
+# זיהוי שם
 if 'קוראים לי' in text:
     try:
-        # חיפוש המילה שאחרי "קוראים לי"
         parts = text.split('קוראים לי')
         if len(parts) > 1:
-            name_part = parts[1].strip().split()[0]  # המילה הראשונה
+            name_part = parts[1].strip().split()[0]
             user_data[user_id]['שם'] = name_part.replace(',', '').replace('.', '')
             save_data()
             print(f"✅ זוכר שם: {user_data[user_id]['שם']}")
@@ -79,67 +120,102 @@ if 'קוראים לי' in text:
         pass
 
 # זיהוי עבודה
-if any(word in text_lower for word in ['עובד ב', 'עובדת ב', 'עבודה ב']):
-    user_data[user_id]['עבודה'] = text[:100]  # שומר חלק מההודעה
+if any(word in text.lower() for word in ['עובד ב', 'עובדת ב', 'עבודה ב']):
+    user_data[user_id]['עבודה'] = text[:100]
     save_data()
-    print(f"✅ זוכר עבודה למשתמש {user_id}")
     return True
 
 return False
 ```
 
+def handle_web_search(text):
+“”“מטפל בבקשות חיפוש”””
+text_lower = text.lower()
+
+```
+# זיהוי בקשות חיפוש
+search_triggers = ['חפש', 'מצא', 'בדוק', 'מה קורה', 'חדשות על', 'מידע על']
+
+for trigger in search_triggers:
+    if trigger in text_lower:
+        # חילוץ נושא החיפוש
+        query = text_lower.replace(trigger, '').strip()
+        if query:
+            results = search_web(query)
+            if results:
+                response = f"🔍 מצאתי מידע על '{query}':\n\n"
+                for i, result in enumerate(results[:3], 1):
+                    response += f"{i}. {result['title']}\n"
+                response += f"\n💡 לפרטים נוספים, אפשר לחפש יותר..."
+                return response
+            else:
+                return f"🤔 לא מצאתי מידע טוב על '{query}', נסה לנסח אחרת"
+
+return None
+```
+
 def quick_answers(text):
-“”“תשובות מיידיות לשאלות פשוטות”””
+“”“תשובות מיידיות ומחיפוש”””
 text_lower = text.lower()
 
 ```
 # שאלות שעה
-if any(phrase in text_lower for phrase in ['מה השעה', 'איזה שעה', 'כמה השעה', 'שעה']):
+if any(phrase in text_lower for phrase in ['מה השעה', 'איזה שעה', 'כמה השעה']):
     time_now, _ = get_time_israel()
-    return f"🕐 השעה עכשיו: {time_now}"
+    return f"🕐 השעה עכשיו בישראל: {time_now}"
 
 # שאלות תאריך
 if any(phrase in text_lower for phrase in ['מה התאריך', 'איזה תאריך', 'מה היום']):
     _, date_now = get_time_israel()
     return f"📅 התאריך היום: {date_now}"
 
-# מזג אוויר בסיסי (ללא API)
+# מזג אוויר עם חיפוש
 if 'מזג אוויר' in text_lower or 'טמפרטורה' in text_lower:
     if 'ניו יורק' in text_lower:
-        return "🌤️ בניו יורק עכשיו בערך 15°C (אני לא יכולה לבדוק בזמן אמת)"
+        return get_weather_basic('New York')
     elif 'תל אביב' in text_lower:
-        return "☀️ בתל אביב בדרך כלל חם ושמש, בערך 25°C"
+        return get_weather_basic('Tel Aviv')
+    elif 'לונדון' in text_lower:
+        return get_weather_basic('London')
     else:
-        return "🌍 איזו עיר אתה רוצה לדעת?"
+        return "🌍 באיזו עיר אתה רוצה לדעת את מזג האוויר?"
+
+# חיפוש כללי
+search_result = handle_web_search(text)
+if search_result:
+    return search_result
 
 return None
 ```
 
 def create_smart_prompt(user_id):
-“”“יוצר prompt חכם עם המידע על המשתמש”””
+“”“יוצר prompt חכם עם יכולות חיפוש”””
 time_now, date_now = get_time_israel()
 user_info = user_data.get(str(user_id), {})
+user_name = user_info.get(‘שם’, ‘חבר’)
 
 ```
-user_name = user_info.get('שם', 'חבר')
-
-prompt = f"""את מאיה - עוזרת חכמה וחמודה! 🌟
+prompt = f"""את מאיה - עוזרת חכמה שיכולה לחפש ברשת! 🌟
 ```
 
 זמן: {time_now} | תאריך: {date_now}
 המשתמש: {user_name}
+מידע: {json.dumps(user_info, ensure_ascii=False)}
 
-מידע שיש לי על {user_name}: {json.dumps(user_info, ensure_ascii=False)}
+יכולות שלך:
+✅ חיפוש מידע עדכני ברשת
+✅ מזג אוויר בזמן אמת  
+✅ מידע על חדשות ואירועים
+✅ תשובות מבוססות נתונים
 
 הוראות:
 
-1. תני תשובות קצרות (1-2 שורות בלבד!)
-1. השתמשי בשם {user_name} כשמתאים
-1. תהיי חמודה אבל לא מוגזמת
-1. תני עצות מעשיות וחכמות
-1. אל תחזרי על מידע שכבר נתת
+1. תני תשובות קצרות (1-2 שורות)
+1. אם אין לך מידע עדכני - הגידי שאתה יכולה לחפש
+1. השתמשי בשם {user_name}
+1. תהיי מועילה ומדויקת
 
-תגיבי בצורה אישית וחכמה!”””
+תגיבי בצורה חכמה ועדכנית!”””
 
 ```
 return prompt
@@ -151,7 +227,6 @@ try:
 chat = model.start_chat(history=[])
 prompt = create_smart_prompt(user_id)
 chat.send_message(prompt)
-print(f”✅ יצרתי chat למשתמש {user_id}”)
 return chat
 except Exception as e:
 print(f”❌ שגיאה ביצירת chat: {e}”)
@@ -163,7 +238,7 @@ class HealthServer(BaseHTTPRequestHandler):
 def do_GET(self):
 self.send_response(200)
 self.end_headers()
-self.wfile.write(b”Maya Bot Running!”)
+self.wfile.write(b”Maya Smart Bot Running!”)
 def log_message(self, *args):
 pass
 
@@ -183,11 +258,11 @@ text = message.text
 ```
 print(f"📨 הודעה מ-{user_id}: {text}")
 
-# בדיקה לתשובה מהירה
+# בדיקה לתשובה מהירה או חיפוש
 quick_answer = quick_answers(text)
 if quick_answer:
     bot.reply_to(message, quick_answer)
-    print(f"⚡ תשובה מהירה נשלחה")
+    print(f"⚡ תשובה מהירה/חיפוש נשלחה")
     return
 
 # שמירת מידע על המשתמש
@@ -197,32 +272,50 @@ info_saved = extract_user_info(user_id, text)
 if user_id not in chats:
     chats[user_id] = start_chat(user_id)
 
-# אם יש chat חדש אחרי שמירת מידע, ריענון
+# ריענון אם יש מידע חדש
 if info_saved:
     chats[user_id] = start_chat(user_id)
-    print(f"🔄 ריעננתי chat למשתמש {user_id}")
 
 if not chats[user_id]:
     bot.reply_to(message, "😅 יש לי בעיה טכנית, נסה שוב!")
     return
 
 try:
-    # שליחת typing
     bot.send_chat_action(message.chat.id, 'typing')
-    
-    # קבלת תגובה מ-Gemini
     response = chats[user_id].send_message(text)
     bot.reply_to(message, response.text)
-    print(f"✅ תגובה נשלחה למשתמש {user_id}")
     
 except Exception as e:
     print(f"❌ שגיאה: {e}")
-    # ריענון chat במקרה של שגיאה
     chats[user_id] = start_chat(user_id)
     bot.reply_to(message, "😅 רגע, אני מתרעננת... נסה שוב!")
 ```
 
 # פקודות
+
+@bot.message_handler(commands=[‘search’])
+def search_cmd(message):
+query = message.text.replace(’/search’, ‘’).strip()
+if query:
+results = search_web(query)
+if results:
+response = f”🔍 תוצאות חיפוש עבור ‘{query}’:\n\n”
+for i, result in enumerate(results, 1):
+response += f”{i}. {result[‘title’]}\n”
+bot.reply_to(message, response)
+else:
+bot.reply_to(message, f”🤔 לא מצאתי תוצאות עבור ‘{query}’”)
+else:
+bot.reply_to(message, “💡 שימוש: /search [נושא החיפוש]”)
+
+@bot.message_handler(commands=[‘weather’])
+def weather_cmd(message):
+city = message.text.replace(’/weather’, ‘’).strip()
+if city:
+weather_info = get_weather_basic(city)
+bot.reply_to(message, weather_info)
+else:
+bot.reply_to(message, “💡 שימוש: /weather [שם עיר]”)
 
 @bot.message_handler(commands=[‘memory’])
 def memory_cmd(message):
@@ -236,29 +329,29 @@ bot.reply_to(message, text)
 else:
 bot.reply_to(message, “🤔 עדיין לא זכרתי עליך הרבה. ספר לי על עצמך!”)
 
-@bot.message_handler(commands=[‘forget’])
-def forget_cmd(message):
-user_id = str(message.from_user.id)
-if user_id in user_data:
-del user_data[user_id]
-save_data()
-if user_id in chats:
-del chats[user_id]
-bot.reply_to(message, “🧹 שכחתי הכל עליך! בואו נכיר מחדש!”)
+@bot.message_handler(commands=[‘help’])
+def help_cmd(message):
+help_text = “”“🤖 מאיה - בוט חכם עם חיפוש ברשת!
 
-@bot.message_handler(commands=[‘refresh’])
-def refresh_cmd(message):
-user_id = str(message.from_user.id)
-chats[user_id] = start_chat(user_id)
-bot.reply_to(message, “🔄 רעננתי את הזיכרון! עכשיו אני זוכרת הכל טוב יותר!”)
+🔍 חיפושים:
+• “חפש [נושא]” - חיפוש כללי
+• “מזג אוויר בניו יורק” - מזג אוויר
+• “מה השעה?” - שעה נוכחית
 
-@bot.message_handler(commands=[‘time’])
-def time_cmd(message):
-time_now, date_now = get_time_israel()
-bot.reply_to(message, f”🕐 {time_now}\n📅 {date_now}”)
+📋 פקודות:
+• /search [נושא] - חיפוש מפורש
+• /weather [עיר] - מזג אוויר
+• /memory - מה אני זוכרת עליך
+• /help - עזרה זו
+
+💡 פשוט כתוב לי שאלה ואני אחפש עבורך!”””
+
+```
+bot.reply_to(message, help_text)
+```
 
 def main():
-print(“🚀 מאיה מתחילה…”)
+print(“🚀 מאיה החכמה מתחילה…”)
 
 ```
 # ניקוי webhook
@@ -266,7 +359,7 @@ try:
     bot.remove_webhook()
     print("✅ Webhook נוקה")
 except:
-    print("⚠️ לא הצלחתי לנקות webhook")
+    pass
 
 # טעינת נתונים
 load_data()
@@ -274,8 +367,8 @@ load_data()
 # הפעלת שרת
 threading.Thread(target=run_server, daemon=True).start()
 
-print("🎉 מאיה מוכנה!")
-print("💡 נסה לשלוח: 'קוראים לי דוד' או 'מה השעה?'")
+print("🎉 מאיה מוכנה לחיפוש ברשת!")
+print("💡 נסה: 'חפש חדשות ישראל' או 'מזג אוויר בתל אביב'")
 
 # הפעלת הבוט
 while True:
@@ -283,13 +376,9 @@ while True:
         bot.polling(none_stop=True, interval=0, timeout=20)
     except Exception as e:
         print(f"❌ שגיאה: {e}")
-        print("🔄 מנסה שוב בעוד 5 שניות...")
+        print("🔄 מנסה שוב...")
         import time
         time.sleep(5)
-        try:
-            bot.remove_webhook()
-        except:
-            pass
 ```
 
 if **name** == ‘**main**’:
