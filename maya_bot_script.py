@@ -1,4 +1,3 @@
-import logging
 import os
 import json
 import threading
@@ -8,204 +7,181 @@ import telebot
 import google.generativeai as genai
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# === הגדרות מאובטחות ===
+# הגדרות
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
-print("🚀 מתחילה להפעיל את מאיה...")
-
-# בדיקת בטיחות
-if not TELEGRAM_TOKEN:
-    print("❌ שגיאה: TELEGRAM_TOKEN לא הוגדר ב-Environment Variables")
+# בדיקות בטיחות
+if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
+    print("❌ חסרים טוקנים!")
     exit(1)
 
-if not GEMINI_API_KEY:
-    print("❌ שגיאה: GEMINI_API_KEY לא הוגדר ב-Environment Variables")
-    exit(1)
+# הגדרת Gemini
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# Setup Gemini
-try:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    print("✅ Gemini API מחובר בהצלחה")
-except Exception as e:
-    print(f"❌ שגיאה בחיבור ל-Gemini: {e}")
-    exit(1)
-
-# יצירת instance של הבוט
+# יצירת הבוט
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 
-# === זיכרון ===
-USER_MEMORY_FILE = 'maya_memory.json'
-user_memory = {}
-chat_sessions = {}
+# זיכרון
+user_data = {}
+chats = {}
 
-def load_memory():
-    global user_memory
+def save_data():
     try:
-        if os.path.exists(USER_MEMORY_FILE):
-            with open(USER_MEMORY_FILE, 'r', encoding='utf-8') as f:
-                user_memory = json.load(f)
-                print(f"✅ נטען זיכרון עבור {len(user_memory)} משתמשים")
-    except Exception as e:
-        print(f"⚠️ שגיאה בטעינת זיכרון: {e}")
-        user_memory = {}
-
-def save_memory():
-    try:
-        with open(USER_MEMORY_FILE, 'w', encoding='utf-8') as f:
-            json.dump(user_memory, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logging.error(f'Error saving memory: {e}')
-
-def get_current_time_israel():
-    israel_tz = pytz.timezone('Asia/Jerusalem')
-    now = datetime.now(israel_tz)
-    return now.strftime('%H:%M:%S'), now.strftime('%A, %d %B %Y')
-
-def create_system_prompt(user_id):
-    current_time, current_date = get_current_time_israel()
-    user_context = ""
-    
-    if str(user_id) in user_memory:
-        user_context = f"זוכר עליך: {json.dumps(user_memory[str(user_id)], ensure_ascii=False)}"
-    
-    return f'''את מאיה - בוט טלגרם חכם, חמוד ועוזר!
-
-🕐 זמן נוכחי: {current_time}
-📅 תאריך: {current_date}
-📍 מיקום: ישראל
-
-👤 מידע על המשתמש: {user_context}
-
-האישיות שלך:
-- חמודה, ידידותית ועוזרת
-- כותבת בעברית באופן טבעי
-- זוכרת פרטים חשובים על המשתמשים
-- עונה בצורה קצרה ולעניין (עד 2-3 שורות)
-- משתמשת באמוג'ים באופן מתון
-- מגיבה באופן אנושי וחם
-
-תני תשובה מועילה וחמודה!'''
-
-def create_chat_session(user_id):
-    try:
-        chat = model.start_chat(history=[])
-        system_prompt = create_system_prompt(user_id)
-        chat.send_message(system_prompt)
-        return chat
-    except Exception as e:
-        logging.error(f"שגיאה ביצירת צ'אט: {e}")
-        return None
-
-# === Handler לכל ההודעות ===
-@bot.message_handler(func=lambda message: True)
-def handle_message(message):
-    try:
-        user_id = str(message.from_user.id)
-        text = message.text.strip()
-        
-        # יצירת צ'אט אם לא קיים
-        if user_id not in chat_sessions:
-            chat_sessions[user_id] = create_chat_session(user_id)
-            if not chat_sessions[user_id]:
-                bot.send_message(message.chat.id, "😅 סליחה, יש לי בעיה טכנית קטנה. נסה שוב בעוד רגע!")
-                return
-        
-        # שליחת הודעת "כותבת..."
-        bot.send_chat_action(message.chat.id, 'typing')
-        
-        # קבלת תגובה מ-Gemini
-        try:
-            response = chat_sessions[user_id].send_message(text)
-            bot_response = response.text
-        except Exception as e:
-            logging.error(f"שגיאה ב-Gemini: {e}")
-            bot_response = "😅 סליחה, קרתה לי שגיאה קטנה. אפשר לנסות שוב?"
-            # יצירת צ'אט חדש במקרה של שגיאה
-            chat_sessions[user_id] = create_chat_session(user_id)
-        
-        # שליחת התגובה
-        bot.send_message(message.chat.id, bot_response)
-        
-    except Exception as e:
-        logging.error(f"שגיאה כללית ב-handle_message: {e}")
-        bot.send_message(message.chat.id, "😅 אופס! משהו לא עבד. בואו ננסה שוב?")
-
-# === פקודות ===
-@bot.message_handler(commands=['memory'])
-def memory_command(message):
-    user_id = str(message.from_user.id)
-    if user_id in user_memory and user_memory[user_id]:
-        memory_text = "🧠 מה שאני זוכרת עליך:\n"
-        for key, value in user_memory[user_id].items():
-            memory_text += f"• {key}: {value}\n"
-        bot.send_message(message.chat.id, memory_text)
-    else:
-        bot.send_message(message.chat.id, "🤔 עדיין לא למדתי עליך הרבה. ספר לי משהו על עצמך!")
-
-@bot.message_handler(commands=['forget'])
-def forget_command(message):
-    user_id = str(message.from_user.id)
-    if user_id in user_memory:
-        del user_memory[user_id]
-        save_memory()
-        bot.send_message(message.chat.id, "🧹 מחקתי את כל מה שזכרתי עליך. בואו נכיר מחדש!")
-    else:
-        bot.send_message(message.chat.id, "🤷‍♀️ בכל מקרה לא זכרתי עליך כלום!")
-
-@bot.message_handler(commands=['stats'])
-def stats_command(message):
-    total_users = len(user_memory)
-    active_chats = len(chat_sessions)
-    current_time, current_date = get_current_time_israel()
-    stats_text = f"""📊 סטטיסטיקות מאיה:
-👥 סך המשתמשים: {total_users}
-💬 צ'אטים פעילים: {active_chats}
-🕐 זמן: {current_time}
-📅 תאריך: {current_date}"""
-    bot.send_message(message.chat.id, stats_text)
-
-# === שרת בריאות ===
-class HealthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/plain; charset=utf-8')
-        self.end_headers()
-        self.wfile.write("✅ מאיה פועלת בהצלחה!".encode('utf-8'))
-    
-    def log_message(self, format, *args):
-        # מונע הדפסת לוגים מיותרים
+        with open('data.json', 'w', encoding='utf-8') as f:
+            json.dump(user_data, f, ensure_ascii=False)
+    except:
         pass
 
-def start_health_server():
+def load_data():
+    global user_data
+    try:
+        with open('data.json', 'r', encoding='utf-8') as f:
+            user_data = json.load(f)
+    except:
+        user_data = {}
+
+def get_time():
+    tz = pytz.timezone('Asia/Jerusalem')
+    now = datetime.now(tz)
+    return now.strftime('%H:%M'), now.strftime('%A %d/%m/%Y')
+
+def create_prompt(user_id):
+    time_now, date_now = get_time()
+    user_info = user_data.get(str(user_id), {})
+    
+    prompt = f"""את מאיה - עוזרת אישית חכמה וחמודה! 🌟
+
+זמן עכשיו: {time_now}
+תאריך: {date_now}
+מקום: ישראל
+
+מידע על המשתמש: {json.dumps(user_info, ensure_ascii=False) if user_info else 'משתמש חדש'}
+
+הוראות חשובות:
+1. תני תשובות חכמות ומועילות בעברית
+2. השתמשי במידע שיש לך על המשתמש
+3. תשובות קצרות (1-3 שורות)
+4. תני עצות אמיתיות ופתרונות מעשיים
+5. שאלי שאלות המשך אם רלוונטי
+6. זכרי פרטים חשובים שהמשתמש אומר
+
+תגיבי בצורה אישית וחכמה!"""
+    
+    return prompt
+
+def start_chat(user_id):
+    try:
+        chat = model.start_chat(history=[])
+        prompt = create_prompt(user_id)
+        chat.send_message(prompt)
+        return chat
+    except:
+        return None
+
+# שרת בריאות
+class HealthServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Maya Bot Running!")
+    def log_message(self, *args): pass
+
+def run_server():
     port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    print(f"✅ שרת בריאות הופעל על פורט {port}")
+    server = HTTPServer(("0.0.0.0", port), HealthServer)
     server.serve_forever()
 
-# === הפעלה ראשית ===
-def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+# טיפול בהודעות
+@bot.message_handler(func=lambda m: True)
+def handle_message(message):
+    user_id = str(message.from_user.id)
+    text = message.text
     
-    # טעינת זיכרון
-    load_memory()
+    # יצירת צ'אט חדש אם צריך
+    if user_id not in chats:
+        chats[user_id] = start_chat(user_id)
     
-    # הפעלת שרת הבריאות בthread נפרד
-    health_thread = threading.Thread(target=start_health_server, daemon=True)
-    health_thread.start()
+    if not chats[user_id]:
+        bot.reply_to(message, "😅 יש לי בעיה טכנית, נסה שוב!")
+        return
+    
+    # שמירת מידע חשוב
+    if user_id not in user_data:
+        user_data[user_id] = {}
+    
+    # זיהוי שם
+    if 'קוראים לי' in text or 'השם שלי' in text:
+        words = text.split()
+        for i, word in enumerate(words):
+            if word in ['לי', 'שלי'] and i + 1 < len(words):
+                user_data[user_id]['שם'] = words[i + 1]
+                save_data()
+                break
+    
+    # זיהוי עבודה
+    if any(word in text for word in ['עובד', 'עובדת', 'עבודה']):
+        user_data[user_id]['עבודה'] = text[:50]
+        save_data()
+    
+    try:
+        # שליחת typing
+        bot.send_chat_action(message.chat.id, 'typing')
+        
+        # קבלת תגובה
+        response = chats[user_id].send_message(text)
+        bot.reply_to(message, response.text)
+        
+    except Exception as e:
+        # אם יש שגיאה, ננסה צ'אט חדש
+        chats[user_id] = start_chat(user_id)
+        bot.reply_to(message, "😅 רגע, אני מתרעננת... נסה שוב!")
 
-    print('🎉 מאיה מוכנה לפעולה! שולחת אהבה ועזרה! 💚')
+# פקודות
+@bot.message_handler(commands=['memory'])
+def memory_cmd(message):
+    user_id = str(message.from_user.id)
+    info = user_data.get(user_id, {})
+    if info:
+        text = "🧠 מה שאני זוכרת עליך:\n"
+        for key, value in info.items():
+            text += f"• {key}: {value}\n"
+        bot.reply_to(message, text)
+    else:
+        bot.reply_to(message, "🤔 עדיין לא זכרתי עליך הרבה. ספר לי על עצמך!")
+
+@bot.message_handler(commands=['forget'])
+def forget_cmd(message):
+    user_id = str(message.from_user.id)
+    if user_id in user_data:
+        del user_data[user_id]
+        save_data()
+    if user_id in chats:
+        del chats[user_id]
+    bot.reply_to(message, "🧹 שכחתי הכל עליך! בואו נכיר מחדש!")
+
+@bot.message_handler(commands=['refresh'])
+def refresh_cmd(message):
+    user_id = str(message.from_user.id)
+    chats[user_id] = start_chat(user_id)
+    bot.reply_to(message, "🔄 רעננתי את הזיכרון! עכשיו אני חכמה יותר!")
+
+def main():
+    print("🚀 מאיה מתחילה...")
+    
+    # טעינת נתונים
+    load_data()
+    print(f"✅ נטען זיכרון עבור {len(user_data)} משתמשים")
+    
+    # הפעלת שרת
+    threading.Thread(target=run_server, daemon=True).start()
+    print("✅ שרת בריאות רץ")
+    
+    print("🎉 מאיה מוכנה!")
     
     # הפעלת הבוט
-    try:
-        bot.polling(none_stop=True, interval=0, timeout=20)
-    except Exception as e:
-        logging.error(f"שגיאה בpolling: {e}")
-        print("❌ הבוט נעצר בגלל שגיאה")
+    bot.polling(none_stop=True, interval=0, timeout=20)
 
 if __name__ == '__main__':
     main()
