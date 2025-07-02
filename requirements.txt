@@ -1,7 +1,3 @@
-python-telegram-bot[job-queue]==20.1
+pyTelegramBotAPI==4.27.0
 google-generativeai==0.3.2
 pytz
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-google-api-python-client
