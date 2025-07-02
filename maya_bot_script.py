@@ -15,7 +15,7 @@ import weakref
 
 # Settings
 TELEGRAM_TOKEN = '7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4'
-GEMINI_API_KEY = 'AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM'
+GEMINI_API_KEY = 'AIzaSyBoIvgf3WlDQj1gDfGySUOi_JxqR-8GdcM'
 
 # Setup Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -104,6 +104,13 @@ async def stats_command(update, context):
 # --- הרצה ---
 def main():
     logging.basicConfig(level=logging.INFO)
+
+    # מנקה webhook קיים כדי למנוע שגיאת Conflict
+    async def reset_webhook():
+        bot = Bot(token=TELEGRAM_TOKEN)
+        await bot.delete_webhook(drop_pending_updates=True)
+    asyncio.run(reset_webhook())
+
     app = Application.builder().token(TELEGRAM_TOKEN).build()
 
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respond))
