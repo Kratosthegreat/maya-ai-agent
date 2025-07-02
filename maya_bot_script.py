@@ -9,9 +9,12 @@ from telegram import Update
 from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
 import google.generativeai as genai
 
-# Settings
-TELEGRAM_TOKEN = '7876544988:AAEc3nM2OmGv6WCvpAc_KinW2Ka0WNGCWJ8'
-GEMINI_API_KEY = 'AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM'
+# Settings - מאובטח עם Environment Variables
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+
+if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
+    raise ValueError("Missing required environment variables: TELEGRAM_TOKEN or GEMINI_API_KEY")
 
 # Setup Gemini
 genai.configure(api_key=GEMINI_API_KEY)
@@ -257,6 +260,23 @@ async def info_command(update, context):
     
     await context.bot.send_message(chat_id=update.message.chat_id, text=info_text)
 
+# הוספת פונקציית Health Check לפתור את בעיית הפורט
+async def health_check():
+    from aiohttp import web
+    
+    async def health_handler(request):
+        return web.Response(text="Bot is running!", status=200)
+    
+    app = web.Application()
+    app.router.add_get('/', health_handler)
+    
+    port = int(os.getenv('PORT', 8080))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f'Health check server running on port {port}')
+
 def main():
     logging.basicConfig(level=logging.INFO)
     
@@ -269,6 +289,12 @@ def main():
     app.add_handler(CommandHandler('info', info_command))
     
     print('🤖 מאיה הפשוטה והעובדת מוכנה!')
+    
+    # הפעלת Health Check Server
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.create_task(health_check())
+    
     app.run_polling()
 
 if __name__ == '__main__':
