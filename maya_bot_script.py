@@ -9,8 +9,9 @@ from datetime import datetime, timedelta, time
 import pytz
 from telegram import Update, Bot
 from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
-from telegram.ext import JobQueue  # ודא שתמיכה זו מותקנת
+from telegram.ext import JobQueue
 import google.generativeai as genai
+import weakref
 
 # Settings
 TELEGRAM_TOKEN = '7876544988:AAFZUHIzHOqyzpJ5TIec2hJFtdiawc4JMF4'
@@ -50,20 +51,16 @@ def get_current_time_israel():
     return now.strftime('%H:%M:%S'), now.strftime('%A, %d %B %Y'), now
 
 async def get_weather_data(city='תל אביב'):
-    # ... נשאר ללא שינוי ...
     return None
 
 def update_user_memory(user_id, new_info):
-    # ... נשאר ללא שינוי ...
     save_memory(user_memory)
 
 def get_user_context(user_id):
-    # ... נשאר ללא שינוי ...
-    return context
+    return ""
 
 def create_enhanced_system_prompt(user_id):
-    # ... נשאר ללא שינוי ...
-    return f'''את מאיה...'''  # כל הקטע שאתה כבר כתבת נשמר
+    return f'''את מאיה...'''
 
 def create_chat_session(user_id):
     chat = model.start_chat(history=[])
@@ -72,18 +69,14 @@ def create_chat_session(user_id):
     return chat
 
 def extract_important_info(message):
-    # ... נשאר ללא שינוי ...
     return None
 
-personal_responses = [
-    # ... רשימת תגובות אישיות ...
-]
+personal_responses = []
 
 def is_quick_message(msg):
     return msg.lower().strip() in ['היי', 'היי מאיה', 'מאיה', 'מה קורה', 'את פה', 'נו', 'שלום', 'מה המצב', 'בוקר טוב']
 
 async def respond(update, context):
-    # ... ללא שינוי ...
     pass
 
 # --- הודעות יזומות: בוקר טוב, תזכורות וכו' ---
@@ -100,20 +93,13 @@ async def reminder_message(context: ContextTypes.DEFAULT_TYPE):
 
 # --- פקודות ---
 async def memory_command(update, context):
-    # ... נשאר ללא שינוי ...
     pass
 
 async def forget_command(update, context):
-    # ... נשאר ללא שינוי ...
     pass
 
 async def stats_command(update, context):
-    # ... נשאר ללא שינוי ...
     pass
-
-# --- פונקציות עתידיות: קול או אווטאר (עתידי) ---
-# כאן ניתן לחבר בהמשך API של Voice (כמו ElevenLabs או Google TTS)
-# וכן Stable Diffusion עבור יצירת אווטאר
 
 # --- הרצה ---
 def main():
@@ -125,13 +111,14 @@ def main():
     app.add_handler(CommandHandler('forget', forget_command))
     app.add_handler(CommandHandler('stats', stats_command))
 
-    # משימות יזומות כל יום
-    job_queue = app.job_queue
-    if job_queue is not None:
+    try:
+        job_queue = JobQueue()
+        job_queue.set_application(app)
         job_queue.run_daily(morning_message, time=time(8, 0, 0, tzinfo=pytz.timezone('Asia/Jerusalem')))
         job_queue.run_daily(reminder_message, time=time(13, 0, 0, tzinfo=pytz.timezone('Asia/Jerusalem')))
-    else:
-        logging.warning("⚠️ JobQueue לא הופעל. ודא שהתקנת עם 'python-telegram-bot[job-queue]'")
+        job_queue.start()
+    except Exception as e:
+        logging.warning(f"⚠️ JobQueue לא הופעל: {e}")
 
     print('🚀 מאיה חיה, זוכרת ויוזמת 😄')
     app.run_polling()
