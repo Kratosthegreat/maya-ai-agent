@@ -12,8 +12,8 @@ import google.generativeai as genai
 # הגדרות
 
 פ
-TELEGRAM_TOKEN = os.getenv(“TELEGRAM_TOKEN”)
-GEMINI_API_KEY = “AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM”
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+GEMINI_API_KEY = "AIzaSyBoIvgf3WlDQj1gDfGySUOi_JXqR-8GdcM"
 
 # הגדרת Gemini
 
