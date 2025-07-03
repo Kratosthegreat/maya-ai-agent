@@ -1,5 +1,5 @@
 """
-Maya Secretary Bot - Simple Version (No SQLAlchemy)
+Maya Secretary Bot - Fixed for google-generativeai 0.3.2
 Compatible with Python 3.13 - Uses JSON for data storage
 """
 
@@ -94,18 +94,17 @@ security = SecurityService()
 
 # === AI SERVICE ===
 class AIService:
-    """AI service for generating responses"""
+    """AI service for generating responses - Fixed for google-generativeai 0.3.2"""
     
     def __init__(self):
         genai.configure(api_key=config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(
-            config.GEMINI_MODEL,
-            system_instruction=self._get_system_instruction()
-        )
+        # In older versions, no system_instruction parameter
+        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
         self.chat_sessions = {}
+        self.system_instruction = self._get_system_instruction()
     
     def _get_system_instruction(self) -> str:
-        """Get system instruction for AI"""
+        """Get system instruction text"""
         return """
         את מאיה, מזכירה אישית חכמה ונעימה. תמיד דברי על עצמך בלשון נקבה.
         
@@ -121,14 +120,19 @@ class AIService:
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         """Generate AI response"""
         try:
-            if user_id not in self.chat_sessions:
-                self.chat_sessions[user_id] = self.model.start_chat(history=[])
-            
+            # Create enhanced message with system instruction included
             enhanced_message = f"""
+            {self.system_instruction}
+            
             הודעת המשתמש: {message}
             הקשר: {context}
             השעה: {datetime.now().strftime('%H:%M')}
+            
+            עני כמאיה, המזכירה החכמה בלשון נקבה.
             """
+            
+            if user_id not in self.chat_sessions:
+                self.chat_sessions[user_id] = self.model.start_chat(history=[])
             
             chat = self.chat_sessions[user_id]
             response = chat.send_message(enhanced_message)
@@ -392,11 +396,12 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "Maya Secretary Bot",
-        "version": "2.0.0-simple",
+        "version": "2.0.0-compatible",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": config.ENVIRONMENT,
         "users": len(user_data),
-        "storage": "JSON"
+        "storage": "JSON",
+        "ai_model": config.GEMINI_MODEL
     })
 
 @app.route("/webhook", methods=["POST"])
@@ -421,7 +426,8 @@ def api_stats():
             "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
             "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
             "bot_status": "active",
-            "storage_type": "JSON"
+            "storage_type": "JSON",
+            "ai_model": config.GEMINI_MODEL
         }
         return jsonify(stats)
     except Exception as e:
@@ -482,10 +488,11 @@ def set_webhook_on_startup():
             logger.error(f"❌ Webhook setup error: {e}")
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Maya Secretary Bot (Simple Version)...")
+    logger.info("🚀 Starting Maya Secretary Bot (Compatible Version)...")
     logger.info(f"🌍 Environment: {config.ENVIRONMENT}")
     logger.info(f"💾 Storage: JSON files")
     logger.info(f"🤖 AI Model: {config.GEMINI_MODEL}")
+    logger.info(f"📦 Google GenAI: Compatible with 0.3.2")
     
     # Set webhook for production
     set_webhook_on_startup()
