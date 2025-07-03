@@ -3,3 +3,9 @@ google-generativeai
 pytz
 requests
 beautifulsoup4
+langdetect
+dateparser
+googletrans==4.0.0rc1
+google-api-python-client
+google-auth
+google-auth-oauthlib
