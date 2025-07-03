@@ -1,36 +1,25 @@
 """
-Maya Secretary Bot - Main Flask Application
-Production-ready Telegram bot with advanced features
+Maya Secretary Bot - Simple Version (No SQLAlchemy)
+Compatible with Python 3.13 - Uses JSON for data storage
 """
 
 import os
 import json
 import logging
-import asyncio
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime
 from flask import Flask, request, jsonify
 import requests
-import httpx
+import pytz
 from typing import Dict, Any, Optional
-import re
 import time
-import threading
 
 # Third-party imports
 import google.generativeai as genai
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, Boolean, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-from sqlalchemy.sql import func
-from cryptography.fernet import Fernet
-
-# Local imports
 from config import config
 
 # === LOGGING SETUP ===
 logging.basicConfig(
-    level=logging.INFO if not config.DEBUG else logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -39,76 +28,51 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 
-# === DATABASE SETUP ===
-Base = declarative_base()
+# === DATA STORAGE (JSON) ===
+DATA_FILE = "maya_data.json"
+user_data = {}
+conversations = {}
+memories = {}
 
-class User(Base):
-    """User model"""
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True)
-    telegram_id = Column(String(50), unique=True, nullable=False, index=True)
-    first_name = Column(String(100))
-    last_name = Column(String(100))
-    username = Column(String(100))
-    preferred_name = Column(String(100))
-    language_code = Column(String(10), default="he")
-    timezone = Column(String(50), default="Asia/Jerusalem")
-    
-    # Statistics
-    total_messages = Column(Integer, default=0)
-    created_at = Column(DateTime, default=func.now())
-    last_activity = Column(DateTime, default=func.now())
-    
-    # Settings
-    is_active = Column(Boolean, default=True)
-    notifications_enabled = Column(Boolean, default=True)
-    preferences = Column(JSON, default=dict)
-    
-    # Relationships
-    conversations = relationship("Conversation", back_populates="user")
-    memories = relationship("UserMemory", back_populates="user")
+def load_data():
+    """Load data from JSON file"""
+    global user_data, conversations, memories
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                user_data = data.get('users', {})
+                conversations = data.get('conversations', {})
+                memories = data.get('memories', {})
+                logger.info(f"Loaded data for {len(user_data)} users")
+    except Exception as e:
+        logger.error(f"Error loading data: {e}")
+        user_data = {}
+        conversations = {}
+        memories = {}
 
-class Conversation(Base):
-    """Conversation history"""
-    __tablename__ = "conversations"
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    message = Column(Text, nullable=False)
-    response = Column(Text, nullable=False)
-    timestamp = Column(DateTime, default=func.now())
-    message_type = Column(String(50), default="text")
-    
-    # Relationships
-    user = relationship("User", back_populates="conversations")
+def save_data():
+    """Save data to JSON file"""
+    try:
+        data = {
+            'users': user_data,
+            'conversations': conversations,
+            'memories': memories,
+            'last_updated': datetime.now().isoformat()
+        }
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error saving data: {e}")
 
-class UserMemory(Base):
-    """User memory and important information"""
-    __tablename__ = "user_memory"
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content = Column(Text, nullable=False)
-    memory_type = Column(String(50), default="general")
-    importance = Column(Integer, default=5)
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
-    
-    # Relationships
-    user = relationship("User", back_populates="memories")
+# Load data on startup
+load_data()
 
-# Database setup
-engine = create_engine(config.DATABASE_URL, echo=config.DEBUG)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base.metadata.create_all(bind=engine)
-
-# === SECURITY & ENCRYPTION ===
+# === SECURITY & RATE LIMITING ===
 class SecurityService:
-    """Security service for rate limiting and encryption"""
+    """Simple security service"""
     
     def __init__(self):
-        self.fernet = Fernet(config.ENCRYPTION_KEY.encode()[:44] + b'=')
         self.rate_limits = {}
     
     def is_rate_limited(self, user_id: str) -> bool:
@@ -125,17 +89,6 @@ class SecurityService:
         
         self.rate_limits[user_id].append(now)
         return False
-    
-    def encrypt_data(self, data: str) -> str:
-        """Encrypt sensitive data"""
-        return self.fernet.encrypt(data.encode()).decode()
-    
-    def decrypt_data(self, encrypted_data: str) -> str:
-        """Decrypt sensitive data"""
-        try:
-            return self.fernet.decrypt(encrypted_data.encode()).decode()
-        except Exception:
-            return ""
 
 security = SecurityService()
 
@@ -190,76 +143,59 @@ ai_service = AIService()
 class UserService:
     """User management service"""
     
-    def get_or_create_user(self, telegram_data: Dict[str, Any]) -> User:
+    def get_or_create_user(self, telegram_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get or create user"""
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.telegram_id == str(telegram_data.get('id'))).first()
-            
-            if not user:
-                user = User(
-                    telegram_id=str(telegram_data.get('id')),
-                    first_name=telegram_data.get('first_name', ''),
-                    last_name=telegram_data.get('last_name', ''),
-                    username=telegram_data.get('username', ''),
-                    language_code=telegram_data.get('language_code', 'he')
-                )
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-                logger.info(f"Created new user: {user.telegram_id}")
-            
-            return user
-        finally:
-            db.close()
+        user_id = str(telegram_data.get('id'))
+        
+        if user_id not in user_data:
+            user_data[user_id] = {
+                'telegram_id': user_id,
+                'first_name': telegram_data.get('first_name', ''),
+                'last_name': telegram_data.get('last_name', ''),
+                'username': telegram_data.get('username', ''),
+                'language_code': telegram_data.get('language_code', 'he'),
+                'total_messages': 0,
+                'created_at': datetime.now().isoformat(),
+                'last_activity': datetime.now().isoformat(),
+                'is_active': True
+            }
+            save_data()
+            logger.info(f"Created new user: {user_id}")
+        
+        return user_data[user_id]
     
-    def update_user_activity(self, user_id: int):
+    def update_user_activity(self, user_id: str):
         """Update user activity"""
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if user:
-                user.last_activity = datetime.utcnow()
-                user.total_messages += 1
-                db.commit()
-        finally:
-            db.close()
+        if user_id in user_data:
+            user_data[user_id]['last_activity'] = datetime.now().isoformat()
+            user_data[user_id]['total_messages'] += 1
+            save_data()
     
-    def get_user_context(self, user_id: int) -> str:
+    def get_user_context(self, user_id: str) -> str:
         """Get user context for AI"""
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return ""
-            
-            memories = db.query(UserMemory).filter(
-                UserMemory.user_id == user_id
-            ).order_by(UserMemory.importance.desc()).limit(5).all()
-            
-            context = f"""
-            משתמש: {user.preferred_name or user.first_name or 'חבר/ה'}
-            הודעות: {user.total_messages}
-            זיכרונות: {', '.join([m.content for m in memories]) if memories else 'אין'}
-            """
-            
-            return context
-        finally:
-            db.close()
+        user = user_data.get(user_id, {})
+        user_memories = memories.get(user_id, [])
+        
+        context = f"""
+        משתמש: {user.get('first_name', 'חבר/ה')}
+        הודעות: {user.get('total_messages', 0)}
+        זיכרונות: {', '.join(user_memories[-5:]) if user_memories else 'אין'}
+        """
+        
+        return context
     
-    def add_memory(self, user_id: int, content: str, importance: int = 5):
+    def add_memory(self, user_id: str, content: str):
         """Add user memory"""
-        db = SessionLocal()
-        try:
-            memory = UserMemory(
-                user_id=user_id,
-                content=content,
-                importance=importance
-            )
-            db.add(memory)
-            db.commit()
-        finally:
-            db.close()
+        if user_id not in memories:
+            memories[user_id] = []
+        
+        memories[user_id].append(content)
+        
+        # Keep only last 10 memories
+        if len(memories[user_id]) > 10:
+            memories[user_id] = memories[user_id][-10:]
+        
+        save_data()
 
 user_service = UserService()
 
@@ -335,17 +271,17 @@ class TelegramBot:
             
             message = update["message"]
             chat_id = message["chat"]["id"]
-            user_data = message.get("from", {})
+            user_data_tg = message.get("from", {})
             text = message.get("text", "")
             
             # Rate limiting
-            if security.is_rate_limited(str(user_data.get("id", 0))):
+            if security.is_rate_limited(str(user_data_tg.get("id", 0))):
                 self.send_message(chat_id, "⚠️ יותר מדי בקשות. המתן דקה ונסה שוב.")
                 return
             
             # Get or create user
-            user = user_service.get_or_create_user(user_data)
-            user_service.update_user_activity(user.id)
+            user = user_service.get_or_create_user(user_data_tg)
+            user_service.update_user_activity(user['telegram_id'])
             
             # Handle commands
             if text.startswith('/'):
@@ -356,12 +292,12 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Process update error: {e}")
     
-    def _handle_command(self, chat_id: int, command: str, user: User):
+    def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         """Handle bot commands"""
         cmd = command.split()[0].lower()
         
         if cmd == "/start":
-            response = f"🌟 שלום {user.first_name}! אני מאיה, המזכירה שלך!\n\nאיך אוכל לעזור לך היום? 😊"
+            response = f"🌟 שלום {user['first_name']}! אני מאיה, המזכירה שלך!\n\nאיך אוכל לעזור לך היום? 😊"
         
         elif cmd == "/help":
             response = """
@@ -379,7 +315,7 @@ class TelegramBot:
             """
         
         elif cmd == "/memory":
-            context = user_service.get_user_context(user.id)
+            context = user_service.get_user_context(user['telegram_id'])
             response = f"🧠 הנה מה שאני זוכרת עליך:\n\n{context}"
         
         elif cmd == "/weather":
@@ -387,31 +323,28 @@ class TelegramBot:
             response = weather_service.get_weather(city)
         
         elif cmd == "/stats":
-            db = SessionLocal()
-            try:
-                total_users = db.query(User).count()
-                total_conversations = db.query(Conversation).count()
-                response = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🤖 אני פעילה!"
-            finally:
-                db.close()
+            total_users = len(user_data)
+            total_conversations = sum(len(conversations.get(uid, [])) for uid in conversations)
+            response = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🤖 אני פעילה!"
         
         elif cmd == "/forget":
-            db = SessionLocal()
-            try:
-                db.query(UserMemory).filter(UserMemory.user_id == user.id).delete()
-                db.query(Conversation).filter(Conversation.user_id == user.id).delete()
-                db.commit()
-                response = "🗑️ מחקתי הכל! נתחיל מחדש."
-            finally:
-                db.close()
+            user_id = user['telegram_id']
+            if user_id in memories:
+                del memories[user_id]
+            if user_id in conversations:
+                del conversations[user_id]
+            save_data()
+            response = "🗑️ מחקתי הכל! נתחיל מחדש."
         
         else:
             response = "❓ לא מכירה את הפקודה הזו. כתוב /help לעזרה."
         
         self.send_message(chat_id, response)
     
-    def _handle_message(self, chat_id: int, text: str, user: User):
+    def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
         """Handle regular messages"""
+        user_id = user['telegram_id']
+        
         # Weather check
         if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר"]):
             city = weather_service.extract_city(text)
@@ -425,28 +358,29 @@ class TelegramBot:
         
         # Save important info
         elif any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר"]):
-            user_service.add_memory(user.id, text, 8)
-            context = user_service.get_user_context(user.id)
-            response = ai_service.generate_response(user.telegram_id, text, context)
+            user_service.add_memory(user_id, text)
+            context = user_service.get_user_context(user_id)
+            response = ai_service.generate_response(user_id, text, context)
         
         # Regular AI response
         else:
-            context = user_service.get_user_context(user.id)
-            response = ai_service.generate_response(user.telegram_id, text, context)
+            context = user_service.get_user_context(user_id)
+            response = ai_service.generate_response(user_id, text, context)
         
         # Log conversation
-        db = SessionLocal()
-        try:
-            conversation = Conversation(
-                user_id=user.id,
-                message=text,
-                response=response
-            )
-            db.add(conversation)
-            db.commit()
-        finally:
-            db.close()
+        if user_id not in conversations:
+            conversations[user_id] = []
+        conversations[user_id].append({
+            'message': text,
+            'response': response,
+            'timestamp': datetime.now().isoformat()
+        })
         
+        # Keep only last 20 conversations
+        if len(conversations[user_id]) > 20:
+            conversations[user_id] = conversations[user_id][-20:]
+        
+        save_data()
         self.send_message(chat_id, response)
 
 bot = TelegramBot()
@@ -458,9 +392,11 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "Maya Secretary Bot",
-        "version": "2.0.0",
+        "version": "2.0.0-simple",
         "timestamp": datetime.utcnow().isoformat(),
-        "environment": config.ENVIRONMENT
+        "environment": config.ENVIRONMENT,
+        "users": len(user_data),
+        "storage": "JSON"
     })
 
 @app.route("/webhook", methods=["POST"])
@@ -478,21 +414,19 @@ def webhook():
 @app.route("/stats", methods=["GET"])
 def api_stats():
     """API stats endpoint"""
-    db = SessionLocal()
     try:
         stats = {
-            "total_users": db.query(User).count(),
-            "active_users": db.query(User).filter(User.is_active == True).count(),
-            "total_conversations": db.query(Conversation).count(),
+            "total_users": len(user_data),
+            "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
+            "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
+            "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
             "bot_status": "active",
-            "database_status": "connected"
+            "storage_type": "JSON"
         }
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Stats error: {e}")
         return jsonify({"error": "Stats unavailable"}), 500
-    finally:
-        db.close()
 
 @app.route("/set_webhook", methods=["POST"])
 def set_webhook():
@@ -548,9 +482,10 @@ def set_webhook_on_startup():
             logger.error(f"❌ Webhook setup error: {e}")
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Maya Secretary Bot...")
+    logger.info("🚀 Starting Maya Secretary Bot (Simple Version)...")
     logger.info(f"🌍 Environment: {config.ENVIRONMENT}")
-    logger.info(f"🔗 Database: {config.DATABASE_URL.split('@')[0] if '@' in config.DATABASE_URL else config.DATABASE_URL}")
+    logger.info(f"💾 Storage: JSON files")
+    logger.info(f"🤖 AI Model: {config.GEMINI_MODEL}")
     
     # Set webhook for production
     set_webhook_on_startup()
