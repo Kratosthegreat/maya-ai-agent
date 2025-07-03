@@ -1,4 +1,5 @@
-# Maya Secretary Bot - Python 3.11 Compatible Requirements
+# Maya Secretary Bot - Simple Version (No SQLAlchemy)
+# Compatible with Python 3.13
 
 # Core Framework
 flask==3.0.0
@@ -9,21 +10,9 @@ python-dotenv==1.0.0
 
 # HTTP Requests
 requests==2.31.0
-httpx==0.25.2
 
 # AI & ML
 google-generativeai==0.3.2
 
-# Database - Updated for Python 3.11 compatibility
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-
-# Security & Encryption - Compatible version
-cryptography==41.0.7
-
 # Timezone handling
 pytz==2023.3
-
-# Optional development tools
-pytest==7.4.3
-pytest-asyncio==0.21.1
