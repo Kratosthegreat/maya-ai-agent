@@ -2,11 +2,13 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route('/', methods=['GET'])
+@app.route("/", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "service": "maya-bot"})
+    return jsonify({"service": "maya-bot", "status": "ok"})
 
-@app.route('/webhook', methods=['POST'])
+@app.route("/webhook", methods=["POST"])
 def webhook():
-    # עיבוד update לטלגרם (ראה main.py)
+    # process Telegram's update here
+    update = request.get_json()
+    # ... your logic ...
     return "OK", 200
