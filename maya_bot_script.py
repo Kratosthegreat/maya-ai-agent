@@ -9,12 +9,10 @@ import google.generativeai as genai
 import wikipediaapi
 import re
 
-# --- משתני סביבה נדרשים ---
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 WEBHOOK_URL = os.environ["WEBHOOK_URL"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "")
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
@@ -62,55 +60,75 @@ def extract_user_info(user_id, text, from_user):
         save_data()
     return updated
 
-### --- קטע קריטי: שליפת שם עיר מהמשפט ---
+# שליפת שם עיר מהמשפט (בעברית/אנגלית)
 def extract_city_from_text(text):
-    # חפש "ב<עיר>" או "לעיר <עיר>"
     text = text.lower()
-    match = re.search(r'(?:בעיר|ב|לעיר)\s*([א-ת\- ]+)', text)
+    match = re.search(r'(?:בעיר|ב|לעיר)\s*([א-תa-zA-Z\- ]+)', text)
     if match:
         city = match.group(1).strip()
         city = city.replace("עיר", "").strip()
         return city
     return None
 
-### --- קטע קריטי: שעה לכל עיר בעולם ---
+# שעה לכל עיר (עברית/אנגלית)
 def get_time_for_location(city):
     city = city.strip().lower()
-    # חפש באזורי זמן של pytz
     for tz in pytz.all_timezones:
-        # דוג' Asia/Jerusalem -> ירושלים, etc.
         tz_parts = tz.split("/")
         if len(tz_parts) > 1 and city in tz_parts[1].replace("_", " ").lower():
             now = datetime.now(pytz.timezone(tz))
             return now.strftime("%H:%M"), tz
-    # נסה התאמה כללית
     for tz in pytz.all_timezones:
         if city in tz.replace("_", " ").lower():
             now = datetime.now(pytz.timezone(tz))
             return now.strftime("%H:%M"), tz
-    # לא נמצא
-    return None, None
+    # ברירת מחדל: ישראל
+    now = datetime.now(pytz.timezone("Asia/Jerusalem"))
+    return now.strftime("%H:%M"), "Asia/Jerusalem"
 
-### --- מזג אוויר לכל עיר בעולם ---
+# מזג אוויר - תמיכה בערים בעברית ואנגלית עם גיאוקודינג
 def get_weather(city):
     if not WEATHER_API_KEY:
         return "⚠️ לא מוגדר מפתח API למזג אוויר."
-    url = "https://api.openweathermap.org/data/2.5/weather"
-    params = {"q": city, "appid": WEATHER_API_KEY, "units": "metric", "lang": "he"}
+    # שלב 1: חפש קואורדינטות של העיר (עברית או אנגלית)
+    geo_url = "http://api.openweathermap.org/geo/1.0/direct"
+    geo_params = {"q": city, "limit": 1, "appid": WEATHER_API_KEY}
     try:
-        resp = requests.get(url, params=params, timeout=5)
+        geo_resp = requests.get(geo_url, params=geo_params, timeout=4)
+        geo_data = geo_resp.json()
+        if not geo_data or not isinstance(geo_data, list) or len(geo_data)==0:
+            return f"❗ לא נמצאה עיר בשם {city}. נסה לכתוב באנגלית."
+        lat = geo_data[0]["lat"]
+        lon = geo_data[0]["lon"]
+        # שלב 2: בקשת מזג אוויר לפי קואורדינטות
+        url = "https://api.openweathermap.org/data/2.5/weather"
+        params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "he"}
+        resp = requests.get(url, params=params, timeout=4)
         data = resp.json()
         if data.get("cod") == 200:
             temp = data["main"]["temp"]
             desc = data["weather"][0]["description"]
             return f"מזג האוויר ב{city}: {desc}, {temp}°C"
         else:
-            return f"מצטערת, לא מצאתי תחזית לעיר {city}."
+            return f"❗ לא נמצאה תחזית לעיר {city}."
     except Exception as e:
         print("Weather error:", e)
-        return f"שגיאת שרת במזג האוויר לעיר {city}."
+        return f"שגיאה בשליפת מזג האוויר לעיר {city}."
 
-### --- Gemini תשובה בינה מלאכותית ---
+# תשובה עובדתית מוויקיפדיה (בעברית/אנגלית)
+def get_wikipedia_summary(query, lang="he"):
+    wiki = wikipediaapi.Wikipedia(lang)
+    page = wiki.page(query)
+    if page.exists():
+        return page.summary[:700] + f"\n\n(מקור: ויקיפדיה {lang})"
+    # fallback לאנגלית
+    wiki_en = wikipediaapi.Wikipedia("en")
+    page_en = wiki_en.page(query)
+    if page_en.exists():
+        return page_en.summary[:700] + "\n\n(Source: Wikipedia en)"
+    return None
+
+# תשובת בינה מלאכותית
 def get_gemini_response(user_id, message_text, from_user):
     try:
         if user_id not in chat_sessions:
@@ -129,7 +147,7 @@ def start_command(message):
 @bot.message_handler(func=lambda m: not getattr(m.from_user, "is_bot", False))
 def handle_message(message):
     try:
-        text = message.text
+        text = message.text.strip()
         user_id = str(message.from_user.id)
         from_user = message.from_user
         extract_user_info(user_id, text, from_user)
@@ -144,9 +162,8 @@ def handle_message(message):
                 if time_now:
                     bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו ב{city}: {time_now}")
                 else:
-                    bot.reply_to(message, f"לא מצאתי את אזור הזמן של העיר {city}.")
+                    bot.reply_to(message, f"❗ לא מצאתי את אזור הזמן של העיר {city}.")
             else:
-                # ברירת מחדל ישראל
                 now = datetime.now(pytz.timezone("Asia/Jerusalem"))
                 bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו בישראל: {now.strftime('%H:%M')}")
             return
@@ -160,11 +177,18 @@ def handle_message(message):
             bot.reply_to(message, weather)
             return
 
+        # ידע כללי - קודם ויקיפדיה!
+        if text.startswith("מי זה") or text.startswith("מה זה") or text.startswith("מי זאת") or text.startswith("מהי"):
+            query = text.replace("מי זה", "").replace("מה זה", "").replace("מי זאת", "").replace("מהי", "").strip()
+            answer = get_wikipedia_summary(query)
+            if answer:
+                bot.reply_to(message, answer)
+                return
+
         # תשובת בינה מלאכותית
         bot.send_chat_action(message.chat.id, "typing")
         response_text = get_gemini_response(user_id, text, from_user)
         bot.reply_to(message, response_text)
-
     except Exception as e:
         print(f"Error in handle_message: {e}")
         bot.reply_to(message, "אירעה שגיאה. נסה שוב.")
