@@ -9,7 +9,7 @@ class Config:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///maya.db")
     SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "your-fernet-key")
-    WEBHOOK_URL = os.getenv("https://maya-bot.onrender.com/webhook", "")
+    WEBHOOK_URL = os.getenv("WEBHOOK_URL", "https://maya-bot.onrender.com/webhook")
     PORT = int(os.getenv("PORT", 10000))
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
     ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
