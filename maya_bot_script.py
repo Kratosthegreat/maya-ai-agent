@@ -17,14 +17,17 @@ WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-# הגדרת מאיה: תמיד גוף נקבה, שיחה טבעית, לא עוזרת דיגיטלית
+# System prompt: מאיה תמיד בלשון נקבה, אך עונה למשתמש לפי המגדר שבו הוא פונה
+SYSTEM_INSTRUCTION = """
+את עוזרת חכמה ונעימה בשם מאיה. כשאת מדברת על עצמך, תמיד תשתמשי בלשון נקבה בלבד.
+כאשר את פונה למשתמש, נסי להבין מהמילים שלו אם הוא פונה אליך בזכר או נקבה, ועני אליו בהתאם.
+אם לא ברור מה מגדר המשתמש, עני בלשון ניטרלית (כגון "שלום", "איך אפשר לעזור?").
+אם את מתבקשת להסביר על עצמך, תזכירי שאת עוזרת בשם מאיה, עוזרת חכמה ונעימה, ותמיד מדברת בגוף נקבה.
+"""
+
 model = genai.GenerativeModel(
     "gemini-1.5-flash",
-    system_instruction="""
-    את עוזרת וירטואלית בשם מאיה. תעני תמיד, בכל תשובה, בגוף נקבה בעברית בלבד – גם אם פונים אליך בזכר.
-    אל תעני לעולם בלשון זכר או בלשון סתמית. כל המשפטים שלך צריכים להיות מנוסחים בלשון נקבה בלבד.
-    שוחחי בחופשיות, בגובה העיניים, כאילו את אדם אמיתי. את לא עוזרת דיגיטלית, את לא מודל שפה – את מאיה, עוזרת חכמה, אדיבה ונעימה.
-    """
+    system_instruction=SYSTEM_INSTRUCTION
 )
 
 user_data = {}
@@ -90,7 +93,7 @@ def get_time_for_location(city):
     now = datetime.now(pytz.timezone("Asia/Jerusalem"))
     return now.strftime("%H:%M"), "Asia/Jerusalem"
 
-# מיפוי ערים נפוצות – כולל בואנוס איירס
+# מיפוי ערים ומדינות עיקריות
 CITY_TRANSLATE = {
     "בואנוס איירס": "Buenos Aires",
     "עפולה": "Afula",
@@ -105,12 +108,23 @@ CITY_TRANSLATE = {
     "טוקיו": "Tokyo",
     "סאו פאולו": "Sao Paulo",
     "סידני": "Sydney"
-    # הוסף כרצונך
 }
 
-def get_weather(city):
+COUNTRY_CAPITALS = {
+    "ישראל": "ירושלים",
+    "ארגנטינה": "בואנוס איירס",
+    "צרפת": "פריז",
+    "ספרד": "מדריד",
+    "איטליה": "רומא",
+    "ארה\"ב": "ניו יורק",
+    "יפן": "טוקיו",
+    "בריטניה": "לונדון",
+}
+
+def get_weather(city_or_country):
     if not WEATHER_API_KEY:
         return "⚠️ לא מוגדר מפתח API למזג אוויר."
+    city = COUNTRY_CAPITALS.get(city_or_country.strip(), city_or_country)
     city_en = CITY_TRANSLATE.get(city.strip(), city)
     geo_url = "http://api.openweathermap.org/geo/1.0/direct"
     geo_params = {"q": city_en, "limit": 1, "appid": WEATHER_API_KEY}
@@ -118,7 +132,7 @@ def get_weather(city):
         geo_resp = requests.get(geo_url, params=geo_params, timeout=4)
         geo_data = geo_resp.json()
         if not geo_data or not isinstance(geo_data, list) or len(geo_data)==0:
-            return f"❗ לא נמצאה עיר בשם {city}. נסי לכתוב באנגלית."
+            return f"❗ לא נמצאה עיר או מדינה בשם {city_or_country}. נסה לכתוב באנגלית."
         lat = geo_data[0]["lat"]
         lon = geo_data[0]["lon"]
         url = "https://api.openweathermap.org/data/2.5/weather"
@@ -130,10 +144,10 @@ def get_weather(city):
             desc = data["weather"][0]["description"]
             return f"מזג האוויר ב{city}: {desc}, {temp}°C"
         else:
-            return f"❗ לא נמצאה תחזית לעיר {city}."
+            return f"❗ לא נמצאה תחזית ל{city}."
     except Exception as e:
         print("Weather error:", e)
-        return f"שגיאה בשליפת מזג האוויר לעיר {city}."
+        return f"שגיאה בשליפת מזג האוויר ל{city}."
 
 def get_wikipedia_summary(query, lang="he"):
     wiki = wikipediaapi.Wikipedia(lang)
@@ -148,9 +162,16 @@ def get_wikipedia_summary(query, lang="he"):
 
 def get_gemini_response(user_id, message_text, from_user):
     try:
+        # חיזוק ההנחיה בכל שאלה
+        prompt = (
+            "הנחיה: את עוזרת בשם מאיה, תמיד מדברת על עצמך בלשון נקבה. כשאת עונה למשתמש, תנסי להבין אם הוא פונה בזכר או נקבה, "
+            "ותפני אליו בהתאם. אם לא ברור, השתמשי בלשון ניטרלית.\n"
+            "המשתמש כתב: "
+            + message_text
+        )
         if user_id not in chat_sessions:
             chat_sessions[user_id] = model.start_chat(history=[])
-        response = chat_sessions[user_id].send_message(message_text)
+        response = chat_sessions[user_id].send_message(prompt)
         return response.text
     except Exception as e:
         print(f"Gemini error: {e}")
@@ -159,7 +180,7 @@ def get_gemini_response(user_id, message_text, from_user):
 
 @bot.message_handler(commands=["start"])
 def start_command(message):
-    bot.reply_to(message, "🌟 היי! אני מאיה, עוזרת חכמה ונעימה. את יכולה לשאול אותי כל מה שעולה על דעתך – אני כאן בשבילך!")
+    bot.reply_to(message, "🌟 היי! אני מאיה, עוזרת חכמה ונעימה. את/ה יכול/ה לשאול אותי כל דבר - אני כאן בשבילך!")
 
 @bot.message_handler(func=lambda m: not getattr(m.from_user, "is_bot", False))
 def handle_message(message):
@@ -169,7 +190,7 @@ def handle_message(message):
         from_user = message.from_user
         extract_user_info(user_id, text, from_user)
         user_info = user_data.get(user_id, {})
-        user_name = user_info.get("שם") or from_user.first_name or "חברה"
+        user_name = user_info.get("שם") or from_user.first_name or "חבר/ה"
 
         # שעה לעיר
         if "שעה" in text:
@@ -185,7 +206,7 @@ def handle_message(message):
                 bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו בישראל: {now.strftime('%H:%M')}")
             return
 
-        # מזג אוויר לעיר
+        # מזג אוויר לעיר או מדינה
         if "טמפרטורה" in text or "מזג אוויר" in text:
             city = extract_city_from_text(text)
             if not city:
@@ -202,13 +223,13 @@ def handle_message(message):
                 bot.reply_to(message, answer)
                 return
 
-        # תשובת בינה מלאכותית בגוף נקבה בלבד
+        # תשובת בינה מלאכותית אדפטיבית מגדרית
         bot.send_chat_action(message.chat.id, "typing")
         response_text = get_gemini_response(user_id, text, from_user)
         bot.reply_to(message, response_text)
     except Exception as e:
         print(f"Error in handle_message: {e}")
-        bot.reply_to(message, "אירעה שגיאה. נסי שוב.")
+        bot.reply_to(message, "אירעה שגיאה. נסה/י שוב.")
 
 @app.route("/", methods=["POST"])
 def webhook():
