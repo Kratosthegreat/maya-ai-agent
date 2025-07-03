@@ -9,7 +9,6 @@ WEBHOOK_URL = os.environ["WEBHOOK_URL"]
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-# נתונים לדוגמה, אפשר להרחיב כרצונך
 user_data = {}
 tasks = {}
 contacts = {}
@@ -38,12 +37,16 @@ def save_data():
     except Exception as e:
         print("Error saving data:", e)
 
-# דוגמה לטיפול בהודעה - אפשר להרחיב לכל לוגיקה שתרצה
-@bot.message_handler(func=lambda m: True)
-def handle_message(message):
-    bot.reply_to(message, "היי! קיבלתי את ההודעה: " + message.text)
+def is_message_from_bot(message):
+    # בודק אם ההודעה הגיעה מבוט (כולל הבוט שלך עצמו)
+    # message.from_user.is_bot נתמך ע"י pyTelegramBotAPI
+    return hasattr(message.from_user, "is_bot") and message.from_user.is_bot
 
-# webhook מהטלגרם
+@bot.message_handler(func=lambda m: not is_message_from_bot(m))
+def handle_message(message):
+    # כאן כתוב לוגיקת הבוט שלך. עכשיו הוא מגיב רק לאנשים, לא לבוטים!
+    bot.reply_to(message, f"היי! קיבלתי את ההודעה: {message.text}")
+
 @app.route("/", methods=["POST"])
 def webhook():
     json_str = request.get_data().decode("UTF-8")
@@ -51,7 +54,6 @@ def webhook():
     bot.process_new_updates([update])
     return "", 200
 
-# health check ל-Render
 @app.route("/", methods=["GET"])
 def health():
     return "OK", 200
