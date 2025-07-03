@@ -17,12 +17,12 @@ WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 
-# System prompt: מאיה תמיד בלשון נקבה, אך עונה למשתמש לפי המגדר שבו הוא פונה
+# System prompt: מאיה בלשון נקבה, מתייחסת למשתמש לפי המגדר שבו הוא פונה, ושומרת זיכרון שיחה
 SYSTEM_INSTRUCTION = """
 את עוזרת חכמה ונעימה בשם מאיה. כשאת מדברת על עצמך, תמיד תשתמשי בלשון נקבה בלבד.
 כאשר את פונה למשתמש, נסי להבין מהמילים שלו אם הוא פונה אליך בזכר או נקבה, ועני אליו בהתאם.
 אם לא ברור מה מגדר המשתמש, עני בלשון ניטרלית (כגון "שלום", "איך אפשר לעזור?").
-אם את מתבקשת להסביר על עצמך, תזכירי שאת עוזרת בשם מאיה, עוזרת חכמה ונעימה, ותמיד מדברת בגוף נקבה.
+את זוכרת את תוכן השיחה הקודמת עם המשתמש ויכולה להתייחס אליו כמו בן אדם אמיתי.
 """
 
 model = genai.GenerativeModel(
@@ -31,7 +31,8 @@ model = genai.GenerativeModel(
 )
 
 user_data = {}
-chat_sessions = {}
+session_history = {}  # user_id: list of {"sender": "מאיה"/"משתמש", "text": ...}
+MAX_HISTORY = 10
 
 def load_data():
     global user_data
@@ -70,6 +71,28 @@ def extract_user_info(user_id, text, from_user):
         save_data()
     return updated
 
+def get_user_history(user_id):
+    user_id = str(user_id)
+    if user_id not in session_history:
+        session_history[user_id] = []
+    return session_history[user_id]
+
+def add_message_to_history(user_id, sender, text):
+    history = get_user_history(user_id)
+    history.append({"sender": sender, "text": text})
+    if len(history) > MAX_HISTORY:
+        history.pop(0)
+    session_history[user_id] = history
+
+def compose_prompt(user_id, new_message):
+    history = get_user_history(user_id)
+    prompt = "היסטוריית השיחה בינך לבין המשתמש:\n"
+    for msg in history:
+        prompt += f"{msg['sender']}: {msg['text']}\n"
+    prompt += f"משתמש: {new_message}\n"
+    prompt += "עני לפי ההקשר של השיחה, כאילו את זוכרת הכל. אל תתנצלי ואל תאמרי שאין לך זיכרון."
+    return prompt
+
 def extract_city_from_text(text):
     text = text.lower()
     match = re.search(r'(?:בעיר|ב|לעיר)\s*([א-תa-zA-Z\- ]+)', text)
@@ -93,7 +116,6 @@ def get_time_for_location(city):
     now = datetime.now(pytz.timezone("Asia/Jerusalem"))
     return now.strftime("%H:%M"), "Asia/Jerusalem"
 
-# מיפוי ערים ומדינות עיקריות
 CITY_TRANSLATE = {
     "בואנוס איירס": "Buenos Aires",
     "עפולה": "Afula",
@@ -162,20 +184,11 @@ def get_wikipedia_summary(query, lang="he"):
 
 def get_gemini_response(user_id, message_text, from_user):
     try:
-        # חיזוק ההנחיה בכל שאלה
-        prompt = (
-            "הנחיה: את עוזרת בשם מאיה, תמיד מדברת על עצמך בלשון נקבה. כשאת עונה למשתמש, תנסי להבין אם הוא פונה בזכר או נקבה, "
-            "ותפני אליו בהתאם. אם לא ברור, השתמשי בלשון ניטרלית.\n"
-            "המשתמש כתב: "
-            + message_text
-        )
-        if user_id not in chat_sessions:
-            chat_sessions[user_id] = model.start_chat(history=[])
-        response = chat_sessions[user_id].send_message(prompt)
+        prompt = compose_prompt(user_id, message_text)
+        response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         print(f"Gemini error: {e}")
-        chat_sessions[user_id] = model.start_chat(history=[])
         return "😅 סליחה, קרתה לי שגיאה קטנה. אפשר לנסות שוב?"
 
 @bot.message_handler(commands=["start"])
@@ -192,6 +205,8 @@ def handle_message(message):
         user_info = user_data.get(user_id, {})
         user_name = user_info.get("שם") or from_user.first_name or "חבר/ה"
 
+        add_message_to_history(user_id, "משתמש", text)
+
         # שעה לעיר
         if "שעה" in text:
             city = extract_city_from_text(text)
@@ -204,6 +219,7 @@ def handle_message(message):
             else:
                 now = datetime.now(pytz.timezone("Asia/Jerusalem"))
                 bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו בישראל: {now.strftime('%H:%M')}")
+            add_message_to_history(user_id, "מאיה", f"🕒 {user_name}, השעה עכשיו ב{city if city else 'ישראל'}: {time_now if city else now.strftime('%H:%M')}")
             return
 
         # מזג אוויר לעיר או מדינה
@@ -213,6 +229,7 @@ def handle_message(message):
                 city = "תל אביב"
             weather = get_weather(city)
             bot.reply_to(message, weather)
+            add_message_to_history(user_id, "מאיה", weather)
             return
 
         # ידע כללי - קודם ויקיפדיה!
@@ -221,12 +238,14 @@ def handle_message(message):
             answer = get_wikipedia_summary(query)
             if answer:
                 bot.reply_to(message, answer)
+                add_message_to_history(user_id, "מאיה", answer)
                 return
 
-        # תשובת בינה מלאכותית אדפטיבית מגדרית
+        # תשובת בינה מלאכותית עם זיכרון שיחה
         bot.send_chat_action(message.chat.id, "typing")
         response_text = get_gemini_response(user_id, text, from_user)
         bot.reply_to(message, response_text)
+        add_message_to_history(user_id, "מאיה", response_text)
     except Exception as e:
         print(f"Error in handle_message: {e}")
         bot.reply_to(message, "אירעה שגיאה. נסה/י שוב.")
