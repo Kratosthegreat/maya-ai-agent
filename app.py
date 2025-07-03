@@ -1,6 +1,5 @@
 """
-Maya Secretary Bot - Fixed for google-generativeai 0.3.2
-Compatible with Python 3.13 - Uses JSON for data storage
+Maya Secretary Bot - With Enhanced Debug Logging
 """
 
 import os
@@ -17,9 +16,9 @@ import time
 import google.generativeai as genai
 from config import config
 
-# === LOGGING SETUP ===
+# === ENHANCED LOGGING SETUP ===
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if config.DEBUG else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -44,9 +43,11 @@ def load_data():
                 user_data = data.get('users', {})
                 conversations = data.get('conversations', {})
                 memories = data.get('memories', {})
-                logger.info(f"Loaded data for {len(user_data)} users")
+                logger.info(f"✅ Loaded data for {len(user_data)} users")
+        else:
+            logger.info("📁 No existing data file, starting fresh")
     except Exception as e:
-        logger.error(f"Error loading data: {e}")
+        logger.error(f"❌ Error loading data: {e}")
         user_data = {}
         conversations = {}
         memories = {}
@@ -62,8 +63,9 @@ def save_data():
         }
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        logger.debug("💾 Data saved successfully")
     except Exception as e:
-        logger.error(f"Error saving data: {e}")
+        logger.error(f"❌ Error saving data: {e}")
 
 # Load data on startup
 load_data()
@@ -85,6 +87,7 @@ class SecurityService:
         self.rate_limits[user_id] = recent_requests
         
         if len(recent_requests) >= config.MAX_REQUESTS_PER_MINUTE:
+            logger.warning(f"🚫 Rate limit exceeded for user {user_id}")
             return True
         
         self.rate_limits[user_id].append(now)
@@ -94,14 +97,18 @@ security = SecurityService()
 
 # === AI SERVICE ===
 class AIService:
-    """AI service for generating responses - Fixed for google-generativeai 0.3.2"""
+    """AI service for generating responses"""
     
     def __init__(self):
-        genai.configure(api_key=config.GEMINI_API_KEY)
-        # In older versions, no system_instruction parameter
-        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
-        self.chat_sessions = {}
-        self.system_instruction = self._get_system_instruction()
+        try:
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+            self.chat_sessions = {}
+            self.system_instruction = self._get_system_instruction()
+            logger.info(f"✅ AI Service initialized with model: {config.GEMINI_MODEL}")
+        except Exception as e:
+            logger.error(f"❌ AI Service initialization failed: {e}")
+            raise
     
     def _get_system_instruction(self) -> str:
         """Get system instruction text"""
@@ -120,6 +127,8 @@ class AIService:
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         """Generate AI response"""
         try:
+            logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
+            
             # Create enhanced message with system instruction included
             enhanced_message = f"""
             {self.system_instruction}
@@ -133,12 +142,16 @@ class AIService:
             
             if user_id not in self.chat_sessions:
                 self.chat_sessions[user_id] = self.model.start_chat(history=[])
+                logger.debug(f"🆕 Created new chat session for user {user_id}")
             
             chat = self.chat_sessions[user_id]
             response = chat.send_message(enhanced_message)
+            
+            logger.debug(f"✅ AI response generated: {response.text[:100]}...")
             return response.text
+            
         except Exception as e:
-            logger.error(f"AI error: {e}")
+            logger.error(f"❌ AI generation error for user {user_id}: {e}")
             return "מצטערת, קרתה לי שגיאה קטנה. אפשר לנסות שוב? 😊"
 
 ai_service = AIService()
@@ -164,7 +177,7 @@ class UserService:
                 'is_active': True
             }
             save_data()
-            logger.info(f"Created new user: {user_id}")
+            logger.info(f"👤 Created new user: {user_id} ({telegram_data.get('first_name', 'Unknown')})")
         
         return user_data[user_id]
     
@@ -174,6 +187,7 @@ class UserService:
             user_data[user_id]['last_activity'] = datetime.now().isoformat()
             user_data[user_id]['total_messages'] += 1
             save_data()
+            logger.debug(f"📈 Updated activity for user {user_id}")
     
     def get_user_context(self, user_id: str) -> str:
         """Get user context for AI"""
@@ -200,6 +214,7 @@ class UserService:
             memories[user_id] = memories[user_id][-10:]
         
         save_data()
+        logger.debug(f"🧠 Added memory for user {user_id}: {content[:50]}...")
 
 user_service = UserService()
 
@@ -236,9 +251,12 @@ class WeatherService:
             temp = current["temperature"]
             windspeed = current["windspeed"]
             
-            return f"🌤️ מזג האוויר ב{city}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
+            result = f"🌤️ מזג האוויר ב{city}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
+            logger.debug(f"🌤️ Weather fetched for {city}: {temp}°C")
+            return result
+            
         except Exception as e:
-            logger.error(f"Weather error: {e}")
+            logger.error(f"❌ Weather error for {city}: {e}")
             return f"❗ לא הצלחתי לקבל מזג אוויר עבור {city}"
 
 weather_service = WeatherService()
@@ -250,6 +268,7 @@ class TelegramBot:
     def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
+        logger.info(f"🤖 Telegram bot initialized with token: {self.token[:10]}...")
     
     def send_message(self, chat_id: int, text: str, parse_mode: str = None):
         """Send message to Telegram"""
@@ -261,22 +280,36 @@ class TelegramBot:
                 "parse_mode": parse_mode
             }
             
+            logger.debug(f"📤 Sending message to chat {chat_id}: {text[:50]}...")
             response = requests.post(url, json=data, timeout=10)
-            return response.json()
+            result = response.json()
+            
+            if result.get("ok"):
+                logger.debug(f"✅ Message sent successfully to chat {chat_id}")
+            else:
+                logger.error(f"❌ Failed to send message: {result}")
+                
+            return result
+            
         except Exception as e:
-            logger.error(f"Send message error: {e}")
+            logger.error(f"❌ Send message error: {e}")
             return {"ok": False, "error": str(e)}
     
     def process_update(self, update: Dict[str, Any]):
         """Process incoming update"""
         try:
+            logger.debug(f"📥 Processing update: {json.dumps(update, indent=2)}")
+            
             if "message" not in update:
+                logger.debug("⚠️ No message in update, skipping")
                 return
             
             message = update["message"]
             chat_id = message["chat"]["id"]
             user_data_tg = message.get("from", {})
             text = message.get("text", "")
+            
+            logger.info(f"📨 Received message from {user_data_tg.get('first_name', 'Unknown')} (ID: {user_data_tg.get('id')}): {text}")
             
             # Rate limiting
             if security.is_rate_limited(str(user_data_tg.get("id", 0))):
@@ -289,16 +322,20 @@ class TelegramBot:
             
             # Handle commands
             if text.startswith('/'):
+                logger.debug(f"🎯 Processing command: {text}")
                 self._handle_command(chat_id, text, user)
             else:
+                logger.debug(f"💬 Processing regular message: {text}")
                 self._handle_message(chat_id, text, user)
                 
         except Exception as e:
-            logger.error(f"Process update error: {e}")
+            logger.error(f"❌ Process update error: {e}")
+            logger.error(f"Update data: {json.dumps(update, indent=2)}")
     
     def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         """Handle bot commands"""
         cmd = command.split()[0].lower()
+        logger.debug(f"🎯 Handling command: {cmd}")
         
         if cmd == "/start":
             response = f"🌟 שלום {user['first_name']}! אני מאיה, המזכירה שלך!\n\nאיך אוכל לעזור לך היום? 😊"
@@ -343,6 +380,7 @@ class TelegramBot:
         else:
             response = "❓ לא מכירה את הפקודה הזו. כתוב /help לעזרה."
         
+        logger.debug(f"📝 Command response: {response[:50]}...")
         self.send_message(chat_id, response)
     
     def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
@@ -351,23 +389,27 @@ class TelegramBot:
         
         # Weather check
         if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר"]):
+            logger.debug("🌤️ Weather query detected")
             city = weather_service.extract_city(text)
             response = weather_service.get_weather(city)
         
         # Time check
         elif "שעה" in text.lower():
+            logger.debug("🕐 Time query detected")
             israel_tz = pytz.timezone("Asia/Jerusalem")
             now = datetime.now(israel_tz)
             response = f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
         
         # Save important info
         elif any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר"]):
+            logger.debug("🧠 Important info detected, saving to memory")
             user_service.add_memory(user_id, text)
             context = user_service.get_user_context(user_id)
             response = ai_service.generate_response(user_id, text, context)
         
         # Regular AI response
         else:
+            logger.debug("🤖 Generating AI response")
             context = user_service.get_user_context(user_id)
             response = ai_service.generate_response(user_id, text, context)
         
@@ -385,6 +427,8 @@ class TelegramBot:
             conversations[user_id] = conversations[user_id][-20:]
         
         save_data()
+        
+        logger.debug(f"📝 Message response: {response[:50]}...")
         self.send_message(chat_id, response)
 
 bot = TelegramBot()
@@ -396,24 +440,34 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "Maya Secretary Bot",
-        "version": "2.0.0-compatible",
+        "version": "2.0.0-debug",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": config.ENVIRONMENT,
         "users": len(user_data),
         "storage": "JSON",
-        "ai_model": config.GEMINI_MODEL
+        "ai_model": config.GEMINI_MODEL,
+        "webhook_url": config.WEBHOOK_URL
     })
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Webhook endpoint for Telegram"""
     try:
+        logger.info("🔔 Webhook called")
         update = request.get_json()
-        if update:
-            bot.process_update(update)
+        
+        if not update:
+            logger.warning("⚠️ Empty webhook request")
+            return "No data", 400
+        
+        logger.debug(f"📥 Webhook data: {json.dumps(update, indent=2)}")
+        bot.process_update(update)
+        
+        logger.info("✅ Webhook processed successfully")
         return "OK", 200
+        
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
+        logger.error(f"❌ Webhook error: {e}")
         return "Error", 500
 
 @app.route("/stats", methods=["GET"])
@@ -427,11 +481,12 @@ def api_stats():
             "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
             "bot_status": "active",
             "storage_type": "JSON",
-            "ai_model": config.GEMINI_MODEL
+            "ai_model": config.GEMINI_MODEL,
+            "webhook_url": config.WEBHOOK_URL
         }
         return jsonify(stats)
     except Exception as e:
-        logger.error(f"Stats error: {e}")
+        logger.error(f"❌ Stats error: {e}")
         return jsonify({"error": "Stats unavailable"}), 500
 
 @app.route("/set_webhook", methods=["POST"])
@@ -445,28 +500,59 @@ def set_webhook():
         url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
         data = {"url": webhook_url}
         
+        logger.info(f"🔗 Setting webhook to: {webhook_url}")
         response = requests.post(url, json=data, timeout=10)
         result = response.json()
         
         if result.get("ok"):
-            logger.info(f"Webhook set successfully: {webhook_url}")
+            logger.info(f"✅ Webhook set successfully: {webhook_url}")
             return jsonify({"success": True, "webhook_url": webhook_url})
         else:
-            logger.error(f"Failed to set webhook: {result}")
+            logger.error(f"❌ Failed to set webhook: {result}")
             return jsonify({"error": "Failed to set webhook"}), 500
     
     except Exception as e:
-        logger.error(f"Set webhook error: {e}")
+        logger.error(f"❌ Set webhook error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/debug", methods=["GET"])
+def debug_info():
+    """Debug information endpoint"""
+    try:
+        debug_data = {
+            "config": {
+                "telegram_token_set": bool(config.TELEGRAM_TOKEN),
+                "gemini_api_key_set": bool(config.GEMINI_API_KEY),
+                "webhook_url": config.WEBHOOK_URL,
+                "environment": config.ENVIRONMENT,
+                "debug": config.DEBUG
+            },
+            "data": {
+                "users_count": len(user_data),
+                "conversations_count": sum(len(conversations.get(uid, [])) for uid in conversations),
+                "memories_count": sum(len(memories.get(uid, [])) for uid in memories)
+            },
+            "services": {
+                "ai_service": "initialized",
+                "weather_service": "initialized",
+                "user_service": "initialized",
+                "security_service": "initialized"
+            }
+        }
+        return jsonify(debug_data)
+    except Exception as e:
+        logger.error(f"❌ Debug info error: {e}")
         return jsonify({"error": str(e)}), 500
 
 # === ERROR HANDLERS ===
 @app.errorhandler(404)
 def not_found(error):
+    logger.warning(f"⚠️ 404 error: {request.url}")
     return jsonify({"error": "Endpoint not found"}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-    logger.error(f"Internal server error: {error}")
+    logger.error(f"❌ Internal server error: {error}")
     return jsonify({"error": "Internal server error"}), 500
 
 # === STARTUP ===
@@ -477,22 +563,28 @@ def set_webhook_on_startup():
             url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
             data = {"url": config.WEBHOOK_URL}
             
+            logger.info(f"🔗 Setting webhook on startup: {config.WEBHOOK_URL}")
             response = requests.post(url, json=data, timeout=10)
             result = response.json()
             
             if result.get("ok"):
-                logger.info(f"✅ Webhook set: {config.WEBHOOK_URL}")
+                logger.info(f"✅ Webhook set on startup: {config.WEBHOOK_URL}")
             else:
-                logger.error(f"❌ Failed to set webhook: {result}")
+                logger.error(f"❌ Failed to set webhook on startup: {result}")
         except Exception as e:
-            logger.error(f"❌ Webhook setup error: {e}")
+            logger.error(f"❌ Webhook setup error on startup: {e}")
+    else:
+        logger.info("⚠️ Webhook not set - missing WEBHOOK_URL or not in production")
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Maya Secretary Bot (Compatible Version)...")
+    logger.info("🚀 Starting Maya Secretary Bot (Debug Version)...")
     logger.info(f"🌍 Environment: {config.ENVIRONMENT}")
+    logger.info(f"🔧 Debug mode: {config.DEBUG}")
     logger.info(f"💾 Storage: JSON files")
     logger.info(f"🤖 AI Model: {config.GEMINI_MODEL}")
-    logger.info(f"📦 Google GenAI: Compatible with 0.3.2")
+    logger.info(f"🔗 Webhook URL: {config.WEBHOOK_URL}")
+    logger.info(f"🔑 Telegram Token: {config.TELEGRAM_TOKEN[:10] if config.TELEGRAM_TOKEN else 'NOT SET'}...")
+    logger.info(f"🔑 Gemini API Key: {config.GEMINI_API_KEY[:10] if config.GEMINI_API_KEY else 'NOT SET'}...")
     
     # Set webhook for production
     set_webhook_on_startup()
@@ -505,4 +597,5 @@ if __name__ == "__main__":
     )
 else:
     # For production servers (gunicorn)
+    logger.info("🚀 Maya Secretary Bot starting via WSGI...")
     set_webhook_on_startup()
