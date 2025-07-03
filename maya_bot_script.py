@@ -1,281 +1,194 @@
 import os
 import json
-import requests
+import logging
+import random
+import asyncio
+import httpx
 from datetime import datetime
 import pytz
 from flask import Flask, request
-import telebot
+from telegram import Update
+from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler
 import google.generativeai as genai
-import wikipediaapi
-import re
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-WEBHOOK_URL = os.environ["WEBHOOK_URL"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "")
+# --- SETTINGS ---
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")  # Secure token handling
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # Secure API key handling
+USER_MEMORY_FILE = "maya_memory.json"  # Persistent memory file for user data
 
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+# Configure Gemini AI
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# --- GLOBAL VARIABLES ---
+user_memory = {}
+chat_sessions = {}
+
+# Flask app for webhook
 app = Flask(__name__)
 
-# System prompt: מאיה בלשון נקבה, מתייחסת למשתמש לפי המגדר שבו הוא פונה, ושומרת זיכרון שיחה
-SYSTEM_INSTRUCTION = """
-את עוזרת חכמה ונעימה בשם מאיה. כשאת מדברת על עצמך, תמיד תשתמשי בלשון נקבה בלבד.
-כאשר את פונה למשתמש, נסי להבין מהמילים שלו אם הוא פונה אליך בזכר או נקבה, ועני אליו בהתאם.
-אם לא ברור מה מגדר המשתמש, עני בלשון ניטרלית (כגון "שלום", "איך אפשר לעזור?").
-את זוכרת את תוכן השיחה הקודמת עם המשתמש ויכולה להתייחס אליו כמו בן אדם אמיתי.
-"""
-
-model = genai.GenerativeModel(
-    "gemini-1.5-flash",
-    system_instruction=SYSTEM_INSTRUCTION
-)
-
-user_data = {}
-session_history = {}  # user_id: list of {"sender": "מאיה"/"משתמש", "text": ...}
-MAX_HISTORY = 10
-
-def load_data():
-    global user_data
+# --- MEMORY MANAGEMENT ---
+def load_memory():
+    """Loads persistent memory from a file."""
+    global user_memory
     try:
-        with open("data.json", "r", encoding="utf-8") as f:
-            data = json.load(f)
-            user_data = data.get("user_data", {})
-    except Exception:
-        user_data = {}
-
-def save_data():
-    try:
-        with open("data.json", "w", encoding="utf-8") as f:
-            json.dump({"user_data": user_data}, f, ensure_ascii=False, indent=2)
+        if os.path.exists(USER_MEMORY_FILE):
+            with open(USER_MEMORY_FILE, "r", encoding="utf-8") as f:
+                user_memory = json.load(f)
     except Exception as e:
-        print("Error saving data:", e)
+        logging.error(f"Error loading memory: {e}")
+        user_memory = {}
 
-def extract_user_info(user_id, text, from_user):
+def save_memory():
+    """Saves user memory to a file."""
+    try:
+        with open(USER_MEMORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(user_memory, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logging.error(f"Error saving memory: {e}")
+
+load_memory()  # Load memory during startup
+
+# --- TIME FUNCTIONS ---
+def get_current_time_israel():
+    """Gets the current time and date in Israel."""
+    israel_tz = pytz.timezone("Asia/Jerusalem")
+    now = datetime.now(israel_tz)
+    return now.strftime("%H:%M"), now.strftime("%A, %d %B %Y")
+
+# --- WEATHER FUNCTIONS ---
+async def get_weather_data(city="תל אביב"):
+    """Fetches weather data for a specific city using Open-Meteo."""
+    city_coords = {
+        "תל אביב": (32.0853, 34.7818),
+        "ירושלים": (31.7683, 35.2137),
+        "חיפה": (32.7940, 34.9896),
+        "באר שבע": (31.2518, 34.7915),
+        "עפולה": (32.6098, 35.2897),
+        "נתניה": (32.3215, 34.8532)
+    }
+    try:
+        matched_coords = city_coords.get(city, city_coords["תל אביב"])
+        lat, lon = matched_coords
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=Asia/Jerusalem"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url)
+            if response.status_code == 200:
+                data = response.json()
+                current = data["current_weather"]
+                temp = current["temperature"]
+                windspeed = current["windspeed"]
+                description = current.get("weathercode", "מזג אוויר משתנה")
+                return f"🌤️ מזג האוויר ב{city}:\n🌡️ טמפרטורה: {temp}°C\n💨 רוח: {windspeed} קמ\"ש\n☁️ {description}"
+    except Exception as e:
+        logging.error(f"Weather error: {e}")
+        return f"❗ לא הצלחתי לקבל נתוני מזג אוויר עבור {city}"
+
+# --- USER MEMORY MANAGEMENT ---
+def update_user_memory(user_id, new_info=None):
+    """Updates or initializes user memory."""
+    global user_memory
     user_id = str(user_id)
-    if user_id not in user_data:
-        user_data[user_id] = {}
-    updated = False
-    if "שם" not in user_data[user_id] and from_user.first_name:
-        user_data[user_id]["שם"] = from_user.first_name
-        updated = True
-    if "קוראים לי" in text:
-        try:
-            parts = text.split("קוראים לי")
-            if len(parts) > 1:
-                name = parts[1].strip().split()[0]
-                user_data[user_id]["שם"] = name.replace(",", "").replace(".", "")
-                updated = True
-        except Exception:
-            pass
-    if updated:
-        save_data()
-    return updated
+    if user_id not in user_memory:
+        user_memory[user_id] = {
+            "name": "משתמש",
+            "preferences": [],
+            "important_info": [],
+            "last_seen": datetime.now().isoformat(),
+            "conversation_count": 0
+        }
+    user_data = user_memory[user_id]
+    user_data["last_seen"] = datetime.now().isoformat()
+    user_data["conversation_count"] += 1
+    if new_info and new_info not in user_data["important_info"]:
+        user_data["important_info"].append(new_info)
+        if len(user_data["important_info"]) > 10:
+            user_data["important_info"] = user_data["important_info"][-10:]
+    save_memory()
 
-def get_user_history(user_id):
+def get_user_context(user_id):
+    """Generates context for a user based on memory."""
+    user_data = user_memory.get(str(user_id), {})
+    context = f"שם: {user_data.get('name', 'משתמש')}\n"
+    context += f"מספר שיחות: {user_data.get('conversation_count', 0)}\n"
+    if user_data.get("important_info"):
+        context += "דברים שאני זוכרת עליך:\n"
+        context += "\n".join([f"• {info}" for info in user_data["important_info"][-5:]])
+    return context
+
+# --- TELEGRAM BOT FUNCTIONS ---
+async def respond(update, context):
+    """Handles user messages."""
+    user_message = update.message.text.strip()
+    chat_id = update.message.chat_id
+    user_id = update.effective_user.id
+
+    # Update user memory
+    update_user_memory(user_id)
+
+    # Quick response for casual messages
+    if user_message.lower() in ["היי", "מה קורה", "מאיה"]:
+        current_time, current_date = get_current_time_israel()
+        reply = random.choice([
+            f"היי! שמחה לראות אותך שוב 😊",
+            f"אהלן! איך הולך?",
+            f"מה חדש אצלך?"
+        ])
+        reply += f"\n\n🕐 {current_time} | 📅 {current_date}"
+        await context.bot.send_message(chat_id=chat_id, text=reply)
+        return
+
+    # Weather queries
+    if any(word in user_message.lower() for word in ["מזג אוויר", "טמפרטורה"]):
+        city = next((c for c in ["תל אביב", "ירושלים", "חיפה"] if c in user_message), "תל אביב")
+        weather_data = await get_weather_data(city)
+        await context.bot.send_message(chat_id=chat_id, text=weather_data)
+        return
+
+    # General AI response
+    if chat_id not in chat_sessions:
+        chat_sessions[chat_id] = model.start_chat(history=[])
+    enhanced_message = f"דוד אמר: \"{user_message}\"\n{get_user_context(user_id)}"
+    chat = chat_sessions[chat_id]
+    response = await asyncio.get_event_loop().run_in_executor(None, lambda: chat.send_message(enhanced_message))
+    await context.bot.send_message(chat_id=chat_id, text=response.text)
+
+async def memory_command(update, context):
+    """Shows what the bot remembers about the user."""
+    user_id = update.effective_user.id
+    reply = f"🧠 מה שאני זוכרת עליך:\n\n{get_user_context(user_id)}"
+    await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
+
+async def forget_command(update, context):
+    """Clears the user's memory."""
+    user_id = update.effective_user.id
     user_id = str(user_id)
-    if user_id not in session_history:
-        session_history[user_id] = []
-    return session_history[user_id]
+    if user_id in user_memory:
+        del user_memory[user_id]
+        save_memory()
+        reply = "שכחתי הכל עליך! נתחיל מחדש 🧹"
+    else:
+        reply = "ממילא לא זכרתי עליך כלום 😅"
+    await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
 
-def add_message_to_history(user_id, sender, text):
-    history = get_user_history(user_id)
-    history.append({"sender": sender, "text": text})
-    if len(history) > MAX_HISTORY:
-        history.pop(0)
-    session_history[user_id] = history
+async def stats_command(update, context):
+    """Displays bot statistics."""
+    total_users = len(user_memory)
+    total_conversations = sum(data.get("conversation_count", 0) for data in user_memory.values())
+    reply = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🧠 זוכרת הכל!"
+    await context.bot.send_message(chat_id=update.message.chat_id, text=reply)
 
-def compose_prompt(user_id, new_message):
-    history = get_user_history(user_id)
-    prompt = "היסטוריית השיחה בינך לבין המשתמש:\n"
-    for msg in history:
-        prompt += f"{msg['sender']}: {msg['text']}\n"
-    prompt += f"משתמש: {new_message}\n"
-    prompt += "עני לפי ההקשר של השיחה, כאילו את זוכרת הכל. אל תתנצלי ואל תאמרי שאין לך זיכרון."
-    return prompt
-
-def extract_city_from_text(text):
-    text = text.lower()
-    match = re.search(r'(?:בעיר|ב|לעיר)\s*([א-תa-zA-Z\- ]+)', text)
-    if match:
-        city = match.group(1).strip()
-        city = city.replace("עיר", "").strip()
-        return city
-    return None
-
-def get_time_for_location(city):
-    city = city.strip().lower()
-    for tz in pytz.all_timezones:
-        tz_parts = tz.split("/")
-        if len(tz_parts) > 1 and city in tz_parts[1].replace("_", " ").lower():
-            now = datetime.now(pytz.timezone(tz))
-            return now.strftime("%H:%M"), tz
-    for tz in pytz.all_timezones:
-        if city in tz.replace("_", " ").lower():
-            now = datetime.now(pytz.timezone(tz))
-            return now.strftime("%H:%M"), tz
-    now = datetime.now(pytz.timezone("Asia/Jerusalem"))
-    return now.strftime("%H:%M"), "Asia/Jerusalem"
-
-CITY_TRANSLATE = {
-    "בואנוס איירס": "Buenos Aires",
-    "עפולה": "Afula",
-    "ניו יורק": "New York",
-    "פריז": "Paris",
-    "לונדון": "London",
-    "ירושלים": "Jerusalem",
-    "חיפה": "Haifa",
-    "ברצלונה": "Barcelona",
-    "מדריד": "Madrid",
-    "לוס אנג'לס": "Los Angeles",
-    "טוקיו": "Tokyo",
-    "סאו פאולו": "Sao Paulo",
-    "סידני": "Sydney"
-}
-
-COUNTRY_CAPITALS = {
-    "ישראל": "ירושלים",
-    "ארגנטינה": "בואנוס איירס",
-    "צרפת": "פריז",
-    "ספרד": "מדריד",
-    "איטליה": "רומא",
-    "ארה\"ב": "ניו יורק",
-    "יפן": "טוקיו",
-    "בריטניה": "לונדון",
-}
-
-def get_weather(city_or_country):
-    if not WEATHER_API_KEY:
-        return "⚠️ לא מוגדר מפתח API למזג אוויר."
-    city = COUNTRY_CAPITALS.get(city_or_country.strip(), city_or_country)
-    city_en = CITY_TRANSLATE.get(city.strip(), city)
-    geo_url = "http://api.openweathermap.org/geo/1.0/direct"
-    geo_params = {"q": city_en, "limit": 1, "appid": WEATHER_API_KEY}
-    try:
-        geo_resp = requests.get(geo_url, params=geo_params, timeout=4)
-        geo_data = geo_resp.json()
-        if not geo_data or not isinstance(geo_data, list) or len(geo_data)==0:
-            return f"❗ לא נמצאה עיר או מדינה בשם {city_or_country}. נסה לכתוב באנגלית."
-        lat = geo_data[0]["lat"]
-        lon = geo_data[0]["lon"]
-        url = "https://api.openweathermap.org/data/2.5/weather"
-        params = {"lat": lat, "lon": lon, "appid": WEATHER_API_KEY, "units": "metric", "lang": "he"}
-        resp = requests.get(url, params=params, timeout=4)
-        data = resp.json()
-        if data.get("cod") == 200:
-            temp = data["main"]["temp"]
-            desc = data["weather"][0]["description"]
-            return f"מזג האוויר ב{city}: {desc}, {temp}°C"
-        else:
-            return f"❗ לא נמצאה תחזית ל{city}."
-    except Exception as e:
-        print("Weather error:", e)
-        return f"שגיאה בשליפת מזג האוויר ל{city}."
-
-def get_wikipedia_summary(query, lang="he"):
-    wiki = wikipediaapi.Wikipedia(lang)
-    page = wiki.page(query)
-    if page.exists():
-        return page.summary[:700] + f"\n\n(מקור: ויקיפדיה {lang})"
-    wiki_en = wikipediaapi.Wikipedia("en")
-    page_en = wiki_en.page(query)
-    if page_en.exists():
-        return page_en.summary[:700] + "\n\n(Source: Wikipedia en)"
-    return None
-
-def get_gemini_response(user_id, message_text, from_user):
-    try:
-        prompt = compose_prompt(user_id, message_text)
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        print(f"Gemini error: {e}")
-        return "😅 סליחה, קרתה לי שגיאה קטנה. אפשר לנסות שוב?"
-
-@bot.message_handler(commands=["start"])
-def start_command(message):
-    bot.reply_to(message, "🌟 היי! אני מאיה, עוזרת חכמה ונעימה. את/ה יכול/ה לשאול אותי כל דבר - אני כאן בשבילך!")
-
-@bot.message_handler(func=lambda m: not getattr(m.from_user, "is_bot", False))
-def handle_message(message):
-    try:
-        text = message.text.strip()
-        user_id = str(message.from_user.id)
-        from_user = message.from_user
-        extract_user_info(user_id, text, from_user)
-        user_info = user_data.get(user_id, {})
-        user_name = user_info.get("שם") or from_user.first_name or "חבר/ה"
-
-        add_message_to_history(user_id, "משתמש", text)
-
-        # שעה לעיר
-        if "שעה" in text:
-            city = extract_city_from_text(text)
-            if city:
-                time_now, tz = get_time_for_location(city)
-                if time_now:
-                    bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו ב{city}: {time_now}")
-                else:
-                    bot.reply_to(message, f"❗ לא מצאתי את אזור הזמן של העיר {city}.")
-            else:
-                now = datetime.now(pytz.timezone("Asia/Jerusalem"))
-                bot.reply_to(message, f"🕒 {user_name}, השעה עכשיו בישראל: {now.strftime('%H:%M')}")
-            add_message_to_history(user_id, "מאיה", f"🕒 {user_name}, השעה עכשיו ב{city if city else 'ישראל'}: {time_now if city else now.strftime('%H:%M')}")
-            return
-
-        # מזג אוויר לעיר או מדינה
-        if "טמפרטורה" in text or "מזג אוויר" in text:
-            city = extract_city_from_text(text)
-            if not city:
-                city = "תל אביב"
-            weather = get_weather(city)
-            bot.reply_to(message, weather)
-            add_message_to_history(user_id, "מאיה", weather)
-            return
-
-        # ידע כללי - קודם ויקיפדיה!
-        if text.startswith("מי זה") or text.startswith("מה זה") or text.startswith("מי זאת") or text.startswith("מהי"):
-            query = text.replace("מי זה", "").replace("מה זה", "").replace("מי זאת", "").replace("מהי", "").strip()
-            answer = get_wikipedia_summary(query)
-            if answer:
-                bot.reply_to(message, answer)
-                add_message_to_history(user_id, "מאיה", answer)
-                return
-
-        # תשובת בינה מלאכותית עם זיכרון שיחה
-        bot.send_chat_action(message.chat.id, "typing")
-        response_text = get_gemini_response(user_id, text, from_user)
-        bot.reply_to(message, response_text)
-        add_message_to_history(user_id, "מאיה", response_text)
-    except Exception as e:
-        print(f"Error in handle_message: {e}")
-        bot.reply_to(message, "אירעה שגיאה. נסה/י שוב.")
-
-@app.route("/", methods=["POST"])
-def webhook():
-    try:
-        json_str = request.get_data().decode("UTF-8")
-        update = telebot.types.Update.de_json(json_str)
-        bot.process_new_updates([update])
-        return "", 200
-    except Exception as e:
-        print(f"Webhook error: {e}")
-        return "", 500
-
-@app.route("/", methods=["GET"])
-def health():
-    return "Maya Bot is running! 🤖", 200
-
+# --- MAIN FUNCTION ---
 def main():
-    print("Maya starting...")
-    load_data()
-    try:
-        bot.remove_webhook()
-        bot.set_webhook(url=WEBHOOK_URL)
-        print(f"Webhook set to: {WEBHOOK_URL}")
-    except Exception as e:
-        print(f"Webhook setup error: {e}")
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port, debug=True)
+    """Starts the bot."""
+    logging.basicConfig(level=logging.INFO)
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), respond))
+    app.add_handler(CommandHandler("memory", memory_command))
+    app.add_handler(CommandHandler("forget", forget_command))
+    app.add_handler(CommandHandler("stats", stats_command))
+    print("Maya bot is ready!")
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
