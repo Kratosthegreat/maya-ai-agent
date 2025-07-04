@@ -502,9 +502,14 @@ class TelegramBot:
         
         # Weather check
         if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר"]):
-            logger.debug("🌤️ Weather query detected")
-            city = weather_service.extract_city(text)
-            response = weather_service.get_weather(city)
+    logger.debug("🌤️ Weather query detected")
+    
+    # בדיקה אם מדובר על מקום שלא בישראל
+    if "ארגנטינה" in text or "argentina" in text.lower():
+        response = "מצטערת, אני יכולה לתת מזג אוויר רק לערים בישראל 🇮🇱\nאיזה עיר בישראל מעניינת אותך?"
+    else:
+        city = weather_service.extract_city(text)
+        response = weather_service.get_weather(city)
         
         # Time check
         elif "שעה" in text.lower():
