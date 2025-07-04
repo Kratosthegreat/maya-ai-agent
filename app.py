@@ -218,22 +218,22 @@ class AIService:
             logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
             
             # Create enhanced message with system instruction included
-enhanced_message = f"""
-{self.system_instruction}
+    enhanced_message = f"""
+    {self.system_instruction}
 
-הודעת המשתמש: {message}
-הקשר: {context}
-השעה: {datetime.now().strftime('%H:%M')}
+    הודעת המשתמש: {message}
+    הקשר: {context}
+    השעה: {datetime.now().strftime('%H:%M')}
 
-עני כמאיה, המזכירה החכמה בלשון נקבה.
-"""
+    עני כמאיה, המזכירה החכמה בלשון נקבה.
+    """
            
-            if user_id not in self.chat_sessions:
-                self.chat_sessions[user_id] = self.model.start_chat(history=[])
-                logger.debug(f"🆕 Created new chat session for user {user_id}")
+    if user_id not in self.chat_sessions:
+        self.chat_sessions[user_id] = self.model.start_chat(history=[])
+        logger.debug(f"🆕 Created new chat session for user {user_id}")
             
-            chat = self.chat_sessions[user_id]
-            response = chat.send_message(enhanced_message)
+    chat = self.chat_sessions[user_id]
+    response = chat.send_message(enhanced_message)
             
             # רישום הבקשה - חדש!
             tokens_used = 0
