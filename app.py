@@ -236,7 +236,7 @@ class AIService:
     response = chat.send_message(enhanced_message)
             
             # רישום הבקשה - חדש!
-            tokens_used = 0
+    tokens_used = 0
             if hasattr(response, 'usage_metadata') and response.usage_metadata:
                 tokens_used = getattr(response.usage_metadata, 'total_token_count', 0)
             self.tracker.record_request(tokens_used)
