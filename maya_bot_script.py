@@ -1,4 +1,3 @@
-יש את זה :
 """
 Maya Secretary Bot - With Enhanced Debug Logging
 """
@@ -22,10 +21,10 @@ logging.basicConfig(
     level=logging.DEBUG if config.DEBUG else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 # === FLASK APP SETUP ===
-app = Flask(name)
+app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 
 # === DATA STORAGE (JSON) ===
@@ -74,23 +73,23 @@ load_data()
 # === SECURITY & RATE LIMITING ===
 class SecurityService:
     """Simple security service"""
-
-    def init(self):
+    
+    def __init__(self):
         self.rate_limits = {}
-
+    
     def is_rate_limited(self, user_id: str) -> bool:
         """Check if user is rate limited"""
         now = time.time()
         user_requests = self.rate_limits.get(user_id, [])
-
+        
         # Clean old requests
         recent_requests = [ts for ts in user_requests if now - ts < 60]
         self.rate_limits[user_id] = recent_requests
-
+        
         if len(recent_requests) >= config.MAX_REQUESTS_PER_MINUTE:
             logger.warning(f"🚫 Rate limit exceeded for user {user_id}")
             return True
-
+        
         self.rate_limits[user_id].append(now)
         return False
 
@@ -99,8 +98,8 @@ security = SecurityService()
 # === AI SERVICE ===
 class AIService:
     """AI service for generating responses"""
-
-    def init(self):
+    
+    def __init__(self):
         try:
             genai.configure(api_key=config.GEMINI_API_KEY)
             self.model = genai.GenerativeModel(config.GEMINI_MODEL)
@@ -110,47 +109,47 @@ class AIService:
         except Exception as e:
             logger.error(f"❌ AI Service initialization failed: {e}")
             raise
-
+    
     def _get_system_instruction(self) -> str:
         """Get system instruction text"""
         return """
         את מאיה, מזכירה אישית חכמה ונעימה. תמיד דברי על עצמך בלשון נקבה.
-
+        
         התפקיד שלך:
         1. לעזור למשתמשים בניהול זמן ומשימות
         2. לזכור מידע חשוב על המשתמשים
         3. לספק מידע מדויק ועדכני
         4. להיות חברותית ומקצועית
-
+        
         תמיד התייחסי למשתמש בכבוד וזכרי פרטים חשובים משיחות קודמות.
         """
-
+    
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         """Generate AI response"""
         try:
             logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
-
+            
             # Create enhanced message with system instruction included
             enhanced_message = f"""
             {self.system_instruction}
-
+            
             הודעת המשתמש: {message}
             הקשר: {context}
             השעה: {datetime.now().strftime('%H:%M')}
-
+            
             עני כמאיה, המזכירה החכמה בלשון נקבה.
             """
-
+            
             if user_id not in self.chat_sessions:
                 self.chat_sessions[user_id] = self.model.start_chat(history=[])
                 logger.debug(f"🆕 Created new chat session for user {user_id}")
-
+            
             chat = self.chat_sessions[user_id]
             response = chat.send_message(enhanced_message)
-
+            
             logger.debug(f"✅ AI response generated: {response.text[:100]}...")
             return response.text
-
+            
         except Exception as e:
             logger.error(f"❌ AI generation error for user {user_id}: {e}")
             return "מצטערת, קרתה לי שגיאה קטנה. אפשר לנסות שוב? 😊"
@@ -160,11 +159,11 @@ ai_service = AIService()
 # === USER SERVICE ===
 class UserService:
     """User management service"""
-
+    
     def get_or_create_user(self, telegram_data: Dict[str, Any]) -> Dict[str, Any]:
         """Get or create user"""
         user_id = str(telegram_data.get('id'))
-
+        
         if user_id not in user_data:
             user_data[user_id] = {
                 'telegram_id': user_id,
@@ -179,9 +178,9 @@ class UserService:
             }
             save_data()
             logger.info(f"👤 Created new user: {user_id} ({telegram_data.get('first_name', 'Unknown')})")
-
+        
         return user_data[user_id]
-
+    
     def update_user_activity(self, user_id: str):
         """Update user activity"""
         if user_id in user_data:
@@ -189,31 +188,31 @@ class UserService:
             user_data[user_id]['total_messages'] += 1
             save_data()
             logger.debug(f"📈 Updated activity for user {user_id}")
-
+    
     def get_user_context(self, user_id: str) -> str:
         """Get user context for AI"""
         user = user_data.get(user_id, {})
         user_memories = memories.get(user_id, [])
-
+        
         context = f"""
         משתמש: {user.get('first_name', 'חבר/ה')}
         הודעות: {user.get('total_messages', 0)}
         זיכרונות: {', '.join(user_memories[-5:]) if user_memories else 'אין'}
         """
-
+        
         return context
-
+    
     def add_memory(self, user_id: str, content: str):
         """Add user memory"""
         if user_id not in memories:
             memories[user_id] = []
-
+        
         memories[user_id].append(content)
-
+        
         # Keep only last 10 memories
         if len(memories[user_id]) > 10:
             memories[user_id] = memories[user_id][-10:]
-
+        
         save_data()
         logger.debug(f"🧠 Added memory for user {user_id}: {content[:50]}...")
 
@@ -222,7 +221,7 @@ user_service = UserService()
 # === WEATHER SERVICE ===
 class WeatherService:
     """Weather service"""
-
+    
     CITIES = {
         "תל אביב": (32.0853, 34.7818),
         "ירושלים": (31.7683, 35.2137),
@@ -231,31 +230,31 @@ class WeatherService:
         "עפולה": (32.6098, 35.2897),
         "בני ברק": (32.0879, 34.8336)
     }
-
+    
     def extract_city(self, text: str) -> str:
         """Extract city from text"""
         for city in self.CITIES:
             if city in text:
                 return city
         return "תל אביב"
-
+    
     def get_weather(self, city: str = "תל אביב") -> str:
         """Get weather for city"""
         try:
             lat, lon = self.CITIES.get(city, self.CITIES["תל אביב"])
             url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-
+            
             response = requests.get(url, timeout=5)
             data = response.json()
-
+            
             current = data["current_weather"]
             temp = current["temperature"]
             windspeed = current["windspeed"]
-
+            
             result = f"🌤️ מזג האוויר ב{city}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
             logger.debug(f"🌤️ Weather fetched for {city}: {temp}°C")
             return result
-
+            
         except Exception as e:
             logger.error(f"❌ Weather error for {city}: {e}")
             return f"❗ לא הצלחתי לקבל מזג אוויר עבור {city}"
@@ -265,12 +264,12 @@ weather_service = WeatherService()
 # === TELEGRAM BOT LOGIC ===
 class TelegramBot:
     """Telegram bot handler"""
-
-    def init(self):
+    
+    def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
         logger.info(f"🤖 Telegram bot initialized with token: {self.token[:10]}...")
-
+    
     def send_message(self, chat_id: int, text: str, parse_mode: str = None):
         """Send message to Telegram"""
         try:
@@ -279,47 +278,47 @@ class TelegramBot:
                 "chat_id": chat_id,
                 "text": text[:4096],  # Telegram limit
             }
-
+            
             logger.debug(f"📤 Sending message to chat {chat_id}: {text[:50]}...")
             response = requests.post(url, json=data, timeout=10)
             result = response.json()
-
+            
             if result.get("ok"):
                 logger.debug(f"✅ Message sent successfully to chat {chat_id}")
             else:
                 logger.error(f"❌ Failed to send message: {result}")
-
+                
             return result
-
+            
         except Exception as e:
             logger.error(f"❌ Send message error: {e}")
             return {"ok": False, "error": str(e)}
-
+    
     def process_update(self, update: Dict[str, Any]):
         """Process incoming update"""
         try:
             logger.debug(f"📥 Processing update: {json.dumps(update, indent=2)}")
-
+            
             if "message" not in update:
                 logger.debug("⚠️ No message in update, skipping")
                 return
-
+            
             message = update["message"]
             chat_id = message["chat"]["id"]
             user_data_tg = message.get("from", {})
             text = message.get("text", "")
-
+            
             logger.info(f"📨 Received message from {user_data_tg.get('first_name', 'Unknown')} (ID: {user_data_tg.get('id')}): {text}")
-
+            
             # Rate limiting
             if security.is_rate_limited(str(user_data_tg.get("id", 0))):
                 self.send_message(chat_id, "⚠️ יותר מדי בקשות. המתן דקה ונסה שוב.")
                 return
-
+            
             # Get or create user
             user = user_service.get_or_create_user(user_data_tg)
             user_service.update_user_activity(user['telegram_id'])
-
+            
             # Handle commands
             if text.startswith('/'):
                 logger.debug(f"🎯 Processing command: {text}")
@@ -327,19 +326,19 @@ class TelegramBot:
             else:
                 logger.debug(f"💬 Processing regular message: {text}")
                 self._handle_message(chat_id, text, user)
-
+                
         except Exception as e:
             logger.error(f"❌ Process update error: {e}")
             logger.error(f"Update data: {json.dumps(update, indent=2)}")
-
+    
     def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         """Handle bot commands"""
         cmd = command.split()[0].lower()
         logger.debug(f"🎯 Handling command: {cmd}")
-
+        
         if cmd == "/start":
             response = f"🌟 שלום {user['first_name']}! אני מאיה, המזכירה שלך!\n\nאיך אוכל לעזור לך היום? 😊"
-
+        
         elif cmd == "/help":
             response = """
 🤖 מאיה - המזכירה שלך
@@ -354,20 +353,20 @@ class TelegramBot:
 
 פשוט כתוב לי מה שאתה צריך! 💪
             """
-
+        
         elif cmd == "/memory":
             context = user_service.get_user_context(user['telegram_id'])
             response = f"🧠 הנה מה שאני זוכרת עליך:\n\n{context}"
-
+        
         elif cmd == "/weather":
             city = weather_service.extract_city(command)
             response = weather_service.get_weather(city)
-
+        
         elif cmd == "/stats":
             total_users = len(user_data)
             total_conversations = sum(len(conversations.get(uid, [])) for uid in conversations)
             response = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🤖 אני פעילה!"
-
+        
         elif cmd == "/forget":
             user_id = user['telegram_id']
             if user_id in memories:
@@ -376,43 +375,43 @@ class TelegramBot:
                 del conversations[user_id]
             save_data()
             response = "🗑️ מחקתי הכל! נתחיל מחדש."
-
+        
         else:
             response = "❓ לא מכירה את הפקודה הזו. כתוב /help לעזרה."
-
+        
         logger.debug(f"📝 Command response: {response[:50]}...")
         self.send_message(chat_id, response)
-
+    
     def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
         """Handle regular messages"""
         user_id = user['telegram_id']
-
+        
         # Weather check
         if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר"]):
             logger.debug("🌤️ Weather query detected")
             city = weather_service.extract_city(text)
             response = weather_service.get_weather(city)
-
+        
         # Time check
         elif "שעה" in text.lower():
             logger.debug("🕐 Time query detected")
             israel_tz = pytz.timezone("Asia/Jerusalem")
             now = datetime.now(israel_tz)
             response = f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
-
+        
         # Save important info
         elif any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר"]):
             logger.debug("🧠 Important info detected, saving to memory")
             user_service.add_memory(user_id, text)
             context = user_service.get_user_context(user_id)
             response = ai_service.generate_response(user_id, text, context)
-
+        
         # Regular AI response
         else:
             logger.debug("🤖 Generating AI response")
             context = user_service.get_user_context(user_id)
             response = ai_service.generate_response(user_id, text, context)
-
+        
         # Log conversation
         if user_id not in conversations:
             conversations[user_id] = []
@@ -421,13 +420,13 @@ class TelegramBot:
             'response': response,
             'timestamp': datetime.now().isoformat()
         })
-
+        
         # Keep only last 20 conversations
         if len(conversations[user_id]) > 20:
             conversations[user_id] = conversations[user_id][-20:]
-
+        
         save_data()
-
+        
         logger.debug(f"📝 Message response: {response[:50]}...")
         self.send_message(chat_id, response)
 
@@ -455,17 +454,17 @@ def webhook():
     try:
         logger.info("🔔 Webhook called")
         update = request.get_json()
-
+        
         if not update:
             logger.warning("⚠️ Empty webhook request")
             return "No data", 400
-
+        
         logger.debug(f"📥 Webhook data: {json.dumps(update, indent=2)}")
         bot.process_update(update)
-
+        
         logger.info("✅ Webhook processed successfully")
         return "OK", 200
-
+        
     except Exception as e:
         logger.error(f"❌ Webhook error: {e}")
         return "Error", 500
@@ -496,21 +495,21 @@ def set_webhook():
         webhook_url = config.WEBHOOK_URL
         if not webhook_url:
             return jsonify({"error": "WEBHOOK_URL not configured"}), 400
-
+        
         url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
         data = {"url": webhook_url}
-
+        
         logger.info(f"🔗 Setting webhook to: {webhook_url}")
         response = requests.post(url, json=data, timeout=10)
         result = response.json()
-
+        
         if result.get("ok"):
             logger.info(f"✅ Webhook set successfully: {webhook_url}")
             return jsonify({"success": True, "webhook_url": webhook_url})
         else:
             logger.error(f"❌ Failed to set webhook: {result}")
             return jsonify({"error": "Failed to set webhook"}), 500
-
+    
     except Exception as e:
         logger.error(f"❌ Set webhook error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -562,11 +561,11 @@ def set_webhook_on_startup():
         try:
             url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
             data = {"url": config.WEBHOOK_URL}
-
+            
             logger.info(f"🔗 Setting webhook on startup: {config.WEBHOOK_URL}")
             response = requests.post(url, json=data, timeout=10)
             result = response.json()
-
+            
             if result.get("ok"):
                 logger.info(f"✅ Webhook set on startup: {config.WEBHOOK_URL}")
             else:
@@ -576,7 +575,7 @@ def set_webhook_on_startup():
     else:
         logger.info("⚠️ Webhook not set - missing WEBHOOK_URL or not in production")
 
-if name == "main":
+if __name__ == "__main__":
     logger.info("🚀 Starting Maya Secretary Bot (Debug Version)...")
     logger.info(f"🌍 Environment: {config.ENVIRONMENT}")
     logger.info(f"🔧 Debug mode: {config.DEBUG}")
@@ -585,10 +584,10 @@ if name == "main":
     logger.info(f"🔗 Webhook URL: {config.WEBHOOK_URL}")
     logger.info(f"🔑 Telegram Token: {config.TELEGRAM_TOKEN[:10] if config.TELEGRAM_TOKEN else 'NOT SET'}...")
     logger.info(f"🔑 Gemini API Key: {config.GEMINI_API_KEY[:10] if config.GEMINI_API_KEY else 'NOT SET'}...")
-
+    
     # Set webhook for production
     set_webhook_on_startup()
-
+    
     # Run Flask app
     app.run(
         host="0.0.0.0",
