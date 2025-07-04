@@ -16,9 +16,7 @@ import time
 import google.generativeai as genai
 from config import config
 logging.basicConfig(level=logging.DEBUG if config.DEBUG else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
 
 # === FLASK APP SETUP ===
 app = Flask(__name__)
