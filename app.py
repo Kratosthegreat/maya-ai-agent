@@ -183,62 +183,122 @@ class AIService:
     
     def _get_system_instruction(self) -> str:
         return """
-        את מאיה, עוזרת אישית מחוברת לאינטרנט בדיוק כמו Claude.
+        את מאיה, עוזרת AI חכמה ומועילה - בדיוק כמו Claude.
         
-        איך להתנהג:
-        1. תמיד תנסי לענות על השאלה - אם לא יודעת, תחפשי באינטרנט
-        2. כשמחפשת מידע תגידי "אני בודקת..." ואז תני תשובה מדויקת
-        3. תהיי בטוחה במידע שלך כי את יכולה לבדוק בזמן אמת
-        4. תשתמשי במידע מעודכן ועדכני תמיד
-        5. תהיי עוזרת אמיתית כמו Claude
+        עקרונות התנהגות (בדיוק כמו Claude):
+        1. תמיד תנסי לעזור ולתת מידע מועיל
+        2. אם לא יודעת משהו - תחפשי באינטרנט או תגידי בכנות שאת לא יודעת
+        3. תהיי ידידותית אבל מקצועית
+        4. תני תשובות ברורות ומובנות
+        5. תכירי במגבלות שלך ותציעי חלופות
+        6. תזכרי הקשר מהשיחה ותשתמשי בו
         
-        מה שאת יכולה:
-        - חיפוש מידע עדכני באינטרנט על כל נושא
-        - מזג אוויר בכל העולם
-        - תאריכים ואירועים עדכניים
-        - מידע על אנשים, חברות, אירועים
-        - עובדות ומידע כללי
+        יכולות שלך:
+        - חיפוש מידע באינטרנט על כל נושא
+        - מזג אוויר בכל מקום בעולם
+        - מידע עדכני על אירועים ואנשים
+        - זיכרון פרטים חשובים על המשתמש
+        - עזרה בשאלות כלליות
         
-        אל תגידי "לא יודעת" - תחפשי ותמצאי תשובה!
-        תהיי כמו Claude - מחוברת, מעודכנת ועוזרת!
+        תגובי בצורה טבעית, מועילה וחברותית - בדיוק כמו Claude!
         """
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         try:
+            # שלב 1: בדיקת מגבלות API (כמו שאני בודק משאבים)
             can_request, status_message = self.tracker.can_make_request()
             if not can_request:
                 logger.warning(f"Limit reached: {status_message}")
                 return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
             
-            logger.debug(f"Generating response for user {user_id}: {message[:50]}...")
+            logger.debug(f"Processing question for user {user_id}: {message[:50]}...")
             
-            enhanced_message = f"""
-            {self.system_instruction}
+            # שלב 2: ניתוח השאלה וקביעת אסטרטגיה (כמו שאני עושה)
+            response_strategy = self._analyze_question_type(message)
             
-            הודעת המשתמש: {message}
-            הקשר: {context}
-            השעה: {datetime.now().strftime('%H:%M')}
+            # שלב 3: יצירת תשובה מותאמת לפי סוג השאלה
+            if response_strategy == "search_needed":
+                # שאלה שדורשת חיפוש - כמו שאני מחפש
+                search_result = web_search_service.get_current_info(message)
+                enhanced_message = f"""
+                המשתמש שאל: {message}
+                
+                מידע שמצאת באינטרנט: {search_result}
+                
+                עכשיו תני תשובה טבעית ומועילה בהתבסס על המידע הזה.
+                תהיי כמו Claude - ישירה, מועילה, ועם הקשר.
+                """
             
-            עני כמאיה, המזכירה החכמה בלשון נקבה.
-            """
+            elif response_strategy == "weather":
+                # שאלת מזג אוויר - תשובה ישירה
+                location = weather_service.extract_location(message)
+                return weather_service.get_weather_anywhere(location)
             
+            elif response_strategy == "time":
+                # שאלת זמן - תשובה ישירה
+                israel_tz = pytz.timezone("Asia/Jerusalem")
+                now = datetime.now(israel_tz)
+                return f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
+            
+            else:
+                # שיחה רגילה - כמו שאני מנהל שיחה
+                enhanced_message = f"""
+                {self.system_instruction}
+                
+                הודעת המשתמש: {message}
+                הקשר מהשיחה: {context}
+                השעה: {datetime.now().strftime('%H:%M')}
+                
+                תני תשובה טבעית, מועילה ומעורבת כמו Claude.
+                אל תהיי רובוטית - תהיי כמו בן אדם מועיל שרוצה לעזור.
+                """
+            
+            # שלב 4: יצירת או המשך סשן צ'אט (כמו שאני זוכר הקשר)
             if user_id not in self.chat_sessions:
                 self.chat_sessions[user_id] = self.model.start_chat(history=[])
                 logger.debug(f"Created new chat session for user {user_id}")
             
+            # שלב 5: יצירת תשובה עם המודל (כמו שאני מעבד ועונה)
             chat = self.chat_sessions[user_id]
             response = chat.send_message(enhanced_message)
             
+            # שלב 6: רישום ומעקב (כמו שאני לומד ומשתפר)
             self.tracker.record_request()
             
-            logger.debug(f"AI response generated: {response.text[:100]}...")
+            logger.debug(f"Generated response: {response.text[:100]}...")
             return response.text
             
         except Exception as e:
-            logger.error(f"AI generation error for user {user_id}: {e}")
+            logger.error(f"Error generating response for user {user_id}: {e}")
+            # שגיאה - תשובה חברותית כמו שאני נותן
             if "429" in str(e) or "quota" in str(e).lower():
-                return "מצטערת, הגעתי למגבלת השימוש. אני אחזור מחר! 😊"
-            return "מצטערת, קרתה לי שגיאה קטנה. אפשר לנסות שוב? 😊"
+                return "מצטערת, יש לי יותר מדי עומס עכשיו. תנסה שוב בעוד רגע! 😊"
+            return "אופס, משהו השתבש. בואו ננסה שוב? 🤔"
+    
+    def _analyze_question_type(self, message: str) -> str:
+        """Analyze question type like Claude does"""
+        message_lower = message.lower()
+        
+        # זיהוי שאלות שדורשות חיפוש (כמו שאני מזהה)
+        search_keywords = ["מתי", "מי זה", "מי זאת", "מה זה", "איפה", "למה", "איך", 
+                          "מונדיאל", "אולימפיאדה", "בחירות", "נשיא", "ממשלה", 
+                          "חדשות", "מה קורה", "מה חדש"]
+        
+        if any(keyword in message_lower for keyword in search_keywords):
+            return "search_needed"
+        
+        # זיהוי שאלות מזג אוויר
+        weather_keywords = ["מזג אוויר", "טמפרטורה", "חם", "קר", "מעלות", "גשם"]
+        if any(keyword in message_lower for keyword in weather_keywords):
+            return "weather"
+        
+        # זיהוי שאלות זמן
+        time_keywords = ["שעה", "זמן", "מתי עכשיו"]
+        if any(keyword in message_lower for keyword in time_keywords):
+            return "time"
+        
+        # שיחה רגילה
+        return "conversation"
     
     def get_usage_stats(self):
         return self.tracker.get_usage_stats()
