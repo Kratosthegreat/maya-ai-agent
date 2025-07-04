@@ -1,3 +1,4 @@
+# === מאיה 3.0 - בנייה מחדש מלאה ===
 import os
 import json
 import logging
@@ -7,23 +8,23 @@ import requests
 import pytz
 from typing import Dict, Any, Optional
 import time
+import re
 
 # Third-party imports
 import google.generativeai as genai
 from config import config
 
-# === ENHANCED LOGGING SETUP ===
+# === LOGGING ===
 logging.basicConfig(
     level=logging.DEBUG if config.DEBUG else logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# === FLASK APP SETUP ===
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
 
-# === DATA STORAGE (JSON) ===
+# === DATA STORAGE ===
 DATA_FILE = "maya_data.json"
 GEMINI_USAGE_FILE = "gemini_usage.json"
 user_data = {}
@@ -31,7 +32,6 @@ conversations = {}
 memories = {}
 
 def load_data():
-    """Load data from JSON file"""
     global user_data, conversations, memories
     try:
         if os.path.exists(DATA_FILE):
@@ -50,7 +50,6 @@ def load_data():
         memories = {}
 
 def save_data():
-    """Save data to JSON file"""
     try:
         data = {
             'users': user_data,
@@ -64,10 +63,298 @@ def save_data():
     except Exception as e:
         logger.error(f"Error saving data: {e}")
 
-# Load data on startup
 load_data()
 
-# === GEMINI API TRACKER ===
+# === CLAUDE-LIKE INTELLIGENCE ENGINE ===
+class ClaudeIntelligenceEngine:
+    """מנוע חכמה שמחקה בדיוק את Claude"""
+    
+    def __init__(self):
+        self.current_year = datetime.now().year
+        self.current_month = datetime.now().month
+        
+        # בסיס ידע מובנה - כמו שיש לי
+        self.built_in_knowledge = {
+            # ידע ישראלי עדכני
+            "israel_current_war": {
+                "name": "מלחמת חרבות ברזל",
+                "start": "7 באוקטובר 2023", 
+                "against": "חמאס",
+                "status": "מתמשכת",
+                "quick_answer": "המלחמה האחרונה של ישראל היא מלחמת חרבות ברזל שהחלה ב-7 באוקטובר 2023 עם התקפת הטרור של חמאס."
+            },
+            
+            # ידע ספורט
+            "world_cup_2026": {
+                "year": 2026,
+                "hosts": ["ארצות הברית", "מקסיקו", "קנדה"], 
+                "teams": 48,
+                "quick_answer": "המונדיאל הבא יתקיים ב-2026 בארצות הברית, מקסיקו וקנדה עם 48 נבחרות."
+            },
+            
+            "olympics_2028": {
+                "year": 2028,
+                "host": "לוס אנג'לס",
+                "season": "קיץ",
+                "quick_answer": "האולימפיאדה הבאה תהיה ב-2028 בלוס אנג'לס."
+            },
+            
+            # ידע פוליטי עדכני
+            "us_president": {
+                "name": "דונלד טראמפ",
+                "elected": "נובמבר 2024",
+                "inaugurated": "ינואר 2025",
+                "quick_answer": "הנשיא הנוכחי של ארצות הברית הוא דונלד טראמפ (נבחר בנובמבר 2024)."
+            }
+        }
+        
+        # דפוסי זיהוי חכמים
+        self.recognition_patterns = {
+            # זיהוי שאלות על מלחמה בישראל
+            "israel_war": [
+                r"(מלחמה|מלחמת).*(אחרון|עכשיו|נוכחי|היום|ישראל)",
+                r"המלחמה.*(של ישראל|בישראל|עכשיו)",
+                r"(7 באוקטובר|שבעה באוקטובר|חרבות ברזל)",
+                r"(חמאס|עזה|דרום).*(מלחמה|קרב)"
+            ],
+            
+            # זיהוי שאלות מונדיאל
+            "world_cup": [
+                r"(מונדיאל|world cup).*(הבא|2026|מתי)",
+                r"(כדורגל|פוטבול).*(עולם|מונדיאל)"
+            ],
+            
+            # זיהוי שאלות אולימפיאדה  
+            "olympics": [
+                r"(אולימפיאדה|olympics).*(הבא|2028|מתי)",
+                r"(משחקים אולימפיים)"
+            ],
+            
+            # זיהוי שאלות על נשיא ארצות הברית
+            "us_president": [
+                r"(נשיא|president).*(אמריקה|ארצות הברית|אמריקאי)",
+                r"(טראמפ|trump)",
+                r"מי (נשיא|מנהל|בראש).*(אמריקה|ארצות הברית)"
+            ],
+            
+            # זיהוי שאלות מזג אוויר
+            "weather": [
+                r"(מזג אוויר|טמפרטורה|חם|קר|מעלות|גשם|שמש)"
+            ],
+            
+            # זיהוי שאלות זמן
+            "time": [
+                r"(שעה|זמן|מתי עכשיו)"
+            ]
+        }
+    
+    def analyze_and_respond(self, message: str) -> Dict[str, Any]:
+        """ניתוח הודעה והחזרת תשובה - כמו שאני עובד"""
+        
+        message_lower = message.lower().strip()
+        
+        # בדיקה האם יש תשובה מובנית מוכנה
+        for topic, patterns in self.recognition_patterns.items():
+            for pattern in patterns:
+                if re.search(pattern, message_lower):
+                    logger.info(f"Detected topic: {topic}")
+                    return self._get_built_in_response(topic, message)
+        
+        # אם אין תשובה מובנית - זה יחזור לשיחה רגילה או חיפוש
+        return {
+            "type": "needs_ai_or_search",
+            "confidence": "low",
+            "response": None
+        }
+    
+    def _get_built_in_response(self, topic: str, original_message: str) -> Dict[str, Any]:
+        """קבלת תשובה מובנית - בסגנון שלי"""
+        
+        if topic == "israel_war":
+            knowledge = self.built_in_knowledge["israel_current_war"]
+            response = f"מלחמת חרבות ברזל - המלחמה שהחלה ב-7 באוקטובר 2023 כשחמאס תקף את ישראל. זו המלחמה הנוכחית של ישראל."
+            
+        elif topic == "world_cup":
+            knowledge = self.built_in_knowledge["world_cup_2026"]
+            response = f"המונדיאל הבא ב-2026! 🏆\nארצות הברית, מקסיקו וקנדה יארחו יחד.\n48 נבחרות במקום 32 - המונדיאל הגדול ביותר בהיסטוריה."
+            
+        elif topic == "olympics":
+            knowledge = self.built_in_knowledge["olympics_2028"]
+            response = f"אולימפיאדת הקיץ הבאה ב-2028 בלוס אנג'לס! 🏅\nהשלישית שלהם בעיר הזו."
+            
+        elif topic == "us_president":
+            knowledge = self.built_in_knowledge["us_president"]
+            response = f"דונלד טראמפ הוא הנשיא הנוכחי של ארצות הברית. נבחר בנובמבר 2024 ונכנס לתפקיד בינואר 2025."
+            
+        elif topic == "weather":
+            return {
+                "type": "weather_service", 
+                "confidence": "high",
+                "response": None  # יעבור לשירות מזג אוויר
+            }
+            
+        elif topic == "time":
+            return {
+                "type": "time_service",
+                "confidence": "high", 
+                "response": None  # יעבור לשירות זמן
+            }
+        
+        else:
+            response = "אין מידע זמין"
+        
+        return {
+            "type": "direct_answer",
+            "confidence": "high",
+            "response": response,
+            "source": "built_in_knowledge"
+        }
+
+# === CLAUDE-STYLE AI SERVICE ===
+class ClaudeStyleAI:
+    """שירות AI שמחקה את Claude בדיוק"""
+    
+    def __init__(self):
+        try:
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+            self.chat_sessions = {}
+            self.intelligence_engine = ClaudeIntelligenceEngine()
+            self.tracker = GeminiTracker()  # יוגדר למטה
+            
+            # הוראות מערכת מחודשות - בדיוק כמו שאני מתנהג
+            self.system_prompt = """את מאיה. אל תגידי "שלום" או תברכי אלא אם כן המשתמש בירך ראשון.
+
+עקרונות תגובה (חשוב מאוד):
+1. תשובות קצרות וישירות - 1-3 משפטים לכל היותר
+2. טון טבעי וחברותי אבל לא פורמלי  
+3. אל תתחילי עם "שלום דוד" או ברכות אוטומטיות
+4. אמוג'י רק אם זה מתאים טבעית
+5. אל תכתבי פסקאות ארוכות
+
+דוגמאות:
+שאלה: "מתי המונדיאל הבא?"
+תשובה: "ב-2026! ארצות הברית, מקסיקו וקנדה יארחו יחד 🏆"
+
+שאלה: "איך אתה?"  
+תשובה: "בסדר גמור! איך אני יכולה לעזור?"
+
+תגיבי בקצרה ולעניין."""
+            
+            logger.info("Claude-style AI Service initialized")
+            
+        except Exception as e:
+            logger.error(f"AI Service initialization failed: {e}")
+            raise
+    
+    def generate_response(self, user_id: str, message: str, context: str = "") -> str:
+        try:
+            # בדיקת מגבלות
+            can_request, status_message = self.tracker.can_make_request()
+            if not can_request:
+                return f"יותר מדי בקשות היום. נסה מאוחר יותר! 😊"
+            
+            # שלב 1: בדיקה אם יש תשובה מובנית
+            intelligence_result = self.intelligence_engine.analyze_and_respond(message)
+            
+            if intelligence_result["type"] == "direct_answer":
+                # יש תשובה מוכנה - החזר אותה!
+                self.tracker.record_request(0)  # לא השתמשנו ב-API
+                return intelligence_result["response"]
+            
+            elif intelligence_result["type"] == "weather_service":
+                location = self._extract_location(message)
+                return weather_service.get_weather_anywhere(location)
+            
+            elif intelligence_result["type"] == "time_service":
+                return self._get_current_time()
+            
+            else:
+                # אין תשובה מובנית - עבור ל-AI או חיפוש
+                return self._generate_ai_response(message, context, user_id)
+                
+        except Exception as e:
+            logger.error(f"Generate response error: {e}")
+            return "משהו השתבש. בוא ננסה שוב? 🤔"
+    
+    def _extract_location(self, message: str) -> str:
+        """חילוץ מיקום מהודעה"""
+        # הסרת מילות מפתח
+        clean_text = message.replace("מזג אוויר", "").replace("טמפרטורה", "")
+        clean_text = clean_text.replace("ב", "").replace("של", "").strip()
+        
+        if not clean_text or len(clean_text) < 2:
+            return "תל אביב"  # ברירת מחדל
+        return clean_text
+    
+    def _get_current_time(self) -> str:
+        """קבלת זמן נוכחי"""
+        israel_tz = pytz.timezone("Asia/Jerusalem")
+        now = datetime.now(israel_tz)
+        return f"🕐 {now.strftime('%H:%M')}"
+    
+    def _generate_ai_response(self, message: str, context: str, user_id: str) -> str:
+        """יצירת תשובה עם AI - בסגנון Claude"""
+        
+        # הכנת הודעה משופרת
+        enhanced_message = f"""
+        {self.system_prompt}
+        
+        הקשר משתמש: {context}
+        הודעת המשתמש: {message}
+        
+        תני תשובה קצרה וטבעית כמו Claude.
+        """
+        
+        try:
+            # שימוש ב-AI
+            if user_id not in self.chat_sessions:
+                self.chat_sessions[user_id] = self.model.start_chat(history=[])
+            
+            chat = self.chat_sessions[user_id]
+            response = chat.send_message(enhanced_message)
+            
+            self.tracker.record_request(len(response.text))
+            
+            # ניקוי התשובה מדברים מיותרים
+            cleaned_response = self._clean_ai_response(response.text)
+            return cleaned_response
+            
+        except Exception as e:
+            logger.error(f"AI generation error: {e}")
+            return "לא הצלחתי לעבד את זה. נסה שאלה אחרת 🤔"
+    
+    def _clean_ai_response(self, response: str) -> str:
+        """ניקוי תשובת AI מדברים מיותרים"""
+        
+        # הסרת ברכות אוטומטיות בתחילת התשובה
+        unwanted_starts = [
+            "שלום דוד", "שלום!", "היי!", "הי דוד", 
+            "שמחה לעזור", "אני כאן בשבילך"
+        ]
+        
+        for unwanted in unwanted_starts:
+            if response.strip().startswith(unwanted):
+                response = response.replace(unwanted, "").strip()
+                if response.startswith(","):
+                    response = response[1:].strip()
+                if response.startswith("!"):
+                    response = response[1:].strip()
+        
+        # קיצור תשובות ארוכות מדי
+        sentences = response.split('.')
+        if len(sentences) > 3:
+            response = '. '.join(sentences[:3]) + '.'
+        
+        # הסרת שורות ריקות מיותרות
+        response = ' '.join(response.split())
+        
+        return response.strip()
+    
+    def get_usage_stats(self):
+        return self.tracker.get_usage_stats()
+
+# === GEMINI TRACKER ===
 class GeminiTracker:
     def __init__(self):
         self.usage_file = GEMINI_USAGE_FILE
@@ -80,7 +367,6 @@ class GeminiTracker:
             try:
                 with open(self.usage_file, 'r', encoding='utf-8') as f:
                     self.usage_data = json.load(f)
-                logger.debug(f"Loaded usage: {self.usage_data.get('daily_requests', 0)} requests today")
             except:
                 self._init_usage_data()
         else:
@@ -121,8 +407,7 @@ class GeminiTracker:
         if len(self.usage_data['minute_requests']) >= self.minute_limit:
             return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
         
-        remaining = self.daily_limit - self.usage_data['daily_requests']
-        return True, f"OK (נותרו: {remaining})"
+        return True, "OK"
     
     def record_request(self, tokens_used=0):
         now = datetime.now()
@@ -131,7 +416,6 @@ class GeminiTracker:
         self.usage_data['minute_requests'].append(now.isoformat())
         self.usage_data['total_tokens'] += tokens_used
         self.save_usage_data()
-        logger.info(f"Recorded: {self.usage_data['daily_requests']}/{self.daily_limit}, Tokens: {tokens_used}")
     
     def get_usage_stats(self):
         return {
@@ -143,7 +427,64 @@ class GeminiTracker:
             'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
         }
 
-# === SECURITY & RATE LIMITING ===
+# === WEATHER SERVICE ===
+class GlobalWeatherService:
+    def extract_location(self, text: str) -> str:
+        text = text.replace("מזג אוויר", "").replace("טמפרטורה", "")
+        text = text.replace("ב", "").replace("של", "").replace("את", "")
+        text = text.strip()
+        
+        if not text or len(text) < 2:
+            return "תל אביב"
+        return text
+    
+    def get_weather_anywhere(self, location: str) -> str:
+        try:
+            # Geocoding
+            geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=he&format=json"
+            geo_response = requests.get(geocoding_url, timeout=5)
+            geo_data = geo_response.json()
+            
+            if not geo_data.get('results'):
+                return f"לא מצאתי את '{location}'. נסה שם אחר 🌍"
+            
+            result = geo_data['results'][0]
+            lat = result['latitude']
+            lon = result['longitude']
+            place_name = result['name']
+            country = result.get('country', '')
+            
+            # Weather
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
+            weather_response = requests.get(weather_url, timeout=5)
+            weather_data = weather_response.json()
+            
+            current = weather_data['current_weather']
+            temp = current['temperature']
+            windspeed = current['windspeed']
+            
+            if temp > 30:
+                temp_emoji = "🔥"
+            elif temp > 20:
+                temp_emoji = "☀️"
+            elif temp > 10:
+                temp_emoji = "🌤️"
+            elif temp > 0:
+                temp_emoji = "☁️"
+            else:
+                temp_emoji = "❄️"
+            
+            location_display = place_name
+            if country and country != place_name:
+                location_display += f", {country}"
+            
+            return f"{temp_emoji} {location_display}: {temp}°C (רוח {windspeed} קמ\"ש)"
+            
+        except Exception as e:
+            logger.error(f"Weather error: {e}")
+            return f"בעיה בקבלת מזג אוויר עבור {location} 🌍"
+
+# === SECURITY ===
 class SecurityService:
     def __init__(self):
         self.rate_limits = {}
@@ -155,267 +496,10 @@ class SecurityService:
         self.rate_limits[user_id] = recent_requests
         
         if len(recent_requests) >= config.MAX_REQUESTS_PER_MINUTE:
-            logger.warning(f"Rate limit exceeded for user {user_id}")
             return True
         
         self.rate_limits[user_id].append(now)
         return False
-
-security = SecurityService()
-
-# === AI SERVICE ===
-class AIService:
-    def __init__(self):
-        try:
-            genai.configure(api_key=config.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
-            self.chat_sessions = {}
-            self.system_instruction = self._get_system_instruction()
-            self.tracker = GeminiTracker()
-            logger.info(f"AI Service initialized with model: {config.GEMINI_MODEL}")
-            
-            stats = self.tracker.get_usage_stats()
-            logger.info(f"Usage today: {stats['daily_requests']}/{stats['daily_limit']} ({stats['percentage_used_today']}%)")
-            
-        except Exception as e:
-            logger.error(f"AI Service initialization failed: {e}")
-            raise
-    
-    def _get_system_instruction(self) -> str:
-        return """
-        את מאיה, עוזרת AI חכמה ומועילה - בדיוק כמו Claude.
-        
-        עקרונות התנהגות (בדיוק כמו Claude):
-        1. תמיד תנסי לעזור ולתת מידע מועיל
-        2. אם לא יודעת משהו - תחפשי באינטרנט או תגידי בכנות שאת לא יודעת
-        3. תהיי ידידותית אבל מקצועית
-        4. תני תשובות ברורות ומובנות
-        5. תכירי במגבלות שלך ותציעי חלופות
-        6. תזכרי הקשר מהשיחה ותשתמשי בו
-        
-        יכולות שלך:
-        - חיפוש מידע באינטרנט על כל נושא
-        - מזג אוויר בכל מקום בעולם
-        - מידע עדכני על אירועים ואנשים
-        - זיכרון פרטים חשובים על המשתמש
-        - עזרה בשאלות כלליות
-        
-        תגובי בצורה טבעית, מועילה וחברותית - בדיוק כמו Claude!
-        """
-    
-    def generate_response(self, user_id: str, message: str, context: str = "") -> str:
-        try:
-            # שלב 0: בדיקת מגבלות (כמו שאני בודק משאבים)
-            can_request, status_message = self.tracker.can_make_request()
-            if not can_request:
-                return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
-            
-            logger.debug(f"Processing question: {message[:50]}...")
-            
-            # שלב 1: ניתוח עמוק של השאלה (כמו שאני מנתח)
-            question_analysis = self._deep_analyze_question(message, context)
-            
-            # שלב 2: קביעת אסטרטגיית תשובה (כמו שאני מחליט איך לענות)
-            response_strategy = self._determine_response_strategy(question_analysis)
-            
-            # שלב 3: איסוף מידע לפי הצורך (כמו שאני מחפש)
-            gathered_info = self._gather_information(question_analysis, response_strategy)
-            
-            # שלב 4: בניית תשובה מותאמת (כמו שאני בונה תשובות)
-            if response_strategy["type"] == "direct_answer":
-                return gathered_info["content"]
-            
-            elif response_strategy["type"] == "search_based":
-                return self._format_search_response(gathered_info, question_analysis)
-            
-            elif response_strategy["type"] == "conversational":
-                return self._generate_conversational_response(message, context, gathered_info)
-            
-            else:
-                return "לא הבנתי את השאלה. תוכל לנסח אחרת? 🤔"
-                
-        except Exception as e:
-            logger.error(f"Error in generate_response: {e}")
-            return "אופס, משהו השתבש. בואו ננסה שוב? 🤔"
-    
-    def _deep_analyze_question(self, message: str, context: str) -> dict:
-        """ניתוח עמוק של השאלה - כמו שאני מנתח"""
-        analysis = {
-            "original": message,
-            "intent": "unknown",
-            "topic": "general",
-            "urgency": "normal",
-            "complexity": "simple",
-            "requires_search": False,
-            "context_relevant": bool(context.strip())
-        }
-        
-        message_lower = message.lower()
-        
-        # זיהוי כוונות ספציפיות
-        if any(word in message_lower for word in ["מתי", "when"]):
-            analysis["intent"] = "time_query"
-            analysis["requires_search"] = True
-        elif any(word in message_lower for word in ["מי זה", "מי זאת", "who is"]):
-            analysis["intent"] = "person_query"
-            analysis["requires_search"] = True
-        elif any(word in message_lower for word in ["מה זה", "what is"]):
-            analysis["intent"] = "definition_query"
-            analysis["requires_search"] = True
-        elif any(word in message_lower for word in ["מזג אוויר", "טמפרטורה", "weather"]):
-            analysis["intent"] = "weather_query"
-            analysis["topic"] = "weather"
-        elif any(word in message_lower for word in ["שעה", "זמן", "time"]):
-            analysis["intent"] = "time_now"
-            analysis["topic"] = "time"
-        else:
-            analysis["intent"] = "conversation"
-        
-        # זיהוי נושאים מיוחדים
-        if any(word in message_lower for word in ["מונדיאל", "world cup"]):
-            analysis["topic"] = "world_cup"
-            analysis["complexity"] = "simple"  # יש לי מידע מוכן
-        elif any(word in message_lower for word in ["אולימפיאדה", "olympics"]):
-            analysis["topic"] = "olympics"
-            analysis["complexity"] = "simple"
-        
-        return analysis
-    
-    def _determine_response_strategy(self, analysis: dict) -> dict:
-        """קביעת אסטרטגיית תשובה - כמו שאני מחליט איך לענות"""
-        strategy = {
-            "type": "conversational",
-            "confidence": "medium",
-            "format": "text",
-            "use_emojis": True
-        }
-        
-        # החלטות על סוג תשובה
-        if analysis["topic"] in ["world_cup", "olympics"]:
-            strategy["type"] = "direct_answer"
-            strategy["confidence"] = "high"
-            strategy["format"] = "structured"
-        
-        elif analysis["intent"] in ["time_query", "person_query", "definition_query"]:
-            strategy["type"] = "search_based"
-            strategy["confidence"] = "high"
-            
-        elif analysis["topic"] == "weather":
-            strategy["type"] = "direct_answer"
-            strategy["confidence"] = "high"
-            
-        elif analysis["topic"] == "time":
-            strategy["type"] = "direct_answer"
-            strategy["confidence"] = "high"
-        
-        return strategy
-    
-    def _gather_information(self, analysis: dict, strategy: dict) -> dict:
-        """איסוף מידע - כמו שאני מחפש"""
-        info = {"content": "", "sources": [], "confidence": "low"}
-        
-        # מידע מוכן מראש (כמו הידע הפנימי שלי)
-        if analysis["topic"] == "world_cup":
-            info["content"] = """המונדיאל הבא יתקיים ב-2026! 🏆
-
-📍 איפה: שלוש מדינות יחד
-- 🇺🇸 ארצות הברית (רוב המשחקים)
-- 🇲🇽 מקסיקו  
-- 🇨🇦 קנדה
-
-⚽ מה מיוחד:
-- 48 נבחרות (במקום 32)
-- 104 משחקים סה"כ
-- המונדיאל הגדול ביותר בהיסטוריה!
-
-🗓️ מתי: קיץ 2026"""
-            info["confidence"] = "high"
-            
-        elif analysis["topic"] == "olympics":
-            info["content"] = """האולימפיאדה הבאה תהיה ב-2028! 🏅
-
-📍 לוס אנג'לס, ארצות הברית
-🗓️ יולי-אוגוסט 2028
-🏟️ אולימפיאדת הקיץ השלישית בלוס אנג'לס"""
-            info["confidence"] = "high"
-            
-        elif analysis["topic"] == "weather":
-            location = weather_service.extract_location(analysis["original"])
-            info["content"] = weather_service.get_weather_anywhere(location)
-            info["confidence"] = "high"
-            
-        elif analysis["topic"] == "time":
-            israel_tz = pytz.timezone("Asia/Jerusalem")
-            now = datetime.now(israel_tz)
-            info["content"] = f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
-            info["confidence"] = "high"
-            
-        elif strategy["type"] == "search_based":
-            # חיפוש באינטרנט
-            search_result = web_search_service.search_web(analysis["original"])
-            info["content"] = search_result
-            info["confidence"] = "medium"
-        
-        return info
-    
-    def _format_search_response(self, info: dict, analysis: dict) -> str:
-        """עיצוב תשובת חיפוש - כמו שאני מעצב תשובות"""
-        if info["confidence"] == "high":
-            return info["content"]
-        elif len(info["content"]) > 50:
-            return f"מצאתי מידע על {analysis['original']}:\n\n{info['content']}"
-        else:
-            return f"לא מצאתי מידע מספיק על '{analysis['original']}'. \nתנסה לנסח אחרת? 🤔"
-    
-    def _generate_conversational_response(self, message: str, context: str, info: dict) -> str:
-        """יצירת תשובה שיחתית - כמו שאני משוחח"""
-        # כאן אשתמש במודל ה-AI לשיחה רגילה
-        enhanced_message = f"""
-        {self.system_instruction}
-        
-        הודעת המשתמש: {message}
-        הקשר: {context}
-        
-        תני תשובה קצרה, טבעית ומועילה כמו Claude.
-        """
-        
-        if message not in self.chat_sessions:
-            self.chat_sessions[message] = self.model.start_chat(history=[])
-        
-        chat = self.chat_sessions[message]
-        response = chat.send_message(enhanced_message)
-        
-        return response.text
-    
-    def _analyze_question_type(self, message: str) -> str:
-        """Analyze question type like Claude does"""
-        message_lower = message.lower()
-        
-        # זיהוי שאלות שדורשות חיפוש (כמו שאני מזהה)
-        search_keywords = ["מתי", "מי זה", "מי זאת", "מה זה", "איפה", "למה", "איך", 
-                          "מונדיאל", "אולימפיאדה", "בחירות", "נשיא", "ממשלה", 
-                          "חדשות", "מה קורה", "מה חדש"]
-        
-        if any(keyword in message_lower for keyword in search_keywords):
-            return "search_needed"
-        
-        # זיהוי שאלות מזג אוויר
-        weather_keywords = ["מזג אוויר", "טמפרטורה", "חם", "קר", "מעלות", "גשם"]
-        if any(keyword in message_lower for keyword in weather_keywords):
-            return "weather"
-        
-        # זיהוי שאלות זמן
-        time_keywords = ["שעה", "זמן", "מתי עכשיו"]
-        if any(keyword in message_lower for keyword in time_keywords):
-            return "time"
-        
-        # שיחה רגילה
-        return "conversation"
-    
-    def get_usage_stats(self):
-        return self.tracker.get_usage_stats()
-
-ai_service = AIService()
 
 # === USER SERVICE ===
 class UserService:
@@ -435,7 +519,7 @@ class UserService:
                 'is_active': True
             }
             save_data()
-            logger.info(f"Created new user: {user_id} ({telegram_data.get('first_name', 'Unknown')})")
+            logger.info(f"Created new user: {user_id}")
         
         return user_data[user_id]
     
@@ -444,17 +528,15 @@ class UserService:
             user_data[user_id]['last_activity'] = datetime.now().isoformat()
             user_data[user_id]['total_messages'] += 1
             save_data()
-            logger.debug(f"Updated activity for user {user_id}")
     
     def get_user_context(self, user_id: str) -> str:
         user = user_data.get(user_id, {})
         user_memories = memories.get(user_id, [])
         
-        context = f"""
-        משתמש: {user.get('first_name', 'חבר/ה')}
-        הודעות: {user.get('total_messages', 0)}
-        זיכרונות: {', '.join(user_memories[-5:]) if user_memories else 'אין'}
-        """
+        if user_memories:
+            context = f"דברים שהמשתמש סיפר: {', '.join(user_memories[-3:])}"
+        else:
+            context = ""
         
         return context
     
@@ -468,185 +550,13 @@ class UserService:
             memories[user_id] = memories[user_id][-10:]
         
         save_data()
-        logger.debug(f"Added memory for user {user_id}: {content[:50]}...")
 
-user_service = UserService()
-
-# === GLOBAL WEATHER SERVICE ===
-class GlobalWeatherService:
-    """Global weather service for any location worldwide"""
-    
-    def extract_location(self, text: str) -> str:
-        """Extract location from text"""
-        # מסיר מילות מפתח וחוזר למיקום
-        text = text.replace("מזג אוויר", "").replace("טמפרטורה", "")
-        text = text.replace("ב", "").replace("של", "").replace("את", "")
-        text = text.strip()
-        
-        # אם לא נמצא מיקום ספציפי, ברירת מחדל
-        if not text or len(text) < 2:
-            return "תל אביב"
-        
-        return text
-    
-    def get_weather_anywhere(self, location: str) -> str:
-        """Get weather for any location worldwide"""
-        try:
-            # שימוש ב-Open-Meteo API (חינמי, ללא מפתח API)
-            # חיפוש קואורדינטות של המקום
-            geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=he&format=json"
-            geo_response = requests.get(geocoding_url, timeout=5)
-            geo_data = geo_response.json()
-            
-            if not geo_data.get('results'):
-                return f"מצטערת, לא מצאתי את המקום '{location}'. נסה לכתוב בדרך אחרת 🌍"
-            
-            # קבלת קואורדינטות
-            result = geo_data['results'][0]
-            lat = result['latitude']
-            lon = result['longitude']
-            place_name = result['name']
-            country = result.get('country', '')
-            
-            # קבלת מזג אוויר
-            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
-            weather_response = requests.get(weather_url, timeout=5)
-            weather_data = weather_response.json()
-            
-            current = weather_data['current_weather']
-            temp = current['temperature']
-            windspeed = current['windspeed']
-            
-            # קביעת אמוג'י לפי טמפרטורה
-            if temp > 30:
-                temp_emoji = "🔥"
-            elif temp > 20:
-                temp_emoji = "☀️"
-            elif temp > 10:
-                temp_emoji = "🌤️"
-            elif temp > 0:
-                temp_emoji = "☁️"
-            else:
-                temp_emoji = "❄️"
-            
-            location_display = f"{place_name}"
-            if country and country != place_name:
-                location_display += f", {country}"
-            
-            result = f"{temp_emoji} מזג האוויר ב{location_display}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
-            logger.debug(f"Weather fetched for {location_display}: {temp}°C")
-            return result
-            
-        except Exception as e:
-            logger.error(f"Weather error for {location}: {e}")
-            return f"מצטערת, לא הצלחתי לקבל מזג אוויר עבור {location}. נסה שם מקום אחר 🌍"
-
-weather_service = GlobalWeatherService()
-
-# === WEB SEARCH SERVICE ===
-class WebSearchService:
-    """Web search service for real-time information like Claude"""
-    
-    def search_web(self, query: str) -> str:
-        """Search the web for current information"""
-        try:
-            # DuckDuckGo Instant Answer API (חינמי וללא מפתח)
-            url = f"https://api.duckduckgo.com/?q={query}&format=json&pretty=1&no_html=1"
-            response = requests.get(url, timeout=10)
-            data = response.json()
-            
-            # בדיקת תשובות שונות מה-API
-            if data.get('AbstractText'):
-                return data['AbstractText'][:400] + "..."
-            elif data.get('Answer'):
-                return data['Answer']
-            elif data.get('Definition'):
-                return data['Definition']
-            elif data.get('RelatedTopics') and len(data['RelatedTopics']) > 0:
-                topic = data['RelatedTopics'][0]
-                if topic.get('Text'):
-                    return topic['Text'][:300] + "..."
-            else:
-                return self._fallback_search(query)
-                
-        except Exception as e:
-            logger.error(f"Web search error: {e}")
-            return f"לא הצלחתי לחפש באינטרנט עבור '{query}'. נסה שאלה אחרת 🔍"
-    
-    def _fallback_search(self, query: str) -> str:
-        """Fallback search method"""
-        try:
-            # Wikipedia API בעברית/אנגלית
-            wiki_url = f"https://he.wikipedia.org/api/rest_v1/page/summary/{query}"
-            response = requests.get(wiki_url, timeout=5)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('extract'):
-                    return data['extract'][:350] + "..."
-            
-            # אם לא מצא בעברית, נסה באנגלית
-            wiki_url_en = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
-            response_en = requests.get(wiki_url_en, timeout=5)
-            
-            if response_en.status_code == 200:
-                data_en = response_en.json()
-                if data_en.get('extract'):
-                    return data_en['extract'][:350] + "...\n(מקור: ויקיפדיה באנגלית)"
-            
-            return f"לא מצאתי מידע מועיל על '{query}'. נסה לנסח אחרת 🤔"
-            
-        except Exception as e:
-            return f"בעיה בחיפוש '{query}' 😔"
-    
-    def get_current_info(self, topic: str) -> str:
-        """Get current information with Claude-like confidence"""
-        current_year = datetime.now().year
-        
-        # שאלות על מונדיאל - תשובה ישירה ובטוחה
-        if any(word in topic.lower() for word in ["מונדיאל", "world cup"]):
-            return """המונדיאל הבא יתקיים ב-2026! 🏆
-
-📍 איפה: שלוש מדינות יחד
-- 🇺🇸 ארצות הברית (רוב המשחקים)  
-- 🇲🇽 מקסיקו
-- 🇨🇦 קנדה
-
-⚽ מה מיוחד:
-- 48 נבחרות (במקום 32)
-- 104 משחקים סה"כ
-- המונדיאל הגדול ביותר בהיסטוריה!
-
-🗓️ מתי: קיץ 2026 (התאריכים המדויקים יפורסמו השנה)"""
-        
-        elif any(word in topic.lower() for word in ["אולימפיאדה", "olympics"]):
-            return """האולימפיאדה הבאה תהיה ב-2028! 🏅
-
-📍 לוס אנג'לס, ארצות הברית
-🗓️ יולי-אוגוסט 2028
-🏟️ אולימפיאדת הקיץ השלישית בלוס אנג'לס"""
-        
-        else:
-            # חיפוש כללי עם ביטחון
-            try:
-                search_result = self.search_web(topic)
-                # אם יש תוצאה טובה - תחזיר אותה בביטחון
-                if len(search_result) > 50 and "לא מצאתי" not in search_result:
-                    return search_result
-                else:
-                    # אם אין מידע טוב - תהיה ישירה
-                    return f"אין לי מידע עדכני על '{topic}'. \nאוכל לעזור בנושא אחר? 🤔"
-            except:
-                return f"לא הצלחתי לחפש מידע על '{topic}' כרגע. \nנסה שאלה אחרת! 💭"
-
-web_search_service = WebSearchService()
-
-# === TELEGRAM BOT LOGIC ===
+# === TELEGRAM BOT ===
 class TelegramBot:
     def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
-        logger.info(f"Telegram bot initialized with token: {self.token[:10]}...")
+        logger.info("Telegram bot initialized")
     
     def send_message(self, chat_id: int, text: str, parse_mode: str = None):
         try:
@@ -656,12 +566,11 @@ class TelegramBot:
                 "text": text[:4096],
             }
             
-            logger.debug(f"Sending message to chat {chat_id}: {text[:50]}...")
             response = requests.post(url, json=data, timeout=10)
             result = response.json()
             
             if result.get("ok"):
-                logger.debug(f"Message sent successfully to chat {chat_id}")
+                logger.debug(f"Message sent to chat {chat_id}")
             else:
                 logger.error(f"Failed to send message: {result}")
                 
@@ -673,10 +582,7 @@ class TelegramBot:
     
     def process_update(self, update: Dict[str, Any]):
         try:
-            logger.debug(f"Processing update: {json.dumps(update, indent=2)}")
-            
             if "message" not in update:
-                logger.debug("No message in update, skipping")
                 return
             
             message = update["message"]
@@ -684,122 +590,78 @@ class TelegramBot:
             user_data_tg = message.get("from", {})
             text = message.get("text", "")
             
-            logger.info(f"Received message from {user_data_tg.get('first_name', 'Unknown')} (ID: {user_data_tg.get('id')}): {text}")
+            logger.info(f"Message from {user_data_tg.get('first_name', 'Unknown')}: {text}")
             
             if security.is_rate_limited(str(user_data_tg.get("id", 0))):
-                self.send_message(chat_id, "⚠️ יותר מדי בקשות. המתן דקה ונסה שוב.")
+                self.send_message(chat_id, "יותר מדי בקשות. חכה דקה ונסה שוב.")
                 return
             
             user = user_service.get_or_create_user(user_data_tg)
             user_service.update_user_activity(user['telegram_id'])
             
             if text.startswith('/'):
-                logger.debug(f"Processing command: {text}")
                 self._handle_command(chat_id, text, user)
             else:
-                logger.debug(f"Processing regular message: {text}")
                 self._handle_message(chat_id, text, user)
                 
         except Exception as e:
             logger.error(f"Process update error: {e}")
-            logger.error(f"Update data: {json.dumps(update, indent=2)}")
     
     def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         cmd = command.split()[0].lower()
-        logger.debug(f"Handling command: {cmd}")
         
         if cmd == "/start":
-            response = f"🌟 שלום {user['first_name']}! אני מאיה, המזכירה שלך!\n\nאיך אוכל לעזור לך היום? 😊"
+            response = f"היי {user['first_name']}! אני מאיה 🤖\nמה שלומך?"
         
         elif cmd == "/help":
-            response = """
-🤖 מאיה - המזכירה שלך
-
-פקודות:
+            response = """פקודות:
 /start - התחלה
-/help - עזרה
-/memory - מה שאני זוכרת
-/weather - מזג אוויר
+/help - עזרה  
+/memory - זיכרון
+/weather [מקום] - מזג אוויר
 /stats - סטטיסטיקות
-/usage - שימוש ב-API
 /forget - מחק זיכרון
 
-פשוט כתוב לי מה שאתה צריך! 💪
-            """
+או פשוט כתוב לי מה שאתה רוצה! 💬"""
         
         elif cmd == "/memory":
             context = user_service.get_user_context(user['telegram_id'])
-            response = f"🧠 הנה מה שאני זוכרת עליך:\n\n{context}"
+            response = f"🧠 מה שאני זוכרת:\n{context}" if context else "אין זיכרונות עדיין"
         
         elif cmd == "/weather":
-            # אם יש טקסט אחרי /weather
-            location_text = command.replace("/weather", "").strip()
-            if location_text:
-                location = location_text
-            else:
-                location = "תל אביב"  # ברירת מחדל
+            location = command.replace("/weather", "").strip() or "תל אביב"
             response = weather_service.get_weather_anywhere(location)
         
         elif cmd == "/stats":
             total_users = len(user_data)
-            total_conversations = sum(len(conversations.get(uid, [])) for uid in conversations)
-            response = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🤖 אני פעילה!"
-        
-        elif cmd == "/usage":
-            try:
-                usage_stats = ai_service.get_usage_stats()
-                response = f"""📊 שימוש ב-Gemini API היום:
-
-🔢 בקשות: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)
-🎯 סה"כ בקשות: {usage_stats['total_requests_ever']}
-🪙 סה"כ טוקנים: {usage_stats['total_tokens']:,}
-
-💡 נותרו היום: {usage_stats['daily_remaining']} בקשות"""
-            except Exception as e:
-                response = f"❌ שגיאה בקבלת נתוני שימוש: {e}"
+            response = f"📊 {total_users} משתמשים רשומים"
         
         elif cmd == "/forget":
             user_id = user['telegram_id']
             if user_id in memories:
                 del memories[user_id]
-            if user_id in conversations:
-                del conversations[user_id]
-            save_data()
-            response = "🗑️ מחקתי הכל! נתחיל מחדש."
+                save_data()
+            response = "🗑️ מחקתי הכל"
         
         else:
-            response = "❓ לא מכירה את הפקודה הזו. כתוב /help לעזרה."
+            response = "לא מכירה את הפקודה. כתוב /help"
         
-        logger.debug(f"Command response: {response[:50]}...")
         self.send_message(chat_id, response)
     
     def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
         user_id = user['telegram_id']
         
-        if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר", "מעלות"]):
-            logger.debug("Weather query detected")
-            
-            # חילוץ המיקום מהטקסט
-            location = weather_service.extract_location(text)
-            response = weather_service.get_weather_anywhere(location)
-        
-        elif "שעה" in text.lower():
-            logger.debug("Time query detected")
-            israel_tz = pytz.timezone("Asia/Jerusalem")
-            now = datetime.now(israel_tz)
-            response = f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
-        
-        elif any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר"]):
-            logger.debug("Important info detected, saving to memory")
+        # בדיקה אם זה מידע אישי שצריך לזכור
+        if any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר", "אני אוהב", "שמי"]):
             user_service.add_memory(user_id, text)
-            context = user_service.get_user_context(user_id)
-            response = ai_service.generate_response(user_id, text, context)
         
-        else:
-            logger.debug("Generating AI response")
-            context = user_service.get_user_context(user_id)
-            response = ai_service.generate_response(user_id, text, context)
+        # קבלת הקשר משתמש
+        context = user_service.get_user_context(user_id)
         
+        # יצירת תשובה עם AI
+        response = ai_service.generate_response(user_id, text, context)
+        
+        # שמירת השיחה
         if user_id not in conversations:
             conversations[user_id] = []
         conversations[user_id].append({
@@ -808,14 +670,18 @@ class TelegramBot:
             'timestamp': datetime.now().isoformat()
         })
         
+        # שמירת רק 20 הודעות אחרונות
         if len(conversations[user_id]) > 20:
             conversations[user_id] = conversations[user_id][-20:]
         
         save_data()
-        
-        logger.debug(f"Message response: {response[:50]}...")
         self.send_message(chat_id, response)
 
+# === SERVICES INITIALIZATION ===
+security = SecurityService()
+user_service = UserService()
+weather_service = GlobalWeatherService()
+ai_service = ClaudeStyleAI()
 bot = TelegramBot()
 
 # === FLASK ROUTES ===
@@ -825,14 +691,19 @@ def health_check():
         usage_stats = ai_service.get_usage_stats()
         return jsonify({
             "status": "healthy",
-            "service": "Maya Secretary Bot",
-            "version": "2.1.0-with-gemini-tracking",
+            "service": "Maya 3.0 - Claude-like Assistant",
+            "version": "3.0.0-complete-rebuild",
             "timestamp": datetime.utcnow().isoformat(),
             "environment": config.ENVIRONMENT,
             "users": len(user_data),
-            "storage": "JSON",
             "ai_model": config.GEMINI_MODEL,
-            "webhook_url": config.WEBHOOK_URL,
+            "features": [
+                "claude_intelligence_engine",
+                "built_in_knowledge_base", 
+                "contextual_understanding",
+                "short_natural_responses",
+                "no_automatic_greetings"
+            ],
             "gemini_usage": {
                 "daily_requests": usage_stats['daily_requests'],
                 "daily_limit": usage_stats['daily_limit'],
@@ -846,17 +717,11 @@ def health_check():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        logger.info("Webhook called")
         update = request.get_json()
-        
         if not update:
-            logger.warning("Empty webhook request")
             return "No data", 400
         
-        logger.debug(f"Webhook data: {json.dumps(update, indent=2)}")
         bot.process_update(update)
-        
-        logger.info("Webhook processed successfully")
         return "OK", 200
         
     except Exception as e:
@@ -872,16 +737,44 @@ def api_stats():
             "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
             "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
             "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
-            "bot_status": "active",
-            "storage_type": "JSON",
-            "ai_model": config.GEMINI_MODEL,
-            "webhook_url": config.WEBHOOK_URL,
+            "version": "3.0.0-complete-rebuild",
+            "features": {
+                "claude_intelligence_engine": True,
+                "built_in_knowledge": True,
+                "contextual_understanding": True,
+                "natural_responses": True,
+                "weather_service": True,
+                "memory_system": True
+            },
             "gemini_usage": usage_stats
         }
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Stats error: {e}")
         return jsonify({"error": "Stats unavailable"}), 500
+
+@app.route("/test_intelligence", methods=["POST"])
+def test_intelligence():
+    """נקודת קצה לבדיקת מנוע החכמה"""
+    try:
+        data = request.get_json()
+        message = data.get('message', '')
+        
+        if not message:
+            return jsonify({"error": "No message provided"}), 400
+        
+        intelligence_engine = ClaudeIntelligenceEngine()
+        result = intelligence_engine.analyze_and_respond(message)
+        
+        return jsonify({
+            "input_message": message,
+            "analysis_result": result,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Intelligence test error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/usage", methods=["GET"])
 def api_usage():
@@ -921,7 +814,27 @@ def set_webhook():
 def debug_info():
     try:
         usage_stats = ai_service.get_usage_stats()
+        
+        # בדיקת מנוע החכמה
+        intelligence_engine = ClaudeIntelligenceEngine()
+        test_cases = [
+            "מתי המונדיאל הבא?",
+            "המלחמה האחרונה של ישראל",
+            "מזג אוויר בתל אביב",
+            "מי נשיא אמריקה?"
+        ]
+        
+        intelligence_tests = {}
+        for test_case in test_cases:
+            result = intelligence_engine.analyze_and_respond(test_case)
+            intelligence_tests[test_case] = {
+                "type": result["type"],
+                "confidence": result["confidence"],
+                "has_response": bool(result.get("response"))
+            }
+        
         debug_data = {
+            "maya_version": "3.0.0-complete-rebuild",
             "config": {
                 "telegram_token_set": bool(config.TELEGRAM_TOKEN),
                 "gemini_api_key_set": bool(config.GEMINI_API_KEY),
@@ -935,12 +848,19 @@ def debug_info():
                 "memories_count": sum(len(memories.get(uid, [])) for uid in memories)
             },
             "services": {
-                "ai_service": "initialized",
-                "weather_service": "initialized", 
-                "user_service": "initialized",
-                "security_service": "initialized",
-                "gemini_tracker": "initialized"
+                "ai_service": "ClaudeStyleAI",
+                "intelligence_engine": "ClaudeIntelligenceEngine",
+                "weather_service": "GlobalWeatherService", 
+                "user_service": "UserService",
+                "security_service": "SecurityService"
             },
+            "intelligence_engine_tests": intelligence_tests,
+            "built_in_knowledge_topics": [
+                "israel_current_war",
+                "world_cup_2026", 
+                "olympics_2028",
+                "us_president"
+            ],
             "gemini_usage": usage_stats
         }
         return jsonify(debug_data)
@@ -950,7 +870,6 @@ def debug_info():
 
 @app.errorhandler(404)
 def not_found(error):
-    logger.warning(f"404 error: {request.url}")
     return jsonify({"error": "Endpoint not found"}), 404
 
 @app.errorhandler(500)
@@ -978,17 +897,35 @@ def set_webhook_on_startup():
         logger.info("Webhook not set - missing WEBHOOK_URL or not in production")
 
 if __name__ == "__main__":
-    logger.info("Starting Maya Secretary Bot...")
+    logger.info("=" * 50)
+    logger.info("Starting Maya 3.0 - Complete Rebuild")
+    logger.info("=" * 50)
     logger.info(f"Environment: {config.ENVIRONMENT}")
     logger.info(f"Debug mode: {config.DEBUG}")
-    logger.info(f"Storage: JSON files")
     logger.info(f"AI Model: {config.GEMINI_MODEL}")
+    logger.info("Features:")
+    logger.info("  ✅ Claude Intelligence Engine")
+    logger.info("  ✅ Built-in Knowledge Base")
+    logger.info("  ✅ Contextual Understanding")
+    logger.info("  ✅ Short Natural Responses")
+    logger.info("  ✅ No Automatic Greetings")
+    logger.info("  ✅ Weather Service")
+    logger.info("  ✅ Memory System")
+    logger.info("=" * 50)
     
     try:
         usage_stats = ai_service.get_usage_stats()
-        logger.info(f"Usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
+        logger.info(f"Gemini usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
     except Exception as e:
         logger.error(f"Could not get usage stats: {e}")
+    
+    # Test intelligence engine
+    try:
+        intelligence_engine = ClaudeIntelligenceEngine()
+        test_result = intelligence_engine.analyze_and_respond("מתי המונדיאל הבא?")
+        logger.info(f"Intelligence engine test: {test_result['type']} - {bool(test_result.get('response'))}")
+    except Exception as e:
+        logger.error(f"Intelligence engine test failed: {e}")
     
     set_webhook_on_startup()
     
@@ -998,5 +935,5 @@ if __name__ == "__main__":
         debug=config.DEBUG
     )
 else:
-    logger.info("Maya Secretary Bot starting via WSGI...")
-    set_webhook_on_startup()
+    logger.info("Maya 3.0 starting via WSGI...")
+    set_webhook_on_startup() "
