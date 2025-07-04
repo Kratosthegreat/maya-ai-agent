@@ -183,17 +183,24 @@ class AIService:
     
     def _get_system_instruction(self) -> str:
         return """
-        את מאיה, מזכירה אישית חכמה ונעימה. תמיד דברי על עצמך בלשון נקבה.
+        את מאיה, עוזרת אישית מחוברת לאינטרנט בדיוק כמו Claude.
         
-        התפקיד שלך:
-        1. לעזור למשתמשים בניהול זמן ומשימות
-        2. לזכור מידע חשוב על המשתמשים
-        3. לספק מידע מדויק ועדכני
-        4. להיות חברותית ומקצועית
+        איך להתנהג:
+        1. תמיד תנסי לענות על השאלה - אם לא יודעת, תחפשי באינטרנט
+        2. כשמחפשת מידע תגידי "אני בודקת..." ואז תני תשובה מדויקת
+        3. תהיי בטוחה במידע שלך כי את יכולה לבדוק בזמן אמת
+        4. תשתמשי במידע מעודכן ועדכני תמיד
+        5. תהיי עוזרת אמיתית כמו Claude
         
-        תני תשובות קצרות - עד 2 משפטים.
-        אל תברכי "שלום" בכל הודעה.
-        תמיד התייחסי למשתמש בכבוד וזכרי פרטים חשובים משיחות קודמות.
+        מה שאת יכולה:
+        - חיפוש מידע עדכני באינטרנט על כל נושא
+        - מזג אוויר בכל העולם
+        - תאריכים ואירועים עדכניים
+        - מידע על אנשים, חברות, אירועים
+        - עובדות ומידע כללי
+        
+        אל תגידי "לא יודעת" - תחפשי ותמצאי תשובה!
+        תהיי כמו Claude - מחוברת, מעודכנת ועוזרת!
         """
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
@@ -293,44 +300,151 @@ class UserService:
 
 user_service = UserService()
 
-# === WEATHER SERVICE ===
-class WeatherService:
-    CITIES = {
-        "תל אביב": (32.0853, 34.7818),
-        "ירושלים": (31.7683, 35.2137),
-        "חיפה": (32.7940, 34.9896),
-        "באר שבע": (31.2518, 34.7915),
-        "עפולה": (32.6098, 35.2897),
-        "בני ברק": (32.0879, 34.8336)
-    }
+# === GLOBAL WEATHER SERVICE ===
+class GlobalWeatherService:
+    """Global weather service for any location worldwide"""
     
-    def extract_city(self, text: str) -> str:
-        for city in self.CITIES:
-            if city in text:
-                return city
-        return "תל אביב"
+    def extract_location(self, text: str) -> str:
+        """Extract location from text"""
+        # מסיר מילות מפתח וחוזר למיקום
+        text = text.replace("מזג אוויר", "").replace("טמפרטורה", "")
+        text = text.replace("ב", "").replace("של", "").replace("את", "")
+        text = text.strip()
+        
+        # אם לא נמצא מיקום ספציפי, ברירת מחדל
+        if not text or len(text) < 2:
+            return "תל אביב"
+        
+        return text
     
-    def get_weather(self, city: str = "תל אביב") -> str:
+    def get_weather_anywhere(self, location: str) -> str:
+        """Get weather for any location worldwide"""
         try:
-            lat, lon = self.CITIES.get(city, self.CITIES["תל אביב"])
-            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+            # שימוש ב-Open-Meteo API (חינמי, ללא מפתח API)
+            # חיפוש קואורדינטות של המקום
+            geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=he&format=json"
+            geo_response = requests.get(geocoding_url, timeout=5)
+            geo_data = geo_response.json()
             
-            response = requests.get(url, timeout=5)
-            data = response.json()
+            if not geo_data.get('results'):
+                return f"מצטערת, לא מצאתי את המקום '{location}'. נסה לכתוב בדרך אחרת 🌍"
             
-            current = data["current_weather"]
-            temp = current["temperature"]
-            windspeed = current["windspeed"]
+            # קבלת קואורדינטות
+            result = geo_data['results'][0]
+            lat = result['latitude']
+            lon = result['longitude']
+            place_name = result['name']
+            country = result.get('country', '')
             
-            result = f"🌤️ מזג האוויר ב{city}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
-            logger.debug(f"Weather fetched for {city}: {temp}°C")
+            # קבלת מזג אוויר
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
+            weather_response = requests.get(weather_url, timeout=5)
+            weather_data = weather_response.json()
+            
+            current = weather_data['current_weather']
+            temp = current['temperature']
+            windspeed = current['windspeed']
+            
+            # קביעת אמוג'י לפי טמפרטורה
+            if temp > 30:
+                temp_emoji = "🔥"
+            elif temp > 20:
+                temp_emoji = "☀️"
+            elif temp > 10:
+                temp_emoji = "🌤️"
+            elif temp > 0:
+                temp_emoji = "☁️"
+            else:
+                temp_emoji = "❄️"
+            
+            location_display = f"{place_name}"
+            if country and country != place_name:
+                location_display += f", {country}"
+            
+            result = f"{temp_emoji} מזג האוויר ב{location_display}:\n🌡️ {temp}°C\n💨 רוח: {windspeed} קמ\"ש"
+            logger.debug(f"Weather fetched for {location_display}: {temp}°C")
             return result
             
         except Exception as e:
-            logger.error(f"Weather error for {city}: {e}")
-            return f"❗ לא הצלחתי לקבל מזג אוויר עבור {city}"
+            logger.error(f"Weather error for {location}: {e}")
+            return f"מצטערת, לא הצלחתי לקבל מזג אוויר עבור {location}. נסה שם מקום אחר 🌍"
 
-weather_service = WeatherService()
+weather_service = GlobalWeatherService()
+
+# === WEB SEARCH SERVICE ===
+class WebSearchService:
+    """Web search service for real-time information like Claude"""
+    
+    def search_web(self, query: str) -> str:
+        """Search the web for current information"""
+        try:
+            # DuckDuckGo Instant Answer API (חינמי וללא מפתח)
+            url = f"https://api.duckduckgo.com/?q={query}&format=json&pretty=1&no_html=1"
+            response = requests.get(url, timeout=10)
+            data = response.json()
+            
+            # בדיקת תשובות שונות מה-API
+            if data.get('AbstractText'):
+                return data['AbstractText'][:400] + "..."
+            elif data.get('Answer'):
+                return data['Answer']
+            elif data.get('Definition'):
+                return data['Definition']
+            elif data.get('RelatedTopics') and len(data['RelatedTopics']) > 0:
+                topic = data['RelatedTopics'][0]
+                if topic.get('Text'):
+                    return topic['Text'][:300] + "..."
+            else:
+                return self._fallback_search(query)
+                
+        except Exception as e:
+            logger.error(f"Web search error: {e}")
+            return f"לא הצלחתי לחפש באינטרנט עבור '{query}'. נסה שאלה אחרת 🔍"
+    
+    def _fallback_search(self, query: str) -> str:
+        """Fallback search method"""
+        try:
+            # Wikipedia API בעברית/אנגלית
+            wiki_url = f"https://he.wikipedia.org/api/rest_v1/page/summary/{query}"
+            response = requests.get(wiki_url, timeout=5)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('extract'):
+                    return data['extract'][:350] + "..."
+            
+            # אם לא מצא בעברית, נסה באנגלית
+            wiki_url_en = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query}"
+            response_en = requests.get(wiki_url_en, timeout=5)
+            
+            if response_en.status_code == 200:
+                data_en = response_en.json()
+                if data_en.get('extract'):
+                    return data_en['extract'][:350] + "...\n(מקור: ויקיפדיה באנגלית)"
+            
+            return f"לא מצאתי מידע מועיל על '{query}'. נסה לנסח אחרת 🤔"
+            
+        except Exception as e:
+            return f"בעיה בחיפוש '{query}' 😔"
+    
+    def get_current_info(self, topic: str) -> str:
+        """Get current information about specific topics"""
+        current_year = datetime.now().year
+        
+        # שאלות על אירועים עדכניים
+        if any(word in topic.lower() for word in ["מונדיאל", "world cup"]):
+            return self.search_web(f"FIFA World Cup {current_year} {current_year + 1} {current_year + 2}")
+        
+        elif any(word in topic.lower() for word in ["אולימפיאדה", "olympics"]):
+            return self.search_web(f"Olympics {current_year} {current_year + 1} {current_year + 2}")
+        
+        elif any(word in topic.lower() for word in ["בחירות", "elections"]):
+            return self.search_web(f"elections {current_year} Israel USA")
+        
+        else:
+            return self.search_web(topic)
+
+web_search_service = WebSearchService()
 
 # === TELEGRAM BOT LOGIC ===
 class TelegramBot:
@@ -423,8 +537,13 @@ class TelegramBot:
             response = f"🧠 הנה מה שאני זוכרת עליך:\n\n{context}"
         
         elif cmd == "/weather":
-            city = weather_service.extract_city(command)
-            response = weather_service.get_weather(city)
+            # אם יש טקסט אחרי /weather
+            location_text = command.replace("/weather", "").strip()
+            if location_text:
+                location = location_text
+            else:
+                location = "תל אביב"  # ברירת מחדל
+            response = weather_service.get_weather_anywhere(location)
         
         elif cmd == "/stats":
             total_users = len(user_data)
@@ -462,14 +581,12 @@ class TelegramBot:
     def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
         user_id = user['telegram_id']
         
-        if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר"]):
+        if any(word in text.lower() for word in ["מזג אוויר", "טמפרטורה", "חם", "קר", "מעלות"]):
             logger.debug("Weather query detected")
             
-            if "ארגנטינה" in text or "argentina" in text.lower():
-                response = "מצטערת, אני יכולה לתת מזג אוויר רק לערים בישראל 🇮🇱\nאיזה עיר בישראל מעניינת אותך?"
-            else:
-                city = weather_service.extract_city(text)
-                response = weather_service.get_weather(city)
+            # חילוץ המיקום מהטקסט
+            location = weather_service.extract_location(text)
+            response = weather_service.get_weather_anywhere(location)
         
         elif "שעה" in text.lower():
             logger.debug("Time query detected")
