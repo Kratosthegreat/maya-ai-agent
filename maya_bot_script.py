@@ -15,14 +15,22 @@ import time
 # Third-party imports
 import google.generativeai as genai
 from config import config
-import logging
+
+# === ENHANCED LOGGING SETUP ===
+logging.basicConfig(
+    level=logging.DEBUG if config.DEBUG else logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
+# === FLASK APP SETUP ===
 app = Flask(__name__)
-app.config["SECRET_KEY"] = config.SECRET_KEY
+app.config['SECRET_KEY'] = config.SECRET_KEY
 
+# === DATA STORAGE (JSON) ===
 DATA_FILE = "maya_data.json"
-GEMINI_USAGE_FILE = "gemini_usage.json"
+user_data = {}
+conversations = {}
 memories = {}
 
 def load_data():
@@ -269,6 +277,7 @@ class TelegramBot:
             data = {
                 "chat_id": chat_id,
                 "text": text[:4096],  # Telegram limit
+                "parse_mode": parse_mode
             }
             
             logger.debug(f"📤 Sending message to chat {chat_id}: {text[:50]}...")
