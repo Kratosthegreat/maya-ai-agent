@@ -17,12 +17,12 @@ import google.generativeai as genai
 from config import config
 import logging
 logger = logging.getLogger(__name__)
-app.config['SECRET_KEY'] = config.SECRET_KEY
 
-# === DATA STORAGE (JSON) ===
+app = Flask(__name__)
+app.config["SECRET_KEY"] = config.SECRET_KEY
+
 DATA_FILE = "maya_data.json"
-user_data = {}
-conversations = {}
+GEMINI_USAGE_FILE = "gemini_usage.json"
 memories = {}
 
 def load_data():
