@@ -171,33 +171,29 @@ class ClaudeIntelligenceEngine:
         """קבלת תשובה מובנית - בסגנון שלי"""
         
         if topic == "israel_war":
-            knowledge = self.built_in_knowledge["israel_current_war"]
-            response = f"מלחמת חרבות ברזל - המלחמה שהחלה ב-7 באוקטובר 2023 כשחמאס תקף את ישראל. זו המלחמה הנוכחית של ישראל."
+            response = "מלחמת חרבות ברזל - המלחמה שהחלה ב-7 באוקטובר 2023 כשחמאס תקף את ישראל. זו המלחמה הנוכחית של ישראל."
             
         elif topic == "world_cup":
-            knowledge = self.built_in_knowledge["world_cup_2026"]
-            response = f"המונדיאל הבא ב-2026! 🏆\nארצות הברית, מקסיקו וקנדה יארחו יחד.\n48 נבחרות במקום 32 - המונדיאל הגדול ביותר בהיסטוריה."
+            response = "המונדיאל הבא ב-2026! 🏆\nארצות הברית, מקסיקו וקנדה יארחו יחד.\n48 נבחרות במקום 32 - המונדיאל הגדול ביותר בהיסטוריה."
             
         elif topic == "olympics":
-            knowledge = self.built_in_knowledge["olympics_2028"]
-            response = f"אולימפיאדת הקיץ הבאה ב-2028 בלוס אנג'לס! 🏅\nהשלישית שלהם בעיר הזו."
+            response = "אולימפיאדת הקיץ הבאה ב-2028 בלוס אנג'לס! 🏅\nהשלישית שלהם בעיר הזו."
             
         elif topic == "us_president":
-            knowledge = self.built_in_knowledge["us_president"]
-            response = f"דונלד טראמפ הוא הנשיא הנוכחי של ארצות הברית. נבחר בנובמבר 2024 ונכנס לתפקיד בינואר 2025."
+            response = "דונלד טראמפ הוא הנשיא הנוכחי של ארצות הברית. נבחר בנובמבר 2024 ונכנס לתפקיד בינואר 2025."
             
         elif topic == "weather":
             return {
                 "type": "weather_service", 
                 "confidence": "high",
-                "response": None  # יעבור לשירות מזג אוויר
+                "response": None
             }
             
         elif topic == "time":
             return {
                 "type": "time_service",
                 "confidence": "high", 
-                "response": None  # יעבור לשירות זמן
+                "response": None
             }
         
         else:
@@ -210,6 +206,79 @@ class ClaudeIntelligenceEngine:
             "source": "built_in_knowledge"
         }
 
+# === GEMINI TRACKER ===
+class GeminiTracker:
+    def __init__(self):
+        self.usage_file = GEMINI_USAGE_FILE
+        self.daily_limit = 1500
+        self.minute_limit = 15
+        self.load_usage_data()
+    
+    def load_usage_data(self):
+        if os.path.exists(self.usage_file):
+            try:
+                with open(self.usage_file, 'r', encoding='utf-8') as f:
+                    self.usage_data = json.load(f)
+            except:
+                self._init_usage_data()
+        else:
+            self._init_usage_data()
+    
+    def _init_usage_data(self):
+        self.usage_data = {
+            'daily_requests': 0,
+            'last_reset': str(datetime.now().date()),
+            'minute_requests': [],
+            'total_tokens': 0,
+            'total_requests_ever': 0
+        }
+    
+    def save_usage_data(self):
+        try:
+            with open(self.usage_file, 'w', encoding='utf-8') as f:
+                json.dump(self.usage_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving usage: {e}")
+    
+    def can_make_request(self):
+        today = str(datetime.now().date())
+        if self.usage_data['last_reset'] != today:
+            self.usage_data['daily_requests'] = 0
+            self.usage_data['last_reset'] = today
+            self.usage_data['minute_requests'] = []
+        
+        now = datetime.now()
+        minute_ago = now - timedelta(minutes=1)
+        self.usage_data['minute_requests'] = [
+            req_time for req_time in self.usage_data['minute_requests']
+            if datetime.fromisoformat(req_time) > minute_ago
+        ]
+        
+        if self.usage_data['daily_requests'] >= self.daily_limit:
+            return False, f"הגעת למגבלה היומית ({self.daily_limit})"
+        if len(self.usage_data['minute_requests']) >= self.minute_limit:
+            return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
+        
+        return True, "OK"
+    
+    def record_request(self, tokens_used=0):
+        now = datetime.now()
+        self.usage_data['daily_requests'] += 1
+        self.usage_data['total_requests_ever'] += 1
+        self.usage_data['minute_requests'].append(now.isoformat())
+        self.usage_data['total_tokens'] += tokens_used
+        self.save_usage_data()
+    
+    def get_usage_stats(self):
+        return {
+            'daily_requests': self.usage_data['daily_requests'],
+            'daily_limit': self.daily_limit,
+            'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
+            'total_tokens': self.usage_data['total_tokens'],
+            'total_requests_ever': self.usage_data['total_requests_ever'],
+            'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
+        }
+
 # === CLAUDE-STYLE AI SERVICE ===
 class ClaudeStyleAI:
     """שירות AI שמחקה את Claude בדיוק"""
@@ -220,7 +289,7 @@ class ClaudeStyleAI:
             self.model = genai.GenerativeModel(config.GEMINI_MODEL)
             self.chat_sessions = {}
             self.intelligence_engine = ClaudeIntelligenceEngine()
-            self.tracker = GeminiTracker()  # יוגדר למטה
+            self.tracker = GeminiTracker()
             
             # הוראות מערכת מחודשות - בדיוק כמו שאני מתנהג
             self.system_prompt = """את מאיה. אל תגידי "שלום" או תברכי אלא אם כן המשתמש בירך ראשון.
@@ -353,79 +422,6 @@ class ClaudeStyleAI:
     
     def get_usage_stats(self):
         return self.tracker.get_usage_stats()
-
-# === GEMINI TRACKER ===
-class GeminiTracker:
-    def __init__(self):
-        self.usage_file = GEMINI_USAGE_FILE
-        self.daily_limit = 1500
-        self.minute_limit = 15
-        self.load_usage_data()
-    
-    def load_usage_data(self):
-        if os.path.exists(self.usage_file):
-            try:
-                with open(self.usage_file, 'r', encoding='utf-8') as f:
-                    self.usage_data = json.load(f)
-            except:
-                self._init_usage_data()
-        else:
-            self._init_usage_data()
-    
-    def _init_usage_data(self):
-        self.usage_data = {
-            'daily_requests': 0,
-            'last_reset': str(datetime.now().date()),
-            'minute_requests': [],
-            'total_tokens': 0,
-            'total_requests_ever': 0
-        }
-    
-    def save_usage_data(self):
-        try:
-            with open(self.usage_file, 'w', encoding='utf-8') as f:
-                json.dump(self.usage_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            logger.error(f"Error saving usage: {e}")
-    
-    def can_make_request(self):
-        today = str(datetime.now().date())
-        if self.usage_data['last_reset'] != today:
-            self.usage_data['daily_requests'] = 0
-            self.usage_data['last_reset'] = today
-            self.usage_data['minute_requests'] = []
-        
-        now = datetime.now()
-        minute_ago = now - timedelta(minutes=1)
-        self.usage_data['minute_requests'] = [
-            req_time for req_time in self.usage_data['minute_requests']
-            if datetime.fromisoformat(req_time) > minute_ago
-        ]
-        
-        if self.usage_data['daily_requests'] >= self.daily_limit:
-            return False, f"הגעת למגבלה היומית ({self.daily_limit})"
-        if len(self.usage_data['minute_requests']) >= self.minute_limit:
-            return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
-        
-        return True, "OK"
-    
-    def record_request(self, tokens_used=0):
-        now = datetime.now()
-        self.usage_data['daily_requests'] += 1
-        self.usage_data['total_requests_ever'] += 1
-        self.usage_data['minute_requests'].append(now.isoformat())
-        self.usage_data['total_tokens'] += tokens_used
-        self.save_usage_data()
-    
-    def get_usage_stats(self):
-        return {
-            'daily_requests': self.usage_data['daily_requests'],
-            'daily_limit': self.daily_limit,
-            'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
-            'total_tokens': self.usage_data['total_tokens'],
-            'total_requests_ever': self.usage_data['total_requests_ever'],
-            'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
-        }
 
 # === WEATHER SERVICE ===
 class GlobalWeatherService:
@@ -652,7 +648,8 @@ class TelegramBot:
         user_id = user['telegram_id']
         
         # בדיקה אם זה מידע אישי שצריך לזכור
-        if any(phrase in text.lower() for phrase in ["קוראים לי", "אני עובד", "אני גר", "אני אוהב", "שמי"]):
+        personal_keywords = ["קוראים לי", "אני עובד", "אני גר", "אני אוהב", "שמי"]
+        if any(phrase in text.lower() for phrase in personal_keywords):
             user_service.add_memory(user_id, text)
         
         # קבלת הקשר משתמש
@@ -936,4 +933,4 @@ if __name__ == "__main__":
     )
 else:
     logger.info("Maya 3.0 starting via WSGI...")
-    set_webhook_on_startup() "
+    set_webhook_on_startup()
