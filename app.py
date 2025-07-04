@@ -209,7 +209,7 @@ class AIService:
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         """Generate AI response"""
-        try:
+    
             # בדיקת מגבלות - חדש!
             can_request, status_message = self.tracker.can_make_request()
             if not can_request:
