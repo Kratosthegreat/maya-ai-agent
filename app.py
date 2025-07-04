@@ -1,7 +1,3 @@
-“””
-Maya Secretary Bot - With Enhanced Debug Logging & Gemini API Tracking
-“””
-
 import os
 import json
 import logging
