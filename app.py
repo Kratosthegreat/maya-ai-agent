@@ -139,7 +139,11 @@ class ClaudeIntelligenceEngine:
             
             # זיהוי שאלות מזג אוויר
             "weather": [
-                r"(מזג אוויר|טמפרטורה|חם|קר|מעלות|גשם|שמש)"
+                r"(מזג אוויר|טמפרטורה|חם|קר|מעלות|גשם|שמש)",
+                r"מה (הטמפרטורה|המזג|מזג האוויר)",
+                r"(טמפרטורה|מזג אוויר).*(ב|של|עכשיו)",
+                r"כמה מעלות",
+                r"איך (המזג|מזג האוויר|הטמפרטורה)"
             ],
             
             # זיהוי שאלות זמן
@@ -350,7 +354,17 @@ class ClaudeStyleAI:
         """חילוץ מיקום מהודעה"""
         # הסרת מילות מפתח
         clean_text = message.replace("מזג אוויר", "").replace("טמפרטורה", "")
-        clean_text = clean_text.replace("ב", "").replace("של", "").strip()
+        clean_text = clean_text.replace("מה ה", "").replace("מה ", "")
+        clean_text = clean_text.replace("ב", "").replace("של", "").replace("את", "")
+        clean_text = clean_text.replace("עכשיו", "").replace("היום", "")
+        clean_text = clean_text.strip()
+        
+        # חיפוש שמות ערים ישראליות
+        israeli_cities = ["חיפה", "תל אביב", "ירושלים", "באר שבע", "אילת", "נצרת", "טבריה", "צפת", "אשדוד", "אשקלון", "רמת גן", "פתח תקווה", "נתניה", "הרצליה", "רעננה", "כפר סבא", "רמלה", "לוד"]
+        
+        for city in israeli_cities:
+            if city in message:
+                return city
         
         if not clean_text or len(clean_text) < 2:
             return "תל אביב"  # ברירת מחדל
