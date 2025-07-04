@@ -238,7 +238,7 @@ class AIService:
             # רישום הבקשה - חדש!
     
             
-            logger.debug(f"✅ AI response generated: {response.text[:100]}...")
+    logger.debug(f"✅ AI response generated: {response.text[:100]}...")
             return response.text
             
         except Exception as e:
