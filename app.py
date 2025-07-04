@@ -72,142 +72,84 @@ logger.error(f”❌ Error saving data: {e}”)
 
 load_data()
 
-# === GEMINI API TRACKER ===
+# === GEMINI API TRACKER (חדש!) ===
 
 class GeminiTracker:
-“”“Gemini API usage tracker”””
+def **init**(self):
+self.usage_file = GEMINI_USAGE_FILE
+self.daily_limit = 1500
+self.minute_limit = 15
+self.load_usage_data()
 
 ```
-def __init__(self):
-    self.usage_file = GEMINI_USAGE_FILE
-    self.daily_limit = 1500  # Free tier daily limit
-    self.minute_limit = 15   # Free tier per minute limit
-    self.load_usage_data()
-
 def load_usage_data(self):
-    """Load usage data from file"""
     if os.path.exists(self.usage_file):
         try:
             with open(self.usage_file, 'r', encoding='utf-8') as f:
                 self.usage_data = json.load(f)
-            logger.debug(f"📊 Loaded Gemini usage data: {self.usage_data.get('daily_requests', 0)} requests today")
-        except Exception as e:
-            logger.error(f"❌ Error loading Gemini usage data: {e}")
+            logger.debug(f"📊 Loaded usage: {self.usage_data.get('daily_requests', 0)} requests today")
+        except:
             self._init_usage_data()
     else:
         self._init_usage_data()
 
 def _init_usage_data(self):
-    """Initialize usage data"""
     self.usage_data = {
         'daily_requests': 0,
         'last_reset': str(datetime.now().date()),
         'minute_requests': [],
         'total_tokens': 0,
-        'total_requests_ever': 0,
-        'last_request_time': None
+        'total_requests_ever': 0
     }
-    logger.info("📊 Initialized new Gemini usage tracking")
 
 def save_usage_data(self):
-    """Save usage data to file"""
     try:
         with open(self.usage_file, 'w', encoding='utf-8') as f:
             json.dump(self.usage_data, f, ensure_ascii=False, indent=2)
-        logger.debug("💾 Gemini usage data saved")
     except Exception as e:
-        logger.error(f"❌ Error saving Gemini usage data: {e}")
+        logger.error(f"❌ Error saving usage: {e}")
 
-def reset_daily_if_needed(self):
-    """Reset daily counters if new day"""
+def can_make_request(self):
+    # Reset if new day
     today = str(datetime.now().date())
     if self.usage_data['last_reset'] != today:
-        old_requests = self.usage_data['daily_requests']
         self.usage_data['daily_requests'] = 0
         self.usage_data['last_reset'] = today
         self.usage_data['minute_requests'] = []
-        self.save_usage_data()
-        logger.info(f"🔄 Daily Gemini usage reset - Previous day: {old_requests} requests")
-
-def clean_minute_requests(self):
-    """Clean old minute requests"""
+    
+    # Clean old minute requests
     now = datetime.now()
     minute_ago = now - timedelta(minutes=1)
-    
-    old_count = len(self.usage_data['minute_requests'])
     self.usage_data['minute_requests'] = [
         req_time for req_time in self.usage_data['minute_requests']
         if datetime.fromisoformat(req_time) > minute_ago
     ]
     
-    if old_count != len(self.usage_data['minute_requests']):
-        logger.debug(f"🧹 Cleaned {old_count - len(self.usage_data['minute_requests'])} old minute requests")
-
-def can_make_request(self) -> tuple[bool, str]:
-    """Check if request can be made"""
-    self.reset_daily_if_needed()
-    self.clean_minute_requests()
-    
-    # Check daily limit
+    # Check limits
     if self.usage_data['daily_requests'] >= self.daily_limit:
-        remaining_time = self._time_until_daily_reset()
-        return False, f"🚫 הגעת למגבלה היומית ({self.daily_limit} בקשות). איפוס ב-{remaining_time}"
-    
-    # Check minute limit
+        return False, f"הגעת למגבלה היומית ({self.daily_limit})"
     if len(self.usage_data['minute_requests']) >= self.minute_limit:
-        return False, f"🚫 יותר מדי בקשות בדקה ({self.minute_limit}). נסה שוב בעוד דקה"
+        return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
     
-    # Check if last request was too recent (avoid spam)
-    if self.usage_data['last_request_time']:
-        last_request = datetime.fromisoformat(self.usage_data['last_request_time'])
-        if (datetime.now() - last_request).total_seconds() < 1:
-            return False, "⚠️ המתן שנייה בין בקשות"
-    
-    remaining_daily = self.daily_limit - self.usage_data['daily_requests']
-    remaining_minute = self.minute_limit - len(self.usage_data['minute_requests'])
-    
-    return True, f"✅ יכול לבצע בקשה (נותרו היום: {remaining_daily}, נותרו בדקה: {remaining_minute})"
+    remaining = self.daily_limit - self.usage_data['daily_requests']
+    return True, f"OK (נותרו: {remaining})"
 
-def _time_until_daily_reset(self) -> str:
-    """Calculate time until daily reset"""
+def record_request(self, tokens_used=0):
     now = datetime.now()
-    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    remaining = tomorrow - now
-    
-    hours = remaining.seconds // 3600
-    minutes = (remaining.seconds % 3600) // 60
-    
-    return f"{hours}:{minutes:02d}"
-
-def record_request(self, tokens_used: int = 0):
-    """Record a successful request"""
-    now = datetime.now()
-    
     self.usage_data['daily_requests'] += 1
     self.usage_data['total_requests_ever'] += 1
     self.usage_data['minute_requests'].append(now.isoformat())
     self.usage_data['total_tokens'] += tokens_used
-    self.usage_data['last_request_time'] = now.isoformat()
-    
     self.save_usage_data()
-    
-    logger.info(f"📊 Gemini request recorded: Daily={self.usage_data['daily_requests']}/{self.daily_limit}, Tokens={tokens_used}")
+    logger.info(f"📊 Recorded: {self.usage_data['daily_requests']}/{self.daily_limit}, Tokens: {tokens_used}")
 
-def get_usage_stats(self) -> dict:
-    """Get current usage statistics"""
-    self.reset_daily_if_needed()
-    self.clean_minute_requests()
-    
+def get_usage_stats(self):
     return {
         'daily_requests': self.usage_data['daily_requests'],
         'daily_limit': self.daily_limit,
         'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
-        'minute_requests': len(self.usage_data['minute_requests']),
-        'minute_limit': self.minute_limit,
-        'minute_remaining': self.minute_limit - len(self.usage_data['minute_requests']),
         'total_tokens': self.usage_data['total_tokens'],
         'total_requests_ever': self.usage_data['total_requests_ever'],
-        'last_request': self.usage_data['last_request_time'],
         'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
     }
 ```
@@ -240,10 +182,10 @@ def is_rate_limited(self, user_id: str) -> bool:
 
 security = SecurityService()
 
-# === AI SERVICE WITH GEMINI TRACKING ===
+# === AI SERVICE ===
 
 class AIService:
-“”“AI service for generating responses with usage tracking”””
+“”“AI service for generating responses”””
 
 ```
 def __init__(self):
@@ -252,12 +194,12 @@ def __init__(self):
         self.model = genai.GenerativeModel(config.GEMINI_MODEL)
         self.chat_sessions = {}
         self.system_instruction = self._get_system_instruction()
-        self.tracker = GeminiTracker()
+        self.tracker = GeminiTracker()  # חדש!
         logger.info(f"✅ AI Service initialized with model: {config.GEMINI_MODEL}")
         
-        # Log initial usage stats
+        # Log initial usage
         stats = self.tracker.get_usage_stats()
-        logger.info(f"📊 Gemini usage today: {stats['daily_requests']}/{stats['daily_limit']} ({stats['percentage_used_today']}%)")
+        logger.info(f"📊 Usage today: {stats['daily_requests']}/{stats['daily_limit']} ({stats['percentage_used_today']}%)")
         
     except Exception as e:
         logger.error(f"❌ AI Service initialization failed: {e}")
@@ -278,16 +220,15 @@ def _get_system_instruction(self) -> str:
     """
 
 def generate_response(self, user_id: str, message: str, context: str = "") -> str:
-    """Generate AI response with usage tracking"""
+    """Generate AI response"""
     try:
-        # Check if we can make a request
+        # בדיקת מגבלות - חדש!
         can_request, status_message = self.tracker.can_make_request()
-        
         if not can_request:
-            logger.warning(f"🚫 Gemini API limit reached: {status_message}")
-            return f"מצטערת, {status_message}\n\nאני זמינה 24/7, אבל יש לי מגבלות יומיות. נסה שוב מאוחר יותר! 😊"
+            logger.warning(f"🚫 Limit reached: {status_message}")
+            return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
         
-        logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}... | {status_message}")
+        logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
         
         # Create enhanced message with system instruction included
         enhanced_message = f"""
@@ -307,32 +248,27 @@ def generate_response(self, user_id: str, message: str, context: str = "") -> st
         chat = self.chat_sessions[user_id]
         response = chat.send_message(enhanced_message)
         
-        # Record successful request
+        # רישום הבקשה - חדש!
         tokens_used = 0
         if hasattr(response, 'usage_metadata') and response.usage_metadata:
             tokens_used = getattr(response.usage_metadata, 'total_token_count', 0)
-        
         self.tracker.record_request(tokens_used)
         
-        logger.debug(f"✅ AI response generated: {response.text[:100]}... | Tokens: {tokens_used}")
+        logger.debug(f"✅ AI response generated: {response.text[:100]}...")
         return response.text
         
     except Exception as e:
         logger.error(f"❌ AI generation error for user {user_id}: {e}")
-        
-        # Check if it's a quota/rate limit error
-        if "429" in str(e) or "quota" in str(e).lower() or "rate" in str(e).lower():
-            return "מצטערת, הגעתי למגבלת השימוש שלי היום. אני אחזור מחר! 😊\n\nתוכל לנסות שוב מאוחר יותר."
-        
+        if "429" in str(e) or "quota" in str(e).lower():
+            return "מצטערת, הגעתי למגבלת השימוש. אני אחזור מחר! 😊"
         return "מצטערת, קרתה לי שגיאה קטנה. אפשר לנסות שוב? 😊"
 
-def get_usage_stats(self) -> dict:
+def get_usage_stats(self):  # חדש!
     """Get Gemini API usage statistics"""
     return self.tracker.get_usage_stats()
 ```
 
 ai_service = AIService()
-
 # === USER SERVICE ===
 
 class UserService:
@@ -556,14 +492,13 @@ def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         total_conversations = sum(len(conversations.get(uid, [])) for uid in conversations)
         response = f"📊 סטטיסטיקות:\n👥 משתמשים: {total_users}\n💬 שיחות: {total_conversations}\n🤖 אני פעילה!"
     
-    elif cmd == "/usage":
+    elif cmd == "/usage":  # חדש!
         try:
             usage_stats = ai_service.get_usage_stats()
             response = f"""📊 שימוש ב-Gemini API היום:
 ```
 
 🔢 בקשות: {usage_stats[‘daily_requests’]}/{usage_stats[‘daily_limit’]} ({usage_stats[‘percentage_used_today’]}%)
-⏱️ בדקה האחרונה: {usage_stats[‘minute_requests’]}/{usage_stats[‘minute_limit’]}
 🎯 סה”כ בקשות: {usage_stats[‘total_requests_ever’]}
 🪙 סה”כ טוקנים: {usage_stats[‘total_tokens’]:,}
 
@@ -644,7 +579,7 @@ bot = TelegramBot()
 def health_check():
 “”“Health check endpoint”””
 try:
-usage_stats = ai_service.get_usage_stats()
+usage_stats = ai_service.get_usage_stats()  # חדש!
 return jsonify({
 “status”: “healthy”,
 “service”: “Maya Secretary Bot”,
@@ -655,7 +590,7 @@ return jsonify({
 “storage”: “JSON”,
 “ai_model”: config.GEMINI_MODEL,
 “webhook_url”: config.WEBHOOK_URL,
-“gemini_usage”: {
+“gemini_usage”: {  # חדש!
 “daily_requests”: usage_stats[‘daily_requests’],
 “daily_limit”: usage_stats[‘daily_limit’],
 “percentage_used”: usage_stats[‘percentage_used_today’]
@@ -692,7 +627,7 @@ except Exception as e:
 def api_stats():
 “”“API stats endpoint”””
 try:
-usage_stats = ai_service.get_usage_stats()
+usage_stats = ai_service.get_usage_stats()  # חדש!
 stats = {
 “total_users”: len(user_data),
 “active_users”: sum(1 for u in user_data.values() if u.get(‘is_active’, True)),
@@ -702,14 +637,14 @@ stats = {
 “storage_type”: “JSON”,
 “ai_model”: config.GEMINI_MODEL,
 “webhook_url”: config.WEBHOOK_URL,
-“gemini_usage”: usage_stats
+“gemini_usage”: usage_stats  # חדש!
 }
 return jsonify(stats)
 except Exception as e:
 logger.error(f”❌ Stats error: {e}”)
 return jsonify({“error”: “Stats unavailable”}), 500
 
-@app.route(”/usage”, methods=[“GET”])
+@app.route(”/usage”, methods=[“GET”])  # חדש!
 def api_usage():
 “”“Gemini API usage endpoint”””
 try:
@@ -751,7 +686,7 @@ except Exception as e:
 def debug_info():
 “”“Debug information endpoint”””
 try:
-usage_stats = ai_service.get_usage_stats()
+usage_stats = ai_service.get_usage_stats()  # חדש!
 debug_data = {
 “config”: {
 “telegram_token_set”: bool(config.TELEGRAM_TOKEN),
@@ -766,85 +701,68 @@ debug_data = {
 “memories_count”: sum(len(memories.get(uid, [])) for uid in memories)
 },
 “services”: {
-“ai_service”: “initialized”,
-“weather_service”: “initialized”,
-“user_service”: “initialized”,
-“security_service”: “initialized”,
-“gemini_tracker”: “initialized”
-},
-“gemini_usage”: usage_stats
-}
-return jsonify(debug_data)
-except Exception as e:
-logger.error(f”❌ Debug info error: {e}”)
-return jsonify({“error”: str(e)}), 500
-
-# === ERROR HANDLERS ===
+                "ai_service": "initialized",
+                "weather_service": "initialized", 
+                "user_service": "initialized",
+                "security_service": "initialized",
+                "gemini_tracker": "initialized"
+            },
+            "gemini_usage": usage_stats
+        }
+        return jsonify(debug_data)
+    except Exception as e:
+        logger.error(f"Debug info error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(404)
 def not_found(error):
-logger.warning(f”⚠️ 404 error: {request.url}”)
-return jsonify({“error”: “Endpoint not found”}), 404
+    logger.warning(f"404 error: {request.url}")
+    return jsonify({"error": "Endpoint not found"}), 404
 
 @app.errorhandler(500)
 def internal_error(error):
-logger.error(f”❌ Internal server error: {error}”)
-return jsonify({“error”: “Internal server error”}), 500
-
-# === STARTUP ===
+    logger.error(f"Internal server error: {error}")
+    return jsonify({"error": "Internal server error"}), 500
 
 def set_webhook_on_startup():
-“”“Set webhook on startup”””
-if config.ENVIRONMENT == “production” and config.WEBHOOK_URL:
-try:
-url = f”https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook”
-data = {“url”: config.WEBHOOK_URL}
+    if config.ENVIRONMENT == "production" and config.WEBHOOK_URL:
+        try:
+            url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
+            data = {"url": config.WEBHOOK_URL}
+            
+            logger.info(f"Setting webhook on startup: {config.WEBHOOK_URL}")
+            response = requests.post(url, json=data, timeout=10)
+            result = response.json()
+            
+            if result.get("ok"):
+                logger.info(f"Webhook set on startup: {config.WEBHOOK_URL}")
+            else:
+                logger.error(f"Failed to set webhook on startup: {result}")
+        except Exception as e:
+            logger.error(f"Webhook setup error on startup: {e}")
+    else:
+        logger.info("Webhook not set - missing WEBHOOK_URL or not in production")
 
-```
-        logger.info(f"🔗 Setting webhook on startup: {config.WEBHOOK_URL}")
-        response = requests.post(url, json=data, timeout=10)
-        result = response.json()
-        
-        if result.get("ok"):
-            logger.info(f"✅ Webhook set on startup: {config.WEBHOOK_URL}")
-        else:
-            logger.error(f"❌ Failed to set webhook on startup: {result}")
+if __name__ == "__main__":
+    logger.info("Starting Maya Secretary Bot...")
+    logger.info(f"Environment: {config.ENVIRONMENT}")
+    logger.info(f"Debug mode: {config.DEBUG}")
+    logger.info(f"Storage: JSON files")
+    logger.info(f"AI Model: {config.GEMINI_MODEL}")
+    
+    try:
+        usage_stats = ai_service.get_usage_stats()
+        logger.info(f"Usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
     except Exception as e:
-        logger.error(f"❌ Webhook setup error on startup: {e}")
+        logger.error(f"Could not get usage stats: {e}")
+    
+    set_webhook_on_startup()
+    
+    app.run(
+        host="0.0.0.0",
+        port=config.PORT,
+        debug=config.DEBUG
+    )
 else:
-    logger.info("⚠️ Webhook not set - missing WEBHOOK_URL or not in production")
-```
-
-if **name** == “**main**”:
-logger.info(“🚀 Starting Maya Secretary Bot (Debug Version with Gemini Tracking)…”)
-logger.info(f”🌍 Environment: {config.ENVIRONMENT}”)
-logger.info(f”🔧 Debug mode: {config.DEBUG}”)
-logger.info(f”💾 Storage: JSON files”)
-logger.info(f”🤖 AI Model: {config.GEMINI_MODEL}”)
-logger.info(f”🔗 Webhook URL: {config.WEBHOOK_URL}”)
-logger.info(f”🔑 Telegram Token: {config.TELEGRAM_TOKEN[:10] if config.TELEGRAM_TOKEN else ‘NOT SET’}…”)
-logger.info(f”🔑 Gemini API Key: {config.GEMINI_API_KEY[:10] if config.GEMINI_API_KEY else ‘NOT SET’}…”)
-
-```
-# Show initial Gemini usage
-try:
-    usage_stats = ai_service.get_usage_stats()
-    logger.info(f"📊 Gemini usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
-except Exception as e:
-    logger.error(f"❌ Could not get initial usage stats: {e}")
-
-# Set webhook for production
-set_webhook_on_startup()
-
-# Run Flask app
-app.run(
-    host="0.0.0.0",
-    port=config.PORT,
-    debug=config.DEBUG
-)
-```
-
-else:
-# For production servers (gunicorn)
-logger.info(“🚀 Maya Secretary Bot starting via WSGI…”)
-set_webhook_on_startup()
+    logger.info("Maya Secretary Bot starting via WSGI...")
+    set_webhook_on_startup()
