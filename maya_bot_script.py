@@ -15,10 +15,7 @@ import time
 # Third-party imports
 import google.generativeai as genai
 from config import config
-
-# === ENHANCED LOGGING SETUP ===
-logging.basicConfig(
-    level=logging.DEBUG if config.DEBUG else logging.INFO,
+logging.basicConfig(level=logging.DEBUG if config.DEBUG else logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
