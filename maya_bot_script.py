@@ -277,7 +277,6 @@ class TelegramBot:
             data = {
                 "chat_id": chat_id,
                 "text": text[:4096],  # Telegram limit
-                "parse_mode": parse_mode
             }
             
             logger.debug(f"📤 Sending message to chat {chat_id}: {text[:50]}...")
