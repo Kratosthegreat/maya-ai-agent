@@ -205,70 +205,187 @@ class AIService:
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         try:
-            # שלב 1: בדיקת מגבלות API (כמו שאני בודק משאבים)
+            # שלב 0: בדיקת מגבלות (כמו שאני בודק משאבים)
             can_request, status_message = self.tracker.can_make_request()
             if not can_request:
-                logger.warning(f"Limit reached: {status_message}")
                 return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
             
-            logger.debug(f"Processing question for user {user_id}: {message[:50]}...")
+            logger.debug(f"Processing question: {message[:50]}...")
             
-            # שלב 2: ניתוח השאלה וקביעת אסטרטגיה (כמו שאני עושה)
-            response_strategy = self._analyze_question_type(message)
+            # שלב 1: ניתוח עמוק של השאלה (כמו שאני מנתח)
+            question_analysis = self._deep_analyze_question(message, context)
             
-            # שלב 3: יצירת תשובה מותאמת לפי סוג השאלה
-            if response_strategy == "search_needed":
-                # שאלה שדורשת חיפוש - כמו שאני מחפש
-                search_result = web_search_service.get_current_info(message)
-                
-                # במקום enhanced_message מסובך - פשוט תחזיר את התוצאה
-                return search_result
+            # שלב 2: קביעת אסטרטגיית תשובה (כמו שאני מחליט איך לענות)
+            response_strategy = self._determine_response_strategy(question_analysis)
             
-            elif response_strategy == "weather":
-                # שאלת מזג אוויר - תשובה ישירה
-                location = weather_service.extract_location(message)
-                return weather_service.get_weather_anywhere(location)
+            # שלב 3: איסוף מידע לפי הצורך (כמו שאני מחפש)
+            gathered_info = self._gather_information(question_analysis, response_strategy)
             
-            elif response_strategy == "time":
-                # שאלת זמן - תשובה ישירה
-                israel_tz = pytz.timezone("Asia/Jerusalem")
-                now = datetime.now(israel_tz)
-                return f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
+            # שלב 4: בניית תשובה מותאמת (כמו שאני בונה תשובות)
+            if response_strategy["type"] == "direct_answer":
+                return gathered_info["content"]
+            
+            elif response_strategy["type"] == "search_based":
+                return self._format_search_response(gathered_info, question_analysis)
+            
+            elif response_strategy["type"] == "conversational":
+                return self._generate_conversational_response(message, context, gathered_info)
             
             else:
-                # שיחה רגילה - כמו שאני מנהל שיחה
-                enhanced_message = f"""
-                {self.system_instruction}
+                return "לא הבנתי את השאלה. תוכל לנסח אחרת? 🤔"
                 
-                הודעת המשתמש: {message}
-                הקשר מהשיחה: {context}
-                השעה: {datetime.now().strftime('%H:%M')}
-                
-                תני תשובה טבעית, מועילה ומעורבת כמו Claude.
-                אל תהיי רובוטית - תהיי כמו בן אדם מועיל שרוצה לעזור.
-                """
-            
-            # שלב 4: יצירת או המשך סשן צ'אט (כמו שאני זוכר הקשר)
-            if user_id not in self.chat_sessions:
-                self.chat_sessions[user_id] = self.model.start_chat(history=[])
-                logger.debug(f"Created new chat session for user {user_id}")
-            
-            # שלב 5: יצירת תשובה עם המודל (כמו שאני מעבד ועונה)
-            chat = self.chat_sessions[user_id]
-            response = chat.send_message(enhanced_message)
-            
-            # שלב 6: רישום ומעקב (כמו שאני לומד ומשתפר)
-            self.tracker.record_request()
-            
-            logger.debug(f"Generated response: {response.text[:100]}...")
-            return response.text
-            
         except Exception as e:
-            logger.error(f"Error generating response for user {user_id}: {e}")
-            # שגיאה - תשובה חברותית כמו שאני נותן
-            if "429" in str(e) or "quota" in str(e).lower():
-                return "מצטערת, יש לי יותר מדי עומס עכשיו. תנסה שוב בעוד רגע! 😊"
+            logger.error(f"Error in generate_response: {e}")
             return "אופס, משהו השתבש. בואו ננסה שוב? 🤔"
+    
+    def _deep_analyze_question(self, message: str, context: str) -> dict:
+        """ניתוח עמוק של השאלה - כמו שאני מנתח"""
+        analysis = {
+            "original": message,
+            "intent": "unknown",
+            "topic": "general",
+            "urgency": "normal",
+            "complexity": "simple",
+            "requires_search": False,
+            "context_relevant": bool(context.strip())
+        }
+        
+        message_lower = message.lower()
+        
+        # זיהוי כוונות ספציפיות
+        if any(word in message_lower for word in ["מתי", "when"]):
+            analysis["intent"] = "time_query"
+            analysis["requires_search"] = True
+        elif any(word in message_lower for word in ["מי זה", "מי זאת", "who is"]):
+            analysis["intent"] = "person_query"
+            analysis["requires_search"] = True
+        elif any(word in message_lower for word in ["מה זה", "what is"]):
+            analysis["intent"] = "definition_query"
+            analysis["requires_search"] = True
+        elif any(word in message_lower for word in ["מזג אוויר", "טמפרטורה", "weather"]):
+            analysis["intent"] = "weather_query"
+            analysis["topic"] = "weather"
+        elif any(word in message_lower for word in ["שעה", "זמן", "time"]):
+            analysis["intent"] = "time_now"
+            analysis["topic"] = "time"
+        else:
+            analysis["intent"] = "conversation"
+        
+        # זיהוי נושאים מיוחדים
+        if any(word in message_lower for word in ["מונדיאל", "world cup"]):
+            analysis["topic"] = "world_cup"
+            analysis["complexity"] = "simple"  # יש לי מידע מוכן
+        elif any(word in message_lower for word in ["אולימפיאדה", "olympics"]):
+            analysis["topic"] = "olympics"
+            analysis["complexity"] = "simple"
+        
+        return analysis
+    
+    def _determine_response_strategy(self, analysis: dict) -> dict:
+        """קביעת אסטרטגיית תשובה - כמו שאני מחליט איך לענות"""
+        strategy = {
+            "type": "conversational",
+            "confidence": "medium",
+            "format": "text",
+            "use_emojis": True
+        }
+        
+        # החלטות על סוג תשובה
+        if analysis["topic"] in ["world_cup", "olympics"]:
+            strategy["type"] = "direct_answer"
+            strategy["confidence"] = "high"
+            strategy["format"] = "structured"
+        
+        elif analysis["intent"] in ["time_query", "person_query", "definition_query"]:
+            strategy["type"] = "search_based"
+            strategy["confidence"] = "high"
+            
+        elif analysis["topic"] == "weather":
+            strategy["type"] = "direct_answer"
+            strategy["confidence"] = "high"
+            
+        elif analysis["topic"] == "time":
+            strategy["type"] = "direct_answer"
+            strategy["confidence"] = "high"
+        
+        return strategy
+    
+    def _gather_information(self, analysis: dict, strategy: dict) -> dict:
+        """איסוף מידע - כמו שאני מחפש"""
+        info = {"content": "", "sources": [], "confidence": "low"}
+        
+        # מידע מוכן מראש (כמו הידע הפנימי שלי)
+        if analysis["topic"] == "world_cup":
+            info["content"] = """המונדיאל הבא יתקיים ב-2026! 🏆
+
+📍 איפה: שלוש מדינות יחד
+- 🇺🇸 ארצות הברית (רוב המשחקים)
+- 🇲🇽 מקסיקו  
+- 🇨🇦 קנדה
+
+⚽ מה מיוחד:
+- 48 נבחרות (במקום 32)
+- 104 משחקים סה"כ
+- המונדיאל הגדול ביותר בהיסטוריה!
+
+🗓️ מתי: קיץ 2026"""
+            info["confidence"] = "high"
+            
+        elif analysis["topic"] == "olympics":
+            info["content"] = """האולימפיאדה הבאה תהיה ב-2028! 🏅
+
+📍 לוס אנג'לס, ארצות הברית
+🗓️ יולי-אוגוסט 2028
+🏟️ אולימפיאדת הקיץ השלישית בלוס אנג'לס"""
+            info["confidence"] = "high"
+            
+        elif analysis["topic"] == "weather":
+            location = weather_service.extract_location(analysis["original"])
+            info["content"] = weather_service.get_weather_anywhere(location)
+            info["confidence"] = "high"
+            
+        elif analysis["topic"] == "time":
+            israel_tz = pytz.timezone("Asia/Jerusalem")
+            now = datetime.now(israel_tz)
+            info["content"] = f"🕐 השעה בישראל: {now.strftime('%H:%M')}\n📅 {now.strftime('%A, %d %B %Y')}"
+            info["confidence"] = "high"
+            
+        elif strategy["type"] == "search_based":
+            # חיפוש באינטרנט
+            search_result = web_search_service.search_web(analysis["original"])
+            info["content"] = search_result
+            info["confidence"] = "medium"
+        
+        return info
+    
+    def _format_search_response(self, info: dict, analysis: dict) -> str:
+        """עיצוב תשובת חיפוש - כמו שאני מעצב תשובות"""
+        if info["confidence"] == "high":
+            return info["content"]
+        elif len(info["content"]) > 50:
+            return f"מצאתי מידע על {analysis['original']}:\n\n{info['content']}"
+        else:
+            return f"לא מצאתי מידע מספיק על '{analysis['original']}'. \nתנסה לנסח אחרת? 🤔"
+    
+    def _generate_conversational_response(self, message: str, context: str, info: dict) -> str:
+        """יצירת תשובה שיחתית - כמו שאני משוחח"""
+        # כאן אשתמש במודל ה-AI לשיחה רגילה
+        enhanced_message = f"""
+        {self.system_instruction}
+        
+        הודעת המשתמש: {message}
+        הקשר: {context}
+        
+        תני תשובה קצרה, טבעית ומועילה כמו Claude.
+        """
+        
+        if message not in self.chat_sessions:
+            self.chat_sessions[message] = self.model.start_chat(history=[])
+        
+        chat = self.chat_sessions[message]
+        response = chat.send_message(enhanced_message)
+        
+        return response.text
     
     def _analyze_question_type(self, message: str) -> str:
         """Analyze question type like Claude does"""
