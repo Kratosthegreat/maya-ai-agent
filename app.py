@@ -218,30 +218,17 @@ class AIService:
             
             logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
             
-            
-            # בדיקה אם זה משתמש חדש או קיים
-if user_id in self.chat_sessions:
-    # משתמש קיים - המשך שיחה
-    enhanced_message = f"""
-    המשך שיחה עם משתמש שאתה כבר מכירה.
-    
-    הודעה נוכחית: {message}
-    הקשר: {context}
-    השעה: {datetime.now().strftime('%H:%M')}
-    
-    עני על ההודעה בלבד, בקצרה. אל תברכי שלום שוב.
-    """
-else:
-    # משתמש חדש - ברכה ראשונה
-    enhanced_message = f"""
-    {self.system_instruction}
-    
-    הודעה ראשונה מהמשתמש: {message}
-    הקשר: {context}
-    השעה: {datetime.now().strftime('%H:%M')}
-    
-    זו הפגישה הראשונה - ברכי בקצרה ועני על השאלה.
-    """
+            # Create enhanced message with system instruction included
+enhanced_message = f"""
+{self.system_instruction}
+
+הודעת המשתמש: {message}
+הקשר: {context}
+השעה: {datetime.now().strftime('%H:%M')}
+
+עני כמאיה, המזכירה החכמה בלשון נקבה.
+"""
+           
             if user_id not in self.chat_sessions:
                 self.chat_sessions[user_id] = self.model.start_chat(history=[])
                 logger.debug(f"🆕 Created new chat session for user {user_id}")
