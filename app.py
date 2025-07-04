@@ -209,12 +209,11 @@ class AIService:
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         """Generate AI response"""
-    
-            # בדיקת מגבלות - חדש!
-            can_request, status_message = self.tracker.can_make_request()
-            if not can_request:
-                logger.warning(f"🚫 Limit reached: {status_message}")
-                return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
+        # בדיקת מגבלות - חדש!
+        can_request, status_message = self.tracker.can_make_request()
+        if not can_request:
+            logger.warning(f"🚫 Limit reached: {status_message}")
+            return f"מצטערת, {status_message}\n\nנסה שוב מאוחר יותר! 😊"
             
             logger.debug(f"🤖 Generating response for user {user_id}: {message[:50]}...")
             
