@@ -817,10 +817,12 @@ weather_service = GlobalWeatherService()
 @app.route("/", methods=["GET"])
 def health_check():
     try:
-        # בדיקה אם השירותים קיימים לפני השימוש בהם
+        # השגת השירותים בצורה בטוחה
+        ai_svc = get_service_safely('ai_service')
+        
         usage_stats = {}
-        if 'ai_service' in globals() and ai_service:
-            usage_stats = ai_service.get_usage_stats()
+        if ai_svc:
+            usage_stats = ai_svc.get_usage_stats()
         else:
             usage_stats = {
                 "daily_requests": 0,
@@ -831,18 +833,27 @@ def health_check():
         return jsonify({
             "status": "healthy",
             "service": "Maya 3.0 - Claude-like Assistant",
-            "version": "3.0.0-complete-rebuild",
+            "version": "3.0.1-stable-services",
             "timestamp": datetime.utcnow().isoformat(),
             "environment": config.ENVIRONMENT,
             "users": len(user_data),
             "ai_model": config.GEMINI_MODEL,
+            "services_initialized": {
+                "security": security is not None,
+                "user_service": user_service is not None,
+                "weather_service": weather_service is not None,
+                "web_search_service": web_search_service is not None,
+                "ai_service": ai_service is not None,
+                "bot": bot is not None
+            },
             "features": [
                 "claude_intelligence_engine",
                 "built_in_knowledge_base", 
                 "contextual_understanding",
                 "short_natural_responses",
                 "no_automatic_greetings",
-                "web_search_enabled"
+                "web_search_enabled",
+                "stable_service_initialization"
             ],
             "gemini_usage": usage_stats
         })
@@ -862,7 +873,13 @@ def webhook():
         if not update:
             return "No data", 400
         
-        bot.process_update(update)
+        # השגת הבוט בצורה בטוחה
+        bot_service = get_service_safely('bot')
+        if not bot_service:
+            logger.error("Bot service not available")
+            return "Bot service unavailable", 503
+        
+        bot_service.process_update(update)
         return "OK", 200
         
     except Exception as e:
@@ -872,10 +889,12 @@ def webhook():
 @app.route("/stats", methods=["GET"])
 def api_stats():
     try:
-        # בדיקה בטוחה של השירותים
+        # השגת השירותים בצורה בטוחה
+        ai_svc = get_service_safely('ai_service')
+        
         usage_stats = {}
-        if 'ai_service' in globals() and ai_service:
-            usage_stats = ai_service.get_usage_stats()
+        if ai_svc:
+            usage_stats = ai_svc.get_usage_stats()
         else:
             usage_stats = {"daily_requests": 0, "daily_limit": 1500}
             
@@ -884,7 +903,16 @@ def api_stats():
             "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
             "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
             "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
-            "version": "3.0.0-complete-rebuild",
+            "version": "3.0.1-stable-services",
+            "services_status": {
+                "all_initialized": all([security, user_service, weather_service, web_search_service, ai_service, bot]),
+                "security": security is not None,
+                "user_service": user_service is not None,
+                "weather_service": weather_service is not None,
+                "web_search_service": web_search_service is not None,
+                "ai_service": ai_service is not None,
+                "bot": bot is not None
+            },
             "features": {
                 "claude_intelligence_engine": True,
                 "built_in_knowledge": True,
@@ -892,14 +920,15 @@ def api_stats():
                 "natural_responses": True,
                 "weather_service": True,
                 "memory_system": True,
-                "web_search_enabled": True
+                "web_search_enabled": True,
+                "stable_initialization": True
             },
             "gemini_usage": usage_stats
         }
         return jsonify(stats)
     except Exception as e:
         logger.error(f"Stats error: {e}")
-        return jsonify({"error": "Stats unavailable"}), 500
+        return jsonify({"error": "Stats unavailable", "details": str(e)}), 500
 
 @app.route("/test_intelligence", methods=["POST"])
 def test_intelligence():
@@ -927,8 +956,9 @@ def test_intelligence():
 @app.route("/usage", methods=["GET"])
 def api_usage():
     try:
-        if 'ai_service' in globals() and ai_service:
-            usage_stats = ai_service.get_usage_stats()
+        ai_svc = get_service_safely('ai_service')
+        if ai_svc:
+            usage_stats = ai_svc.get_usage_stats()
             return jsonify(usage_stats)
         else:
             return jsonify({
@@ -937,11 +967,12 @@ def api_usage():
                 "daily_remaining": 1500,
                 "total_tokens": 0,
                 "total_requests_ever": 0,
-                "percentage_used_today": 0
+                "percentage_used_today": 0,
+                "status": "service_not_initialized"
             })
     except Exception as e:
         logger.error(f"Usage stats error: {e}")
-        return jsonify({"error": "Usage stats unavailable"}), 500
+        return jsonify({"error": "Usage stats unavailable", "details": str(e)}), 500
 
 @app.route("/set_webhook", methods=["POST"])
 def set_webhook():
@@ -1056,36 +1087,40 @@ def set_webhook_on_startup():
 
 if __name__ == "__main__":
     logger.info("=" * 50)
-    logger.info("Starting Maya 3.0 - Complete Rebuild")
+    logger.info("Starting Maya 3.0 - Stable Services")
     logger.info("=" * 50)
     logger.info(f"Environment: {config.ENVIRONMENT}")
     logger.info(f"Debug mode: {config.DEBUG}")
     logger.info(f"AI Model: {config.GEMINI_MODEL}")
-    logger.info("Features:")
-    logger.info("  ✅ Claude Intelligence Engine")
-    logger.info("  ✅ Built-in Knowledge Base")
-    logger.info("  ✅ Contextual Understanding")
-    logger.info("  ✅ Short Natural Responses")
-    logger.info("  ✅ No Automatic Greetings")
-    logger.info("  ✅ Weather Service")
-    logger.info("  ✅ Memory System")
+    
+    # יצירת השירותים לפני הכל
+    logger.info("Initializing services...")
+    if initialize_services():
+        logger.info("✅ All services initialized successfully!")
+        
+        # בדיקות נוספות
+        try:
+            if ai_service:
+                usage_stats = ai_service.get_usage_stats()
+                logger.info(f"Gemini usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
+            
+            # Test intelligence engine
+            if ai_service and hasattr(ai_service, 'intelligence_engine'):
+                test_result = ai_service.intelligence_engine.analyze_and_respond("מתי המונדיאל הבא?")
+                logger.info(f"Intelligence engine test: {test_result['type']} - {bool(test_result.get('response'))}")
+            
+        except Exception as e:
+            logger.error(f"Service tests failed: {e}")
+        
+        # הגדרת webhook
+        set_webhook_on_startup()
+        
+        logger.info("🚀 Maya 3.0 ready to serve!")
+        
+    else:
+        logger.error("❌ Failed to initialize services! Server may not work properly.")
+    
     logger.info("=" * 50)
-    
-    try:
-        usage_stats = ai_service.get_usage_stats()
-        logger.info(f"Gemini usage today: {usage_stats['daily_requests']}/{usage_stats['daily_limit']} ({usage_stats['percentage_used_today']}%)")
-    except Exception as e:
-        logger.error(f"Could not get usage stats: {e}")
-    
-    # Test intelligence engine
-    try:
-        intelligence_engine = ClaudeIntelligenceEngine()
-        test_result = intelligence_engine.analyze_and_respond("מתי המונדיאל הבא?")
-        logger.info(f"Intelligence engine test: {test_result['type']} - {bool(test_result.get('response'))}")
-    except Exception as e:
-        logger.error(f"Intelligence engine test failed: {e}")
-    
-    set_webhook_on_startup()
     
     app.run(
         host="0.0.0.0",
@@ -1094,4 +1129,6 @@ if __name__ == "__main__":
     )
 else:
     logger.info("Maya 3.0 starting via WSGI...")
+    # יצירת השירותים גם ב-WSGI mode
+    initialize_services()
     set_webhook_on_startup()
