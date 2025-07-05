@@ -1129,6 +1129,13 @@ if __name__ == "__main__":
     )
 else:
     logger.info("Maya 3.0 starting via WSGI...")
-    # יצירת השירותים גם ב-WSGI mode
-    initialize_services()
+# === תפקוד השירותים ב-WSGI mode ===
+def setup_wsgi_services():
+    """הגדרת שירותים למצב WSGI"""
+    if not initialize_services():
+        logger.error("❌ Failed to initialize services in WSGI mode!")
     set_webhook_on_startup()
+
+# קריאה לפונקציה רק אם זה לא main
+if __name__ != "__main__":
+    setup_wsgi_services()
