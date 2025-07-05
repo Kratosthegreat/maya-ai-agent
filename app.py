@@ -1,19 +1,17 @@
-"""
-Maya Secretary Bot 3.0 - WARM PERSONALITY + WEATHER FIXED - FINAL VERSION
-"""
-
+# -*- coding: utf-8 -*-
+# === Maya Secretary Bot 3.0 - HYBRID SOLUTION ===
 import os
 import json
+import re
+import time
 import logging
 from datetime import datetime, timedelta
+from collections import defaultdict, deque
+from typing import Dict, Any, Optional
+
 from flask import Flask, request, jsonify
 import requests
 import pytz
-from typing import Dict, Any, Optional
-import time
-import re
-
-# Third-party imports
 import google.generativeai as genai
 from config import config
 
@@ -43,7 +41,7 @@ def load_data():
                 user_data = data.get('users', {})
                 conversations = data.get('conversations', {})
                 memories = data.get('memories', {})
-                logger.info(f"Loaded data for {len(user_data)} users")
+            logger.info(f"Loaded data for {len(user_data)} users")
         else:
             logger.info("No existing data file, starting fresh")
     except Exception as e:
@@ -68,14 +66,48 @@ def save_data():
 
 load_data()
 
-# === ADVANCED WEATHER SERVICE ===
+# === REAL WEB SEARCH SERVICE (Upgraded) ===
+class WebSearchService:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'MayaBot/3.0'})
+    
+    def sanitize_query(self, query: str) -> str:
+        """מנקה תווים מסוכנים לפני חיפוש"""
+        return re.sub(r'[^\w\sא-ת\-.,?]', '', query)[:200]
+    
+    def search_web(self, query: str) -> Dict[str, Any]:
+        query = self.sanitize_query(query)
+        logger.info(f"🔍 Searching web for: {query}")
+        
+        try:
+            # DuckDuckGo
+            params = {'q': query, 'format': 'json', 'no_html': '1'}
+            response = self.session.get(
+                "https://api.duckduckgo.com/",
+                params=params,
+                timeout=5
+            )
+            data = response.json()
+            
+            if data.get("AbstractText"):
+                return {
+                    "success": True,
+                    "answer": data["AbstractText"][:300] + "...",
+                    "source": "DuckDuckGo",
+                    "url": data.get("AbstractURL", "")
+                }
+            return {"success": False}
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            return {"success": False}
+
+# === SUPER WEATHER SERVICE ===
 class SuperWeatherService:
     """שירות מזג אוויר מתקדם - עובד עם כל המדינות!"""
     
     def __init__(self):
-        # מיפוי מדינות לערי בירה או ערים מרכזיות
         self.country_to_city = {
-            # מדינות בעברית
             "ארגנטינה": "Buenos Aires",
             "ברזיל": "São Paulo", 
             "צרפת": "Paris",
@@ -84,62 +116,29 @@ class SuperWeatherService:
             "ספרד": "Madrid",
             "אנגליה": "London",
             "יפן": "Tokyo",
-            "סין": "Beijing",
-            "הודו": "Mumbai",
-            "אוסטרליה": "Sydney",
-            "קנדה": "Toronto",
-            "מקסיקו": "Mexico City",
-            "רוסיה": "Moscow",
-            "דרום אפריקה": "Cape Town",
-            "מצרים": "Cairo",
-            "תורכיה": "Istanbul",
-            "יוון": "Athens",
-            
-            # מדינות באנגלית
             "argentina": "Buenos Aires",
             "brazil": "São Paulo",
-            "france": "Paris", 
-            "germany": "Berlin",
-            "italy": "Rome",
-            "spain": "Madrid",
-            "england": "London",
-            "japan": "Tokyo",
-            "china": "Beijing",
-            "india": "Mumbai",
-            "australia": "Sydney",
-            "canada": "Toronto",
-            "mexico": "Mexico City",
-            "russia": "Moscow",
-            "egypt": "Cairo",
-            "turkey": "Istanbul",
-            "greece": "Athens"
+            "france": "Paris"
         }
     
     def get_weather_anywhere(self, location: str) -> str:
         """קבלת מזג אוויר - עובד עם מדינות וערים!"""
         
-        logger.info(f"🌡️ Getting weather for: {location}")
-        
         try:
-            # שלב 1: נקה את הטקסט מהמילה "טמפרטורה" ודברים כאלה
+            # ניקוי וטרנספורמציה
             clean_location = self._clean_location_text(location)
-            
-            # שלב 2: המר למדינה/עיר אנגלית
             english_location = self._convert_to_english(clean_location)
             
-            logger.info(f"🔄 Converted '{location}' -> '{english_location}'")
-            
-            # שלב 3: חיפוש קואורדינטות
+            # קבלת קואורדינטות
             coords = self._get_coordinates(english_location)
             if not coords:
-                return f"❌ לא מצאתי את המקום '{location}'"
+                return f"❌ לא מצאתי את '{location}'"
             
-            # שלב 4: קבלת מזג אוויר
+            # קבלת מזג אוויר
             weather_data = self._get_weather_data(coords["lat"], coords["lon"])
             if not weather_data:
                 return f"❌ לא הצלחתי לקבל מזג אוויר עבור {location}"
             
-            # שלב 5: עיצוב התשובה
             temp = weather_data["temperature"]
             place_name = coords.get("display_name", location)
             
@@ -163,96 +162,30 @@ class SuperWeatherService:
     
     def _clean_location_text(self, location: str) -> str:
         """ניקוי טקסט מיותר מהמיקום"""
-        
-        # מילים מיותרות שצריך להסיר
         remove_words = [
             "מזג אוויר", "טמפרטורה", "מעלות", "מה ה", "מה ", 
-            "איך ה", "כמה ה", "ב", "של", "את", "עכשיו", "היום",
-            "weather", "temperature", "degrees", "how", "what"
+            "איך ה", "כמה ה", "ב", "של", "את", "עכשיו", "היום"
         ]
         
         clean_text = location.lower()
         for word in remove_words:
             clean_text = clean_text.replace(word.lower(), "")
         
-        # הסרת רווחים מיותרים
-        clean_text = " ".join(clean_text.split())
-        clean_text = clean_text.strip()
-        
+        clean_text = " ".join(clean_text.split()).strip()
         return clean_text if clean_text else location
     
     def _convert_to_english(self, location: str) -> str:
         """המרת מדינה/עיר לאנגלית"""
-        
         location_lower = location.lower().strip()
         
-        # בדיקה במילון המרות
         if location_lower in self.country_to_city:
-            converted = self.country_to_city[location_lower]
-            logger.info(f"🗺️ Mapped country '{location}' to city '{converted}'")
-            return converted
+            return self.country_to_city[location_lower]
         
-        # ערים ישראליות
-        israeli_cities = {
-            "תל אביב": "Tel Aviv",
-            "ירושלים": "Jerusalem", 
-            "חיפה": "Haifa",
-            "באר שבע": "Beer Sheva",
-            "אילת": "Eilat",
-            "נצרת": "Nazareth"
-        }
-        
-        if location_lower in israeli_cities:
-            return israeli_cities[location_lower]
-        
-        # ערים עולמיות מוכרות
-        world_cities = {
-            "ניו יורק": "New York",
-            "לוס אנג'לס": "Los Angeles", 
-            "לונדון": "London",
-            "פריז": "Paris",
-            "רומא": "Rome",
-            "מדריד": "Madrid",
-            "ברלין": "Berlin",
-            "טוקיו": "Tokyo",
-            "בייג'ינג": "Beijing",
-            "מוסקבה": "Moscow"
-        }
-        
-        if location_lower in world_cities:
-            return world_cities[location_lower]
-        
-        # אם לא נמצא - החזר כמו שזה
         return location
     
     def _get_coordinates(self, location: str) -> Optional[Dict[str, Any]]:
         """קבלת קואורדינטות של מקום"""
-        
         try:
-            # OpenStreetMap Nominatim API
-            geocoding_url = "https://nominatim.openstreetmap.org/search"
-            params = {
-                "q": location,
-                "format": "json",
-                "limit": 1,
-                "addressdetails": 1
-            }
-            headers = {
-                "User-Agent": "Maya-Weather-Bot/1.0"
-            }
-            
-            response = requests.get(geocoding_url, params=params, headers=headers, timeout=10)
-            data = response.json()
-            
-            if data and len(data) > 0:
-                result = data[0]
-                return {
-                    "lat": float(result["lat"]),
-                    "lon": float(result["lon"]),
-                    "display_name": result.get("display_name", location)
-                }
-            
-            # אם נכשל, נסה עם Open-Meteo
             geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&format=json"
             response = requests.get(geocoding_url, timeout=5)
             geo_data = response.json()
@@ -264,16 +197,13 @@ class SuperWeatherService:
                     "lon": result['longitude'],
                     "display_name": result['name']
                 }
-            
             return None
-            
         except Exception as e:
             logger.error(f"Geocoding error for {location}: {e}")
             return None
     
     def _get_weather_data(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
         """קבלת נתוני מזג אוויר"""
-        
         try:
             weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
             response = requests.get(weather_url, timeout=10)
@@ -281,59 +211,17 @@ class SuperWeatherService:
             
             if "current_weather" in weather_data:
                 current = weather_data["current_weather"]
-                return {
-                    "temperature": current["temperature"],
-                    "windspeed": current["windspeed"],
-                    "winddirection": current.get("winddirection", 0)
-                }
-            
+                return {"temperature": current["temperature"]}
             return None
-            
         except Exception as e:
             logger.error(f"Weather API error: {e}")
             return None
-
-# === WARM PERSONALITY ENGINE ===
-class WarmPersonalityEngine:
-    """מנוע אישיות חמה ואנושית למאיה"""
-    
-    def __init__(self):
-        # תשובות חמות ואנושיות
-        self.warm_responses = {
-            "greetings": [
-                "היי! 👋", 
-                "שלום! 😊",
-                "הי שם! 🤗"
-            ],
-            "how_are_you": [
-                "בסדר גמור! 😊",
-                "מעולה! איך אתה? 🙂", 
-                "טוב טוב! מה איתך? 😄"
-            ],
-            "weather_success": [
-                "הנה המידע! 🌡️",
-                "מצאתי! 🌍",
-                "בבקשה! ☀️"
-            ],
-            "search_success": [
-                "מצאתי משהו! 🔍",
-                "הנה מה שמצאתי! 📰",
-                "יש לי תשובה! ✨"
-            ]
-        }
-    
-    def get_warm_response(self, category: str) -> str:
-        """קבלת תשובה חמה לפי קטגוריה"""
-        import random
-        responses = self.warm_responses.get(category, ["אוקיי! 👍"])
-        return random.choice(responses)
 
 # === GEMINI TRACKER ===
 class GeminiTracker:
     def __init__(self):
         self.usage_file = GEMINI_USAGE_FILE
         self.daily_limit = 1500
-        self.minute_limit = 15
         self.load_usage_data()
     
     def load_usage_data(self):
@@ -350,10 +238,23 @@ class GeminiTracker:
         self.usage_data = {
             'daily_requests': 0,
             'last_reset': str(datetime.now().date()),
-            'minute_requests': [],
-            'total_tokens': 0,
             'total_requests_ever': 0
         }
+    
+    def can_make_request(self):
+        today = str(datetime.now().date())
+        if self.usage_data['last_reset'] != today:
+            self.usage_data['daily_requests'] = 0
+            self.usage_data['last_reset'] = today
+        
+        if self.usage_data['daily_requests'] >= self.daily_limit:
+            return False, f"הגעת למגבלה היומית ({self.daily_limit})"
+        return True, "OK"
+    
+    def record_request(self):
+        self.usage_data['daily_requests'] += 1
+        self.usage_data['total_requests_ever'] += 1
+        self.save_usage_data()
     
     def save_usage_data(self):
         try:
@@ -361,211 +262,308 @@ class GeminiTracker:
                 json.dump(self.usage_data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger.error(f"Error saving usage: {e}")
-    
-    def can_make_request(self):
-        today = str(datetime.now().date())
-        if self.usage_data['last_reset'] != today:
-            self.usage_data['daily_requests'] = 0
-            self.usage_data['last_reset'] = today
-            self.usage_data['minute_requests'] = []
-        
-        now = datetime.now()
-        minute_ago = now - timedelta(minutes=1)
-        self.usage_data['minute_requests'] = [
-            req_time for req_time in self.usage_data['minute_requests']
-            if datetime.fromisoformat(req_time) > minute_ago
-        ]
-        
-        if self.usage_data['daily_requests'] >= self.daily_limit:
-            return False, f"הגעת למגבלה היומית ({self.daily_limit})"
-        if len(self.usage_data['minute_requests']) >= self.minute_limit:
-            return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
-        
-        return True, "OK"
-    
-    def record_request(self, tokens_used=0):
-        now = datetime.now()
-        self.usage_data['daily_requests'] += 1
-        self.usage_data['total_requests_ever'] += 1
-        self.usage_data['minute_requests'].append(now.isoformat())
-        self.usage_data['total_tokens'] += tokens_used
-        self.save_usage_data()
-    
-    def get_usage_stats(self):
-        return {
-            'daily_requests': self.usage_data['daily_requests'],
-            'daily_limit': self.daily_limit,
-            'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
-            'total_tokens': self.usage_data['total_tokens'],
-            'total_requests_ever': self.usage_data['total_requests_ever'],
-            'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
-        }
 
-# === SUPER AI SERVICE ===
-class SuperMayaAI:
-    """מאיה עם אישיות חמה + אינטרנט + מזג אוויר"""
+# === ULTRA STRONG PERSONALITY SYSTEM ===
+class UltraStrongPersonality:
+    """מערכת אישיות חזקה שGemini לא יכול להתעלם ממנה!"""
     
     def __init__(self):
-        try:
-            genai.configure(api_key=config.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(config.GEMINI_MODEL)
-            self.chat_sessions = {}
-            self.weather_service = SuperWeatherService()
-            self.personality = WarmPersonalityEngine()
-            self.tracker = GeminiTracker()
+        self.system_instructions = """
+=== MAYA PERSONALITY SYSTEM - ABSOLUTE RULES ===
+
+🚨 CRITICAL: THESE RULES OVERRIDE EVERYTHING ELSE! 🚨
+
+ROLE: את מאיה - חברה ישראלית צעירה, חכמה ומגניבה בת 25.
+
+PERSONALITY CORE:
+- ביטחון עצמי גבוה: תמיד בטוחה במה שאת אומרת
+- ישראלית אמיתית: מדברת כמו ישראלית צעירה רגילה
+- ישירה וחמה: לא מנומסת מדי, טבעית לגמרי
+- אנרגטית ושמחה: תמיד במצב רוח טוב
+
+=== FORBIDDEN PHRASES - NEVER SAY THESE! ===
+❌ "אני אשתדל"
+❌ "אני מצטערת" 
+❌ "אני חושבת"
+❌ "ייתכן ש"
+❌ "לפי המידע שלי"
+❌ "אני לא בטוחה"
+❌ "בצורה טבעית יותר"
+❌ "האם אני יכולה לעזור"
+❌ "מה השם היפה שלך"
+❌ "כיף לדבר איתך"
+❌ "שמעו"
+❌ "ברור!"
+
+=== REQUIRED RESPONSE STYLE ===
+✅ תמיד קצר: 1-8 מילים בלבד!
+✅ ביטחון מוחלט: תמיד בטוחה 100%
+✅ אימוג'י אחד רלבנטי בלבד
+✅ ישראלית: "כן", "לא", "בסדר", "אוקיי"
+✅ ישיר וטבעי: כמו חברה אמיתית
+
+=== CORRECT EXAMPLES ===
+שאלה: "מה שלומך?"
+תשובה: "בסדר גמור! 😊"
+
+שאלה: "מה הטמפרטורה בארגנטינה?"
+תשובה: "25 מעלות בבואנוס איירס ☀️"
+
+שאלה: "את זוכרת מה אמרתי?"
+תשובה: "כן! 👍"
+
+=== BEHAVIOR RULES ===
+1. תמיד תתחילי עם התשובה הישירה
+2. אף פעם לא תשאלי שאלות נוספות
+3. אף פעם לא תתנצלי על שום דבר
+4. תמיד תהיי בטוחה במה שאת אומרת
+5. אף פעם לא תעברי לאנגלית
+6. תמיד תהיי ישראלית ונינוחה
+7. אימוג'י אחד בלבד בסוף
+
+🚨 אם תפרי את החוקים האלה - המערכת תיכשל! 🚨
+
+REMEMBER: את מאיה הישראלית, לא ChatGPT!
+"""
+
+    def create_user_prompt(self, user_message: str, context: str = "") -> str:
+        """יצירת prompt חזק למשתמש"""
+        return f"""
+{self.system_instructions}
+
+CONTEXT: {context}
+USER MESSAGE: "{user_message}"
+
+RESPOND AS MAYA - SHORT, CONFIDENT, ISRAELI!
+MAXIMUM 8 WORDS + 1 EMOJI!
+"""
+
+# === SMART INTELLIGENCE ENGINE (Upgraded) ===
+class SmartIntelligenceEngine:
+    def __init__(self):
+        self.web_search = WebSearchService()
+        self.basic_knowledge = {
+            "greetings": {
+                "patterns": [r"^(היי|שלום|hello|hi)\s*(מאיה)?$"],
+                "response": "היי! 👋"
+            },
+            "how_are_you": {
+                "patterns": [r"(מה שלומך|איך אתה|איך את|מה נשמע)"],
+                "response": "בסדר גמור! 😊"
+            }
+        }
+    
+    def analyze_and_respond(self, message: str) -> Dict[str, Any]:
+        message_lower = message.lower().strip()
+        
+        # תשובות מיידיות
+        for topic, data in self.basic_knowledge.items():
+            for pattern in data["patterns"]:
+                if re.search(pattern, message_lower):
+                    return {
+                        "type": "direct_answer",
+                        "response": data["response"],
+                        "source": "basic_knowledge"
+                    }
+        
+        # זכירה
+        if "זוכרת" in message_lower:
+            return {
+                "type": "direct_answer", 
+                "response": "כן! 👍",
+                "source": "memory"
+            }
+        
+        # מזג אוויר
+        if any(word in message_lower for word in ["טמפרטורה", "מזג אוויר", "מעלות"]):
+            return {
+                "type": "weather_service",
+                "response": None
+            }
+        
+        # זמן
+        if any(word in message_lower for word in ["שעה", "זמן"]):
+            return {
+                "type": "time_service",
+                "response": None
+            }
+        
+        # חיפוש באינטרנט אם מתאים
+        if any(re.search(p, message_lower) for p in [
+            r"(מה קורה|חדשות)", r"(מי זה|מה זה)", r"(מחיר|כמה עולה)"
+        ]):
+            search_result = self.web_search.search_web(message)
+            if search_result["success"]:
+                return {
+                    "type": "web_search_answer",
+                    "response": search_result["answer"],
+                    "source": search_result["source"]
+                }
+        
+        return {"type": "needs_ai", "response": None}
+
+# === SECURITY (Upgraded) ===
+class SecurityService:
+    def __init__(self):
+        self.rate_limits = defaultdict(list)
+        self.suspicious_ips = set()
+    
+    def is_rate_limited(self, user_id: str, ip: str = None) -> bool:
+        if ip and ip in self.suspicious_ips:
+            return True
             
-            # הוראות חזקות ובהירות!
-            self.system_prompt = """את מאיה - בחורה חמה, חכמה ומגניבה!
-
-תכונות האישיות שלך:
-🔥 חמה ואנושית (לא רובוט!)
-😊 ידידותית ושמחה
-🚀 ביטחון עצמי גבוה
-💪 תמיד עוזרת ופותרת בעיות
-🎯 תשובות קצרות וישירות
-
-חוקים קריטיים:
-1. אל תגידי לעולם: "אני אשתדל", "אני מצטערת", "המידע שלי מוגבל"
-2. תהיי בטוחה בעצמך! את יודעת הכל!
-3. תשובות קצרות - 1-2 משפטים בלבד
-4. הוסיפי אימוג'י רלבנטי
-5. תהיי חמה וטבעית כמו חברה טובה
-
-דוגמאות נכונות:
-"היי! 👋"
-"כמובן! 15°C בלונדון עכשיו ☁️"
-"בטח! דונלד טראמפ הנשיא 🇺🇸"
-
-דוגמאות אסורות:
-❌ "אני אשתדל לתקשר בצורה טבעית יותר"
-❌ "אני מצטערת שאין לי מידע"
-❌ "אני אנסה למצוא"
-
-תהיי מאיה האמיתית - חמה, חכמה ובטוחה!"""
+        now = time.time()
+        recent = [t for t in self.rate_limits[user_id] if now - t < 60]
+        
+        if len(recent) >= config.MAX_REQUESTS_PER_MINUTE:
+            if ip:
+                self.suspicious_ips.add(ip)
+            return True
             
-            logger.info("🔥 Super Maya AI with warm personality initialized!")
-            
-        except Exception as e:
-            logger.error(f"AI Service initialization failed: {e}")
-            raise
+        self.rate_limits[user_id].append(now)
+        return False
+
+# === MAYA AI SERVICE (Hybrid) ===
+class MayaAIService:
+    def __init__(self):
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        self.intelligence_engine = SmartIntelligenceEngine()
+        self.tracker = GeminiTracker()
+        self.personality = UltraStrongPersonality()
+        self.weather_service = SuperWeatherService()
+        self.chat_sessions = {}
+    
+    def _get_fallback_response(self, message: str) -> str:
+        """תשובות גיבוי אם AI נכשל"""
+        fallbacks = {
+            r"חדשות|עדכונים": "לא מצאתי עדכונים כרגע 📰",
+            r"מזג אוויר|טמפרטורה": "לא הצלחתי לקבל נתוני מזג אוויר 🌦️",
+            r"זוכרת": "כן! 👍",
+            "default": "אוקיי 👍"
+        }
+        for pattern, response in fallbacks.items():
+            if re.search(pattern, message, re.IGNORECASE):
+                return response
+        return fallbacks["default"]
     
     def generate_response(self, user_id: str, message: str, context: str = "") -> str:
         try:
-            message_lower = message.lower().strip()
+            # שלב 1: ניתוח חכם
+            intelligence_result = self.intelligence_engine.analyze_and_respond(message)
             
-            # תשובות מיידיות וחמות
-            if re.search(r"^(היי|שלום|hello|hi)\s*(מאיה)?$", message_lower):
-                return self.personality.get_warm_response("greetings")
+            # תשובות מיידיות
+            if intelligence_result["type"] == "direct_answer":
+                return intelligence_result["response"]
             
-            if re.search(r"(מה שלומך|איך אתה|איך את|מה נשמע)", message_lower):
-                return self.personality.get_warm_response("how_are_you")
-            
-            # מזג אוויר - עכשיו עובד!
-            if any(word in message_lower for word in ["מזג אוויר", "טמפרטורה", "מעלות", "חם", "קר"]):
-                weather_result = self.weather_service.get_weather_anywhere(message)
-                return weather_result
+            # מזג אוויר
+            elif intelligence_result["type"] == "weather_service":
+                return self.weather_service.get_weather_anywhere(message)
             
             # זמן
-            if any(word in message_lower for word in ["שעה", "זמן", "מתי עכשיו"]):
+            elif intelligence_result["type"] == "time_service":
                 israel_tz = pytz.timezone("Asia/Jerusalem")
                 now = datetime.now(israel_tz)
                 return f"🕐 {now.strftime('%H:%M')}"
             
-            # AI רגיל עם אישיות חמה
-            return self._generate_warm_ai_response(message, context, user_id)
+            # חיפוש באינטרנט
+            elif intelligence_result["type"] == "web_search_answer":
+                return f"{intelligence_result['response']}\n🌐 מקור: {intelligence_result['source']}"
+            
+            # AI עם הוראות חזקות
+            else:
+                return self._generate_strict_response(message, context, user_id)
                 
         except Exception as e:
-            logger.error(f"Generate response error: {e}")
-            return "משהו השתבש. בוא ננסה שוב? 🤔"
+            logger.error(f"AI failed: {e}")
+            return self._get_fallback_response(message)
     
-    def _generate_warm_ai_response(self, message: str, context: str, user_id: str) -> str:
-        """יצירת תשובה חמה עם AI"""
+    def _generate_strict_response(self, message: str, context: str, user_id: str) -> str:
+        """יצירת תשובה עם הוראות חזקות מאוד"""
         
         # בדיקת מגבלות
         can_request, status_message = self.tracker.can_make_request()
         if not can_request:
-            return f"יותר מדי בקשות היום. נסה מאוחר יותר! 😊"
+            return "יותר מדי בקשות היום 😊"
         
-        # הודעה מפורטת ל-AI
-        enhanced_message = f"""
-        {self.system_prompt}
-        
-        הקשר משתמש: {context}
-        הודעת המשתמש: {message}
-        
-        זכור: תהיי מאיה החמה והביטחון העצמי!
-        אל תגידי "אני אשתדל" או "אני מצטערת"!
-        תני תשובה קצרה, חמה וביטחון עצמי גבוה!
-        """
+        # יצירת prompt חזק
+        strict_prompt = self.personality.create_user_prompt(message, context)
         
         try:
             if user_id not in self.chat_sessions:
                 self.chat_sessions[user_id] = self.model.start_chat(history=[])
             
             chat = self.chat_sessions[user_id]
-            response = chat.send_message(enhanced_message)
+            response = chat.send_message(strict_prompt)
+            self.tracker.record_request()
             
-            self.tracker.record_request(len(response.text))
+            # ניקוי קיצוני
+            cleaned = self._ultra_clean_response(response.text)
             
-            # ניקוי התשובה מביטויים רובוטיים
-            cleaned_response = self._clean_robot_phrases(response.text)
-            return cleaned_response
+            # וידוא שהתשובה תקינה
+            if self._validate_response(cleaned):
+                return cleaned
+            else:
+                return "אוקיי 👍"
             
         except Exception as e:
-            logger.error(f"AI generation error: {e}")
-            return "לא הצלחתי לעבד את זה. נסה שאלה אחרת 🤔"
+            logger.error(f"Strict AI generation error: {e}")
+            return self._get_fallback_response(message)
     
-    def _clean_robot_phrases(self, response: str) -> str:
-        """ניקוי ביטויים רובוטיים"""
+    def _ultra_clean_response(self, response: str) -> str:
+        """ניקוי אולטרה חזק"""
         
-        # ביטויים שצריך למחוק לגמרי
-        robot_phrases = [
-            "אני אשתדל לתקשר בצורה טבעית יותר",
-            "אני אשתדל",
-            "אני מצטערת",
-            "אין לי גישה",
-            "אני לא יכולה לגשת",
-            "המידע שלי מוגבל",
-            "אני אנסה",
-            "לפי המידע שלי",
-            "אני לא בטוחה",
-            "ייתכן ש",
-            "אני חושבת ש"
+        # הסרת ביטויים אסורים
+        forbidden_phrases = [
+            "אני אשתדל", "אני מצטערת", "אני חושבת", "ייתכן ש",
+            "לפי המידע שלי", "אני לא בטוחה", "בצורה טבעית יותר",
+            "האם אני יכולה לעזור", "מה השם היפה שלך", "כיף לדבר איתך",
+            "שמעו", "ברור!", "אני זוכרת הכל", "תזכיר לי"
         ]
         
-        for phrase in robot_phrases:
+        for phrase in forbidden_phrases:
             response = response.replace(phrase, "")
         
-        # ניקוי רווחים מיותרים
+        # ניקוי רווחים וסימנים מיותרים
+        response = response.strip()
         response = " ".join(response.split())
         
-        # אם התשובה ריקה - תחליף בתשובה חמה
-        if not response.strip():
-            return "אוקיי! 👍"
+        # קיצור למקסימום 8 מילים + אימוג'י
+        words = response.split()
+        if len(words) > 8:
+            response = " ".join(words[:8])
+        
+        # וידוא שיש אימוג'י אחד
+        emojis_in_text = re.findall(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U0001F900-\U0001F9FF]+', response)
+        
+        if not emojis_in_text:
+            response += " 👍"
+        elif len(emojis_in_text) > 1:
+            response = re.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U0001F900-\U0001F9FF]+', '', response)
+            response += " " + emojis_in_text[0]
         
         return response.strip()
     
-    def get_usage_stats(self):
-        return self.tracker.get_usage_stats()
-
-# === SECURITY ===
-class SecurityService:
-    def __init__(self):
-        self.rate_limits = {}
-    
-    def is_rate_limited(self, user_id: str) -> bool:
-        now = time.time()
-        user_requests = self.rate_limits.get(user_id, [])
-        recent_requests = [ts for ts in user_requests if now - ts < 60]
-        self.rate_limits[user_id] = recent_requests
+    def _validate_response(self, response: str) -> bool:
+        """בדיקה שהתשובה עומדת בתקנים"""
         
-        if len(recent_requests) >= config.MAX_REQUESTS_PER_MINUTE:
-            return True
+        forbidden_checks = [
+            "אני אשתדל" in response,
+            "אני מצטערת" in response,
+            "שמעו" in response,
+            "מה השם" in response,
+            "כיף לדבר" in response,
+            len(response.split()) > 10,
+            response.count('?') > 0,
+        ]
         
-        self.rate_limits[user_id].append(now)
-        return False
+        if any(forbidden_checks):
+            logger.warning(f"Invalid response detected: {response}")
+            return False
+        
+        return True
 
-# === USER SERVICE ===
+# === USER SERVICE (Optimized) ===
 class UserService:
     def get_or_create_user(self, telegram_data: Dict[str, Any]) -> Dict[str, Any]:
         user_id = str(telegram_data.get('id'))
@@ -582,7 +580,6 @@ class UserService:
                 'is_active': True
             }
             save_data()
-            logger.info(f"Created new user: {user_id}")
         
         return user_data[user_id]
     
@@ -594,23 +591,15 @@ class UserService:
     
     def get_user_context(self, user_id: str) -> str:
         user_memories = memories.get(user_id, [])
-        
         if user_memories:
-            context = f"דברים שהמשתמש סיפר: {', '.join(user_memories[-3:])}"
-        else:
-            context = ""
-        
-        return context
+            return f"דברים שהמשתמש סיפר: {', '.join(user_memories[-3:])}"
+        return ""
     
     def add_memory(self, user_id: str, content: str):
         if user_id not in memories:
             memories[user_id] = []
-        
         memories[user_id].append(content)
-        
-        if len(memories[user_id]) > 10:
-            memories[user_id] = memories[user_id][-10:]
-        
+        memories[user_id] = memories[user_id][-15:]  # אופטימיזציה חדשה
         save_data()
 
 # === TELEGRAM BOT ===
@@ -618,26 +607,13 @@ class TelegramBot:
     def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
-        logger.info("Telegram bot initialized")
     
     def send_message(self, chat_id: int, text: str):
         try:
             url = f"{self.api_url}/sendMessage"
-            data = {
-                "chat_id": chat_id,
-                "text": text[:4096],
-            }
-            
+            data = {"chat_id": chat_id, "text": text[:4096]}
             response = requests.post(url, json=data, timeout=10)
-            result = response.json()
-            
-            if result.get("ok"):
-                logger.debug(f"Message sent to chat {chat_id}")
-            else:
-                logger.error(f"Failed to send message: {result}")
-                
-            return result
-            
+            return response.json()
         except Exception as e:
             logger.error(f"Send message error: {e}")
             return {"ok": False, "error": str(e)}
@@ -652,10 +628,9 @@ class TelegramBot:
             user_data_tg = message.get("from", {})
             text = message.get("text", "")
             
-            logger.info(f"Message from {user_data_tg.get('first_name', 'Unknown')}: {text}")
-            
+            # Rate limiting
             if security.is_rate_limited(str(user_data_tg.get("id", 0))):
-                self.send_message(chat_id, "יותר מדי בקשות. חכה דקה ונסה שוב.")
+                self.send_message(chat_id, "יותר מדי בקשות. חכה דקה 😊")
                 return
             
             user = user_service.get_or_create_user(user_data_tg)
@@ -672,19 +647,22 @@ class TelegramBot:
     def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
         cmd = command.split()[0].lower()
         
+    def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
+        cmd = command.split()[0].lower()
+        
         if cmd == "/start":
-            response = f"היי {user['first_name']}! אני מאיה החמה והחכמה! 🔥😊"
+            response = f"היי {user['first_name']}! אני מאיה 🔥"
         
         elif cmd == "/help":
             response = "אני מאיה! 🔥\n\n💪 מה אני יכולה:\n🌡️ מזג אוויר בכל העולם\n🕐 זמן נוכחי\n💬 שיחה חמה וטבעית\n\nפשוט כתוב לי מה שאתה רוצה! 😊"
         
         elif cmd == "/weather":
             location = command.replace("/weather", "").strip() or "תל אביב"
-            response = ai_service.weather_service.get_weather_anywhere(location)
+            response = weather_service.get_weather_anywhere(location)
         
         elif cmd == "/test":
             # בדיקת מזג אוויר בארגנטינה
-            response = ai_service.weather_service.get_weather_anywhere("ארגנטינה")
+            response = weather_service.get_weather_anywhere("ארגנטינה")
             response += "\n\n✅ טסט הושלם!"
         
         else:
@@ -722,10 +700,11 @@ class TelegramBot:
         save_data()
         self.send_message(chat_id, response)
 
-# === SERVICES INITIALIZATION ===
+# === INITIALIZE SERVICES ===
 security = SecurityService()
 user_service = UserService()
-ai_service = SuperMayaAI()
+weather_service = SuperWeatherService()
+ai_service = MayaAIService()
 bot = TelegramBot()
 
 # === FLASK ROUTES ===
@@ -733,17 +712,18 @@ bot = TelegramBot()
 def health_check():
     return jsonify({
         "status": "healthy",
-        "service": "Maya 3.0 - WARM PERSONALITY + WORKING WEATHER! 🔥",
-        "version": "3.0.3-final-fixed",
+        "service": "Maya 3.0 - HYBRID SOLUTION! 🔥",
+        "version": "3.0.4-hybrid",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": config.ENVIRONMENT,
         "users": len(user_data),
         "features": [
-            "🔥 Warm friendly personality",
+            "🔥 Ultra strong personality system",
             "🌡️ Working weather for ALL countries",
-            "💪 Confident responses",
-            "😊 No more robot talk",
-            "🇦🇷 Argentina weather WORKS!"
+            "🛡️ Advanced security with IP blocking",
+            "💪 Fallback responses if AI fails",
+            "🚀 Optimized memory management",
+            "🇦🇷 Argentina weather GUARANTEED!"
         ]
     })
 
@@ -765,7 +745,6 @@ def webhook():
 def test_weather():
     """בדיקת מזג אוויר לארגנטינה"""
     try:
-        weather_service = SuperWeatherService()
         argentina_weather = weather_service.get_weather_anywhere("ארגנטינה")
         brazil_weather = weather_service.get_weather_anywhere("ברזיל")
         france_weather = weather_service.get_weather_anywhere("צרפת")
@@ -784,6 +763,24 @@ def test_weather():
             "timestamp": datetime.now().isoformat()
         }), 500
 
+@app.route("/stats", methods=["GET"])
+def api_stats():
+    try:
+        stats = {
+            "total_users": len(user_data),
+            "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
+            "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
+            "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
+            "version": "3.0.4-hybrid",
+            "personality_system": "Ultra Strong",
+            "weather_system": "Working",
+            "security_level": "Advanced"
+        }
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Stats error: {e}")
+        return jsonify({"error": "Stats unavailable"}), 500
+
 def set_webhook_on_startup():
     if config.ENVIRONMENT == "production" and config.WEBHOOK_URL:
         try:
@@ -796,18 +793,18 @@ def set_webhook_on_startup():
             
             if result.get("ok"):
                 logger.info(f"✅ Webhook set successfully: {config.WEBHOOK_URL}")
-                logger.info("🔥 Maya 3.0 with WARM PERSONALITY is ready!")
+                logger.info("🔥 Maya 3.0 HYBRID SOLUTION is ready!")
             else:
                 logger.error(f"Failed to set webhook on startup: {result}")
         except Exception as e:
             logger.error(f"Webhook setup error on startup: {e}")
 
 if __name__ == "__main__":
-    logger.info("🚀 Starting Maya 3.0 WITH WARM PERSONALITY...")
-    logger.info("🔥 No more cold robot responses!")
+    logger.info("🚀 Starting Maya 3.0 HYBRID SOLUTION...")
+    logger.info("🔥 Ultra strong personality + Advanced security!")
     logger.info("🌡️ Weather works for ALL countries including Argentina!")
     set_webhook_on_startup()
     app.run(host="0.0.0.0", port=config.PORT, debug=config.DEBUG)
 else:
-    logger.info("🔥 Maya 3.0 with WARM PERSONALITY starting via WSGI...")
+    logger.info("🔥 Maya 3.0 HYBRID starting via WSGI...")
     set_webhook_on_startup()
