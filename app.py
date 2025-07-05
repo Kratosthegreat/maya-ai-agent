@@ -811,9 +811,7 @@ class TelegramBot:
 security = SecurityService()
 user_service = UserService()
 weather_service = GlobalWeatherService()
-web_search_service = WebSearchService()  # הוספתי את זה!
-ai_service = ClaudeStyleAI()
-bot = TelegramBot()
+# web_search_service יוגדר אחרי ההגדרה של WebSearchService
 
 # === FLASK ROUTES ===
 @app.route("/", methods=["GET"])
