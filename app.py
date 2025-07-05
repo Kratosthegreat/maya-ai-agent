@@ -1136,12 +1136,14 @@ if __name__ != "__main__":
     
     # בדיקה אם הפונקציה קיימת לפני הקריאה
     if 'initialize_services' in globals():
+        logger.info("✅ Found initialize_services in globals!")
         if not initialize_services():
             logger.error("❌ Failed to initialize services in WSGI mode!")
         else:
             logger.info("✅ WSGI services initialized successfully!")
     else:
         logger.error("❌ initialize_services function not found in globals!")
+        logger.error(f"Available functions: {[name for name in globals() if callable(globals()[name]) and not name.startswith('_')]}")
         
     # בדיקה אם set_webhook_on_startup קיימת
     if 'set_webhook_on_startup' in globals():
