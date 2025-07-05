@@ -1,34 +1,7 @@
-def _extract_location(self, message: str) -> str:
-        """חילוץ מיקום מהודעה - משופר לערים מורכבות"""
-        
-        # רשימת ערים ומדינות מוכרות (כולל שמות מורכבים)
-        known_locations = [
-            # ערים ישראליות
-            "חיפה", "תל אביב", "ירושלים", "באר שבע", "אילת", "נצרת", "טבריה", 
-            "צפת", "אשדוד", "אשקלון", "רמת גן", "פתח תקווה", "נתניה", "הרצליה", 
-            "רעננה", "כפר סבא", "רמלה", "לוד", "עפולה", "חדרה", "קריית שמונה",
-            
-            # ערים עולמיות מוכרות (כולל שמות מורכבים)
-            "בואנוס איירס", "ניו יורק", "לוס אנג'לס", "סן פרנסיסקו", "לאס וגאס",
-            "מיאמי", "שיקגו", "בוסטון", "סיאטל", "לונדון", "פריז", "ברלין", 
-            "רומא", "מדריד", "אמסטרדם", "מוסקבה", "טוקיו", "בייג'ינג", "שנגחאי",
-            "מומבאי", "דלהי", "סינגפור", "הונג קונג", "סידני", "מלבורן", "קייפ טאון",
-            
-            # מדינות
-            "ארגנטינה", "ברזיל", "אמריקה", "ארצות הברית", "אנגליה", "צרפת", 
-            "גרמניה", "איטליה", "ספרד", "רוסיה", "יפן", "סין", "הודו", "אוסטרליה"
-        ]
-        
-        message_lower = message.lower()
-        
-        # חיפוש ערים/מדינות מוכרות בהודעה
-        for location in known_locations:
-            if location.lower() in message_lower:
-                logger.debug(f"Found known location: {location}")
-                return location
-        
-        # אם לא נמצא מיקום מוכר, נסה לחלץ מהטקסט
-        # הסרת מיל# === מאיה 3.0 - בנייה מחדש מלאה ===
+"""
+Maya Secretary Bot 3.0 - Complete Fixed Version
+"""
+
 import os
 import json
 import logging
@@ -206,16 +179,8 @@ class ClaudeIntelligenceEngine:
                     logger.info(f"Detected topic: {topic}")
                     return self._get_built_in_response(topic, message)
         
-            else:
-                # אין תשובה מובנית - בדוק אם צריך חיפוש או AI
-                return self._determine_next_action(message, message_lower)
-        
-        # אם אין תשובה מובנית - זה יחזור לשיחה רגילה או חיפוש
-        return {
-            "type": "needs_search_or_ai",
-            "confidence": "low",
-            "response": None
-        }
+        # אין תשובה מובנית - בדוק אם צריך חיפוש או AI
+        return self._determine_next_action(message, message_lower)
     
     def _determine_next_action(self, original_message: str, message_lower: str) -> Dict[str, Any]:
         """קביעה מה לעשות כשאין תשובה מובנית"""
@@ -421,29 +386,13 @@ class ClaudeStyleAI:
             elif intelligence_result["type"] == "weather_service":
                 location = self._extract_location(message)
                 weather_result = weather_service.get_weather_anywhere(location)
-                # אם שירות מזג האוויר נכשל, נסה חיפוש באינטרנט
-                if "בעיה" in weather_result or "לא מצאתי" in weather_result:
-                    logger.info(f"Weather service failed for {location}, trying web search")
-                    search_query = f"weather temperature {location} now"
-                    search_result = web_search_service.search_web(search_query)
-                    return search_result if search_result else weather_result
                 return weather_result
             
             elif intelligence_result["type"] == "time_service":
                 return self._get_current_time()
             
-            elif intelligence_result["type"] == "needs_web_search":
-                # חיפוש באינטרנט מיידי
-                logger.info(f"Performing web search for: {message}")
-                search_result = web_search_service.search_web(message)
-                if len(search_result) > 50 and "לא מצאתי" not in search_result:
-                    return search_result
-                else:
-                    # אם החיפוש נכשל, עבור ל-AI
-                    return self._generate_ai_response(message, context, user_id)
-            
             else:
-                # אין תשובה מובנית - עבור ל-AI או חיפוש
+                # אין תשובה מובנית - עבור ל-AI רגיל
                 return self._generate_ai_response(message, context, user_id)
                 
         except Exception as e:
@@ -559,4 +508,331 @@ class ClaudeStyleAI:
         # קיצור תשובות ארוכות מדי - רק 2 משפטים
         sentences = response.split('.')
         if len(sentences) > 2:
-            response =
+            response = '. '.join(sentences[:2]) + '.'
+        
+        # הסרת שורות ריקות מיותרות
+        response = ' '.join(response.split())
+        
+        # ודא שהתשובה לא ריקה
+        if not response.strip():
+            response = "אוקיי 👍"
+        
+        return response.strip()
+    
+    def get_usage_stats(self):
+        return self.tracker.get_usage_stats()
+
+# === WEATHER SERVICE ===
+class GlobalWeatherService:
+    def get_weather_anywhere(self, location: str) -> str:
+        try:
+            # תרגום בסיסי
+            location_en = location
+            if location == "ארגנטינה":
+                location_en = "Buenos Aires"
+            elif location == "בואנוס איירס":
+                location_en = "Buenos Aires"
+            
+            # Geocoding
+            geocoding_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location_en}&count=1&format=json"
+            geo_response = requests.get(geocoding_url, timeout=5)
+            geo_data = geo_response.json()
+            
+            if not geo_data.get('results'):
+                return f"לא מצאתי את '{location}'. נסה לכתוב את שם העיר באנגלית 🌍"
+            
+            result = geo_data['results'][0]
+            lat = result['latitude']
+            lon = result['longitude']
+            place_name = result['name']
+            country = result.get('country', '')
+            
+            # Weather
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true&timezone=auto"
+            weather_response = requests.get(weather_url, timeout=5)
+            weather_data = weather_response.json()
+            
+            current = weather_data['current_weather']
+            temp = current['temperature']
+            windspeed = current['windspeed']
+            
+            if temp > 30:
+                temp_emoji = "🔥"
+            elif temp > 20:
+                temp_emoji = "☀️"
+            elif temp > 10:
+                temp_emoji = "🌤️"
+            elif temp > 0:
+                temp_emoji = "☁️"
+            else:
+                temp_emoji = "❄️"
+            
+            location_display = place_name
+            if country and country != place_name:
+                location_display += f", {country}"
+            
+            return f"{temp_emoji} {location_display}: {temp}°C (רוח {windspeed} קמ\"ש)"
+            
+        except Exception as e:
+            logger.error(f"Weather error: {e}")
+            return f"בעיה בקבלת מזג אוויר עבור {location} 🌍"
+
+# === SECURITY ===
+class SecurityService:
+    def __init__(self):
+        self.rate_limits = {}
+    
+    def is_rate_limited(self, user_id: str) -> bool:
+        now = time.time()
+        user_requests = self.rate_limits.get(user_id, [])
+        recent_requests = [ts for ts in user_requests if now - ts < 60]
+        self.rate_limits[user_id] = recent_requests
+        
+        if len(recent_requests) >= config.MAX_REQUESTS_PER_MINUTE:
+            return True
+        
+        self.rate_limits[user_id].append(now)
+        return False
+
+# === USER SERVICE ===
+class UserService:
+    def get_or_create_user(self, telegram_data: Dict[str, Any]) -> Dict[str, Any]:
+        user_id = str(telegram_data.get('id'))
+        
+        if user_id not in user_data:
+            user_data[user_id] = {
+                'telegram_id': user_id,
+                'first_name': telegram_data.get('first_name', ''),
+                'last_name': telegram_data.get('last_name', ''),
+                'username': telegram_data.get('username', ''),
+                'total_messages': 0,
+                'created_at': datetime.now().isoformat(),
+                'last_activity': datetime.now().isoformat(),
+                'is_active': True
+            }
+            save_data()
+            logger.info(f"Created new user: {user_id}")
+        
+        return user_data[user_id]
+    
+    def update_user_activity(self, user_id: str):
+        if user_id in user_data:
+            user_data[user_id]['last_activity'] = datetime.now().isoformat()
+            user_data[user_id]['total_messages'] += 1
+            save_data()
+    
+    def get_user_context(self, user_id: str) -> str:
+        user = user_data.get(user_id, {})
+        user_memories = memories.get(user_id, [])
+        
+        if user_memories:
+            context = f"דברים שהמשתמש סיפר: {', '.join(user_memories[-3:])}"
+        else:
+            context = ""
+        
+        return context
+    
+    def add_memory(self, user_id: str, content: str):
+        if user_id not in memories:
+            memories[user_id] = []
+        
+        memories[user_id].append(content)
+        
+        if len(memories[user_id]) > 10:
+            memories[user_id] = memories[user_id][-10:]
+        
+        save_data()
+
+# === TELEGRAM BOT ===
+class TelegramBot:
+    def __init__(self):
+        self.token = config.TELEGRAM_TOKEN
+        self.api_url = f"https://api.telegram.org/bot{self.token}"
+        logger.info("Telegram bot initialized")
+    
+    def send_message(self, chat_id: int, text: str):
+        try:
+            url = f"{self.api_url}/sendMessage"
+            data = {
+                "chat_id": chat_id,
+                "text": text[:4096],
+            }
+            
+            response = requests.post(url, json=data, timeout=10)
+            result = response.json()
+            
+            if result.get("ok"):
+                logger.debug(f"Message sent to chat {chat_id}")
+            else:
+                logger.error(f"Failed to send message: {result}")
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Send message error: {e}")
+            return {"ok": False, "error": str(e)}
+    
+    def process_update(self, update: Dict[str, Any]):
+        try:
+            if "message" not in update:
+                return
+            
+            message = update["message"]
+            chat_id = message["chat"]["id"]
+            user_data_tg = message.get("from", {})
+            text = message.get("text", "")
+            
+            logger.info(f"Message from {user_data_tg.get('first_name', 'Unknown')}: {text}")
+            
+            if security.is_rate_limited(str(user_data_tg.get("id", 0))):
+                self.send_message(chat_id, "יותר מדי בקשות. חכה דקה ונסה שוב.")
+                return
+            
+            user = user_service.get_or_create_user(user_data_tg)
+            user_service.update_user_activity(user['telegram_id'])
+            
+            if text.startswith('/'):
+                self._handle_command(chat_id, text, user)
+            else:
+                self._handle_message(chat_id, text, user)
+                
+        except Exception as e:
+            logger.error(f"Process update error: {e}")
+    
+    def _handle_command(self, chat_id: int, command: str, user: Dict[str, Any]):
+        cmd = command.split()[0].lower()
+        
+        if cmd == "/start":
+            response = f"היי {user['first_name']}! אני מאיה 🤖"
+        
+        elif cmd == "/help":
+            response = """פקודות זמינות:
+/help - עזרה  
+/memory - זיכרון
+/weather [מקום] - מזג אוויר
+/stats - סטטיסטיקות
+/forget - מחק זיכרון
+
+אבל אתה לא צריך פקודות! פשוט כתוב לי מה שאתה רוצה 💬"""
+        
+        elif cmd == "/memory":
+            context = user_service.get_user_context(user['telegram_id'])
+            response = f"🧠 מה שאני זוכרת:\n{context}" if context else "אין זיכרונות עדיין"
+        
+        elif cmd == "/weather":
+            location = command.replace("/weather", "").strip() or "תל אביב"
+            response = weather_service.get_weather_anywhere(location)
+        
+        elif cmd == "/stats":
+            total_users = len(user_data)
+            response = f"📊 {total_users} משתמשים רשומים"
+        
+        elif cmd == "/forget":
+            user_id = user['telegram_id']
+            if user_id in memories:
+                del memories[user_id]
+                save_data()
+            response = "🗑️ מחקתי הכל"
+        
+        else:
+            response = "לא מכירה את הפקודה. כתוב /help"
+        
+        self.send_message(chat_id, response)
+    
+    def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
+        user_id = user['telegram_id']
+        
+        personal_keywords = ["קוראים לי", "אני עובד", "אני גר", "אני אוהב", "שמי"]
+        if any(phrase in text.lower() for phrase in personal_keywords):
+            user_service.add_memory(user_id, text)
+        
+        context = user_service.get_user_context(user_id)
+        response = ai_service.generate_response(user_id, text, context)
+        
+        if user_id not in conversations:
+            conversations[user_id] = []
+        conversations[user_id].append({
+            'message': text,
+            'response': response,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        if len(conversations[user_id]) > 20:
+            conversations[user_id] = conversations[user_id][-20:]
+        
+        save_data()
+        self.send_message(chat_id, response)
+
+# === SERVICES INITIALIZATION ===
+security = SecurityService()
+user_service = UserService()
+weather_service = GlobalWeatherService()
+ai_service = ClaudeStyleAI()
+bot = TelegramBot()
+
+# === FLASK ROUTES ===
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "Maya 3.0 - Claude-like Assistant",
+        "version": "3.0.1-fixed",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": config.ENVIRONMENT,
+        "users": len(user_data),
+        "ai_model": config.GEMINI_MODEL
+    })
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    try:
+        update = request.get_json()
+        if not update:
+            return "No data", 400
+        
+        bot.process_update(update)
+        return "OK", 200
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return "Error", 500
+
+@app.route("/stats", methods=["GET"])
+def api_stats():
+    try:
+        stats = {
+            "total_users": len(user_data),
+            "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
+            "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
+            "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
+            "version": "3.0.1-fixed"
+        }
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Stats error: {e}")
+        return jsonify({"error": "Stats unavailable"}), 500
+
+def set_webhook_on_startup():
+    if config.ENVIRONMENT == "production" and config.WEBHOOK_URL:
+        try:
+            url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
+            data = {"url": config.WEBHOOK_URL}
+            
+            logger.info(f"Setting webhook on startup: {config.WEBHOOK_URL}")
+            response = requests.post(url, json=data, timeout=10)
+            result = response.json()
+            
+            if result.get("ok"):
+                logger.info(f"Webhook set on startup: {config.WEBHOOK_URL}")
+            else:
+                logger.error(f"Failed to set webhook on startup: {result}")
+        except Exception as e:
+            logger.error(f"Webhook setup error on startup: {e}")
+
+if __name__ == "__main__":
+    logger.info("🚀 Starting Maya 3.0...")
+    set_webhook_on_startup()
+    app.run(host="0.0.0.0", port=config.PORT, debug=config.DEBUG)
+else:
+    logger.info("Maya 3.0 starting via WSGI...")
+    set_webhook_on_startup()
