@@ -110,6 +110,18 @@ class ClaudeIntelligenceEngine:
         
         # דפוסי זיהוי חכמים
         self.recognition_patterns = {
+            # זיהוי ברכות
+            "greeting": [
+                r"^(היי|שלום|hello|hi)\s*(מאיה)?$",
+                r"^(בוקר טוב|ערב טוב|לילה טוב)$"
+            ],
+            
+            # זיהוי שאלות על מצב
+            "how_are_you": [
+                r"(מה שלומך|איך אתה|איך את|מה נשמע|איך הולך)",
+                r"(how are you|how's it going|what's up)"
+            ],
+            
             # זיהוי שאלות על מלחמה בישראל
             "israel_war": [
                 r"(מלחמה|מלחמת).*(אחרון|עכשיו|נוכחי|היום|ישראל)",
@@ -174,7 +186,13 @@ class ClaudeIntelligenceEngine:
     def _get_built_in_response(self, topic: str, original_message: str) -> Dict[str, Any]:
         """קבלת תשובה מובנית - בסגנון שלי"""
         
-        if topic == "israel_war":
+        if topic == "greeting":
+            response = "היי! 👋"
+            
+        elif topic == "how_are_you":
+            response = "בסדר גמור! 😊"
+            
+        elif topic == "israel_war":
             response = "מלחמת חרבות ברזל - המלחמה שהחלה ב-7 באוקטובר 2023 כשחמאס תקף את ישראל. זו המלחמה הנוכחית של ישראל."
             
         elif topic == "world_cup":
@@ -296,23 +314,26 @@ class ClaudeStyleAI:
             self.tracker = GeminiTracker()
             
             # הוראות מערכת מחודשות - בדיוק כמו שאני מתנהג
-            self.system_prompt = """את מאיה. אל תגידי "שלום" או תברכי אלא אם כן המשתמש בירך ראשון.
+            self.system_prompt = """את מאיה - עוזרת AI פשוטה וישירה.
 
-עקרונות תגובה (חשוב מאוד):
-1. תשובות קצרות וישירות - 1-3 משפטים לכל היותר
-2. טון טבעי וחברותי אבל לא פורמלי  
-3. אל תתחילי עם "שלום דוד" או ברכות אוטומטיות
-4. אמוג'י רק אם זה מתאים טבעית
-5. אל תכתבי פסקאות ארוכות
+חוקים קריטיים:
+1. אל תברכי אוטומטית! אל תגידי "שלום" או "היי" אלא אם המשתמש בירך קודם
+2. תשובות קצרות - משפט אחד או שניים לכל היותר
+3. אל תשאלי שאלות מיותרות כמו "מה שלומך?" או "איך אני יכולה לעזור?"
+4. תני תשובות ישירות ולעניין
+5. אל תכפילי הודעות
 
 דוגמאות:
+שאלה: "מה שלומך?"
+תשובה: "בסדר גמור! 😊"
+
+שאלה: "היי מאיה"  
+תשובה: "היי! 👋"
+
 שאלה: "מתי המונדיאל הבא?"
-תשובה: "ב-2026! ארצות הברית, מקסיקו וקנדה יארחו יחד 🏆"
+תשובה: "ב-2026 בארצות הברית, מקסיקו וקנדה 🏆"
 
-שאלה: "איך אתה?"  
-תשובה: "בסדר גמור! איך אני יכולה לעזור?"
-
-תגיבי בקצרה ולעניין."""
+תגיבי רק למה שנשאל ותהיי קצרה ומדויקת."""
             
             logger.info("Claude-style AI Service initialized")
             
@@ -412,8 +433,9 @@ class ClaudeStyleAI:
         
         # הסרת ברכות אוטומטיות בתחילת התשובה
         unwanted_starts = [
-            "שלום דוד", "שלום!", "היי!", "הי דוד", 
-            "שמחה לעזור", "אני כאן בשבילך"
+            "שלום דוד", "שלום!", "היי!", "הי דוד", "היי דוד",
+            "שמחה לעזור", "אני כאן בשבילך", "🤖 היי David! אני מאיה",
+            "היי David!", "אני מאיה"
         ]
         
         for unwanted in unwanted_starts:
@@ -424,13 +446,27 @@ class ClaudeStyleAI:
                 if response.startswith("!"):
                     response = response[1:].strip()
         
-        # קיצור תשובות ארוכות מדי
+        # הסרת שאלות מיותרות בסוף
+        unwanted_endings = [
+            "מה שלומך?", "איך אני יכולה לעזור?", "איך אוכל לעזור?",
+            "מה אתה צריך?", "במה אוכל לסייע?"
+        ]
+        
+        for unwanted in unwanted_endings:
+            if response.strip().endswith(unwanted):
+                response = response.replace(unwanted, "").strip()
+        
+        # קיצור תשובות ארוכות מדי - רק 2 משפטים
         sentences = response.split('.')
-        if len(sentences) > 3:
-            response = '. '.join(sentences[:3]) + '.'
+        if len(sentences) > 2:
+            response = '. '.join(sentences[:2]) + '.'
         
         # הסרת שורות ריקות מיותרות
         response = ' '.join(response.split())
+        
+        # ודא שהתשובה לא ריקה
+        if not response.strip():
+            response = "אוקיי 👍"
         
         return response.strip()
     
@@ -581,6 +617,8 @@ class TelegramBot:
             
             if result.get("ok"):
                 logger.debug(f"Message sent to chat {chat_id}")
+                # וודא שלא נשלחת הודעה כפולה
+                time.sleep(0.5)  # המתנה קצרה למניעת כפילויות
             else:
                 logger.error(f"Failed to send message: {result}")
                 
@@ -606,12 +644,15 @@ class TelegramBot:
                 self.send_message(chat_id, "יותר מדי בקשות. חכה דקה ונסה שוב.")
                 return
             
+            # יצירת משתמש אוטומטית - ללא תלות ב-/start
             user = user_service.get_or_create_user(user_data_tg)
             user_service.update_user_activity(user['telegram_id'])
             
+            # טיפול בפקודות (רק אם זה באמת פקודה)
             if text.startswith('/'):
                 self._handle_command(chat_id, text, user)
             else:
+                # טיפול בהודעה רגילה - זה המצב הנורמלי!
                 self._handle_message(chat_id, text, user)
                 
         except Exception as e:
@@ -621,18 +662,17 @@ class TelegramBot:
         cmd = command.split()[0].lower()
         
         if cmd == "/start":
-            response = f"היי {user['first_name']}! אני מאיה 🤖\nמה שלומך?"
+            response = f"היי {user['first_name']}! אני מאיה 🤖"
         
         elif cmd == "/help":
-            response = """פקודות:
-/start - התחלה
+            response = """פקודות זמינות:
 /help - עזרה  
 /memory - זיכרון
 /weather [מקום] - מזג אוויר
 /stats - סטטיסטיקות
 /forget - מחק זיכרון
 
-או פשוט כתוב לי מה שאתה רוצה! 💬"""
+אבל אתה לא צריך פקודות! פשוט כתוב לי מה שאתה רוצה 💬"""
         
         elif cmd == "/memory":
             context = user_service.get_user_context(user['telegram_id'])
