@@ -41,103 +41,134 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'supersecretkey')
 
-# === Enhanced Services ===
+# === Enhanced Memory System ===
 class EnhancedMemory:
-    # [קוד הזיכרון המשופר מהתשובה הקודמת]
-    pass
-
-class GoogleIntegration:
-    # [קוד האינטגרציה עם Google מהתשובה הקודמת]
-    pass
-
-class SmartResponseEngine:
-    # [קוד מנוע התגובות החכם מהתשובה הקודמת]
-    pass
-
-class TelegramBot:
-    # [קוד הבוט של טלגרם מהתשובה הקודמת]
-    pass
-
-# === Flask Routes ===
-@app.route('/')
-def home():
-    return jsonify({
-        "status": "running",
-        "service": "Maya Bot",
-        "version": "4.0",
-        "timestamp": datetime.now().isoformat()
-    })
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.method == 'POST':
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.memory_file = f"users/{user_id}_memory.json"
+        os.makedirs(os.path.dirname(self.memory_file), exist_ok=True)
+        self.load_memory()
+    
+    def load_memory(self):
         try:
-            update = request.get_json()
-            if not update:
-                logger.warning("Received empty webhook update")
-                return jsonify({"status": "error", "message": "Empty request"}), 400
-                
-            bot.process_update(update)
-            return jsonify({"status": "success"}), 200
-            
+            if os.path.exists(self.memory_file):
+                with open(self.memory_file, 'r') as f:
+                    self.data = json.load(f)
+            else:
+                self.data = {
+                    "personal_details": {},
+                    "preferences": {},
+                    "conversation_history": []
+                }
         except Exception as e:
-            logger.error(f"Webhook processing error: {str(e)}")
-            return jsonify({"status": "error", "message": str(e)}), 500
+            logger.error(f"Memory load error: {e}")
+            self.data = {
+                "personal_details": {},
+                "preferences": {},
+                "conversation_history": []
+            }
     
-    return jsonify({"status": "error", "message": "Method not allowed"}), 405
-
-@app.route('/auth/google', methods=['POST'])
-def google_auth():
-    # [קוד האימות של Google מהתשובה הקודמת]
-    pass
-
-# === Initialization ===
-bot = TelegramBot()
-
-# === Request Logging Middleware ===
-@app.before_request
-def log_request():
-    logger.info(f"Incoming {request.method} request to {request.path}")
-
-# === Error Handling ===
-@app.errorhandler(404)
-def not_found(e):
-    return jsonify({"status": "error", "message": "Endpoint not found"}), 404
-
-@app.errorhandler(500)
-def server_error(e):
-    return jsonify({"status": "error", "message": "Internal server error"}), 500
-
-if __name__ == '__main__':
-    # Initialize services
-    port = int(os.environ.get('PORT', config.PORT))
+    def save_memory(self):
+        try:
+            with open(self.memory_file, 'w') as f:
+                json.dump(self.data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Memory save error: {e}")
     
-    # For production on Render
-    if config.ENVIRONMENT == 'production':
-        from gunicorn.app.base import BaseApplication
+    def extract_personal_info(self, text):
+        text_lower = text.lower()
+        # Name detection
+        name_patterns = [r"קוראים לי (.+)", r"שמי (.+)", r"השם שלי (.+)"]
+        for pattern in name_patterns:
+            match = re.search(pattern, text_lower)
+            if match and len(match.group(1).split()) < 4:
+                self.data["personal_details"]["name"] = match.group(1).strip()
+                self.save_memory()
         
-        class FlaskApplication(BaseApplication):
-            def __init__(self, app, options=None):
-                self.application = app
-                self.options = options or {}
-                super().__init__()
+        # Birthday detection
+        if any(x in text_lower for x in ["נולדתי ב", "תאריך לידה"]):
+            self.data["personal_details"]["birthday"] = text.split("ב")[-1].strip()
+            self.save_memory()
+
+# === Google Integration ===
+class GoogleIntegration:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.token_file = f"{config.SECURE_STORAGE_PATH}user_{user_id}_token.json"
+        os.makedirs(os.path.dirname(self.token_file), exist_ok=True)
+    
+    def get_credentials(self):
+        if os.path.exists(self.token_file):
+            return Credentials.from_authorized_user_file(self.token_file)
+        return None
+    
+    def get_upcoming_events(self, max_results=5):
+        creds = self.get_credentials()
+        if not creds:
+            return None
+        
+        try:
+            service = build('calendar', 'v3', credentials=creds)
+            events = service.events().list(
+                calendarId='primary',
+                maxResults=max_results,
+                singleEvents=True,
+                orderBy='startTime'
+            ).execute()
+            return events.get('items', [])
+        except Exception as e:
+            logger.error(f"Calendar error: {e}")
+            return None
+
+# === Smart Response Engine ===
+class SmartResponseEngine:
+    def __init__(self, user_id):
+        self.user_id = user_id
+        self.memory = EnhancedMemory(user_id)
+        self.google = GoogleIntegration(user_id)
+    
+    def generate_response(self, message):
+        # Personal info requests
+        if any(x in message.lower() for x in ["איך קוראים לי", "השם שלי"]):
+            name = self.memory.data["personal_details"].get("name")
+            return f"קוראים לך {name} 😊" if name else "עדיין לא למדתי את שמך!"
+        
+        # Calendar requests
+        if "מה בתכנית היום" in message.lower():
+            events = self.google.get_upcoming_events()
+            if events is None:
+                return "צריך לאשר גישה ליומן Google תחילה 🔐"
+            if not events:
+                return "אין אירועים מתוכננים להיום 🎉"
             
-            def load_config(self):
-                for key, value in self.options.items():
-                    self.cfg.set(key, value)
+            events_str = []
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                if 'dateTime' in event['start']:
+                    start_time = parse(start).strftime('%H:%M')
+                    events_str.append(f"⏰ {event['summary']} ב-{start_time}")
+                else:
+                    events_str.append(f"📅 {event['summary']} (כל היום)")
             
-            def load(self):
-                return self.application
+            return "האירועים הקרובים:\n" + "\n".join(events_str)
         
-        options = {
-            'bind': f'0.0.0.0:{port}',
-            'workers': 2,
-            'timeout': 120,
-            'worker_class': 'sync'
-        }
-        
-        FlaskApplication(app, options).run()
+        return None
+
+# === Telegram Bot Handler ===
+class TelegramBot:
+    def __init__(self):
+        self.token = config.TELEGRAM_TOKEN
+        self.api_url = f"https://api.telegram.org/bot{self.token}"
     
-    # For local development
-    else:
-        app.run(host='0.0.0.0', port=port, debug=config.DEBUG)
+    def send_message(self, chat_id: int, text: str):
+        try:
+            url = f"{self.api_url}/sendMessage"
+            data = {"chat_id": chat_id, "text": text[:4096]}
+            response = requests.post(url, json=data, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error sending message: {e}")
+            return {"ok": False}
+    
+    def process_update(self, update: Dict[str, Any
