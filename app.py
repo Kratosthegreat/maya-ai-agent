@@ -811,6 +811,7 @@ class TelegramBot:
 security = SecurityService()
 user_service = UserService()
 weather_service = GlobalWeatherService()
+web_search_service = WebSearchService()  # הוספתי את זה!
 ai_service = ClaudeStyleAI()
 bot = TelegramBot()
 
