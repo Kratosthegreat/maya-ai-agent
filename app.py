@@ -171,4 +171,125 @@ class TelegramBot:
             logger.error(f"Error sending message: {e}")
             return {"ok": False}
     
-    def process_update(self, update: Dict[str, Any
+    def process_update(self, update: Dict[str, Any]):
+        try:
+            if "message" not in update:
+                logger.warning("Update does not contain message")
+                return
+            
+            message = update["message"]
+            chat_id = message["chat"]["id"]
+            user_id = str(message["from"]["id"])
+            text = message.get("text", "")
+            
+            logger.info(f"Processing message from user {user_id}: {text[:50]}...")
+            
+            # Initialize services
+            smart_engine = SmartResponseEngine(user_id)
+            enhanced_memory = EnhancedMemory(user_id)
+            
+            # Process personal info
+            enhanced_memory.extract_personal_info(text)
+            
+            # Generate response
+            response = smart_engine.generate_response(text) or "אני עדיין לומדת לענות על שאלות כאלה! 🤖"
+            
+            self.send_message(chat_id, response)
+            
+        except Exception as e:
+            logger.error(f"Failed to process update: {e}")
+
+# === Flask Routes ===
+@app.route('/')
+def home():
+    return jsonify({
+        "status": "running",
+        "service": "Maya Bot",
+        "version": "4.0",
+        "timestamp": datetime.now().isoformat()
+    })
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.method == 'POST':
+        try:
+            update = request.get_json()
+            if not update:
+                logger.warning("Received empty webhook update")
+                return jsonify({"status": "error", "message": "Empty request"}), 400
+                
+            bot.process_update(update)
+            return jsonify({"status": "success"}), 200
+            
+        except Exception as e:
+            logger.error(f"Webhook processing error: {str(e)}")
+            return jsonify({"status": "error", "message": str(e)}), 500
+    
+    return jsonify({"status": "error", "message": "Method not allowed"}), 405
+
+@app.route('/auth/google', methods=['POST'])
+def google_auth():
+    try:
+        user_id = request.json.get("user_id")
+        token_data = request.json.get("token")
+        
+        if not user_id or not token_data:
+            return jsonify({"status": "error", "message": "Missing data"}), 400
+        
+        os.makedirs(config.SECURE_STORAGE_PATH, exist_ok=True)
+        token_file = f"{config.SECURE_STORAGE_PATH}user_{user_id}_token.json"
+        
+        with open(token_file, "w") as f:
+            json.dump(token_data, f)
+        
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        logger.error(f"Google auth error: {e}")
+        return jsonify({"status": "error"}), 500
+
+# === Initialization ===
+bot = TelegramBot()
+
+# === Request Logging ===
+@app.before_request
+def log_request():
+    logger.info(f"Incoming {request.method} request to {request.path}")
+
+# === Error Handlers ===
+@app.errorhandler(404)
+def not_found(e):
+    return jsonify({"status": "error", "message": "Endpoint not found"}), 404
+
+@app.errorhandler(500)
+def server_error(e):
+    return jsonify({"status": "error", "message": "Internal server error"}), 500
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', config.PORT))
+    
+    if config.ENVIRONMENT == 'production':
+        from gunicorn.app.base import BaseApplication
+        
+        class FlaskApplication(BaseApplication):
+            def __init__(self, app, options=None):
+                self.application = app
+                self.options = options or {}
+                super().__init__()
+            
+            def load_config(self):
+                for key, value in self.options.items():
+                    self.cfg.set(key, value)
+            
+            def load(self):
+                return self.application
+        
+        options = {
+            'bind': f'0.0.0.0:{port}',
+            'workers': 2,
+            'timeout': 120,
+            'worker_class': 'sync'
+        }
+        
+        FlaskApplication(app, options).run()
+    else:
+        app.run(host='0.0.0.0', port=port, debug=config.DEBUG)
