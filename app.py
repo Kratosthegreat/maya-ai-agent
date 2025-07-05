@@ -1129,15 +1129,25 @@ if __name__ == "__main__":
     )
 
 # === WSGI MODE INITIALIZATION ===
-# הקוד הזה ירוץ כשהקובץ מיובא (WSGI mode)
+# הקוד הזה ירוץ כשהקובץ מיובא (WSGI mode)  
+# חשוב: קוד זה נמצא אחרי שכל הפונקציות הוגדרו!
 if __name__ != "__main__":
     logger.info("Maya 3.0 starting via WSGI...")
-    # עכשיו כל הפונקציות כבר הוגדרו, אפשר לקרוא להן
-    if not initialize_services():
-        logger.error("❌ Failed to initialize services in WSGI mode!")
+    
+    # בדיקה אם הפונקציה קיימת לפני הקריאה
+    if 'initialize_services' in globals():
+        if not initialize_services():
+            logger.error("❌ Failed to initialize services in WSGI mode!")
+        else:
+            logger.info("✅ WSGI services initialized successfully!")
     else:
-        logger.info("✅ WSGI services initialized successfully!")
-    set_webhook_on_startup()
+        logger.error("❌ initialize_services function not found in globals!")
+        
+    # בדיקה אם set_webhook_on_startup קיימת
+    if 'set_webhook_on_startup' in globals():
+        set_webhook_on_startup()
+    else:
+        logger.error("❌ set_webhook_on_startup function not found!")
 else:
     logger.info("Maya 3.0 starting via WSGI...")
 # === תפקוד השירותים ב-WSGI mode ===
