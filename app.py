@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-# === Maya Secretary Bot 5.2 - Enhanced Response Version ===
+# === Maya Secretary Bot 5.3 - Weather & Date Version ===
 import os
 import json
 import re
 import logging
+import requests
 from datetime import datetime
 from typing import Dict, Any, Optional
 import pytz
 
 from flask import Flask, request, jsonify
-import requests
 
 # === Configuration ===
 class Config:
@@ -21,6 +21,8 @@ class Config:
         self.PORT = int(os.getenv('PORT', 10000))
         self.DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
         self.TIMEZONE = pytz.timezone('Asia/Jerusalem')
+        self.WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '')
+        self.WEATHER_API_URL = "http://api.weatherapi.com/v1/current.json"
 
 config = Config()
 
@@ -33,21 +35,37 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# === User Memory System ===
+# === User Memory & Services ===
 class UserMemory:
     def __init__(self):
-        self.user_data = {}  # In-memory storage (replace with DB in production)
+        self.user_data = {}
     
     def remember_name(self, user_id: int, name: str):
-        if user_id not in self.user_data:
-            self.user_data[user_id] = {}
-        self.user_data[user_id]['name'] = name
+        self.user_data.setdefault(user_id, {})['name'] = name
         logger.info(f"Remembered name for user {user_id}: {name}")
     
     def get_name(self, user_id: int) -> Optional[str]:
         return self.user_data.get(user_id, {}).get('name')
 
+class WeatherService:
+    @staticmethod
+    def get_temperature(city: str) -> Optional[str]:
+        if not config.WEATHER_API_KEY:
+            return None
+            
+        try:
+            response = requests.get(
+                f"{config.WEATHER_API_URL}?key={config.WEATHER_API_KEY}&q={city}&aqi=no",
+                timeout=5
+            )
+            data = response.json()
+            return f"{data['current']['temp_c']}°C"
+        except Exception as e:
+            logger.error(f"Weather API error: {e}")
+            return None
+
 memory = UserMemory()
+weather = WeatherService()
 
 # === Telegram Bot Handler ===
 class TelegramBot:
@@ -73,8 +91,9 @@ class TelegramBot:
             return False
     
     def process_message(self, message: Dict[str, Any]) -> Optional[str]:
-        text = message.get("text", "").strip()
+        text = message.get("text", "").strip().lower()
         user_id = message["from"]["id"]
+        user_name = memory.get_name(user_id)
         
         # Handle name declaration
         name_match = re.search(r'(שמי|קוראים לי|השם שלי) (.+)', text)
@@ -83,23 +102,33 @@ class TelegramBot:
             memory.remember_name(user_id, name)
             return f"נעים להכיר אותך, {name}! 😊"
         
+        # Handle weather requests
+        if 'טמפרטורה' in text or 'מזג אוויר' in text:
+            city = 'Afula' if 'עפולה' in text else 'Israel'
+            temp = weather.get_temperature(city)
+            if temp:
+                return f"הטמפרטורה ב{city} היא {temp} 🌡️"
+            return "לא מצליחה לקבל נתוני מזג אוויר כרגע. 🚧"
+        
+        # Handle date requests
+        if 'באיזה יום' in text or 'איזה יום' in text:
+            now = datetime.now(config.TIMEZONE)
+            return f"היום יום {now.strftime('%A')}, {now.strftime('%d/%m/%Y')} 📅"
+        
         # Handle time requests
         if 'מה השעה' in text or 'שעה עכשיו' in text:
             now = datetime.now(config.TIMEZONE)
             return f"השעה עכשיו בישראל היא: {now.strftime('%H:%M')} 🕒"
         
-        # Check if we know the user's name
-        user_name = memory.get_name(user_id)
-        
         # Handle /start command
-        if text.lower() == "/start":
+        if text == "/start":
             greeting = f"👋 שלום! אני מאיה" 
             if user_name:
                 greeting += f", {user_name}"
             return greeting + "! איך אוכל לעזור לך היום?"
         
         # Handle greetings
-        if any(word in text.lower() for word in ["היי", "שלום", "הייי"]):
+        if any(word in text for word in ["היי", "שלום", "הייי"]):
             greeting = "👋 היי"
             if user_name:
                 greeting += f" {user_name}"
@@ -109,8 +138,12 @@ class TelegramBot:
         if "מאיה" in text:
             return "כן? אני כאן! איך אוכל לעזור לך?"
         
+        # Handle "בסדר"
+        if text == "בסדר":
+            return "מצוין! האם יש משהו נוסף שביכולתי לעזור עם זה? 😊"
+        
         # Default response
-        return "אשמח לעזור! תוכל לשאול אותי על:\n- מה השעה עכשיו\n- לשמור את שמך\n- או כל בקשה אחרת"
+        return "אשמח לעזור! תוכל לשאול אותי על:\n- מזג אוויר\n- תאריך ושעה\n- או כל בקשה אחרת"
 
     def process_update(self, update: Dict[str, Any]):
         if "message" not in update:
@@ -135,7 +168,7 @@ def home():
     return jsonify({
         "status": "running",
         "service": "Maya Bot",
-        "version": "5.2",
+        "version": "5.3",
         "timestamp": datetime.now().isoformat()
     })
 
