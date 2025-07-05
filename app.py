@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
-# === Maya Secretary Bot 5.1 - Fixed Response Version ===
+# === Maya Secretary Bot 5.2 - Enhanced Response Version ===
 import os
 import json
 import re
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional
+import pytz
 
 from flask import Flask, request, jsonify
 import requests
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from dateutil.parser import parse
 
 # === Configuration ===
 class Config:
@@ -20,9 +18,9 @@ class Config:
         if not self.TELEGRAM_TOKEN:
             raise ValueError("Missing TELEGRAM_TOKEN environment variable")
         
-        self.PORT = int(os.getenv('PORT', 10000))  # Using port 10000 as detected
+        self.PORT = int(os.getenv('PORT', 10000))
         self.DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
-        self.WEBHOOK_URL = os.getenv('WEBHOOK_URL', '')
+        self.TIMEZONE = pytz.timezone('Asia/Jerusalem')
 
 config = Config()
 
@@ -35,12 +33,27 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# === Enhanced Telegram Bot Handler ===
+# === User Memory System ===
+class UserMemory:
+    def __init__(self):
+        self.user_data = {}  # In-memory storage (replace with DB in production)
+    
+    def remember_name(self, user_id: int, name: str):
+        if user_id not in self.user_data:
+            self.user_data[user_id] = {}
+        self.user_data[user_id]['name'] = name
+        logger.info(f"Remembered name for user {user_id}: {name}")
+    
+    def get_name(self, user_id: int) -> Optional[str]:
+        return self.user_data.get(user_id, {}).get('name')
+
+memory = UserMemory()
+
+# === Telegram Bot Handler ===
 class TelegramBot:
     def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
-        self.user_sessions = {}  # Simple session storage
     
     def send_message(self, chat_id: int, text: str) -> bool:
         try:
@@ -63,29 +76,41 @@ class TelegramBot:
         text = message.get("text", "").strip()
         user_id = message["from"]["id"]
         
-        # Initialize session if new user
-        if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = {
-                "first_seen": datetime.now(),
-                "message_count": 0
-            }
+        # Handle name declaration
+        name_match = re.search(r'(שמי|קוראים לי|השם שלי) (.+)', text)
+        if name_match:
+            name = name_match.group(2)
+            memory.remember_name(user_id, name)
+            return f"נעים להכיר אותך, {name}! 😊"
         
-        self.user_sessions[user_id]["message_count"] += 1
+        # Handle time requests
+        if 'מה השעה' in text or 'שעה עכשיו' in text:
+            now = datetime.now(config.TIMEZONE)
+            return f"השעה עכשיו בישראל היא: {now.strftime('%H:%M')} 🕒"
+        
+        # Check if we know the user's name
+        user_name = memory.get_name(user_id)
         
         # Handle /start command
         if text.lower() == "/start":
-            return "👋 שלום! אני מאיה, העוזרת האישית שלך. איך אוכל לעזור לך היום?"
+            greeting = f"👋 שלום! אני מאיה" 
+            if user_name:
+                greeting += f", {user_name}"
+            return greeting + "! איך אוכל לעזור לך היום?"
         
-        # Handle basic greetings
+        # Handle greetings
         if any(word in text.lower() for word in ["היי", "שלום", "הייי"]):
-            return "👋 היי! נעים להכיר. מה שלומך היום?"
+            greeting = "👋 היי"
+            if user_name:
+                greeting += f" {user_name}"
+            return greeting + "! מה שלומך היום?"
         
         # Handle "Maya" mentions
         if "מאיה" in text:
             return "כן? אני כאן! איך אוכל לעזור לך?"
         
-        # Default response for unrecognized messages
-        return "אני עדיין לומדת להכיר אותך! תוכל לשאול אותי שאלות פשוטות או להגיד 'מה אתה יודעת לעשות?'"
+        # Default response
+        return "אשמח לעזור! תוכל לשאול אותי על:\n- מה השעה עכשיו\n- לשמור את שמך\n- או כל בקשה אחרת"
 
     def process_update(self, update: Dict[str, Any]):
         if "message" not in update:
@@ -95,12 +120,14 @@ class TelegramBot:
         chat_id = message["chat"]["id"]
         user_id = message["from"]["id"]
         
-        logger.info(f"Processing message from user {user_id}: {message.get('text', '')[:50]}...")
+        logger.info(f"Processing message from user {user_id}: {message.get('text', '')}")
         
-        # Generate response
+        # Generate and send response
         response = self.process_message(message)
         if response:
-            self.send_message(chat_id, response)
+            success = self.send_message(chat_id, response)
+            if not success:
+                logger.error(f"Failed to send response to user {user_id}")
 
 # === Flask Routes ===
 @app.route('/')
@@ -108,8 +135,7 @@ def home():
     return jsonify({
         "status": "running",
         "service": "Maya Bot",
-        "version": "5.1",
-        "port": config.PORT,
+        "version": "5.2",
         "timestamp": datetime.now().isoformat()
     })
 
