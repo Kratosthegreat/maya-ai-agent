@@ -1,4 +1,34 @@
-# === מאיה 3.0 - בנייה מחדש מלאה ===
+def _extract_location(self, message: str) -> str:
+        """חילוץ מיקום מהודעה - משופר לערים מורכבות"""
+        
+        # רשימת ערים ומדינות מוכרות (כולל שמות מורכבים)
+        known_locations = [
+            # ערים ישראליות
+            "חיפה", "תל אביב", "ירושלים", "באר שבע", "אילת", "נצרת", "טבריה", 
+            "צפת", "אשדוד", "אשקלון", "רמת גן", "פתח תקווה", "נתניה", "הרצליה", 
+            "רעננה", "כפר סבא", "רמלה", "לוד", "עפולה", "חדרה", "קריית שמונה",
+            
+            # ערים עולמיות מוכרות (כולל שמות מורכבים)
+            "בואנוס איירס", "ניו יורק", "לוס אנג'לס", "סן פרנסיסקו", "לאס וגאס",
+            "מיאמי", "שיקגו", "בוסטון", "סיאטל", "לונדון", "פריז", "ברלין", 
+            "רומא", "מדריד", "אמסטרדם", "מוסקבה", "טוקיו", "בייג'ינג", "שנגחאי",
+            "מומבאי", "דלהי", "סינגפור", "הונג קונג", "סידני", "מלבורן", "קייפ טאון",
+            
+            # מדינות
+            "ארגנטינה", "ברזיל", "אמריקה", "ארצות הברית", "אנגליה", "צרפת", 
+            "גרמניה", "איטליה", "ספרד", "רוסיה", "יפן", "סין", "הודו", "אוסטרליה"
+        ]
+        
+        message_lower = message.lower()
+        
+        # חיפוש ערים/מדינות מוכרות בהודעה
+        for location in known_locations:
+            if location.lower() in message_lower:
+                logger.debug(f"Found known location: {location}")
+                return location
+        
+        # אם לא נמצא מיקום מוכר, נסה לחלץ מהטקסט
+        # הסרת מיל# === מאיה 3.0 - בנייה מחדש מלאה ===
 import os
 import json
 import logging
@@ -176,10 +206,42 @@ class ClaudeIntelligenceEngine:
                     logger.info(f"Detected topic: {topic}")
                     return self._get_built_in_response(topic, message)
         
+            else:
+                # אין תשובה מובנית - בדוק אם צריך חיפוש או AI
+                return self._determine_next_action(message, message_lower)
+        
         # אם אין תשובה מובנית - זה יחזור לשיחה רגילה או חיפוש
         return {
-            "type": "needs_ai_or_search",
+            "type": "needs_search_or_ai",
             "confidence": "low",
+            "response": None
+        }
+    
+    def _determine_next_action(self, original_message: str, message_lower: str) -> Dict[str, Any]:
+        """קביעה מה לעשות כשאין תשובה מובנית"""
+        
+        # שאלות שדורשות חיפוש באינטרנט
+        search_indicators = [
+            "מה קורה", "מה חדש", "עדכונים", "חדשות",
+            "מי זה", "מי זאת", "מה זה", "איפה", "מתי",
+            "כמה עולה", "מחיר", "עלות", "מחירים"
+        ]
+        
+        # שאלות מזג אוויר על מקומות לא מוכרים
+        weather_but_unknown = any(word in message_lower for word in ["טמפרטורה", "מזג אוויר", "מעלות", "חם", "קר"])
+        
+        # אם זה נראה כמו שאלה שדורשת מידע עדכני
+        if any(indicator in message_lower for indicator in search_indicators) or weather_but_unknown:
+            return {
+                "type": "needs_web_search",
+                "confidence": "high",
+                "response": None
+            }
+        
+        # אחרת, עבור ל-AI רגיל
+        return {
+            "type": "needs_ai_or_search",
+            "confidence": "medium", 
             "response": None
         }
     
@@ -358,10 +420,27 @@ class ClaudeStyleAI:
             
             elif intelligence_result["type"] == "weather_service":
                 location = self._extract_location(message)
-                return weather_service.get_weather_anywhere(location)
+                weather_result = weather_service.get_weather_anywhere(location)
+                # אם שירות מזג האוויר נכשל, נסה חיפוש באינטרנט
+                if "בעיה" in weather_result or "לא מצאתי" in weather_result:
+                    logger.info(f"Weather service failed for {location}, trying web search")
+                    search_query = f"weather temperature {location} now"
+                    search_result = web_search_service.search_web(search_query)
+                    return search_result if search_result else weather_result
+                return weather_result
             
             elif intelligence_result["type"] == "time_service":
                 return self._get_current_time()
+            
+            elif intelligence_result["type"] == "needs_web_search":
+                # חיפוש באינטרנט מיידי
+                logger.info(f"Performing web search for: {message}")
+                search_result = web_search_service.search_web(message)
+                if len(search_result) > 50 and "לא מצאתי" not in search_result:
+                    return search_result
+                else:
+                    # אם החיפוש נכשל, עבור ל-AI
+                    return self._generate_ai_response(message, context, user_id)
             
             else:
                 # אין תשובה מובנית - עבור ל-AI או חיפוש
