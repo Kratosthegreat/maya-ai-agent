@@ -1,5 +1,5 @@
 """
-Maya Secretary Bot 3.0 - WARM PERSONALITY + WEATHER FIXED
+Maya Secretary Bot 3.0 - WARM PERSONALITY + WEATHER FIXED - FINAL VERSION
 """
 
 import os
@@ -328,6 +328,79 @@ class WarmPersonalityEngine:
         responses = self.warm_responses.get(category, ["אוקיי! 👍"])
         return random.choice(responses)
 
+# === GEMINI TRACKER ===
+class GeminiTracker:
+    def __init__(self):
+        self.usage_file = GEMINI_USAGE_FILE
+        self.daily_limit = 1500
+        self.minute_limit = 15
+        self.load_usage_data()
+    
+    def load_usage_data(self):
+        if os.path.exists(self.usage_file):
+            try:
+                with open(self.usage_file, 'r', encoding='utf-8') as f:
+                    self.usage_data = json.load(f)
+            except:
+                self._init_usage_data()
+        else:
+            self._init_usage_data()
+    
+    def _init_usage_data(self):
+        self.usage_data = {
+            'daily_requests': 0,
+            'last_reset': str(datetime.now().date()),
+            'minute_requests': [],
+            'total_tokens': 0,
+            'total_requests_ever': 0
+        }
+    
+    def save_usage_data(self):
+        try:
+            with open(self.usage_file, 'w', encoding='utf-8') as f:
+                json.dump(self.usage_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving usage: {e}")
+    
+    def can_make_request(self):
+        today = str(datetime.now().date())
+        if self.usage_data['last_reset'] != today:
+            self.usage_data['daily_requests'] = 0
+            self.usage_data['last_reset'] = today
+            self.usage_data['minute_requests'] = []
+        
+        now = datetime.now()
+        minute_ago = now - timedelta(minutes=1)
+        self.usage_data['minute_requests'] = [
+            req_time for req_time in self.usage_data['minute_requests']
+            if datetime.fromisoformat(req_time) > minute_ago
+        ]
+        
+        if self.usage_data['daily_requests'] >= self.daily_limit:
+            return False, f"הגעת למגבלה היומית ({self.daily_limit})"
+        if len(self.usage_data['minute_requests']) >= self.minute_limit:
+            return False, f"יותר מדי בקשות בדקה ({self.minute_limit})"
+        
+        return True, "OK"
+    
+    def record_request(self, tokens_used=0):
+        now = datetime.now()
+        self.usage_data['daily_requests'] += 1
+        self.usage_data['total_requests_ever'] += 1
+        self.usage_data['minute_requests'].append(now.isoformat())
+        self.usage_data['total_tokens'] += tokens_used
+        self.save_usage_data()
+    
+    def get_usage_stats(self):
+        return {
+            'daily_requests': self.usage_data['daily_requests'],
+            'daily_limit': self.daily_limit,
+            'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
+            'total_tokens': self.usage_data['total_tokens'],
+            'total_requests_ever': self.usage_data['total_requests_ever'],
+            'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
+        }
+
 # === SUPER AI SERVICE ===
 class SuperMayaAI:
     """מאיה עם אישיות חמה + אינטרנט + מזג אוויר"""
@@ -339,6 +412,7 @@ class SuperMayaAI:
             self.chat_sessions = {}
             self.weather_service = SuperWeatherService()
             self.personality = WarmPersonalityEngine()
+            self.tracker = GeminiTracker()
             
             # הוראות חזקות ובהירות!
             self.system_prompt = """את מאיה - בחורה חמה, חכמה ומגניבה!
@@ -407,6 +481,11 @@ class SuperMayaAI:
     def _generate_warm_ai_response(self, message: str, context: str, user_id: str) -> str:
         """יצירת תשובה חמה עם AI"""
         
+        # בדיקת מגבלות
+        can_request, status_message = self.tracker.can_make_request()
+        if not can_request:
+            return f"יותר מדי בקשות היום. נסה מאוחר יותר! 😊"
+        
         # הודעה מפורטת ל-AI
         enhanced_message = f"""
         {self.system_prompt}
@@ -425,6 +504,8 @@ class SuperMayaAI:
             
             chat = self.chat_sessions[user_id]
             response = chat.send_message(enhanced_message)
+            
+            self.tracker.record_request(len(response.text))
             
             # ניקוי התשובה מביטויים רובוטיים
             cleaned_response = self._clean_robot_phrases(response.text)
@@ -463,9 +544,9 @@ class SuperMayaAI:
             return "אוקיי! 👍"
         
         return response.strip()
-
-# === SERVICES INITIALIZATION ===
-ai_service = SuperMayaAI()
+    
+    def get_usage_stats(self):
+        return self.tracker.get_usage_stats()
 
 # === SECURITY ===
 class SecurityService:
@@ -644,6 +725,7 @@ class TelegramBot:
 # === SERVICES INITIALIZATION ===
 security = SecurityService()
 user_service = UserService()
+ai_service = SuperMayaAI()
 bot = TelegramBot()
 
 # === FLASK ROUTES ===
@@ -652,7 +734,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "Maya 3.0 - WARM PERSONALITY + WORKING WEATHER! 🔥",
-        "version": "3.0.3-personality-weather-fixed",
+        "version": "3.0.3-final-fixed",
         "timestamp": datetime.utcnow().isoformat(),
         "environment": config.ENVIRONMENT,
         "users": len(user_data),
@@ -679,15 +761,6 @@ def webhook():
         logger.error(f"Webhook error: {e}")
         return "Error", 500
 
-@app.route("/test_weather", methods=["GET"])
-def test_weather():
-    """בדיקת מזג אוויר לארגנטינה"""
-    try:
-        weather_service = SuperWeatherService()
-        argentina_weather = weather_service.get_weather_anywhere("ארגנטינה")
-        brazil_weather = weather_service.get_weather_anywhere("ברזיל")
-        france_weather = weather_service.get_weather_anywhere("צרפת")
-        
 @app.route("/test_weather", methods=["GET"])
 def test_weather():
     """בדיקת מזג אוויר לארגנטינה"""
@@ -738,4 +811,3 @@ if __name__ == "__main__":
 else:
     logger.info("🔥 Maya 3.0 with WARM PERSONALITY starting via WSGI...")
     set_webhook_on_startup()
-            "
