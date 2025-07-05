@@ -1129,23 +1129,28 @@ if __name__ == "__main__":
     )
 
 # === WSGI MODE INITIALIZATION ===
-# הקוד הזה ירוץ כשהקובץ מיובא (WSGI mode)  
-# חשוב: קוד זה נמצא אחרי שכל הפונקציות הוגדרו!
+# קוד זה רץ כשהקובץ מיובא (WSGI mode)
 if __name__ != "__main__":
     logger.info("Maya 3.0 starting via WSGI...")
     
-    # בדיקה אם הפונקציה קיימת לפני הקריאה
-    if 'initialize_services' in globals():
-        logger.info("✅ Found initialize_services in globals!")
-        if not initialize_services():
-            logger.error("❌ Failed to initialize services in WSGI mode!")
-        else:
-            logger.info("✅ WSGI services initialized successfully!")
-    else:
-        logger.error("❌ initialize_services function not found in globals!")
-        logger.error(f"Available functions: {[name for name in globals() if callable(globals()[name]) and not name.startswith('_')]}")
+    # הפונקציה initialize_services לא קיימת אז ניצור את השירותים ישירות
+    try:
+        logger.info("Creating services directly...")
         
-    # בדיקה אם set_webhook_on_startup קיימת
+        # יצירת השירותים
+        security_obj = SecurityService()
+        user_service_obj = UserService()
+        weather_service_obj = GlobalWeatherService()
+        web_search_service_obj = WebSearchService()
+        ai_service_obj = ClaudeStyleAI()
+        bot_obj = TelegramBot()
+        
+        logger.info("✅ WSGI services created successfully!")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to create WSGI services: {e}")
+        
+    # הגדרת webhook
     if 'set_webhook_on_startup' in globals():
         set_webhook_on_startup()
     else:
