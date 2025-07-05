@@ -817,7 +817,17 @@ weather_service = GlobalWeatherService()
 @app.route("/", methods=["GET"])
 def health_check():
     try:
-        usage_stats = ai_service.get_usage_stats()
+        # בדיקה אם השירותים קיימים לפני השימוש בהם
+        usage_stats = {}
+        if 'ai_service' in globals() and ai_service:
+            usage_stats = ai_service.get_usage_stats()
+        else:
+            usage_stats = {
+                "daily_requests": 0,
+                "daily_limit": 1500,
+                "percentage_used_today": 0
+            }
+            
         return jsonify({
             "status": "healthy",
             "service": "Maya 3.0 - Claude-like Assistant",
@@ -831,17 +841,19 @@ def health_check():
                 "built_in_knowledge_base", 
                 "contextual_understanding",
                 "short_natural_responses",
-                "no_automatic_greetings"
+                "no_automatic_greetings",
+                "web_search_enabled"
             ],
-            "gemini_usage": {
-                "daily_requests": usage_stats['daily_requests'],
-                "daily_limit": usage_stats['daily_limit'],
-                "percentage_used": usage_stats['percentage_used_today']
-            }
+            "gemini_usage": usage_stats
         })
     except Exception as e:
         logger.error(f"Health check error: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({
+            "status": "error", 
+            "error": str(e),
+            "service": "Maya 3.0",
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -860,7 +872,13 @@ def webhook():
 @app.route("/stats", methods=["GET"])
 def api_stats():
     try:
-        usage_stats = ai_service.get_usage_stats()
+        # בדיקה בטוחה של השירותים
+        usage_stats = {}
+        if 'ai_service' in globals() and ai_service:
+            usage_stats = ai_service.get_usage_stats()
+        else:
+            usage_stats = {"daily_requests": 0, "daily_limit": 1500}
+            
         stats = {
             "total_users": len(user_data),
             "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
@@ -873,7 +891,8 @@ def api_stats():
                 "contextual_understanding": True,
                 "natural_responses": True,
                 "weather_service": True,
-                "memory_system": True
+                "memory_system": True,
+                "web_search_enabled": True
             },
             "gemini_usage": usage_stats
         }
@@ -908,8 +927,18 @@ def test_intelligence():
 @app.route("/usage", methods=["GET"])
 def api_usage():
     try:
-        usage_stats = ai_service.get_usage_stats()
-        return jsonify(usage_stats)
+        if 'ai_service' in globals() and ai_service:
+            usage_stats = ai_service.get_usage_stats()
+            return jsonify(usage_stats)
+        else:
+            return jsonify({
+                "daily_requests": 0,
+                "daily_limit": 1500,
+                "daily_remaining": 1500,
+                "total_tokens": 0,
+                "total_requests_ever": 0,
+                "percentage_used_today": 0
+            })
     except Exception as e:
         logger.error(f"Usage stats error: {e}")
         return jsonify({"error": "Usage stats unavailable"}), 500
