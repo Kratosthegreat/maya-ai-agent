@@ -1,25 +1,24 @@
-# Maya Secretary Bot - Simple Version (No SQLAlchemy)
-# Compatible with Python 3.13
-
-# Core Framework
+# === Core Framework ===
 flask==3.0.0
 gunicorn==21.2.0
 
-# Environment & Configuration
+# === Environment & Configuration ===
 python-dotenv==1.0.0
 
-# HTTP Requests
+# === HTTP Requests ===
 requests==2.31.0
 
-# AI & ML
+# === AI & ML ===
 google-generativeai==0.3.2
 
-# Timezone handling
-pytz==2023.3
+# === Google Integrations ===
+google-api-python-client==2.108.0  # הגרסה העדכנית ל-Python 3.13
+google-auth-oauthlib==1.1.0
+python-dateutil==2.8.2
 
-google-api-python-client
-google-auth-oauthlib
-python-dateutil
-python-dateutil>=2.8.0
-google-api-python-client>=2.0.0
-google-auth-oauthlib>=1.0.0
+# === Timezone Handling ===
+pytz==2023.3.post1  # גרסה רשמית שתומכת ב-Python 3.13
+
+# === Additional Utilities ===
+beautifulsoup4==4.12.2  # מומלץ לחיפוש באינטרנט
+python-magic==0.4.27  # לזיהוי סוגי קבצים
