@@ -1,5 +1,5 @@
 """
-Maya Secretary Bot 3.0 - WITH REAL INTERNET ACCESS
+Maya Secretary Bot 3.0 - WITH REAL INTERNET ACCESS - SYNTAX FIXED
 """
 
 import os
@@ -365,6 +365,16 @@ class GeminiTracker:
         self.usage_data['minute_requests'].append(now.isoformat())
         self.usage_data['total_tokens'] += tokens_used
         self.save_usage_data()
+    
+    def get_usage_stats(self):
+        return {
+            'daily_requests': self.usage_data['daily_requests'],
+            'daily_limit': self.daily_limit,
+            'daily_remaining': self.daily_limit - self.usage_data['daily_requests'],
+            'total_tokens': self.usage_data['total_tokens'],
+            'total_requests_ever': self.usage_data['total_requests_ever'],
+            'percentage_used_today': round((self.usage_data['daily_requests'] / self.daily_limit) * 100, 1)
+        }
 
 # === MAYA AI SERVICE WITH INTERNET ===
 class MayaAIService:
@@ -520,6 +530,9 @@ class MayaAIService:
             response = "אוקיי 👍"
         
         return response.strip()
+    
+    def get_usage_stats(self):
+        return self.tracker.get_usage_stats()
 
 # === WEATHER SERVICE ===
 class GlobalWeatherService:
@@ -691,10 +704,181 @@ class TelegramBot:
             response = f"היי {user['first_name']}! אני מאיה עם גישה לאינטרנט! 🤖🌐"
         
         elif cmd == "/help":
-            response = """אני מאיה - עוזרת AI עם גישה אמיתית לאינטרנט! 🌐
+            response = "אני מאיה - עוזרת AI עם גישה אמיתית לאינטרנט! 🌐\n\nיכולות שלי:\n🔍 חיפוש מידע עדכני באינטרנט\n📰 חדשות אחרונות\n🌍 מזג אוויר בכל העולם\n⏰ זמן נוכחי\n💰 מחירים ונתונים עדכניים\n\nפקודות:\n/help - עזרה\n/test_internet - בדיקת חיבור אינטרנט\n/weather [מקום] - מזג אוויר\n/news - חדשות אחרונות\n\nפשוט כתוב לי מה שאתה רוצה לדעת! 💬"
+        
+        elif cmd == "/test_internet":
+            # בדיקת חיבור אינטרנט
+            test_result = ai_service.intelligence_engine.web_search.search_web("test internet connection")
+            if test_result["success"]:
+                response = "✅ חיבור האינטרנט עובד מעולה! אני יכולה לחפש מידע עדכני 🌐"
+            else:
+                response = "❌ בעיה בחיבור האינטרנט. נסה שוב מאוחר יותר"
+        
+        elif cmd == "/news":
+            # חדשות אחרונות
+            news_result = ai_service.intelligence_engine.web_search.search_web("latest news israel today")
+            if news_result["success"]:
+                response = f"📰 {news_result['answer']}\n\n🌐 מקור: {news_result['source']}"
+            else:
+                response = "לא הצלחתי להביא חדשות כרגע. נסה שוב 📰"
+        
+        elif cmd == "/weather":
+            location = command.replace("/weather", "").strip() or "תל אביב"
+            response = weather_service.get_weather_anywhere(location)
+        
+        elif cmd == "/memory":
+            context = user_service.get_user_context(user['telegram_id'])
+            response = f"🧠 מה שאני זוכרת:\n{context}" if context else "אין זיכרונות עדיין"
+        
+        elif cmd == "/stats":
+            total_users = len(user_data)
+            usage_stats = ai_service.get_usage_stats()
+            response = f"📊 סטטיסטיקות מאיה:\n👥 {total_users} משתמשים רשומים\n🔍 {usage_stats['total_requests_ever']} חיפושים בסך הכל\n🌐 חיבור אינטרנט: ✅ פעיל"
+        
+        elif cmd == "/forget":
+            user_id = user['telegram_id']
+            if user_id in memories:
+                del memories[user_id]
+                save_data()
+            response = "🗑️ מחקתי הכל"
+        
+        else:
+            response = "לא מכירה את הפקודה. כתוב /help 🤖"
+        
+        self.send_message(chat_id, response)
+    
+    def _handle_message(self, chat_id: int, text: str, user: Dict[str, Any]):
+        user_id = user['telegram_id']
+        
+        # זיהוי מידע אישי לשמירה
+        personal_keywords = ["קוראים לי", "אני עובד", "אני גר", "אני אוהב", "שמי"]
+        if any(phrase in text.lower() for phrase in personal_keywords):
+            user_service.add_memory(user_id, text)
+        
+        # קבלת הקשר משתמש
+        context = user_service.get_user_context(user_id)
+        
+        # יצירת תשובה עם גישה לאינטרנט!
+        response = ai_service.generate_response(user_id, text, context)
+        
+        # שמירת השיחה
+        if user_id not in conversations:
+            conversations[user_id] = []
+        conversations[user_id].append({
+            'message': text,
+            'response': response,
+            'timestamp': datetime.now().isoformat(),
+            'has_internet': True  # סימון שהתשובה עם אינטרנט
+        })
+        
+        if len(conversations[user_id]) > 20:
+            conversations[user_id] = conversations[user_id][-20:]
+        
+        save_data()
+        self.send_message(chat_id, response)
 
-יכולות שלי:
-🔍 חיפוש מידע עדכני באינטרנט
-📰 חדשות אחרונות
-🌍 מזג אוויר בכל העולם
-⏰ זמן נו
+# === SERVICES INITIALIZATION ===
+security = SecurityService()
+user_service = UserService()
+weather_service = GlobalWeatherService()
+ai_service = MayaAIService()  # מאיה החדשה עם אינטרנט!
+bot = TelegramBot()
+
+# === FLASK ROUTES ===
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "Maya 3.0 - WITH REAL INTERNET ACCESS! 🌐",
+        "version": "3.0.2-internet-fixed",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": config.ENVIRONMENT,
+        "users": len(user_data),
+        "ai_model": config.GEMINI_MODEL,
+        "internet_access": "✅ ENABLED",
+        "features": [
+            "Real web search",
+            "Live news",
+            "Current information",
+            "Weather worldwide",
+            "No more 'I can't access internet' nonsense!"
+        ]
+    })
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    try:
+        update = request.get_json()
+        if not update:
+            return "No data", 400
+        
+        bot.process_update(update)
+        return "OK", 200
+        
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
+        return "Error", 500
+
+@app.route("/stats", methods=["GET"])
+def api_stats():
+    try:
+        usage_stats = ai_service.get_usage_stats()
+        stats = {
+            "total_users": len(user_data),
+            "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
+            "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
+            "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
+            "internet_searches": usage_stats['total_requests_ever'],
+            "version": "3.0.2-internet-fixed",
+            "internet_status": "✅ CONNECTED AND WORKING"
+        }
+        return jsonify(stats)
+    except Exception as e:
+        logger.error(f"Stats error: {e}")
+        return jsonify({"error": "Stats unavailable"}), 500
+
+@app.route("/test_internet", methods=["GET"])
+def test_internet():
+    """בדיקת חיבור האינטרנט"""
+    try:
+        web_search = WebSearchService()
+        result = web_search.search_web("test connection")
+        
+        return jsonify({
+            "internet_working": result["success"],
+            "test_result": result["answer"] if result["success"] else "Failed",
+            "timestamp": datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "internet_working": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+def set_webhook_on_startup():
+    if config.ENVIRONMENT == "production" and config.WEBHOOK_URL:
+        try:
+            url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/setWebhook"
+            data = {"url": config.WEBHOOK_URL}
+            
+            logger.info(f"Setting webhook on startup: {config.WEBHOOK_URL}")
+            response = requests.post(url, json=data, timeout=10)
+            result = response.json()
+            
+            if result.get("ok"):
+                logger.info(f"✅ Webhook set successfully: {config.WEBHOOK_URL}")
+                logger.info("🌐 Maya 3.0 with REAL INTERNET ACCESS is ready!")
+            else:
+                logger.error(f"Failed to set webhook on startup: {result}")
+        except Exception as e:
+            logger.error(f"Webhook setup error on startup: {e}")
+
+if __name__ == "__main__":
+    logger.info("🚀 Starting Maya 3.0 WITH REAL INTERNET ACCESS...")
+    logger.info("🌐 No more 'I can't access internet' excuses!")
+    set_webhook_on_startup()
+    app.run(host="0.0.0.0", port=config.PORT, debug=config.DEBUG)
+else:
+    logger.info("🌐 Maya 3.0 with INTERNET starting via WSGI...")
+    set_webhook_on_startup()
