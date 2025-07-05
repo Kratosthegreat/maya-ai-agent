@@ -1,44 +1,42 @@
 # -*- coding: utf-8 -*-
 
-# === Maya AI Secretary Bot 6.0 - Enhanced Intelligence Version ===
+# Maya AI Secretary Bot 6.0 - Clean Version
 
 import os
 import json
 import re
 import logging
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Any, Optional, List
 import pytz
 import sqlite3
 from dataclasses import dataclass, field
 from enum import Enum
-import hashlib
-import hmac
 from contextlib import contextmanager
 import random
 
 from flask import Flask, request, jsonify
 
-# === Enhanced Configuration ===
+# Configuration
 
 class Config:
 def **init**(self):
-self.TELEGRAM_TOKEN = os.getenv(‘TELEGRAM_TOKEN’)
+self.TELEGRAM_TOKEN = os.getenv(“TELEGRAM_TOKEN”)
 if not self.TELEGRAM_TOKEN:
 raise ValueError(“Missing TELEGRAM_TOKEN environment variable”)
 
 ```
-    self.PORT = int(os.getenv('PORT', 10000))
-    self.DEBUG = os.getenv('DEBUG', 'False').lower() in ('true', '1', 't')
-    self.TIMEZONE = pytz.timezone('Asia/Jerusalem')
-    self.WEATHER_API_KEY = os.getenv('WEATHER_API_KEY', '')
+    self.PORT = int(os.getenv("PORT", 10000))
+    self.DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
+    self.TIMEZONE = pytz.timezone("Asia/Jerusalem")
+    self.WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
     self.WEATHER_API_URL = "http://api.weatherapi.com/v1/current.json"
-    self.DB_PATH = os.getenv('DB_PATH', 'maya_bot.db')
+    self.DB_PATH = os.getenv("DB_PATH", "maya_bot.db")
     self.MAX_CONVERSATION_HISTORY = 20
 ```
 
-# === Data Models ===
+# Data Models
 
 class MessageType(Enum):
 GREETING = “greeting”
@@ -57,21 +55,21 @@ location: Optional[str] = None
 conversation_history: List[Dict] = field(default_factory=list)
 last_activity: Optional[datetime] = None
 
-# === Configuration ===
+# Initialize config
 
 config = Config()
 
-# === Logging ===
+# Logging
 
 logging.basicConfig(
 level=logging.DEBUG if config.DEBUG else logging.INFO,
-format=’%(asctime)s - %(name)s - %(levelname)s - %(message)s’
+format=”%(asctime)s - %(name)s - %(levelname)s - %(message)s”
 )
 logger = logging.getLogger(**name**)
 
 app = Flask(**name**)
 
-# === Database Manager ===
+# Database Manager
 
 class DatabaseManager:
 def **init**(self, db_path: str):
@@ -82,7 +80,7 @@ self.init_database()
 def init_database(self):
     try:
         with self.get_connection() as conn:
-            conn.executescript('''
+            conn.executescript("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id INTEGER PRIMARY KEY,
                     name TEXT,
@@ -100,7 +98,7 @@ def init_database(self):
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 );
-            ''')
+            """)
             logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
@@ -119,33 +117,33 @@ def get_connection(self):
         conn.close()
 ```
 
-# === Intelligence Engine ===
+# Intelligence Engine
 
 class IntelligenceEngine:
 def **init**(self):
 self.hebrew_patterns = {
 MessageType.GREETING: [
-r’שלום|היי|הי|הייי|בוקר טוב|ערב טוב|לילה טוב’,
-r’מה שלומך|מה נשמע|איך הולך|מה קורה’
+r”שלום|היי|הי|הייי|בוקר טוב|ערב טוב|לילה טוב”,
+r”מה שלומך|מה נשמע|איך הולך|מה קורה”
 ],
 MessageType.WEATHER_REQUEST: [
-r’מזג אוויר|טמפרטורה|חם|קר|גשם|שמש|עננים’,
-r’איך מזג האוויר|מה הטמפרטורה’
+r”מזג אוויר|טמפרטורה|חם|קר|גשם|שמש|עננים”,
+r”איך מזג האוויר|מה הטמפרטורה”
 ],
 MessageType.TIME_REQUEST: [
-r’מה השעה|איזה יום|באיזה תאריך|זמן|שעה’,
-r’יום.*|מועד|לוח שנה’
+r”מה השעה|איזה יום|באיזה תאריך|זמן|שעה”,
+r”יום.*|מועד|לוח שנה”
 ],
 MessageType.PERSONAL_INFO: [
-r’שמי|קוראים לי|השם שלי|אני.*|גר ב|גרה ב’,
-r’אוהב|אוהבת|עובד|עובדת’
+r”שמי|קוראים לי|השם שלי|אני.*|גר ב|גרה ב”,
+r”אוהב|אוהבת|עובד|עובדת”
 ],
 MessageType.TASK_REQUEST: [
-r’תוכל|תוכלי|עזור|עזרי|בצע|תעשה|תעשי’,
-r’אפשר|רוצה ש|צריך ש|בקש’
+r”תוכל|תוכלי|עזור|עזרי|בצע|תעשה|תעשי”,
+r”אפשר|רוצה ש|צריך ש|בקש”
 ],
 MessageType.CASUAL_CHAT: [
-r’איך את|מה דעתך|מה חושב|נחמד|יפה|טוב|רע’
+r”איך את|מה דעתך|מה חושב|נחמד|יפה|טוב|רע”
 ]
 }
 
@@ -171,44 +169,44 @@ def extract_entities(self, text: str) -> Dict[str, Any]:
     
     # Extract names
     name_patterns = [
-        r'שמי (הוא )?(.+?)(?:\s|$|\.)',
-        r'קוראים לי (.+?)(?:\s|$|\.)',
-        r'השם שלי (הוא )?(.+?)(?:\s|$|\.)',
-        r'אני (.+?)(?:\s|$|\.)'
+        r"שמי (הוא )?(.+?)(?:\s|$|\.)",
+        r"קוראים לי (.+?)(?:\s|$|\.)",
+        r"השם שלי (הוא )?(.+?)(?:\s|$|\.)",
+        r"אני (.+?)(?:\s|$|\.)"
     ]
     
     for pattern in name_patterns:
         match = re.search(pattern, text)
         if match:
             name = match.group(-1).strip()
-            if len(name) > 0 and len(name) < 20:  # Basic validation
-                entities['name'] = name
+            if len(name) > 0 and len(name) < 20:
+                entities["name"] = name
             break
     
     # Extract locations
     israeli_cities = [
-        'תל אביב', 'ירושלים', 'חיפה', 'באר שבע', 'נתניה', 
-        'פתח תקווה', 'אשדוד', 'ראשון לציון', 'עפולה'
+        "תל אביב", "ירושלים", "חיפה", "באר שבע", "נתניה", 
+        "פתח תקווה", "אשדוד", "ראשון לציון", "עפולה"
     ]
     
     for city in israeli_cities:
         if city in text:
-            entities['location'] = city
+            entities["location"] = city
             break
     
     return entities
 ```
 
-# === Weather Service ===
+# Weather Service
 
 class WeatherService:
 def **init**(self):
 self.api_key = config.WEATHER_API_KEY
 self.cache = {}
-self.cache_duration = 600  # 10 minutes
+self.cache_duration = 600
 
 ```
-def get_weather_info(self, city: str = 'Israel') -> Optional[Dict[str, Any]]:
+def get_weather_info(self, city: str = "Israel") -> Optional[Dict[str, Any]]:
     if not self.api_key:
         return None
     
@@ -227,11 +225,11 @@ def get_weather_info(self, city: str = 'Israel') -> Optional[Dict[str, Any]]:
         if response.status_code == 200:
             data = response.json()
             weather_info = {
-                'temperature': data['current']['temp_c'],
-                'condition': data['current']['condition']['text'],
-                'humidity': data['current']['humidity'],
-                'feels_like': data['current']['feelslike_c'],
-                'city': data['location']['name']
+                "temperature": data["current"]["temp_c"],
+                "condition": data["current"]["condition"]["text"],
+                "humidity": data["current"]["humidity"],
+                "feels_like": data["current"]["feelslike_c"],
+                "city": data["location"]["name"]
             }
             
             self.cache[cache_key] = (weather_info, datetime.now().timestamp())
@@ -243,7 +241,7 @@ def get_weather_info(self, city: str = 'Israel') -> Optional[Dict[str, Any]]:
     return None
 ```
 
-# === Response Generator ===
+# Response Generator
 
 class ResponseGenerator:
 def **init**(self):
@@ -253,7 +251,7 @@ self.weather_service = WeatherService()
 def generate_response(self, message: str, context: UserContext, 
                      message_type: MessageType, entities: Dict) -> str:
     
-    name = context.name or entities.get('name', '')
+    name = context.name or entities.get("name", "")
     greeting_suffix = f" {name}" if name else ""
     
     if message_type == MessageType.GREETING:
@@ -298,7 +296,7 @@ def generate_response(self, message: str, context: UserContext,
         return random.choice(defaults)
 
 def _handle_weather_response(self, entities: Dict) -> str:
-    location = entities.get('location', 'Israel')
+    location = entities.get("location", "Israel")
     weather_info = self.weather_service.get_weather_info(location)
     
     if weather_info:
@@ -313,23 +311,23 @@ def _handle_weather_response(self, entities: Dict) -> str:
 def _handle_time_response(self) -> str:
     now = datetime.now(config.TIMEZONE)
     hebrew_days = {
-        'Monday': 'שני', 'Tuesday': 'שלישי', 'Wednesday': 'רביעי',
-        'Thursday': 'חמישי', 'Friday': 'שישי', 'Saturday': 'שבת', 'Sunday': 'ראשון'
+        "Monday": "שני", "Tuesday": "שלישי", "Wednesday": "רביעי",
+        "Thursday": "חמישי", "Friday": "שישי", "Saturday": "שבת", "Sunday": "ראשון"
     }
-    day_name = hebrew_days.get(now.strftime('%A'), now.strftime('%A'))
+    day_name = hebrew_days.get(now.strftime("%A"), now.strftime("%A"))
     
     return (f"📅 היום יום {day_name}, {now.strftime('%d/%m/%Y')}\n"
            f"🕒 השעה: {now.strftime('%H:%M')}")
 
 def _handle_personal_info(self, entities: Dict) -> str:
-    if 'name' in entities:
+    if "name" in entities:
         return f"נעים מאוד להכיר אותך, {entities['name']}! 😊 איך אוכל לעזור לך?"
-    if 'location' in entities:
+    if "location" in entities:
         return f"נחמד! אז אתה מ{entities['location']}. מקום יפה! 🏘️"
     return "תודה שאתה חולק איתי! זה עוזר לי להכיר אותך יותר טוב 💝"
 ```
 
-# === User Memory ===
+# User Memory
 
 class UserMemory:
 def **init**(self, db_manager: DatabaseManager):
@@ -350,8 +348,8 @@ def get_user_context(self, user_id: int) -> UserContext:
             if user_row:
                 context = UserContext(
                     user_id=user_id,
-                    name=user_row['name'],
-                    location=user_row['location'],
+                    name=user_row["name"],
+                    location=user_row["location"],
                     last_activity=datetime.now()
                 )
             else:
@@ -368,10 +366,10 @@ def get_user_context(self, user_id: int) -> UserContext:
             
             context.conversation_history = [
                 {
-                    'message': row['message'],
-                    'response': row['response'],
-                    'type': row['message_type'],
-                    'timestamp': row['timestamp']
+                    "message": row["message"],
+                    "response": row["response"],
+                    "type": row["message_type"],
+                    "timestamp": row["timestamp"]
                 }
                 for row in reversed(history_rows)
             ]
@@ -418,7 +416,7 @@ def _create_user(self, context: UserContext):
         logger.error(f"Error creating user: {e}")
 ```
 
-# === Enhanced Telegram Bot ===
+# Enhanced Telegram Bot
 
 class EnhancedTelegramBot:
 def **init**(self):
@@ -464,10 +462,10 @@ def process_message(self, message: Dict[str, Any]) -> Optional[str]:
         entities = self.intelligence.extract_entities(text)
         
         # Update context with extracted entities
-        if 'name' in entities and entities['name']:
-            context.name = entities['name']
-        if 'location' in entities and entities['location']:
-            context.location = entities['location']
+        if "name" in entities and entities["name"]:
+            context.name = entities["name"]
+        if "location" in entities and entities["location"]:
+            context.location = entities["location"]
         
         # Generate response
         response = self.response_generator.generate_response(
@@ -505,9 +503,9 @@ def process_update(self, update: Dict[str, Any]):
         self.send_message(chat_id, "מצטערת, הייתה בעיה. נסה שוב 🔧")
 ```
 
-# === Flask Routes ===
+# Flask Routes
 
-@app.route(’/’)
+@app.route(”/”)
 def home():
 return jsonify({
 “status”: “running”,
@@ -522,9 +520,9 @@ return jsonify({
 “timestamp”: datetime.now().isoformat()
 })
 
-@app.route(’/webhook’, methods=[‘POST’])
+@app.route(”/webhook”, methods=[“POST”])
 def webhook():
-if request.method == ‘POST’:
+if request.method == “POST”:
 try:
 update = request.get_json()
 if not update:
@@ -542,7 +540,7 @@ return jsonify({“status”: “error”, “message”: “Empty request”}),
 return jsonify({"status": "error", "message": "Method not allowed"}), 405
 ```
 
-@app.route(’/stats’)
+@app.route(”/stats”)
 def stats():
 try:
 with bot.db_manager.get_connection() as conn:
@@ -559,10 +557,10 @@ except Exception as e:
     return jsonify({"error": str(e)}), 500
 ```
 
-# === Initialization ===
+# Initialization
 
 bot = EnhancedTelegramBot()
 
-if **name** == ‘**main**’:
+if **name** == “**main**”:
 logger.info(f”Starting Enhanced Maya AI Bot on port {config.PORT}”)
-app.run(host=‘0.0.0.0’, port=config.PORT, debug=config.DEBUG)
+app.run(host=“0.0.0.0”, port=config.PORT, debug=config.DEBUG)
