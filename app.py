@@ -66,7 +66,7 @@ class MayaBot:
             "Content-Type": "application/json"
         }
         data = {
-            "model": "mistralai/mistral-7b-instruct",
+            "model": "openai/gpt-3.5-turbo",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message}
@@ -107,10 +107,10 @@ def home():
         "current_time": time_info['full'],
         "users_with_names": len(maya.user_names),
         "features": [
-            "✅ GPT-based natural Hebrew replies",
-            "✅ Emotion and context awareness",
-            "✅ Name detection and memory",
-            "✅ Free OpenRouter support"
+            "✅ GPT (3.5-turbo) עם עברית טבעית",
+            "✅ הבנה רגשית והקשרית",
+            "✅ שמירת שמות משתמשים",
+            "✅ בוט רגיש וחם, לא רובוטי"
         ]
     })
 
@@ -137,9 +137,9 @@ def webhook():
 @app.route("/test")
 def test():
     return jsonify({
-        "message": maya.process_message(123, "אני עצוב היום"),
+        "message": maya.process_message(123, "אני מרגיש תקוע היום"),
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot is running with GPT via OpenRouter")
+    logger.info("🚀 Maya Bot is running with GPT via OpenRouter (gpt-3.5-turbo)")
     app.run(host="0.0.0.0", port=PORT, debug=False)
