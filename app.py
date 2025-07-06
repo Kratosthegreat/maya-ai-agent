@@ -63,8 +63,28 @@ class MinimalKnowledgeEngine:
         if GEMINI_AVAILABLE and config.GEMINI_API_KEY:
             try:
                 genai.configure(api_key=config.GEMINI_API_KEY)
-                self.gemini_model = genai.GenerativeModel('gemini-pro')
-                logger.info("Gemini Pro initialized")
+                # Try different model names
+                model_names = [
+                    'gemini-1.5-flash',
+                    'gemini-1.5-pro', 
+                    'gemini-pro-latest',
+                    'gemini-1.0-pro'
+                ]
+                
+                for model_name in model_names:
+                    try:
+                        self.gemini_model = genai.GenerativeModel(model_name)
+                        # Test the model
+                        test_response = self.gemini_model.generate_content("היי")
+                        logger.info(f"Gemini {model_name} initialized successfully")
+                        break
+                    except Exception as e:
+                        logger.warning(f"Model {model_name} failed: {e}")
+                        continue
+                
+                if not self.gemini_model:
+                    logger.error("No working Gemini model found")
+                    
             except Exception as e:
                 logger.error(f"Gemini init error: {e}")
     
