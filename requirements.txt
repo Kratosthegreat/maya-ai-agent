@@ -11,35 +11,18 @@ requests==2.31.0
 # === AI & ML ===
 google-generativeai==0.3.2
 
-# === Google Integrations ===
-google-api-python-client==2.108.0
-google-auth-oauthlib==1.1.0
-python-dateutil==2.8.2
-
 # === Timezone Handling ===
 pytz==2023.3.post1
 
 # === Knowledge & Data Sources ===
 wikipedia==1.4.0
-yfinance==0.2.28
 feedparser==6.0.10
-wolframalpha==5.0.0
 
 # === Translation & Language ===
 googletrans==4.0.0rc1
 
 # === Web Scraping & Parsing ===
 beautifulsoup4==4.12.2
-
-# === Async Support ===
-aiohttp==3.9.1
-
-# === Data Processing (Optimized versions) ===
-pandas==1.5.3
-numpy==1.24.3
-
-# === Database ===
-# sqlite3 comes with Python standard library
 
 # === Additional Utilities ===
 validators==0.22.0
