@@ -24,7 +24,8 @@ import feedparser
 from flask import Flask, request, jsonify, Response
 from http import HTTPStatus
 from googletrans import Translator
-import openai
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import wolframalpha
 import calendar
 import schedule
@@ -43,7 +44,7 @@ class GlobalConfig:
         self.TIMEZONE = pytz.timezone("Asia/Jerusalem")
         
         # AI & Knowledge APIs - Research-Based Integration
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
         self.WOLFRAM_APP_ID = os.getenv("WOLFRAM_APP_ID", "")
         self.WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
         self.NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
@@ -84,7 +85,7 @@ class GlobalKnowledgeEngine:
         self.translator = Translator()
         self.cache = {}
         self.wolfram_client = None
-        self.openai_client = None
+        self.gemini_model = None
         
         # Initialize API clients
         self._init_api_clients()
@@ -109,10 +110,18 @@ class GlobalKnowledgeEngine:
                 self.wolfram_client = wolframalpha.Client(config.WOLFRAM_APP_ID)
                 logger.info("Wolfram Alpha client initialized")
             
-            if config.OPENAI_API_KEY:
-                openai.api_key = config.OPENAI_API_KEY
-                self.openai_client = openai
-                logger.info("OpenAI client initialized")
+            if config.GEMINI_API_KEY:
+                genai.configure(api_key=config.GEMINI_API_KEY)
+                self.gemini_model = genai.GenerativeModel(
+                    'gemini-pro',
+                    safety_settings={
+                        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                    }
+                )
+                logger.info("Gemini Pro client initialized")
         
         except Exception as e:
             logger.error(f"Error initializing API clients: {e}")
@@ -489,25 +498,20 @@ class GlobalKnowledgeEngine:
                     'sources': ['Wikipedia']
                 }
             
-            # Try OpenAI if available
-            if self.openai_client and config.OPENAI_API_KEY:
+            # Try Gemini if available
+            if self.gemini_model and config.GEMINI_API_KEY:
                 try:
-                    response = openai.ChatCompletion.create(
-                        model="gpt-3.5-turbo",
-                        messages=[
-                            {"role": "system", "content": "אתה עוזר מידע חכם. ענה בעברית בצורה קצרה ומדויקת."},
-                            {"role": "user", "content": query}
-                        ],
-                        max_tokens=200
-                    )
+                    prompt = f"ענה בעברית על השאלה הבאה בצורה קצרה ומדויקת: {query}"
+                    response = self.gemini_model.generate_content(prompt)
                     
-                    answer = response.choices[0].message.content
-                    return {
-                        'answer': f"🤖 {answer}",
-                        'confidence': 0.8,
-                        'sources': ['OpenAI GPT']
-                    }
-                except:
+                    if response and response.text:
+                        return {
+                            'answer': f"🤖 {response.text}",
+                            'confidence': 0.8,
+                            'sources': ['Google Gemini']
+                        }
+                except Exception as e:
+                    logger.error(f"Gemini error: {e}")
                     pass
             
             return {
@@ -1160,7 +1164,7 @@ def test_intelligence():
         "knowledge_domains": list(maya.knowledge_engine.knowledge_domains.keys()),
         "api_status": {
             "wolfram": bool(config.WOLFRAM_APP_ID),
-            "openai": bool(config.OPENAI_API_KEY),
+            "gemini": bool(config.GEMINI_API_KEY),
             "weather": bool(config.WEATHER_API_KEY),
             "translation": True
         }
@@ -1211,7 +1215,7 @@ def global_stats():
             "system_uptime": "Running smoothly! 🚀",
             "capabilities_active": {
                 "mathematics": bool(config.WOLFRAM_APP_ID),
-                "ai_conversation": bool(config.OPENAI_API_KEY),
+                "ai_conversation": bool(config.GEMINI_API_KEY),
                 "weather": bool(config.WEATHER_API_KEY),
                 "translation": True,
                 "finance": True,
@@ -1243,7 +1247,7 @@ if __name__ == "__main__":
     logger.info("🌍 Weather: Global weather information")
     logger.info("📰 News: Live RSS feeds")
     logger.info("🌐 Translation: Multi-language support")
-    logger.info("🧠 AI: GPT-4 conversation engine")
+    logger.info("🧠 AI: Google Gemini Pro conversation engine")
     logger.info("📊 Memory: Advanced user context")
     logger.info("=" * 60)
     
@@ -1254,10 +1258,10 @@ if __name__ == "__main__":
     else:
         api_status.append("❌ Wolfram Alpha (limited math)")
     
-    if config.OPENAI_API_KEY:
-        api_status.append("✅ OpenAI GPT")
+    if config.GEMINI_API_KEY:
+        api_status.append("✅ Google Gemini")
     else:
-        api_status.append("❌ OpenAI (basic responses)")
+        api_status.append("❌ Gemini (basic responses)")
     
     if config.WEATHER_API_KEY:
         api_status.append("✅ Weather API")
