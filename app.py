@@ -82,7 +82,12 @@ class GlobalKnowledgeEngine:
     """Advanced Knowledge Engine integrating multiple global data sources"""
     
     def __init__(self):
-        self.translator = Translator()
+        # Initialize translator if available
+        if TRANSLATION_AVAILABLE:
+            self.translator = Translator()
+        else:
+            self.translator = None
+            
         self.cache = {}
         self.wolfram_client = None
         self.gemini_model = None
@@ -106,7 +111,7 @@ class GlobalKnowledgeEngine:
     def _init_api_clients(self):
         """Initialize external API clients"""
         try:
-            if config.WOLFRAM_APP_ID:
+            if WOLFRAM_AVAILABLE and config.WOLFRAM_APP_ID:
                 self.wolfram_client = wolframalpha.Client(config.WOLFRAM_APP_ID)
                 logger.info("Wolfram Alpha client initialized")
             
@@ -268,6 +273,13 @@ class GlobalKnowledgeEngine:
     
     async def _handle_finance_query(self, query: str) -> Dict[str, Any]:
         """Handle financial queries using multiple APIs"""
+        if not FINANCE_AVAILABLE:
+            return {
+                'answer': 'שירותי כלכלה לא זמינים כרגע. אפשר לוודא שyfinance מותקן?',
+                'confidence': 0.1,
+                'sources': []
+            }
+        
         try:
             # Extract stock symbol if present
             stock_symbols = re.findall(r'\b[A-Z]{1,5}\b', query.upper())
@@ -387,6 +399,13 @@ class GlobalKnowledgeEngine:
     
     async def _handle_news_query(self, query: str) -> Dict[str, Any]:
         """Handle news queries using news APIs"""
+        if not NEWS_AVAILABLE:
+            return {
+                'answer': 'שירות חדשות לא זמין כרגע. אפשר לוודא שfeedparser מותקן?',
+                'confidence': 0.1,
+                'sources': []
+            }
+        
         try:
             # Try RSS feeds first (free)
             rss_feeds = [
@@ -435,6 +454,13 @@ class GlobalKnowledgeEngine:
     
     async def _handle_translation_query(self, query: str) -> Dict[str, Any]:
         """Handle translation requests"""
+        if not TRANSLATION_AVAILABLE:
+            return {
+                'answer': 'שירות תרגום לא זמין כרגע. אפשר לוודא שgoogletrans מותקן?',
+                'confidence': 0.1,
+                'sources': []
+            }
+        
         try:
             # Extract text to translate
             translate_patterns = [
