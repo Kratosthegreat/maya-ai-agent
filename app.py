@@ -142,7 +142,7 @@ class MayaBot:
         }
 
         data = {
-            "model": "meta-llama/llama-3.1-8b-instruct:free",
+            "model": "microsoft/wizardlm-2-8x22b:free",
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 150
@@ -310,7 +310,7 @@ def test_model():
     }
 
     data = {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",
+        "model": "microsoft/wizardlm-2-8x22b:free",
         "messages": [{"role": "user", "content": "Test message"}],
         "temperature": 0.7,
         "max_tokens": 50
