@@ -110,6 +110,10 @@ class MayaBot:
             self._add_to_history(user_id, "assistant", response_text)
             return response_text
 
+        # דיאגנוסטיקה - בדיקת מודלים זמינים
+        if text_lower in ["דיאגנוסטיקה", "בדיקה", "טסט", "test"]:
+            return self._run_model_diagnosis()
+
         # Prepare for API call
         user_name = self.user_names.get(user_id, "")
         name_suffix = f" {user_name}" if user_name else ""
@@ -134,6 +138,15 @@ class MayaBot:
         # Add current message
         messages.append({"role": "user", "content": message})
 
+        # רשימת מודלים לנסות (בסדר עדיפות)
+        models_to_try = [
+            "microsoft/wizardlm-2-8x22b:free",
+            "meta-llama/llama-3.1-8b-instruct:free",
+            "mistralai/mistral-7b-instruct:free",
+            "google/gemma-7b-it:free",
+            "huggingfaceh4/zephyr-7b-beta:free"
+        ]
+
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
@@ -141,74 +154,103 @@ class MayaBot:
             "X-Title": "Maya Bot"
         }
 
-        data = {
-            "model": "microsoft/wizardlm-2-8x22b:free",
-            "messages": messages,
-            "temperature": 0.7,
-            "max_tokens": 150
-        }
+        last_error = None
+        
+        # נסה כל מודל עד שאחד עובד
+        for model_name in models_to_try:
+            data = {
+                "model": model_name,
+                "messages": messages,
+                "temperature": 0.7,
+                "max_tokens": 150
+            }
 
+            try:
+                logger.info(f"🔄 מנסה מודל: {model_name}")
+                logger.info(f"Sending request to OpenRouter API: {OPENROUTER_API_URL}")
+                
+                response = requests.post(
+                    OPENROUTER_API_URL,
+                    headers=headers,
+                    json=data,
+                    timeout=REQUEST_TIMEOUT
+                )
+
+                logger.info(f"📊 סטטוס מודל {model_name}: {response.status_code}")
+                
+                if response.status_code == 200:
+                    response_json = response.json()
+                    logger.info(f"✅ מודל {model_name} עבד! תשובה: {response_json}")
+                    
+                    if "choices" in response_json and response_json["choices"]:
+                        reply = response_json["choices"][0]["message"]["content"]
+                        cleaned_reply = self._clean_llm_response(reply)
+
+                        # Update conversation history
+                        self._add_to_history(user_id, "user", message)
+                        self._add_to_history(user_id, "assistant", cleaned_reply)
+
+                        logger.info(f"🎉 השתמשתי במודל: {model_name}")
+                        return cleaned_reply
+                
+                # אם הגענו לכאן, המודל לא עבד
+                error_details = f"Status: {response.status_code}, Response: {response.text[:200]}"
+                logger.warning(f"❌ מודל {model_name} נכשל: {error_details}")
+                last_error = error_details
+                
+                # אם זה 401/403 - אין טעם לנסות מודלים אחרים
+                if response.status_code in [401, 403]:
+                    logger.error("🔑 בעיית הרשאה - עוצר ניסיונות נוספים")
+                    break
+                    
+            except requests.exceptions.Timeout:
+                logger.error(f"⏰ Timeout למודל {model_name}")
+                last_error = "Timeout"
+                continue
+            except requests.exceptions.RequestException as e:
+                logger.error(f"🔌 בעיית חיבור למודל {model_name}: {e}")
+                last_error = str(e)
+                continue
+            except Exception as e:
+                logger.error(f"💥 שגיאה כללית למודל {model_name}: {e}")
+                last_error = str(e)
+                continue
+
+        # אם כל המודלים נכשלו
+        logger.error(f"💀 כל המודלים נכשלו! שגיאה אחרונה: {last_error}")
+        
+        # תן הודעת שגיאה מידעת יותר
+        if "401" in str(last_error) or "403" in str(last_error):
+            return "יש בעיה עם המפתח שלי 🔑"
+        elif "404" in str(last_error):
+            return "המודלים לא זמינים כרגע 🚫"
+        elif "429" in str(last_error):
+            return "יותר מדי בקשות, נסה בעוד דקה ⏳"
+        elif "timeout" in str(last_error).lower():
+            return "לוקח יותר מדי זמן, נסה שוב ⏰"
+        else:
+            return "יש לי בעיה טכנית זמנית 🛠️"
+
+    def _run_model_diagnosis(self):
+        """רץ דיאגנוסטיקה מהירה של מודלים"""
         try:
-            logger.info(f"Sending request to OpenRouter API: {OPENROUTER_API_URL}")
-            logger.info(f"Using model: {data['model']}")
-            logger.info(f"Request headers: {headers}")
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            }
             
-            response = requests.post(
-                OPENROUTER_API_URL,
-                headers=headers,
-                json=data,
-                timeout=REQUEST_TIMEOUT
-            )
-
-            # Enhanced error logging
-            logger.info(f"OpenRouter response status: {response.status_code}")
-            logger.info(f"OpenRouter response headers: {dict(response.headers)}")
+            # בדוק אם יש גישה לרשימת מודלים
+            models_response = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=5)
             
-            if response.status_code != 200:
-                error_msg = f"OpenRouter API error: {response.status_code} - {response.text}"
-                logger.error(error_msg)
+            if models_response.status_code == 200:
+                models_data = models_response.json()
+                free_models = [m["id"] for m in models_data.get("data", []) if ":free" in m["id"]]
+                return f"יש {len(free_models)} מודלים חינמיים זמינים ✅"
+            else:
+                return f"בעיה בגישה למודלים: {models_response.status_code} ❌"
                 
-                try:
-                    error_json = response.json()
-                    logger.error(f"OpenRouter error details: {error_json}")
-                except:
-                    pass
-                
-                # Return appropriate fallback based on error type
-                if response.status_code == 404:
-                    return "יש לי בעיה טכנית, תנסה שוב בעוד דקה? 🔧"
-                elif response.status_code == 401:
-                    return "יש בעיה עם המפתח שלי, אני מטפלת בזה! 🔑"
-                elif response.status_code == 429:
-                    return "אני מקבלת יותר מדי בקשות, נסה שוב בעוד דקה ⏳"
-                else:
-                    return "משהו השתבש בצד שלי, בוא ננסה שוב! ✨"
-
-            response_json = response.json()
-            logger.info(f"OpenRouter response: {response_json}")
-            
-            if "choices" not in response_json or not response_json["choices"]:
-                logger.error("No choices in OpenRouter response")
-                return "לא קיבלתי תשובה טובה, תנסה שוב! 🤔"
-
-            reply = response_json["choices"][0]["message"]["content"]
-            cleaned_reply = self._clean_llm_response(reply)
-
-            # Update conversation history
-            self._add_to_history(user_id, "user", message)
-            self._add_to_history(user_id, "assistant", cleaned_reply)
-
-            return cleaned_reply
-
-        except requests.exceptions.Timeout:
-            logger.error("OpenRouter API timeout")
-            return "לוקח לי יותר מדי זמן לחשוב, נסה שוב! ⏳"
-        except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouter API connection error: {e}")
-            return "יש לי בעיה להתחבר, נסה שוב בעוד דקה! 🔌"
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return "משהו השתבש, אבל אני כבר מטפלת בזה! 🛠️"
+            return f"שגיאה בדיאגנוסטיקה: {str(e)[:50]} 🔧"
 
     def _add_to_history(self, user_id, role, content):
         """Manage conversation history with size limit"""
@@ -298,6 +340,125 @@ def home():
         "active_users": len(maya.conversation_history),
         "version": "1.1.0"
     })
+
+@app.route("/deep-diagnosis")
+def deep_diagnosis():
+    """מערכת דיאגנוסטיקה מעמיקה לבעיות OpenRouter"""
+    diagnosis_results = {}
+    
+    # בדיקה 1: חיבור בסיסי ל-OpenRouter
+    try:
+        test_url = "https://openrouter.ai/api/v1/models"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        models_response = requests.get(test_url, headers=headers, timeout=10)
+        diagnosis_results["models_api_status"] = models_response.status_code
+        diagnosis_results["models_api_response"] = models_response.text[:500] + "..." if len(models_response.text) > 500 else models_response.text
+        
+        if models_response.status_code == 200:
+            models_data = models_response.json()
+            available_models = [model["id"] for model in models_data.get("data", [])]
+            free_models = [model for model in available_models if ":free" in model]
+            diagnosis_results["total_models_available"] = len(available_models)
+            diagnosis_results["free_models_count"] = len(free_models)
+            diagnosis_results["free_models_sample"] = free_models[:10]  # ראשונים 10
+            
+            # בדיקה אם הדגמים שניסינו זמינים
+            test_models = [
+                "openai/gpt-3.5-turbo",
+                "meta-llama/llama-3.1-8b-instruct:free", 
+                "microsoft/wizardlm-2-8x22b:free",
+                "mistralai/mistral-7b-instruct:free"
+            ]
+            for model in test_models:
+                diagnosis_results[f"model_{model.replace('/', '_').replace(':', '_')}_available"] = model in available_models
+        
+    except Exception as e:
+        diagnosis_results["models_api_error"] = str(e)
+    
+    # בדיקה 2: בדיקת API Key עם completion פשוט
+    free_models_to_test = [
+        "meta-llama/llama-3.1-8b-instruct:free",
+        "microsoft/wizardlm-2-8x22b:free", 
+        "mistralai/mistral-7b-instruct:free",
+        "google/gemma-7b-it:free",
+        "huggingfaceh4/zephyr-7b-beta:free"
+    ]
+    
+    for model_name in free_models_to_test:
+        try:
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://maya-bot.onrender.com",
+                "X-Title": "Maya Bot Diagnosis"
+            }
+            
+            data = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": "Hello"}],
+                "temperature": 0.7,
+                "max_tokens": 10
+            }
+            
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=data, timeout=15)
+            
+            diagnosis_results[f"test_{model_name.replace('/', '_').replace(':', '_')}"] = {
+                "status_code": response.status_code,
+                "response_preview": response.text[:200] + "..." if len(response.text) > 200 else response.text,
+                "success": response.status_code == 200
+            }
+            
+            if response.status_code == 200:
+                diagnosis_results["WORKING_MODEL_FOUND"] = model_name
+                break
+                
+        except Exception as e:
+            diagnosis_results[f"test_{model_name.replace('/', '_').replace(':', '_')}_error"] = str(e)
+    
+    # בדיקה 3: בדיקת חשבון וקרדיטים
+    try:
+        credits_url = "https://openrouter.ai/api/v1/auth/key"
+        headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
+        credits_response = requests.get(credits_url, headers=headers, timeout=10)
+        
+        diagnosis_results["account_status"] = credits_response.status_code
+        if credits_response.status_code == 200:
+            account_data = credits_response.json()
+            diagnosis_results["account_info"] = account_data
+        else:
+            diagnosis_results["account_error"] = credits_response.text
+            
+    except Exception as e:
+        diagnosis_results["account_check_error"] = str(e)
+    
+    # בדיקה 4: תוקף API Key
+    api_key_valid = OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 20 and OPENROUTER_API_KEY.startswith("sk-")
+    diagnosis_results["api_key_format_valid"] = api_key_valid
+    diagnosis_results["api_key_length"] = len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0
+    diagnosis_results["api_key_prefix"] = OPENROUTER_API_KEY[:10] + "..." if OPENROUTER_API_KEY else "None"
+    
+    # סיכום והמלצות
+    recommendations = []
+    if not api_key_valid:
+        recommendations.append("🔑 API Key לא תקף - צריך להתחיל ב-sk- ולהיות ארוך יותר")
+    
+    if diagnosis_results.get("models_api_status") != 200:
+        recommendations.append("🚫 לא מצליח לגשת לרשימת הדגמים - בדוק API Key")
+    
+    if diagnosis_results.get("free_models_count", 0) == 0:
+        recommendations.append("💸 אין דגמים חינמיים זמינים - אולי צריך לקנות קרדיטים")
+    
+    if "WORKING_MODEL_FOUND" not in diagnosis_results:
+        recommendations.append("❌ אף דגם לא עובד - בעיה בחשבון או במפתח")
+    
+    diagnosis_results["recommendations"] = recommendations
+    diagnosis_results["timestamp"] = datetime.now().isoformat()
+    
+    return jsonify(diagnosis_results)
 
 @app.route("/test-model")
 def test_model():
