@@ -24,18 +24,28 @@ if not WEBHOOK_SECRET_TOKEN:
 # Constants
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-MAX_HISTORY_LENGTH = 10  # Keep last 5 conversation turns (user + assistant)
-REQUEST_TIMEOUT = 30  # seconds - increased from 20
+MAX_HISTORY_LENGTH = 10
+REQUEST_TIMEOUT = 30
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# רשימת מודלים לנסות
+MODELS_TO_TRY = [
+    "huggingfaceh4/zephyr-7b-beta:free",
+    "mistralai/mistral-7b-instruct:free", 
+    "google/gemma-7b-it:free",
+    "microsoft/wizardlm-2-8x22b:free",
+    "meta-llama/llama-3.1-8b-instruct:free"
+]
+
 class MayaBot:
     def __init__(self):
         self.user_names = {}
         self.conversation_history = {}
-        self.rate_limits = {}  # Track user request timestamps for rate limiting
+        self.rate_limits = {}
+        self.working_model = None  # שמירת מודל שעובד
 
     def get_israel_time(self):
         """Get current Israeli time with Hebrew day names"""
@@ -73,15 +83,52 @@ class MayaBot:
         self.rate_limits[user_id].append(current_time)
         return True
 
+    def _test_single_model(self, model_name):
+        """בדיקה אם מודל ספציפי עובד"""
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://maya-bot.onrender.com",
+            "X-Title": "Maya Bot Test"
+        }
+
+        data = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": "שלום"}],
+            "temperature": 0.7,
+            "max_tokens": 10
+        }
+
+        try:
+            logger.info(f"🔍 בודק מודל: {model_name}")
+            response = requests.post(OPENROUTER_API_URL, headers=headers, json=data, timeout=10)
+            
+            logger.info(f"📊 תוצאה למודל {model_name}: סטטוס={response.status_code}")
+            
+            if response.status_code == 200:
+                response_json = response.json()
+                if "choices" in response_json and response_json["choices"]:
+                    logger.info(f"✅ מודל {model_name} עובד!")
+                    return True, "עובד"
+            
+            # לוג שגיאות
+            error_text = response.text[:200] if response.text else "אין תשובה"
+            logger.error(f"❌ מודל {model_name} נכשל: {response.status_code} - {error_text}")
+            return False, f"Status: {response.status_code}, Error: {error_text}"
+            
+        except Exception as e:
+            logger.error(f"💥 שגיאה במודל {model_name}: {str(e)}")
+            return False, f"Exception: {str(e)}"
+
     def process_message(self, user_id, message):
-        # Check rate limit first
+        # בדיקת rate limit
         if not self._check_rate_limit(user_id):
             logger.warning(f"Rate limit exceeded for user {user_id}")
             return "אני צריכה לנוח רגע, נדבר עוד דקה? 😴"
 
         text_lower = message.lower().strip()
 
-        # 1. Handle name introduction
+        # הכרת שם
         name_patterns = [
             r'(?:שמי|קוראים לי|השם שלי) (?:הוא )?([א-ת\s]{2,15})(?:\s|$|\.)',
             r'אני ([א-ת\s]{2,15})(?:\s|$|\.)'
@@ -98,7 +145,7 @@ class MayaBot:
                     self._add_to_history(user_id, "assistant", response_text)
                     return response_text
 
-        # 2. Handle TIME/DATE questions (local processing - no API needed)
+        # שאלות זמן
         time_phrases = [
             'מה השעה', 'איזה יום', 'מה התאריך', 'תאריך היום', 
             'איזה תאריך', 'כמה השעה', 'מה הזמן', 'זמן עכשיו'
@@ -110,11 +157,23 @@ class MayaBot:
             self._add_to_history(user_id, "assistant", response_text)
             return response_text
 
-        # דיאגנוסטיקה - בדיקת מודלים זמינים
-        if text_lower in ["דיאגנוסטיקה", "בדיקה", "טסט", "test"]:
-            return self._run_model_diagnosis()
+        # דיאגנוסטיקה פשוטה מהצ'אט
+        if any(word in text_lower for word in ["דיאגנוסטיקה", "בדיקה", "טסט", "debug"]):
+            logger.info("🔧 מריץ דיאגנוסטיקה...")
+            results = []
+            
+            for model in MODELS_TO_TRY:
+                is_working, status = self._test_single_model(model)
+                if is_working:
+                    results.append(f"✅ {model}")
+                    self.working_model = model
+                    break
+                else:
+                    results.append(f"❌ {model}: {status[:50]}")
+            
+            return f"דיאגנוסטיקה:\n" + "\n".join(results[:3]) + " 🔧"
 
-        # Prepare for API call
+        # הכנת הודעה ל-API
         user_name = self.user_names.get(user_id, "")
         name_suffix = f" {user_name}" if user_name else ""
 
@@ -131,33 +190,26 @@ class MayaBot:
 
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Add conversation history
+        # הוספת היסטוריה
         if user_id in self.conversation_history:
             messages.extend(self.conversation_history[user_id])
         
-        # Add current message
         messages.append({"role": "user", "content": message})
 
-        # רשימת מודלים לנסות (בסדר עדיפות)
-        models_to_try = [
-            "microsoft/wizardlm-2-8x22b:free",
-            "meta-llama/llama-3.1-8b-instruct:free",
-            "mistralai/mistral-7b-instruct:free",
-            "google/gemma-7b-it:free",
-            "huggingfaceh4/zephyr-7b-beta:free"
-        ]
-
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://maya-bot.onrender.com",
-            "X-Title": "Maya Bot"
-        }
-
-        last_error = None
+        # ניסיון עם מודלים שונים
+        models_to_test = [self.working_model] if self.working_model else MODELS_TO_TRY
         
-        # נסה כל מודל עד שאחד עובד
-        for model_name in models_to_try:
+        for model_name in models_to_test:
+            if not model_name:
+                continue
+                
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://maya-bot.onrender.com",
+                "X-Title": "Maya Bot"
+            }
+
             data = {
                 "model": model_name,
                 "messages": messages,
@@ -167,90 +219,42 @@ class MayaBot:
 
             try:
                 logger.info(f"🔄 מנסה מודל: {model_name}")
-                logger.info(f"Sending request to OpenRouter API: {OPENROUTER_API_URL}")
-                
-                response = requests.post(
-                    OPENROUTER_API_URL,
-                    headers=headers,
-                    json=data,
-                    timeout=REQUEST_TIMEOUT
-                )
+                response = requests.post(OPENROUTER_API_URL, headers=headers, json=data, timeout=REQUEST_TIMEOUT)
 
-                logger.info(f"📊 סטטוס מודל {model_name}: {response.status_code}")
+                logger.info(f"📊 תגובה מ-{model_name}: סטטוס={response.status_code}")
                 
                 if response.status_code == 200:
                     response_json = response.json()
-                    logger.info(f"✅ מודל {model_name} עבד! תשובה: {response_json}")
                     
                     if "choices" in response_json and response_json["choices"]:
                         reply = response_json["choices"][0]["message"]["content"]
                         cleaned_reply = self._clean_llm_response(reply)
 
-                        # Update conversation history
+                        # שמירת ההיסטוריה
                         self._add_to_history(user_id, "user", message)
                         self._add_to_history(user_id, "assistant", cleaned_reply)
 
-                        logger.info(f"🎉 השתמשתי במודל: {model_name}")
+                        # שמירת המודל שעובד
+                        self.working_model = model_name
+                        logger.info(f"🎉 הצלחה עם מודל: {model_name}")
                         return cleaned_reply
                 
-                # אם הגענו לכאן, המודל לא עבד
-                error_details = f"Status: {response.status_code}, Response: {response.text[:200]}"
-                logger.warning(f"❌ מודל {model_name} נכשל: {error_details}")
-                last_error = error_details
+                # שגיאה - נסה מודל הבא
+                error_preview = response.text[:100] if response.text else "לא ידוע"
+                logger.warning(f"❌ מודל {model_name} נכשל: {response.status_code} - {error_preview}")
                 
-                # אם זה 401/403 - אין טעם לנסות מודלים אחרים
+                # אם זה שגיאת הרשאה - עצור
                 if response.status_code in [401, 403]:
-                    logger.error("🔑 בעיית הרשאה - עוצר ניסיונות נוספים")
+                    logger.error("🔑 שגיאת הרשאה - עוצר")
                     break
                     
-            except requests.exceptions.Timeout:
-                logger.error(f"⏰ Timeout למודל {model_name}")
-                last_error = "Timeout"
-                continue
-            except requests.exceptions.RequestException as e:
-                logger.error(f"🔌 בעיית חיבור למודל {model_name}: {e}")
-                last_error = str(e)
-                continue
             except Exception as e:
-                logger.error(f"💥 שגיאה כללית למודל {model_name}: {e}")
-                last_error = str(e)
+                logger.error(f"💥 שגיאה במודל {model_name}: {str(e)}")
                 continue
 
-        # אם כל המודלים נכשלו
-        logger.error(f"💀 כל המודלים נכשלו! שגיאה אחרונה: {last_error}")
-        
-        # תן הודעת שגיאה מידעת יותר
-        if "401" in str(last_error) or "403" in str(last_error):
-            return "יש בעיה עם המפתח שלי 🔑"
-        elif "404" in str(last_error):
-            return "המודלים לא זמינים כרגע 🚫"
-        elif "429" in str(last_error):
-            return "יותר מדי בקשות, נסה בעוד דקה ⏳"
-        elif "timeout" in str(last_error).lower():
-            return "לוקח יותר מדי זמן, נסה שוב ⏰"
-        else:
-            return "יש לי בעיה טכנית זמנית 🛠️"
-
-    def _run_model_diagnosis(self):
-        """רץ דיאגנוסטיקה מהירה של מודלים"""
-        try:
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json"
-            }
-            
-            # בדוק אם יש גישה לרשימת מודלים
-            models_response = requests.get("https://openrouter.ai/api/v1/models", headers=headers, timeout=5)
-            
-            if models_response.status_code == 200:
-                models_data = models_response.json()
-                free_models = [m["id"] for m in models_data.get("data", []) if ":free" in m["id"]]
-                return f"יש {len(free_models)} מודלים חינמיים זמינים ✅"
-            else:
-                return f"בעיה בגישה למודלים: {models_response.status_code} ❌"
-                
-        except Exception as e:
-            return f"שגיאה בדיאגנוסטיקה: {str(e)[:50]} 🔧"
+        # כל המודלים נכשלו
+        logger.error("💀 כל המודלים נכשלו")
+        return "יש לי בעיה טכנית, כתוב 'דיאגנוסטיקה' לבדיקה 🔧"
 
     def _add_to_history(self, user_id, role, content):
         """Manage conversation history with size limit"""
@@ -335,170 +339,41 @@ def send_message(chat_id, text):
 def home():
     time_info = maya.get_israel_time()
     return jsonify({
-        "status": "🤖 Maya Bot - GPT via OpenRouter",
+        "status": "🤖 Maya Bot - Debug Version",
         "current_time": time_info['full'],
         "active_users": len(maya.conversation_history),
-        "version": "1.1.0"
+        "working_model": maya.working_model,
+        "version": "1.2.0-debug"
     })
 
-@app.route("/deep-diagnosis")
-def deep_diagnosis():
-    """מערכת דיאגנוסטיקה מעמיקה לבעיות OpenRouter"""
-    diagnosis_results = {}
+@app.route("/debug")
+def debug():
+    """דיאגנוסטיקה פשוטה"""
+    results = {}
     
-    # בדיקה 1: חיבור בסיסי ל-OpenRouter
-    try:
-        test_url = "https://openrouter.ai/api/v1/models"
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        models_response = requests.get(test_url, headers=headers, timeout=10)
-        diagnosis_results["models_api_status"] = models_response.status_code
-        diagnosis_results["models_api_response"] = models_response.text[:500] + "..." if len(models_response.text) > 500 else models_response.text
-        
-        if models_response.status_code == 200:
-            models_data = models_response.json()
-            available_models = [model["id"] for model in models_data.get("data", [])]
-            free_models = [model for model in available_models if ":free" in model]
-            diagnosis_results["total_models_available"] = len(available_models)
-            diagnosis_results["free_models_count"] = len(free_models)
-            diagnosis_results["free_models_sample"] = free_models[:10]  # ראשונים 10
-            
-            # בדיקה אם הדגמים שניסינו זמינים
-            test_models = [
-                "openai/gpt-3.5-turbo",
-                "meta-llama/llama-3.1-8b-instruct:free", 
-                "microsoft/wizardlm-2-8x22b:free",
-                "mistralai/mistral-7b-instruct:free"
-            ]
-            for model in test_models:
-                diagnosis_results[f"model_{model.replace('/', '_').replace(':', '_')}_available"] = model in available_models
-        
-    except Exception as e:
-        diagnosis_results["models_api_error"] = str(e)
+    # בדיקת API Key
+    results["api_key_valid"] = OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 20
+    results["api_key_prefix"] = OPENROUTER_API_KEY[:15] + "..." if OPENROUTER_API_KEY else "None"
     
-    # בדיקה 2: בדיקת API Key עם completion פשוט
-    free_models_to_test = [
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "microsoft/wizardlm-2-8x22b:free", 
-        "mistralai/mistral-7b-instruct:free",
-        "google/gemma-7b-it:free",
-        "huggingfaceh4/zephyr-7b-beta:free"
-    ]
+    # בדיקת מודלים
+    working_models = []
+    failed_models = []
     
-    for model_name in free_models_to_test:
+    for model in MODELS_TO_TRY[:3]:  # בדוק רק 3 ראשונים
         try:
-            headers = {
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://maya-bot.onrender.com",
-                "X-Title": "Maya Bot Diagnosis"
-            }
-            
-            data = {
-                "model": model_name,
-                "messages": [{"role": "user", "content": "Hello"}],
-                "temperature": 0.7,
-                "max_tokens": 10
-            }
-            
-            response = requests.post(OPENROUTER_API_URL, headers=headers, json=data, timeout=15)
-            
-            diagnosis_results[f"test_{model_name.replace('/', '_').replace(':', '_')}"] = {
-                "status_code": response.status_code,
-                "response_preview": response.text[:200] + "..." if len(response.text) > 200 else response.text,
-                "success": response.status_code == 200
-            }
-            
-            if response.status_code == 200:
-                diagnosis_results["WORKING_MODEL_FOUND"] = model_name
-                break
-                
+            is_working, status = maya._test_single_model(model)
+            if is_working:
+                working_models.append(model)
+            else:
+                failed_models.append(f"{model}: {status[:50]}")
         except Exception as e:
-            diagnosis_results[f"test_{model_name.replace('/', '_').replace(':', '_')}_error"] = str(e)
+            failed_models.append(f"{model}: {str(e)[:50]}")
     
-    # בדיקה 3: בדיקת חשבון וקרדיטים
-    try:
-        credits_url = "https://openrouter.ai/api/v1/auth/key"
-        headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}"}
-        credits_response = requests.get(credits_url, headers=headers, timeout=10)
-        
-        diagnosis_results["account_status"] = credits_response.status_code
-        if credits_response.status_code == 200:
-            account_data = credits_response.json()
-            diagnosis_results["account_info"] = account_data
-        else:
-            diagnosis_results["account_error"] = credits_response.text
-            
-    except Exception as e:
-        diagnosis_results["account_check_error"] = str(e)
+    results["working_models"] = working_models
+    results["failed_models"] = failed_models
+    results["recommendation"] = "✅ יש מודל שעובד" if working_models else "❌ אין מודל שעובד"
     
-    # בדיקה 4: תוקף API Key
-    api_key_valid = OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 20 and OPENROUTER_API_KEY.startswith("sk-")
-    diagnosis_results["api_key_format_valid"] = api_key_valid
-    diagnosis_results["api_key_length"] = len(OPENROUTER_API_KEY) if OPENROUTER_API_KEY else 0
-    diagnosis_results["api_key_prefix"] = OPENROUTER_API_KEY[:10] + "..." if OPENROUTER_API_KEY else "None"
-    
-    # סיכום והמלצות
-    recommendations = []
-    if not api_key_valid:
-        recommendations.append("🔑 API Key לא תקף - צריך להתחיל ב-sk- ולהיות ארוך יותר")
-    
-    if diagnosis_results.get("models_api_status") != 200:
-        recommendations.append("🚫 לא מצליח לגשת לרשימת הדגמים - בדוק API Key")
-    
-    if diagnosis_results.get("free_models_count", 0) == 0:
-        recommendations.append("💸 אין דגמים חינמיים זמינים - אולי צריך לקנות קרדיטים")
-    
-    if "WORKING_MODEL_FOUND" not in diagnosis_results:
-        recommendations.append("❌ אף דגם לא עובד - בעיה בחשבון או במפתח")
-    
-    diagnosis_results["recommendations"] = recommendations
-    diagnosis_results["timestamp"] = datetime.now().isoformat()
-    
-    return jsonify(diagnosis_results)
-
-@app.route("/test-model")
-def test_model():
-    """Test OpenRouter API connection and model availability"""
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://maya-bot.onrender.com",
-        "X-Title": "Maya Bot"
-    }
-
-    data = {
-        "model": "microsoft/wizardlm-2-8x22b:free",
-        "messages": [{"role": "user", "content": "Test message"}],
-        "temperature": 0.7,
-        "max_tokens": 50
-    }
-
-    try:
-        response = requests.post(
-            OPENROUTER_API_URL,
-            headers=headers,
-            json=data,
-            timeout=10
-        )
-        
-        return jsonify({
-            "status_code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text,
-            "headers": dict(response.headers),
-            "api_url": OPENROUTER_API_URL,
-            "model": data["model"]
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "error": str(e),
-            "api_url": OPENROUTER_API_URL,
-            "model": data["model"]
-        })
+    return jsonify(results)
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -520,9 +395,9 @@ def webhook():
         user_id = message.get("from", {}).get("id")
 
         if chat_id and text and user_id:
-            logger.info(f"Processing message from {user_id}: {text[:40]}...")
+            logger.info(f"🎯 הודעה מ-{user_id}: {text[:40]}...")
             response = maya.process_message(user_id, text)
-            logger.info(f"Sending response: {response[:40]}...")
+            logger.info(f"📤 שולח תשובה: {response[:40]}...")
             send_message(chat_id, response)
         
         return "OK"
@@ -541,10 +416,7 @@ def test():
         ("שלום מאיה!", "greeting"),
         ("קוראים לי דנה", "name introduction"),
         ("מה השעה?", "time query"),
-        ("אני מרגיש עצוב היום", "emotional support"),
-        ("תסבירי על בינה מלאכותית", "knowledge query"),
-        ("לא הבנתי כלום", "confusion"),
-        ("תודה רבה", "thanks")
+        ("דיאגנוסטיקה", "debug test")
     ]
 
     results = {}
@@ -557,5 +429,5 @@ def test():
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot is running with enhanced stability and error handling")
+    logger.info("🚀 Maya Bot Debug Version - Enhanced Diagnostics")
     app.run(host="0.0.0.0", port=PORT, debug=False)
