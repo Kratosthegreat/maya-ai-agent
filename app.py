@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-# Maya AI Secretary Bot 6.0 - Clean Version
+# Maya Bot - Final Enhanced Version with Research-Based Improvements
 import os
 import json
 import re
+import time
 import logging
-import requests
+import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+import requests
 import pytz
-import sqlite3
-from dataclasses import dataclass, field
-from enum import Enum
-from contextlib import contextmanager
 import random
-
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
+from http import HTTPStatus
 
 # Configuration
 class Config:
@@ -27,383 +25,420 @@ class Config:
         self.DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
         self.TIMEZONE = pytz.timezone("Asia/Jerusalem")
         self.WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
-        self.WEATHER_API_URL = "http://api.weatherapi.com/v1/current.json"
-        self.DB_PATH = os.getenv("DB_PATH", "maya_bot.db")
-        self.MAX_CONVERSATION_HISTORY = 20
+        self.WEATHER_API_URL = "http://api.openweathermap.org/data/2.5/weather"
 
-# Data Models
-class MessageType(Enum):
-    GREETING = "greeting"
-    WEATHER_REQUEST = "weather_request"
-    TIME_REQUEST = "time_request"
-    PERSONAL_INFO = "personal_info"
-    TASK_REQUEST = "task_request"
-    CASUAL_CHAT = "casual_chat"
-    UNKNOWN = "unknown"
-
-@dataclass
-class UserContext:
-    user_id: int
-    name: Optional[str] = None
-    location: Optional[str] = None
-    conversation_history: List[Dict] = field(default_factory=list)
-    last_activity: Optional[datetime] = None
-
-# Initialize config
-config = Config()
-
-# Logging
+# Logging setup
 logging.basicConfig(
-    level=logging.DEBUG if config.DEBUG else logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG if Config().DEBUG else logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
+config = Config()
 app = Flask(__name__)
 
-# Database Manager
-class DatabaseManager:
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-        self.init_database()
-    
-    def init_database(self):
-        try:
-            with self.get_connection() as conn:
-                conn.executescript("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        user_id INTEGER PRIMARY KEY,
-                        name TEXT,
-                        location TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    );
-                    
-                    CREATE TABLE IF NOT EXISTS conversations (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        user_id INTEGER,
-                        message TEXT,
-                        response TEXT,
-                        message_type TEXT,
-                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users (user_id)
-                    );
-                """)
-                logger.info("Database initialized successfully")
-        except Exception as e:
-            logger.error(f"Database initialization error: {e}")
-    
-    @contextmanager
-    def get_connection(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-            conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
-
-# Intelligence Engine
-class IntelligenceEngine:
+# Hebrew Text Processor - Research-Based
+class HebrewTextProcessor:
     def __init__(self):
         self.hebrew_patterns = {
-            MessageType.GREETING: [
-                r"שלום|היי|הי|הייי|בוקר טוב|ערב טוב|לילה טוב",
-                r"מה שלומך|מה נשמע|איך הולך|מה קורה"
-            ],
-            MessageType.WEATHER_REQUEST: [
-                r"מזג אוויר|טמפרטורה|חם|קר|גשם|שמש|עננים",
-                r"איך מזג האוויר|מה הטמפרטורה"
-            ],
-            MessageType.TIME_REQUEST: [
-                r"מה השעה|איזה יום|באיזה תאריך|זמן|שעה",
-                r"יום.*|מועד|לוח שנה"
-            ],
-            MessageType.PERSONAL_INFO: [
-                r"שמי|קוראים לי|השם שלי|אני.*|גר ב|גרה ב",
-                r"אוהב|אוהבת|עובד|עובדת"
-            ],
-            MessageType.TASK_REQUEST: [
-                r"תוכל|תוכלי|עזור|עזרי|בצע|תעשה|תעשי",
-                r"אפשר|רוצה ש|צריך ש|בקש"
-            ],
-            MessageType.CASUAL_CHAT: [
-                r"איך את|מה דעתך|מה חושב|נחמד|יפה|טוב|רע"
+            'letters': r'[\u05D0-\u05EA]',
+            'words': r'[\u05D0-\u05EA\u05F0-\u05F4]+',
+            'greeting': r'(?:שלום|היי|הי|הייי|בוקר טוב|ערב טוב|צהריים טובים|לילה טוב)',
+            'weather_request': r'(?:מזג אוויר|טמפרטורה|מעלות|חם|קר|גשם|שמש|עננים|רוח|לחות)',
+            'time_request': r'(?:מה השעה|איזה יום|תאריך|זמן|שעה|כמה השעה)',
+            'question_words': r'(?:איך|מה|מתי|איפה|למה|מי|כמה|איזה)',
+            'politeness': r'(?:בבקשה|תודה|תודה רבה|סליחה|אני מצטער|מעריך)',
+            'name_patterns': [
+                r'שמי (הוא )?(.+?)(?:\s|$|\.)',
+                r'קוראים לי (.+?)(?:\s|$|\.)',
+                r'השם שלי (הוא )?(.+?)(?:\s|$|\.)',
+                r'אני (.+?)(?:\s|$|\.)'
             ]
         }
+        
+        # Israeli cities mapping
+        self.city_translations = {
+            'תל אביב': 'Tel Aviv',
+            'ירושלים': 'Jerusalem', 
+            'חיפה': 'Haifa',
+            'באר שבע': 'Beer Sheva',
+            'אילת': 'Eilat',
+            'נתניה': 'Netanya',
+            'פתח תקווה': 'Petah Tikva',
+            'אשדוד': 'Ashdod',
+            'ראשון לציון': 'Rishon LeZion',
+            'עפולה': 'Afula',
+            'הרצליה': 'Herzliya',
+            'כפר סבא': 'Kfar Saba'
+        }
     
-    def classify_message(self, text: str) -> MessageType:
-        text_lower = text.lower()
-        scores = {}
-        
-        for msg_type, patterns in self.hebrew_patterns.items():
-            score = 0
-            for pattern in patterns:
-                if re.search(pattern, text_lower):
-                    score += 1
-            scores[msg_type] = score
-        
-        max_score = max(scores.values()) if scores else 0
-        if max_score > 0:
-            return max(scores, key=scores.get)
-        return MessageType.UNKNOWN
+    def remove_niqqud(self, text: str) -> str:
+        """Remove Hebrew diacritics"""
+        return re.sub(r'[\u0591-\u05C7]', '', text)
     
-    def extract_entities(self, text: str) -> Dict[str, Any]:
-        entities = {}
+    def normalize_text(self, text: str) -> str:
+        """Normalize Hebrew text"""
+        text = self.remove_niqqud(text)
+        text = re.sub(r'\s+', ' ', text.strip())
+        return text.lower()
+    
+    def detect_intent(self, text: str) -> str:
+        """Detect intent from Hebrew text"""
+        normalized = self.normalize_text(text)
         
-        # Extract names
-        name_patterns = [
-            r"שמי (הוא )?(.+?)(?:\s|$|\.)",
-            r"קוראים לי (.+?)(?:\s|$|\.)",
-            r"השם שלי (הוא )?(.+?)(?:\s|$|\.)",
-            r"אני (.+?)(?:\s|$|\.)"
-        ]
-        
-        for pattern in name_patterns:
+        if re.search(self.hebrew_patterns['greeting'], normalized):
+            return 'greeting'
+        elif re.search(self.hebrew_patterns['weather_request'], normalized):
+            return 'weather_request'
+        elif re.search(self.hebrew_patterns['time_request'], normalized):
+            return 'time_request'
+        elif re.search(self.hebrew_patterns['question_words'], normalized):
+            return 'question'
+        elif re.search(self.hebrew_patterns['politeness'], normalized):
+            return 'polite'
+        elif any(pattern in normalized for pattern in ['שמי', 'קוראים לי', 'השם שלי']):
+            return 'personal_info'
+        return 'casual'
+    
+    def extract_name(self, text: str) -> Optional[str]:
+        """Extract name from Hebrew text"""
+        for pattern in self.hebrew_patterns['name_patterns']:
             match = re.search(pattern, text)
             if match:
                 name = match.group(-1).strip()
                 if len(name) > 0 and len(name) < 20:
-                    entities["name"] = name
-                break
+                    return name
+        return None
+    
+    def extract_city_name(self, text: str) -> Optional[str]:
+        """Extract city name from Hebrew text"""
+        normalized = self.normalize_text(text)
         
-        # Extract locations
-        israeli_cities = [
-            "תל אביב", "ירושלים", "חיפה", "באר שבע", "נתניה", 
-            "פתח תקווה", "אשדוד", "ראשון לציון", "עפולה"
-        ]
+        # Check Hebrew city names
+        for hebrew_city, english_city in self.city_translations.items():
+            if hebrew_city in normalized:
+                return english_city
         
-        for city in israeli_cities:
-            if city in text:
-                entities["location"] = city
-                break
-        
-        return entities
+        # Check English words
+        english_words = re.findall(r'[a-zA-Z]+', text)
+        return english_words[0] if english_words else None
 
-# Weather Service
+# Weather Service with Error Handling
 class WeatherService:
     def __init__(self):
         self.api_key = config.WEATHER_API_KEY
+        self.base_url = config.WEATHER_API_URL
         self.cache = {}
-        self.cache_duration = 600
+        self.cache_ttl = 300  # 5 minutes
     
-    def get_weather_info(self, city: str = "Israel") -> Optional[Dict[str, Any]]:
-        if not self.api_key:
-            return None
+    def get_weather(self, city: str) -> Dict[str, Any]:
+        """Get weather with comprehensive error handling"""
+        cache_key = f"weather:{city}"
         
-        cache_key = f"weather_{city}"
+        # Check cache
         if cache_key in self.cache:
             cached_data, timestamp = self.cache[cache_key]
-            if datetime.now().timestamp() - timestamp < self.cache_duration:
+            if time.time() - timestamp < self.cache_ttl:
                 return cached_data
         
+        if not self.api_key:
+            return {"success": False, "error": "no_api_key"}
+        
         try:
-            response = requests.get(
-                f"{config.WEATHER_API_URL}?key={self.api_key}&q={city}&aqi=no",
-                timeout=5
-            )
+            params = {
+                'q': city,
+                'appid': self.api_key,
+                'units': 'metric',
+                'lang': 'he'
+            }
+            
+            response = requests.get(self.base_url, params=params, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
-                weather_info = {
-                    "temperature": data["current"]["temp_c"],
-                    "condition": data["current"]["condition"]["text"],
-                    "humidity": data["current"]["humidity"],
-                    "feels_like": data["current"]["feelslike_c"],
-                    "city": data["location"]["name"]
-                }
-                
-                self.cache[cache_key] = (weather_info, datetime.now().timestamp())
-                return weather_info
+                formatted_data = self._format_weather_data(data)
+                self.cache[cache_key] = (formatted_data, time.time())
+                return formatted_data
             
+            elif response.status_code == 404:
+                return {"success": False, "error": "city_not_found"}
+            elif response.status_code == 401:
+                logger.error("Invalid API key")
+                return {"success": False, "error": "api_key_invalid"}
+            else:
+                logger.error(f"API error: {response.status_code}")
+                return {"success": False, "error": "api_error"}
+        
+        except requests.exceptions.Timeout:
+            logger.error("API timeout")
+            return {"success": False, "error": "timeout"}
         except Exception as e:
-            logger.error(f"Weather API error: {e}")
-        
-        return None
+            logger.error(f"Unexpected weather error: {e}")
+            return {"success": False, "error": "unexpected_error"}
+    
+    def _format_weather_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format weather data"""
+        try:
+            return {
+                "success": True,
+                "city": data["name"],
+                "temperature": round(data["main"]["temp"]),
+                "description": data["weather"][0]["description"],
+                "humidity": data["main"]["humidity"],
+                "feels_like": round(data["main"]["feels_like"]),
+                "wind_speed": data.get("wind", {}).get("speed", 0)
+            }
+        except KeyError as e:
+            logger.error(f"Weather data format error: {e}")
+            return {"success": False, "error": "data_format_error"}
 
-# Response Generator
-class ResponseGenerator:
+# Bot Personality Engine - Research-Based Improvements
+class BotPersonality:
     def __init__(self):
-        self.weather_service = WeatherService()
+        self.conversation_context = {}
+        self.user_preferences = {}
+        self.used_responses = {}
+        
+        # Time-based greetings
+        self.time_greetings = {
+            "morning": [
+                "בוקר טוב! ☀️ איך השינה? מה התוכניות להיום?",
+                "בוקר טוב! 🌅 קום עם חיוך? איך אוכל לעזור?",
+                "בוקר טוב יקר! ☕ מקווה שהתחלת את היום טוב!"
+            ],
+            "afternoon": [
+                "צהריים טובים! 🌤️ איך עובר היום?",
+                "שלום! 👋 איך החלק הראשון של היום?",
+                "צהריים טובים! 🍽️ מקווה שאכלת משהו טוב!"
+            ],
+            "evening": [
+                "ערב טוב! 🌆 איך היה היום?",
+                "ערב טוב! 🌙 מתחיל להירגע?",
+                "שלום! ערב נעים! איך אפשר לעזור?"
+            ],
+            "night": [
+                "לילה טוב! 🌙 עדיין ער/ה?",
+                "שלום! מאוחר היום, אבל אני כאן! 🦉",
+                "לילה טוב! מה שומר אותך ער/ה?"
+            ]
+        }
+        
+        # Varied responses to prevent repetition
+        self.response_variations = {
+            'weather_success': [
+                "🌤️ הנה מזג האוויר ב{city}:\n\n🌡️ טמפרטורה: {temperature}°C\n🤔 מרגיש כמו: {feels_like}°C\n☁️ מצב: {description}\n💧 לחות: {humidity}%",
+                "☀️ מידע מזג אוויר עבור {city}:\n\n🌡️ כרגע: {temperature}°C (מרגיש {feels_like}°C)\n🌤️ תיאור: {description}\n💧 לחות באוויר: {humidity}%",
+                "🌈 דו\"ח מזג אוויר - {city}:\n\n🌡️ טמפרטורה נוכחית: {temperature}°C\n😊 תחושה: {feels_like}°C\n☁️ מה קורה בשמיים: {description}\n💧 לחות: {humidity}%"
+            ],
+            'weather_error': [
+                "🤔 לא הצלחתי למצוא את העיר הזו... אולי תנסה לכתוב בדרך אחרת?",
+                "😅 העיר לא נמצאה במאגר שלי. אולי יש שגיאת כתיב?",
+                "🔍 לא מכיר את המקום הזה. תוכל לנסות שם אחר או לבדוק את הכתיב?"
+            ],
+            'no_api': [
+                "😔 מצטער, השירות לא זמין כרגע. נסה שוב מאוחר יותר!",
+                "🚧 יש בעיה זמנית עם שירות מזג האוויר. תחזור בעוד קצת?",
+                "⚠️ לא יכול לגשת לנתוני מזג אוויר עכשיו. אנא נסה מאוחר יותר."
+            ],
+            'unknown': [
+                "🤔 לא בטוח שהבנתי... תוכל לנסח מחדש?",
+                "😅 זה לא ברור לי לגמרי. אולי תסביר קצת יותר?",
+                "🧐 אני קצת מבולבל. תוכל לכתוב בדרך אחרת?"
+            ],
+            'thanks': [
+                "😊 בכיף! תמיד נעים לעזור!",
+                "🙏 בבקשה! זה הכי משמח אותי!",
+                "❤️ שמח שיכולתי לעזור! יש עוד משהו?"
+            ]
+        }
     
-    def generate_response(self, message: str, context: UserContext, 
-                         message_type: MessageType, entities: Dict) -> str:
-        
-        name = context.name or entities.get("name", "")
-        greeting_suffix = f" {name}" if name else ""
-        
-        if message_type == MessageType.GREETING:
-            greetings = [
-                f"שלום{greeting_suffix}! איך אוכל לעזור לך היום? 😊",
-                f"היי{greeting_suffix}! מה שלומך? איך יכולה לסייע?",
-                f"שמחה לראות אותך{greeting_suffix}! במה אוכל לעזור?"
-            ]
-            return random.choice(greetings)
-        
-        elif message_type == MessageType.WEATHER_REQUEST:
-            return self._handle_weather_response(entities)
-        
-        elif message_type == MessageType.TIME_REQUEST:
-            return self._handle_time_response()
-        
-        elif message_type == MessageType.PERSONAL_INFO:
-            return self._handle_personal_info(entities)
-        
-        elif message_type == MessageType.TASK_REQUEST:
-            tasks = [
-                f"בוודאי{greeting_suffix}! איך בדיוק אוכל לעזור לך?",
-                "אשמח לסייע! תוכל להסביר יותר על מה שאתה צריך?",
-                "כמובן! ספר לי מה אתה רוצה שאעשה."
-            ]
-            return random.choice(tasks)
-        
-        elif message_type == MessageType.CASUAL_CHAT:
-            casual = [
-                f"מעניין{greeting_suffix}! מה דעתך על זה?",
-                "נחמד לשמוע! ספר לי עוד.",
-                "זה נשמע כיף! איך זה הרגיש?"
-            ]
-            return random.choice(casual)
-        
+    def get_time_context(self) -> str:
+        """Get current time context"""
+        hour = datetime.now(config.TIMEZONE).hour
+        if 5 <= hour < 12:
+            return "morning"
+        elif 12 <= hour < 17:
+            return "afternoon"
+        elif 17 <= hour < 22:
+            return "evening"
         else:
-            defaults = [
-                f"מעניין{greeting_suffix}! תוכל להסביר יותר?",
-                "אני כאן לעזור! במה אוכל לסייע?",
-                "לא בטוחה שהבנתי. תוכל לנסח אחרת?"
-            ]
-            return random.choice(defaults)
+            return "night"
     
-    def _handle_weather_response(self, entities: Dict) -> str:
-        location = entities.get("location", "Israel")
-        weather_info = self.weather_service.get_weather_info(location)
+    def get_time_based_greeting(self, user_id: int = None) -> str:
+        """Get time-appropriate greeting"""
+        time_context = self.get_time_context()
+        greetings = self.time_greetings[time_context]
         
-        if weather_info:
-            return (f"🌤️ מזג האוויר ב{weather_info['city']}:\n"
-                   f"🌡️ טמפרטורה: {weather_info['temperature']}°C "
-                   f"(מרגיש כמו {weather_info['feels_like']}°C)\n"
-                   f"☁️ מצב: {weather_info['condition']}\n"
-                   f"💧 לחות: {weather_info['humidity']}%")
+        # Avoid repetition per user
+        if user_id:
+            key = f"greeting_{user_id}"
+            if key in self.used_responses:
+                available = [g for g in greetings if g not in self.used_responses[key]]
+                if not available:
+                    self.used_responses[key] = []
+                    available = greetings
+            else:
+                available = greetings
+                self.used_responses[key] = []
+            
+            chosen = random.choice(available)
+            self.used_responses[key].append(chosen)
+            return chosen
         
-        return f"לא מצליחה לקבל נתוני מזג אוויר עבור {location} כרגע. נסה שוב מאוחר יותר 🚧"
+        return random.choice(greetings)
     
-    def _handle_time_response(self) -> str:
+    def get_varied_response(self, response_type: str, user_id: int = None, **kwargs) -> str:
+        """Get varied response to prevent repetition"""
+        if response_type not in self.response_variations:
+            return "אני כאן לעזור! איך אוכל לסייע?"
+        
+        variations = self.response_variations[response_type]
+        
+        # Avoid repetition per user
+        if user_id:
+            key = f"{response_type}_{user_id}"
+            if key in self.used_responses:
+                available = [v for v in variations if v not in self.used_responses[key]]
+                if not available:
+                    self.used_responses[key] = []
+                    available = variations
+            else:
+                available = variations
+                self.used_responses[key] = []
+            
+            chosen = random.choice(available)
+            self.used_responses[key].append(chosen)
+        else:
+            chosen = random.choice(variations)
+        
+        return chosen.format(**kwargs)
+    
+    def remember_user_info(self, user_id: int, info_type: str, value: str):
+        """Remember user information"""
+        if user_id not in self.user_preferences:
+            self.user_preferences[user_id] = {}
+        self.user_preferences[user_id][info_type] = value
+    
+    def get_user_name(self, user_id: int) -> Optional[str]:
+        """Get remembered user name"""
+        return self.user_preferences.get(user_id, {}).get('name')
+
+# Enhanced Response Engine
+class EnhancedResponseEngine:
+    def __init__(self):
+        self.text_processor = HebrewTextProcessor()
+        self.weather_service = WeatherService()
+        self.personality = BotPersonality()
+    
+    def process_message(self, user_id: int, message: str) -> str:
+        """Process message and generate intelligent response"""
+        try:
+            # Detect intent
+            intent = self.text_processor.detect_intent(message)
+            logger.info(f"Detected intent: {intent} for user {user_id}")
+            
+            # Handle different intents
+            if intent == 'greeting':
+                return self._handle_greeting(user_id)
+            
+            elif intent == 'weather_request':
+                return self._handle_weather_request(user_id, message)
+            
+            elif intent == 'time_request':
+                return self._handle_time_request(user_id)
+            
+            elif intent == 'personal_info':
+                return self._handle_personal_info(user_id, message)
+            
+            elif intent == 'polite':
+                return self._handle_politeness(user_id, message)
+            
+            else:
+                return self._handle_casual_chat(user_id)
+        
+        except Exception as e:
+            logger.error(f"Error processing message: {e}")
+            return "😅 מצטער, הייתה לי בעיה קטנה. אוכל לנסות שוב?"
+    
+    def _handle_greeting(self, user_id: int) -> str:
+        """Handle greeting messages"""
+        user_name = self.personality.get_user_name(user_id)
+        greeting = self.personality.get_time_based_greeting(user_id)
+        
+        if user_name:
+            greeting = greeting.replace("!", f" {user_name}!")
+        
+        return greeting
+    
+    def _handle_weather_request(self, user_id: int, message: str) -> str:
+        """Handle weather requests"""
+        city = self.text_processor.extract_city_name(message)
+        
+        if not city:
+            return "🤔 איזו עיר מעניינת אותך? תוכל לכתוב את השם?"
+        
+        weather_data = self.weather_service.get_weather(city)
+        
+        if weather_data['success']:
+            return self.personality.get_varied_response(
+                'weather_success', user_id, **weather_data
+            )
+        else:
+            if weather_data['error'] == 'city_not_found':
+                return self.personality.get_varied_response('weather_error', user_id)
+            else:
+                return self.personality.get_varied_response('no_api', user_id)
+    
+    def _handle_time_request(self, user_id: int) -> str:
+        """Handle time/date requests"""
         now = datetime.now(config.TIMEZONE)
         hebrew_days = {
-            "Monday": "שני", "Tuesday": "שלישי", "Wednesday": "רביעי",
-            "Thursday": "חמישי", "Friday": "שישי", "Saturday": "שבת", "Sunday": "ראשון"
+            'Monday': 'שני', 'Tuesday': 'שלישי', 'Wednesday': 'רביעי',
+            'Thursday': 'חמישי', 'Friday': 'שישי', 'Saturday': 'שבת', 'Sunday': 'ראשון'
         }
-        day_name = hebrew_days.get(now.strftime("%A"), now.strftime("%A"))
+        day_name = hebrew_days.get(now.strftime('%A'), now.strftime('%A'))
         
         return (f"📅 היום יום {day_name}, {now.strftime('%d/%m/%Y')}\n"
-               f"🕒 השעה: {now.strftime('%H:%M')}")
+               f"🕒 השעה בישראל: {now.strftime('%H:%M')}")
     
-    def _handle_personal_info(self, entities: Dict) -> str:
-        if "name" in entities:
-            return f"נעים מאוד להכיר אותך, {entities['name']}! 😊 איך אוכל לעזור לך?"
-        if "location" in entities:
-            return f"נחמד! אז אתה מ{entities['location']}. מקום יפה! 🏘️"
-        return "תודה שאתה חולק איתי! זה עוזר לי להכיר אותך יותר טוב 💝"
+    def _handle_personal_info(self, user_id: int, message: str) -> str:
+        """Handle personal information sharing"""
+        name = self.text_processor.extract_name(message)
+        
+        if name:
+            self.personality.remember_user_info(user_id, 'name', name)
+            responses = [
+                f"נעים מאוד להכיר אותך, {name}! 😊 איך אוכל לעזור לך?",
+                f"שמח להכיר, {name}! 👋 מה שלומך היום?",
+                f"היי {name}! 🙂 נחמד שאתה כאן. במה אוכל לסייע?"
+            ]
+            return random.choice(responses)
+        
+        return "תודה שאתה חולק איתי! 😊 זה עוזר לי להכיר אותך יותר טוב."
+    
+    def _handle_politeness(self, user_id: int, message: str) -> str:
+        """Handle polite expressions"""
+        if any(word in message for word in ['תודה', 'מעריך']):
+            return self.personality.get_varied_response('thanks', user_id)
+        
+        return "😊 בכיף! אני כאן בשבילך."
+    
+    def _handle_casual_chat(self, user_id: int) -> str:
+        """Handle casual conversation"""
+        return self.personality.get_varied_response('unknown', user_id)
 
-# User Memory
-class UserMemory:
-    def __init__(self, db_manager: DatabaseManager):
-        self.db = db_manager
-        self.active_users = {}
-    
-    def get_user_context(self, user_id: int) -> UserContext:
-        if user_id in self.active_users:
-            return self.active_users[user_id]
-        
-        try:
-            with self.db.get_connection() as conn:
-                user_row = conn.execute(
-                    "SELECT * FROM users WHERE user_id = ?", (user_id,)
-                ).fetchone()
-                
-                if user_row:
-                    context = UserContext(
-                        user_id=user_id,
-                        name=user_row["name"],
-                        location=user_row["location"],
-                        last_activity=datetime.now()
-                    )
-                else:
-                    context = UserContext(user_id=user_id, last_activity=datetime.now())
-                    self._create_user(context)
-                
-                # Load recent conversation history
-                history_rows = conn.execute(
-                    """SELECT message, response, message_type, timestamp 
-                       FROM conversations WHERE user_id = ? 
-                       ORDER BY timestamp DESC LIMIT ?""",
-                    (user_id, config.MAX_CONVERSATION_HISTORY)
-                ).fetchall()
-                
-                context.conversation_history = [
-                    {
-                        "message": row["message"],
-                        "response": row["response"],
-                        "type": row["message_type"],
-                        "timestamp": row["timestamp"]
-                    }
-                    for row in reversed(history_rows)
-                ]
-        
-        except Exception as e:
-            logger.error(f"Error loading user context: {e}")
-            context = UserContext(user_id=user_id, last_activity=datetime.now())
-        
-        self.active_users[user_id] = context
-        return context
-    
-    def update_user_context(self, context: UserContext):
-        try:
-            with self.db.get_connection() as conn:
-                conn.execute(
-                    """UPDATE users SET name = ?, location = ?, 
-                       last_activity = CURRENT_TIMESTAMP WHERE user_id = ?""",
-                    (context.name, context.location, context.user_id)
-                )
-            self.active_users[context.user_id] = context
-        except Exception as e:
-            logger.error(f"Error updating user context: {e}")
-    
-    def save_conversation(self, user_id: int, message: str, response: str, message_type: MessageType):
-        try:
-            with self.db.get_connection() as conn:
-                conn.execute(
-                    """INSERT INTO conversations (user_id, message, response, message_type)
-                       VALUES (?, ?, ?, ?)""",
-                    (user_id, message, response, message_type.value)
-                )
-        except Exception as e:
-            logger.error(f"Error saving conversation: {e}")
-    
-    def _create_user(self, context: UserContext):
-        try:
-            with self.db.get_connection() as conn:
-                conn.execute(
-                    """INSERT INTO users (user_id, name, location)
-                       VALUES (?, ?, ?)""",
-                    (context.user_id, context.name, context.location)
-                )
-        except Exception as e:
-            logger.error(f"Error creating user: {e}")
-
-# Enhanced Telegram Bot
-class EnhancedTelegramBot:
+# Main Bot Class
+class MayaBot:
     def __init__(self):
         self.token = config.TELEGRAM_TOKEN
         self.api_url = f"https://api.telegram.org/bot{self.token}"
-        self.db_manager = DatabaseManager(config.DB_PATH)
-        self.memory = UserMemory(self.db_manager)
-        self.intelligence = IntelligenceEngine()
-        self.response_generator = ResponseGenerator()
+        self.response_engine = EnhancedResponseEngine()
     
     def send_message(self, chat_id: int, text: str) -> bool:
+        """Send message with error handling"""
         try:
             response = requests.post(
                 f"{self.api_url}/sendMessage",
@@ -414,121 +449,132 @@ class EnhancedTelegramBot:
                 },
                 timeout=10
             )
-            response.raise_for_status()
-            return True
             
+            if response.status_code == 200:
+                return True
+            else:
+                logger.error(f"Telegram API error: {response.status_code}")
+                return False
+                
         except Exception as e:
             logger.error(f"Error sending message: {e}")
             return False
     
-    def process_message(self, message: Dict[str, Any]) -> Optional[str]:
-        text = message.get("text", "").strip()
-        user_id = message["from"]["id"]
-        
-        if not text:
-            return None
-        
+    def process_update(self, update: Dict[str, Any]):
+        """Process incoming update"""
         try:
-            # Get user context
-            context = self.memory.get_user_context(user_id)
+            if "message" not in update:
+                return
             
-            # Classify message and extract entities
-            message_type = self.intelligence.classify_message(text)
-            entities = self.intelligence.extract_entities(text)
+            message = update["message"]
+            chat_id = message.get("chat", {}).get("id")
+            text = message.get("text", "")
+            user_id = message.get("from", {}).get("id")
             
-            # Update context with extracted entities
-            if "name" in entities and entities["name"]:
-                context.name = entities["name"]
-            if "location" in entities and entities["location"]:
-                context.location = entities["location"]
+            if not chat_id or not text or not user_id:
+                return
+            
+            logger.info(f"Processing message from user {user_id}: {text[:50]}...")
             
             # Generate response
-            response = self.response_generator.generate_response(
-                text, context, message_type, entities
-            )
+            response = self.response_engine.process_message(user_id, text)
             
-            # Save conversation and update context
-            self.memory.save_conversation(user_id, text, response, message_type)
-            self.memory.update_user_context(context)
-            
-            return response
-            
+            # Send response
+            success = self.send_message(chat_id, response)
+            if not success:
+                # Fallback message
+                self.send_message(chat_id, "😅 הייתה בעיה קטנה. תוכל לנסות שוב?")
+        
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
-            return "מצטערת, הייתה בעיה טכנית. נסה שוב בעוד רגע 🔧"
-    
-    def process_update(self, update: Dict[str, Any]):
-        if "message" not in update:
-            return
-        
-        message = update["message"]
-        chat_id = message["chat"]["id"]
-        user_id = message["from"]["id"]
-        
-        logger.info(f"Processing message from user {user_id}")
-        
-        try:
-            response = self.process_message(message)
-            if response:
-                success = self.send_message(chat_id, response)
-                if not success:
-                    logger.error(f"Failed to send response to user {user_id}")
-        except Exception as e:
-            logger.error(f"Error in process_update: {e}")
-            self.send_message(chat_id, "מצטערת, הייתה בעיה. נסה שוב 🔧")
+            logger.error(f"Error processing update: {e}")
+            if "message" in update and "chat" in update["message"]:
+                chat_id = update["message"]["chat"]["id"]
+                self.send_message(chat_id, "😔 מצטער, אירעה שגיאה. אנא נסה שוב.")
 
 # Flask Routes
-@app.route("/")
+bot = MayaBot()
+
+@app.route("/", methods=["GET"])
 def home():
+    """Health check endpoint"""
     return jsonify({
-        "status": "running",
-        "service": "Maya AI Bot",
-        "version": "6.0",
+        "status": "Maya Bot is running! 🤖",
+        "version": "7.0 - Enhanced",
         "features": [
-            "Hebrew NLP",
-            "User Memory", 
-            "Weather Service",
-            "Conversation History"
+            "🧠 Smart Hebrew NLP",
+            "😊 Personality Engine", 
+            "🌤️ Weather Service",
+            "💾 User Memory",
+            "🎭 Varied Responses",
+            "⏰ Time-Aware Greetings"
         ],
         "timestamp": datetime.now().isoformat()
     })
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    if request.method == "POST":
-        try:
-            update = request.get_json()
-            if not update:
-                logger.warning("Empty webhook update received")
-                return jsonify({"status": "error", "message": "Empty request"}), 400
-            
-            bot.process_update(update)
-            return jsonify({"status": "success"}), 200
-            
-        except Exception as e:
-            logger.error(f"Webhook error: {str(e)}")
-            return jsonify({"status": "error", "message": str(e)}), 500
-    
-    return jsonify({"status": "error", "message": "Method not allowed"}), 405
-
-@app.route("/stats")
-def stats():
+    """Webhook endpoint for Telegram"""
     try:
-        with bot.db_manager.get_connection() as conn:
-            user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            message_count = conn.execute("SELECT COUNT(*) FROM conversations").fetchone()[0]
-            
-        return jsonify({
-            "users": user_count,
-            "messages": message_count,
-            "active_sessions": len(bot.memory.active_users)
-        })
+        update = request.get_json()
+        if not update:
+            logger.warning("Empty webhook update received")
+            return Response(status=HTTPStatus.BAD_REQUEST)
+        
+        bot.process_update(update)
+        return Response(status=HTTPStatus.OK)
+        
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Webhook error: {e}")
+        return Response(status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-# Initialization
-bot = EnhancedTelegramBot()
+@app.route("/test", methods=["GET"])
+def test_responses():
+    """Test endpoint for response variations"""
+    test_messages = [
+        "היי",
+        "מה השעה", 
+        "מה מזג האוויר בתל אביב",
+        "שמי דני",
+        "תודה רבה",
+        "איך אתה"
+    ]
+    
+    results = {}
+    test_user_id = 999999
+    
+    for message in test_messages:
+        response = bot.response_engine.process_message(test_user_id, message)
+        results[message] = response
+    
+    return jsonify(results)
 
+@app.route("/stats", methods=["GET"])
+def stats():
+    """Bot statistics"""
+    return jsonify({
+        "active_users": len(bot.response_engine.personality.user_preferences),
+        "cached_weather": len(bot.response_engine.weather_service.cache),
+        "response_variations": len(bot.response_engine.personality.response_variations),
+        "uptime": "Running smoothly! 💪"
+    })
+
+# Error handler
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({"error": "Internal server error"}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "Endpoint not found"}), 404
+
+# Run the application
 if __name__ == "__main__":
-    logger.info(f"Starting Enhanced Maya AI Bot on port {config.PORT}")
-    app.run(host="0.0.0.0", port=config.PORT, debug=config.DEBUG)
+    logger.info("Starting Maya Bot - Enhanced Version 7.0")
+    logger.info("Features: Smart NLP, Personality Engine, Weather Service")
+    
+    app.run(
+        host="0.0.0.0", 
+        port=config.PORT, 
+        debug=config.DEBUG
+    )
