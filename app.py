@@ -6,7 +6,7 @@ import requests
 import pytz
 from flask import Flask, request, jsonify
 
-# Config
+# Env config
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
@@ -54,11 +54,10 @@ class MayaBot:
         name_suffix = f" {user_name}" if user_name else ""
 
         system_prompt = f"""
-        את מאיה, המזכירה האישית של דוד. את חכמה, רגישה, מבינה רמזים רגשיים, מדברת בעברית בלבד.
-        את לא רובוט – את מגיבה כמו אדם חם, נעים, מצחיק לפעמים, או מרגיעה כשצריך.
-        את זוכרת שהשם של המשתמש הוא{name_suffix}.
-        אם הוא שואל שאלה פשוטה – תעני ישר ולעניין.
-        אם הוא מרגיש תקוע, עייף או מתוסכל – תגיבי בהתאם ברגישות.
+        את מאיה, המזכירה האישית של דוד. את מדברת בעברית בלבד, עם רגש, הקשבה, והומור רך.
+        את לא רובוט – את מדברת כמו אדם חכם, מרגיש, ואכפתי.
+        שמו של המשתמש הוא{name_suffix}. שימי לב להקשר ולתחושות.
+        אם הוא שואל שאלה פשוטה – תעני ישר. אם הוא עייף או מתוסכל – תהיי רכה.
         """
 
         headers = {
@@ -66,6 +65,7 @@ class MayaBot:
             "Content-Type": "application/json",
             "HTTP-Referer": "https://maya-bot.onrender.com"
         }
+
         data = {
             "model": "openai/gpt-3.5-turbo",
             "messages": [
@@ -76,7 +76,7 @@ class MayaBot:
 
         try:
             response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                "https://api.openrouter.ai/v1/chat/completions",
                 headers=headers,
                 json=data,
                 timeout=10
@@ -104,14 +104,14 @@ def send_message(chat_id, text):
 def home():
     time_info = maya.get_israel_time()
     return jsonify({
-        "status": "🤖 Maya Bot - GPT via OpenRouter",
+        "status": "🤖 Maya Bot - Powered by GPT via OpenRouter",
         "current_time": time_info['full'],
         "users_with_names": len(maya.user_names),
         "features": [
-            "✅ GPT (3.5-turbo) עם עברית טבעית",
+            "✅ תגובות GPT טבעיות בעברית",
+            "✅ זיהוי שמות משתמשים",
             "✅ הבנה רגשית והקשרית",
-            "✅ שמירת שמות משתמשים",
-            "✅ בוט רגיש וחם, לא רובוטי"
+            "✅ זיכרון קצר לשיחה"
         ]
     })
 
@@ -121,15 +121,18 @@ def webhook():
         update = request.get_json()
         if not update or "message" not in update:
             return "OK"
+
         message = update["message"]
         chat_id = message.get("chat", {}).get("id")
         text = message.get("text", "")
         user_id = message.get("from", {}).get("id")
+
         if chat_id and text and user_id:
             logger.info(f"User {user_id}: {text[:40]}...")
             response = maya.process_message(user_id, text)
             logger.info(f"Response: {response[:40]}...")
             send_message(chat_id, response)
+
         return "OK"
     except Exception as e:
         logger.error(f"Webhook error: {e}")
@@ -138,9 +141,9 @@ def webhook():
 @app.route("/test")
 def test():
     return jsonify({
-        "message": maya.process_message(123, "אני מרגיש תקוע היום"),
+        "message": maya.process_message(123, "אני מרגיש תקוע")
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot is running with GPT via OpenRouter (gpt-3.5-turbo)")
+    logger.info("🚀 Maya Bot is running with GPT via OpenRouter (Final version)")
     app.run(host="0.0.0.0", port=PORT, debug=False)
