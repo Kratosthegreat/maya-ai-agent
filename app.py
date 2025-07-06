@@ -4,7 +4,6 @@ import logging
 from datetime import datetime
 import requests
 import pytz
-import random
 from flask import Flask, request, jsonify
 
 # Config - Load from environment with validation
@@ -12,20 +11,20 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 if not TELEGRAM_TOKEN:
     raise ValueError("Missing TELEGRAM_TOKEN in environment variables")
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-if not OPENROUTER_API_KEY:
-    raise ValueError("Missing OPENROUTER_API_KEY in environment variables")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError("Missing GROQ_API_KEY in environment variables")
 
 PORT = int(os.getenv("PORT", 10000))
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 if not WEBHOOK_SECRET_TOKEN:
     logging.warning("Running without WEBHOOK_SECRET_TOKEN - not recommended for production")
 
-# Constants
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+# Constants - Groq API
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-MAX_HISTORY_LENGTH = 10  # Keep last 5 conversation turns (user + assistant)
-REQUEST_TIMEOUT = 30  # seconds
+MAX_HISTORY_LENGTH = 10
+REQUEST_TIMEOUT = 20  # Groq is much faster
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +34,7 @@ class MayaBot:
     def __init__(self):
         self.user_names = {}
         self.conversation_history = {}
-        self.rate_limits = {}  # Track user request timestamps for rate limiting
+        self.rate_limits = {}
 
     def get_israel_time(self):
         """Get current Israeli time with Hebrew day names"""
@@ -56,7 +55,7 @@ class MayaBot:
         }
 
     def _check_rate_limit(self, user_id):
-        """Implement basic rate limiting (5 requests per minute)"""
+        """Implement basic rate limiting (10 requests per minute)"""
         current_time = datetime.now().timestamp()
         if user_id not in self.rate_limits:
             self.rate_limits[user_id] = []
@@ -67,7 +66,7 @@ class MayaBot:
             if current_time - t < 60
         ]
         
-        if len(self.rate_limits[user_id]) >= 5:
+        if len(self.rate_limits[user_id]) >= 10:
             return False
         
         self.rate_limits[user_id].append(current_time)
@@ -135,52 +134,47 @@ class MayaBot:
         messages.append({"role": "user", "content": message})
 
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://maya-bot.onrender.com",
-            "X-Title": "Maya Bot"
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
         }
 
         data = {
-            "model": "google/gemini-2.0-flash-exp:free",
+            "model": "llama-3.1-70b-versatile",
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 150
         }
 
         try:
-            logger.info(f"🔄 Sending request to OpenRouter API: {OPENROUTER_API_URL}")
-            logger.info(f"📝 Using model: {data['model']}")
-            logger.info(f"🔑 API Key prefix: {OPENROUTER_API_KEY[:15]}...")
+            logger.info(f"🚀 Sending request to Groq API: {GROQ_API_URL}")
+            logger.info(f"🦙 Using model: {data['model']}")
             
             response = requests.post(
-                OPENROUTER_API_URL,
+                GROQ_API_URL,
                 headers=headers,
                 json=data,
                 timeout=REQUEST_TIMEOUT
             )
 
-            logger.info(f"📊 OpenRouter response status: {response.status_code}")
+            logger.info(f"⚡ Groq response status: {response.status_code}")
             
             if response.status_code != 200:
-                error_msg = f"OpenRouter API error: {response.status_code} - {response.text[:300]}"
+                error_msg = f"Groq API error: {response.status_code} - {response.text[:300]}"
                 logger.error(error_msg)
                 
                 # Return appropriate fallback based on error type
-                if response.status_code == 404:
-                    return "המודל לא זמין, נסה שוב בעוד דקה 🔧"
-                elif response.status_code == 401:
+                if response.status_code == 401:
                     return "יש בעיה עם המפתח שלי 🔑"
                 elif response.status_code == 429:
-                    return "הגעתי למגבלת הבקשות, נסה בעוד דקה ⏳"
+                    return "יותר מדי בקשות, נסה בעוד דקה ⏳"
                 else:
                     return "משהו השתבש, בוא ננסה שוב! ✨"
 
             response_json = response.json()
-            logger.info(f"✅ OpenRouter response success: {str(response_json)[:200]}...")
+            logger.info(f"✅ Groq response success!")
             
             if "choices" not in response_json or not response_json["choices"]:
-                logger.error("❌ No choices in OpenRouter response")
+                logger.error("❌ No choices in Groq response")
                 return "לא קיבלתי תשובה טובה, תנסה שוב! 🤔"
 
             reply = response_json["choices"][0]["message"]["content"]
@@ -194,10 +188,10 @@ class MayaBot:
             return cleaned_reply
 
         except requests.exceptions.Timeout:
-            logger.error("⏰ OpenRouter API timeout")
+            logger.error("⏰ Groq API timeout")
             return "לוקח לי יותר מדי זמן לחשוב, נסה שוב! ⏳"
         except requests.exceptions.RequestException as e:
-            logger.error(f"🔌 OpenRouter API connection error: {e}")
+            logger.error(f"🔌 Groq API connection error: {e}")
             return "יש לי בעיה להתחבר, נסה שוב בעוד דקה! 🔌"
         except Exception as e:
             logger.error(f"💥 Unexpected error: {e}")
@@ -286,11 +280,12 @@ def send_message(chat_id, text):
 def home():
     time_info = maya.get_israel_time()
     return jsonify({
-        "status": "🤖 Maya Bot - Simple Fix",
+        "status": "🦙 Maya Bot - Powered by Groq (FREE & FAST!)",
         "current_time": time_info['full'],
         "active_users": len(maya.conversation_history),
-        "model": "google/gemini-2.0-flash-exp:free",
-        "version": "1.1.1"
+        "model": "llama-3.1-70b-versatile",
+        "api": "Groq",
+        "version": "2.0.0"
     })
 
 @app.route("/webhook", methods=["POST"])
@@ -334,7 +329,7 @@ def test():
         ("שלום מאיה!", "greeting"),
         ("קוראים לי דנה", "name introduction"),
         ("מה השעה?", "time query"),
-        ("איך מרגישים היום?", "emotional check")
+        ("איך אתה מרגיש היום?", "emotional check")
     ]
 
     results = {}
@@ -342,10 +337,12 @@ def test():
         results[description] = maya.process_message(test_user_id, text)
 
     return jsonify({
-        "status": "Test completed",
+        "status": "Test completed with Groq",
+        "api": "Groq",
+        "model": "llama-3.1-70b-versatile",
         "results": results
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot is running - Simple Model Fix")
+    logger.info("🚀 Maya Bot is running with Groq API - FREE & LIGHTNING FAST!")
     app.run(host="0.0.0.0", port=PORT, debug=False)
