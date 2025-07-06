@@ -25,7 +25,7 @@ if not WEBHOOK_SECRET_TOKEN:
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 MAX_HISTORY_LENGTH = 10  # Keep last 5 conversation turns (user + assistant)
-REQUEST_TIMEOUT = 20  # seconds
+REQUEST_TIMEOUT = 30  # seconds - increased from 20
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -149,6 +149,10 @@ class MayaBot:
         }
 
         try:
+            logger.info(f"Sending request to OpenRouter API: {OPENROUTER_API_URL}")
+            logger.info(f"Using model: {data['model']}")
+            logger.info(f"Request headers: {headers}")
+            
             response = requests.post(
                 OPENROUTER_API_URL,
                 headers=headers,
@@ -156,20 +160,38 @@ class MayaBot:
                 timeout=REQUEST_TIMEOUT
             )
 
-            # Detailed error logging
+            # Enhanced error logging
+            logger.info(f"OpenRouter response status: {response.status_code}")
+            logger.info(f"OpenRouter response headers: {dict(response.headers)}")
+            
             if response.status_code != 200:
                 error_msg = f"OpenRouter API error: {response.status_code} - {response.text}"
                 logger.error(error_msg)
                 
+                try:
+                    error_json = response.json()
+                    logger.error(f"OpenRouter error details: {error_json}")
+                except:
+                    pass
+                
                 # Return appropriate fallback based on error type
                 if response.status_code == 404:
                     return "יש לי בעיה טכנית, תנסה שוב בעוד דקה? 🔧"
+                elif response.status_code == 401:
+                    return "יש בעיה עם המפתח שלי, אני מטפלת בזה! 🔑"
                 elif response.status_code == 429:
                     return "אני מקבלת יותר מדי בקשות, נסה שוב בעוד דקה ⏳"
                 else:
                     return "משהו השתבש בצד שלי, בוא ננסה שוב! ✨"
 
-            reply = response.json()["choices"][0]["message"]["content"]
+            response_json = response.json()
+            logger.info(f"OpenRouter response: {response_json}")
+            
+            if "choices" not in response_json or not response_json["choices"]:
+                logger.error("No choices in OpenRouter response")
+                return "לא קיבלתי תשובה טובה, תנסה שוב! 🤔"
+
+            reply = response_json["choices"][0]["message"]["content"]
             cleaned_reply = self._clean_llm_response(reply)
 
             # Update conversation history
@@ -276,6 +298,46 @@ def home():
         "active_users": len(maya.conversation_history),
         "version": "1.1.0"
     })
+
+@app.route("/test-model")
+def test_model():
+    """Test OpenRouter API connection and model availability"""
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://maya-bot.onrender.com",
+        "X-Title": "Maya Bot"
+    }
+
+    data = {
+        "model": "openai/gpt-3.5-turbo",
+        "messages": [{"role": "user", "content": "Test message"}],
+        "temperature": 0.7,
+        "max_tokens": 50
+    }
+
+    try:
+        response = requests.post(
+            OPENROUTER_API_URL,
+            headers=headers,
+            json=data,
+            timeout=10
+        )
+        
+        return jsonify({
+            "status_code": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text,
+            "headers": dict(response.headers),
+            "api_url": OPENROUTER_API_URL,
+            "model": data["model"]
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "api_url": OPENROUTER_API_URL,
+            "model": data["model"]
+        })
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
