@@ -142,7 +142,7 @@ class MayaBot:
         }
 
         data = {
-            "model": "openai/gpt-3.5-turbo",
+            "model": "meta-llama/llama-3.1-8b-instruct:free",
             "messages": messages,
             "temperature": 0.7,
             "max_tokens": 150
@@ -310,7 +310,7 @@ def test_model():
     }
 
     data = {
-        "model": "openai/gpt-3.5-turbo",
+        "model": "meta-llama/llama-3.1-8b-instruct:free",
         "messages": [{"role": "user", "content": "Test message"}],
         "temperature": 0.7,
         "max_tokens": 50
