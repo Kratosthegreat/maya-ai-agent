@@ -63,7 +63,8 @@ class MayaBot:
 
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://maya-bot.onrender.com"
         }
         data = {
             "model": "openai/gpt-3.5-turbo",
