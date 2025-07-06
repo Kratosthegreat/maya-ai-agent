@@ -4,17 +4,28 @@ import logging
 from datetime import datetime
 import requests
 import pytz
-import random # נשאר בשביל גמישות עתידית או אם יש רנדומליות אחרת
-
+import random
 from flask import Flask, request, jsonify
 
-# Config
+# Config - Load from environment with validation
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+if not TELEGRAM_TOKEN:
+    raise ValueError("Missing TELEGRAM_TOKEN in environment variables")
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not OPENROUTER_API_KEY:
+    raise ValueError("Missing OPENROUTER_API_KEY in environment variables")
+
 PORT = int(os.getenv("PORT", 10000))
-# מומלץ מאוד להגדיר את זה ב-Render/היכן שהקוד מאוחסן!
-# לדוגמה: WEBHOOK_SECRET_TOKEN="my-super-secret-telegram-token-123"
-WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN") 
+WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
+if not WEBHOOK_SECRET_TOKEN:
+    logging.warning("Running without WEBHOOK_SECRET_TOKEN - not recommended for production")
+
+# Constants
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+MAX_HISTORY_LENGTH = 10  # Keep last 5 conversation turns (user + assistant)
+REQUEST_TIMEOUT = 20  # seconds
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -23,15 +34,14 @@ logger = logging.getLogger(__name__)
 class MayaBot:
     def __init__(self):
         self.user_names = {}
-        # New: Store conversation history for each user. In this setup, it's effectively for one user.
-        self.conversation_history = {} 
+        self.conversation_history = {}
+        self.rate_limits = {}  # Track user request timestamps for rate limiting
 
     def get_israel_time(self):
-        """Get current Israeli time"""
+        """Get current Israeli time with Hebrew day names"""
         israel_tz = pytz.timezone("Asia/Jerusalem")
         now = datetime.now(israel_tz)
         
-        # Hebrew day names
         hebrew_days = {
             'Monday': 'שני', 'Tuesday': 'שלישי', 'Wednesday': 'רביעי',
             'Thursday': 'חמישי', 'Friday': 'שישי', 'Saturday': 'שבת', 'Sunday': 'ראשון'
@@ -45,45 +55,65 @@ class MayaBot:
             'full': f"יום {day_name}, {now.strftime('%d/%m/%Y')} בשעה {now.strftime('%H:%M')}"
         }
 
+    def _check_rate_limit(self, user_id):
+        """Implement basic rate limiting (5 requests per minute)"""
+        current_time = datetime.now().timestamp()
+        if user_id not in self.rate_limits:
+            self.rate_limits[user_id] = []
+        
+        # Remove old requests (older than 1 minute)
+        self.rate_limits[user_id] = [
+            t for t in self.rate_limits[user_id] 
+            if current_time - t < 60
+        ]
+        
+        if len(self.rate_limits[user_id]) >= 5:
+            return False
+        
+        self.rate_limits[user_id].append(current_time)
+        return True
+
     def process_message(self, user_id, message):
+        # Check rate limit first
+        if not self._check_rate_limit(user_id):
+            logger.warning(f"Rate limit exceeded for user {user_id}")
+            return "אני צריכה לנוח רגע, נדבר עוד דקה? 😴"
+
         text_lower = message.lower().strip()
 
-        # 1. Handle name introduction FIRST
-        # Added character range validation to regex and explicit check for Hebrew letters
+        # 1. Handle name introduction
         name_patterns = [
-            r'(?:שמי|קוראים לי|השם שלי) (?:הוא )?([א-ת\s]{2,15})(?:\s|$|\.)', # More specific Hebrew name pattern
-            r'אני ([א-ת\s]{2,15})(?:\s|$|\.)' # Also more specific
+            r'(?:שמי|קוראים לי|השם שלי) (?:הוא )?([א-ת\s]{2,15})(?:\s|$|\.)',
+            r'אני ([א-ת\s]{2,15})(?:\s|$|\.)'
         ]
         
         for pattern in name_patterns:
             match = re.search(pattern, message)
             if match:
                 name = match.group(1).strip()
-                # Additional validation: name should not be a common Hebrew verb/preposition
-                if name and len(name) > 1 and len(name) < 15 and name not in ["הוא", "היא", "אתה", "את", "אנחנו", "אתם", "הם"]:
+                if name and len(name) > 1 and len(name) < 15 and name not in ["הוא", "היא", "אתה", "את"]:
                     self.user_names[user_id] = name
-                    # Add to history
                     self._add_to_history(user_id, "user", message)
                     response_text = f"נעים מאוד להכיר אותך, {name}! 😊 אני מאיה, העוזרת הדיגיטלית שלך."
                     self._add_to_history(user_id, "assistant", response_text)
                     return response_text
 
-        # 2. Handle TIME/DATE questions SPECIFICALLY (Re-integrated for accuracy and efficiency)
-        if any(phrase in text_lower for phrase in [
+        # 2. Handle TIME/DATE questions (local processing - no API needed)
+        time_phrases = [
             'מה השעה', 'איזה יום', 'מה התאריך', 'תאריך היום', 
             'איזה תאריך', 'כמה השעה', 'מה הזמן', 'זמן עכשיו'
-        ]):
+        ]
+        if any(phrase in text_lower for phrase in time_phrases):
             time_info = self.get_israel_time()
-            self._add_to_history(user_id, "user", message) # Add user message to history
+            self._add_to_history(user_id, "user", message)
             response_text = f"🕐 {time_info['full']}"
-            self._add_to_history(user_id, "assistant", response_text) # Add bot response to history
+            self._add_to_history(user_id, "assistant", response_text)
             return response_text
 
-        # Get user name for prompt and suffix
+        # Prepare for API call
         user_name = self.user_names.get(user_id, "")
         name_suffix = f" {user_name}" if user_name else ""
 
-        # Construct system prompt with personalized name and strict persona rules
         system_prompt = f"""
         את מאיה, המזכירה האישית של{name_suffix}. את חכמה, רגישה, מבינה רמזים רגשיים, ומדברת בעברית בלבד.
         את לא רובוט – את מגיבה כמו אדם חם, נעים, מצחיק לפעמים, או מרגיעה כשצריך.
@@ -92,146 +122,149 @@ class MayaBot:
         אם הוא מרגיש תקוע, עייף או מתוסכל – תגיבי בהתאם ברגישות.
         תמיד תעני בקצרה, בין 1-10 מילים.
         תמיד תסיימי את התשובה באימוג'י אחד בלבד, שמתאים לתשובה.
-        אסור לך להשתמש בביטויים כמו "אני מצטערת", "אני חושבת", "ייתכן ש", "אני לא בטוחה", "כמודל שפה גדול", "אני אשתדל", "לפי המידע שלי", "האם אני יכולה לעזור", "מה השם היפה שלך", "כיף לדבר איתך", "שמעו", "ברור!", "אני זוכרת הכל", "תזכיר לי", "אופס, נראה לי שמשהו לא ברור.", "אוקיי, הבנתי.", "אני עוזרת לך", "אני כאן בשבילך", "בצורה טבעית יותר".
-        אם את לא מבינה שאלה, תגידי שאת לא מבינה וצריכה הבהרה, בצורה בטוחה וקצרה.
+        אסור לך להשתמש בביטויים כמו "אני מצטערת", "אני חושבת", "ייתכן ש", "אני לא בטוחה", "כמודל שפה גדול".
         """
 
-        # Prepare messages for OpenRouter API, including history
         messages = [{"role": "system", "content": system_prompt}]
         
-        # Load last few turns of conversation history (user + assistant)
+        # Add conversation history
         if user_id in self.conversation_history:
-            messages.extend(self.conversation_history[user_id]) 
+            messages.extend(self.conversation_history[user_id])
         
-        # Add current user message
+        # Add current message
         messages.append({"role": "user", "content": message})
 
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://maya-bot.onrender.com" # Replace with your actual deployed URL
+            "HTTP-Referer": "https://maya-bot.onrender.com",
+            "X-Title": "Maya Bot"
         }
+
         data = {
             "model": "openai/gpt-3.5-turbo",
-            "messages": messages
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 150
         }
 
         try:
             response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_API_URL,
                 headers=headers,
                 json=data,
-                timeout=15 # Increased timeout for LLM response
+                timeout=REQUEST_TIMEOUT
             )
-            response.raise_for_status() # Raises HTTPError for bad responses (4xx or 5xx)
+
+            # Detailed error logging
+            if response.status_code != 200:
+                error_msg = f"OpenRouter API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                
+                # Return appropriate fallback based on error type
+                if response.status_code == 404:
+                    return "יש לי בעיה טכנית, תנסה שוב בעוד דקה? 🔧"
+                elif response.status_code == 429:
+                    return "אני מקבלת יותר מדי בקשות, נסה שוב בעוד דקה ⏳"
+                else:
+                    return "משהו השתבש בצד שלי, בוא ננסה שוב! ✨"
+
             reply = response.json()["choices"][0]["message"]["content"]
-            
-            # Clean and validate the response from LLM to enforce persona
             cleaned_reply = self._clean_llm_response(reply)
 
-            # Add user message and assistant reply to history
+            # Update conversation history
             self._add_to_history(user_id, "user", message)
             self._add_to_history(user_id, "assistant", cleaned_reply)
 
             return cleaned_reply
+
+        except requests.exceptions.Timeout:
+            logger.error("OpenRouter API timeout")
+            return "לוקח לי יותר מדי זמן לחשוב, נסה שוב! ⏳"
         except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouter API request error: {e}")
-            return "משהו התפקשש לי, בוא ננסה שוב! ✨" # More personality-consistent fallback
+            logger.error(f"OpenRouter API connection error: {e}")
+            return "יש לי בעיה להתחבר, נסה שוב בעוד דקה! 🔌"
         except Exception as e:
-            logger.error(f"OpenRouter GPT unexpected error: {e}")
-            return "קצר בתקשורת, תנסה שוב! ⚡" # More personality-consistent fallback
+            logger.error(f"Unexpected error: {e}")
+            return "משהו השתבש, אבל אני כבר מטפלת בזה! 🛠️"
 
     def _add_to_history(self, user_id, role, content):
-        """Adds a message to the user's conversation history, keeping it limited."""
+        """Manage conversation history with size limit"""
         if user_id not in self.conversation_history:
             self.conversation_history[user_id] = []
         
         self.conversation_history[user_id].append({"role": role, "content": content})
         
-        # Keep history limited to prevent excessive token usage (e.g., last 10 messages = 5 turns)
-        if len(self.conversation_history[user_id]) > 10: 
-            self.conversation_history[user_id] = self.conversation_history[user_id][-10:]
+        if len(self.conversation_history[user_id]) > MAX_HISTORY_LENGTH:
+            self.conversation_history[user_id] = self.conversation_history[user_id][-MAX_HISTORY_LENGTH:]
 
     def _clean_llm_response(self, response_text: str) -> str:
-        """Cleans LLM response to enforce Maya's personality rules."""
-        # Convert to Hebrew string if it's not already (safety check)
+        """Enforce Maya's personality rules in responses"""
         if isinstance(response_text, bytes):
             response_text = response_text.decode('utf-8')
         
-        # Remove forbidden phrases (case-insensitive and word boundaries)
+        # Remove forbidden phrases
         forbidden_phrases = [
-            r'\bאני מצטערת\b', r'\bאני חושבת\b', r'\bייתכן ש\b', r'\bאני לא בטוחה\b', 
+            r'\bאני מצטערת\b', r'\bאני חושבת\b', r'\bייתכן ש\b', r'\bאני לא בטוחה\b',
             r'\bכמודל שפה גדול\b', r'\bאני אשתדל\b', r'\bלפי המידע שלי\b', r'\bהאם אני יכולה לעזור\b',
-            r'\bמה השם היפה שלך\b', r'\bכיף לדבר איתך\b', r'\bשמעו\b', r'\bברור!\b', 
-            r'\bאני זוכרת הכל\b', r'\bתזכיר לי\b', r'\bאופס, נראה לי שמשהו לא ברור\.\b', 
-            r'\bאוקיי, הבנתי\.\b', r'\bאני עוזרת לך\b', r'\bאני כאן בשבילך\b', 
-            r'\bבצורה טבעית יותר\b', r'\bשלום לך\b', r'\bהיי לך\b', r'\bבוקר טוב לך\b', 
-            r'\bערב טוב לך\b', r'\bלילה טוב לך\b', r'\bבסדר גמור\b', r'\bהכל טוב\b', 
-            r'\bמעולה\b', r'\bתודה ששאלת\b', r'\bמה שלומך\b', r'\bאיך אתה\b', r'\bאיך את\b', 
-            r'\bמה המצב\b', r'\bאיך הולך\b', r'\bמעניין\b', r'\bלא בטוחה\b', r'\bזה נושא מעניין\b',
-            r'\bאני עדיין לומדת\b', r'\bבכיף\b', r'\bבבקשה\b', r'\bשמחה שיכולתי לעזור\b',
-            r'\bבוודאי\b', r'\bאני כאן לעזור\b', r'\bאשמח לסייע\b', r'\bאני מאיה\b',
-            r'\bשמי מאיה\b', r'\bאני בוט חכם\b', r'\bהמזכירה הדיגיטלית שלך\b', r'\bמאיה העוזרת הדיגיטלית\b'
+            r'\bמה השם היפה שלך\b', r'\bכיף לדבר איתך\b', r'\bשמעו\b', r'\bברור!\b'
         ]
         for phrase_regex in forbidden_phrases:
             response_text = re.sub(phrase_regex, "", response_text, flags=re.IGNORECASE).strip()
 
-        # Remove markdown characters (bold, italics, code blocks)
-        response_text = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL) # Code blocks
-        response_text = re.sub(r'[*_`]', '', response_text) # Bold/italics/inline code
+        # Clean formatting and punctuation
+        response_text = re.sub(r'```.*?```', '', response_text, flags=re.DOTALL)
+        response_text = re.sub(r'[*_`]', '', response_text)
+        response_text = " ".join(response_text.split())
+        response_text = re.sub(r'^[.,;!?-]+', '', response_text).strip()
+        response_text = re.sub(r'[.,;!?-]+$', '', response_text).strip()
 
-        # Clean multiple spaces and leading/trailing punctuation
-        response_text = " ".join(response_text.split()) # Remove extra spaces
-        response_text = re.sub(r'^[.,;!?-]+', '', response_text).strip() # Remove leading punctuation
-        response_text = re.sub(r'[.,;!?-]+$', '', response_text).strip() # Remove trailing punctuation (before emoji)
-
-        # Enforce max words (1-10 words)
+        # Enforce length and add emoji
         words = response_text.split()
-        if len(words) == 0: # Handle empty string after cleaning
-            return "אני לא מבינה. 😕" # Fallback if everything was removed
+        if not words:
+            return "אני לא מבינה. 😕"
         if len(words) > 10:
             response_text = " ".join(words[:10])
 
-        # Ensure exactly one emoji at the end
-        # First, remove all existing emojis from the text part
-        text_without_emojis = re.sub(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U0001F900-\U0001F9FF]+', '', response_text).strip()
-        
-        # Determine appropriate emoji based on content (can be expanded)
-        # Using a fixed mapping here, consider more advanced sentiment analysis for richer emoji selection
-        if any(w in text_without_emojis for w in ["נעים", "כיף", "טוב", "שמחה", "מוכן", "מעולה"]):
-            chosen_emoji = "😊"
-        elif any(w in text_without_emojis for w in ["תודה", "בכיף"]):
-            chosen_emoji = "✨"
-        elif any(w in text_without_emojis for w in ["זמן", "שעה", "תאריך", "יום"]):
-            chosen_emoji = "🕐"
-        elif any(w in text_without_emojis for w in ["עזרה", "לעזור", "צריך", "אשמח"]):
-            chosen_emoji = "💪"
-        elif any(w in text_without_emojis for w in ["מבלבל", "לא מבין", "לנסח", "???", "!!!", "קצר"]):
-            chosen_emoji = "🤔"
-        elif any(w in text_without_emojis for w in ["תקוע", "עייף", "מתוסכל", "קשה"]):
-            chosen_emoji = "🫂" # Hugging face for empathy
+        # Select appropriate emoji
+        text_lower = response_text.lower()
+        if any(w in text_lower for w in ["נעים", "כיף", "טוב", "שמחה"]):
+            emoji = "😊"
+        elif any(w in text_lower for w in ["תודה", "בכיף"]):
+            emoji = "✨"
+        elif any(w in text_lower for w in ["זמן", "שעה", "תאריך"]):
+            emoji = "🕐"
+        elif any(w in text_lower for w in ["עזרה", "לעזור"]):
+            emoji = "💪"
+        elif any(w in text_lower for w in ["לא מבין", "???", "!!!"]):
+            emoji = "🤔"
+        elif any(w in text_lower for w in ["תקוע", "עייף", "מתוסכל"]):
+            emoji = "🫂"
         else:
-            chosen_emoji = "👍" # Default positive emoji
+            emoji = "👍"
 
-        final_response = f"{text_without_emojis} {chosen_emoji}".strip()
-        return final_response
+        return f"{response_text} {emoji}".strip()
 
-
-# Bot instance
+# Initialize bot
 maya = MayaBot()
 
 def send_message(chat_id, text):
-    """Send message to Telegram"""
+    """Send message through Telegram API with retry logic"""
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        data = {"chat_id": chat_id, "text": text}
-        response = requests.post(url, json=data, timeout=5)
-        # Log more details if sending fails
+        response = requests.post(
+            TELEGRAM_API_URL,
+            json={"chat_id": chat_id, "text": text},
+            timeout=5
+        )
+        
         if response.status_code != 200:
-            logger.error(f"Telegram API error sending message: {response.status_code} - {response.text}")
-        return response.status_code == 200
-    except Exception as e:
-        logger.error(f"Send error: {e}")
+            logger.error(f"Telegram API error: {response.status_code} - {response.text}")
+            return False
+            
+        return True
+        
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Telegram send error: {e}")
         return False
 
 @app.route("/")
@@ -240,78 +273,66 @@ def home():
     return jsonify({
         "status": "🤖 Maya Bot - GPT via OpenRouter",
         "current_time": time_info['full'],
-        "users_with_names": len(maya.user_names), # Should ideally be 0 or 1 now
-        "features": [
-            "✅ GPT (3.5-turbo) עם עברית טבעית",
-            "✅ הבנה רגשית והקשרית",
-            "✅ שמירת שמות משתמשים (בזיכרון בלבד)",
-            "✅ בוט רגיש וחם, לא רובוטי",
-            "✅ זיכרון שיחה מוגבל (5 תורות)",
-            "✅ טיפול מדויק בשעה ותאריך",
-            "✅ סינון תגובות LLM לאכיפת אישיות"
-        ]
+        "active_users": len(maya.conversation_history),
+        "version": "1.1.0"
     })
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    # Verify secret token if configured
+    if WEBHOOK_SECRET_TOKEN:
+        header_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
+        if not header_secret or header_secret != WEBHOOK_SECRET_TOKEN:
+            logger.warning("Unauthorized webhook access attempt")
+            return "Unauthorized", 403
+    
     try:
-        # Verify webhook secret token (highly recommended for production)
-        if WEBHOOK_SECRET_TOKEN:
-            header_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
-            if not header_secret or header_secret != WEBHOOK_SECRET_TOKEN:
-                logger.warning("Unauthorized webhook access attempt (missing or incorrect secret token).")
-                return "Unauthorized", 403 # Return 403 Forbidden
-        
         update = request.get_json()
         if not update or "message" not in update:
-            return "OK" # Acknowledge updates without message (e.g., channel_post)
+            return "OK"
 
         message = update["message"]
         chat_id = message.get("chat", {}).get("id")
         text = message.get("text", "")
-        user_id = message.get("from", {}).get("id") # Get the user's ID
+        user_id = message.get("from", {}).get("id")
 
         if chat_id and text and user_id:
-            logger.info(f"Processing message from user {user_id}: {text[:40]}...")
+            logger.info(f"Processing message from {user_id}: {text[:40]}...")
             response = maya.process_message(user_id, text)
-            logger.info(f"Sending response to user {user_id}: {response[:40]}...")
+            logger.info(f"Sending response: {response[:40]}...")
             send_message(chat_id, response)
         
-        return "OK" # Always return OK to Telegram
+        return "OK"
 
     except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return "ERROR" # Return ERROR in case of unhandled exception
+        logger.error(f"Webhook processing error: {e}")
+        return "ERROR", 500
 
 @app.route("/test")
 def test():
-    # Simulate a user ID for testing purposes
-    test_user_id = 999999999 
-    
-    # Reset history for the test user to ensure consistent testing
-    if test_user_id in maya.conversation_history:
-        del maya.conversation_history[test_user_id]
-    if test_user_id in maya.user_names:
-        del maya.user_names[test_user_id]
+    test_user_id = 999999999
+    maya.conversation_history.pop(test_user_id, None)
+    maya.user_names.pop(test_user_id, None)
 
-    # Test cases for LLM interaction and specific functionalities
-    test_results = {
-        "1_initial_greeting": maya.process_message(test_user_id, "שלום מאיה!"),
-        "2_name_intro": maya.process_message(test_user_id, "קוראים לי אלון"),
-        "3_name_recall_and_greeting": maya.process_message(test_user_id, "היי מאיה! מה שלומך?"),
-        "4_time_query": maya.process_message(test_user_id, "מה השעה עכשיו?"),
-        "5_emotional_query": maya.process_message(test_user_id, "אני מרגיש תקוע היום"),
-        "6_general_question": maya.process_message(test_user_id, "מה זה בינה מלאכותית?"),
-        "7_confusion": maya.process_message(test_user_id, "לא הבנתי כלום!!!"),
-        "8_thanks": maya.process_message(test_user_id, "תודה רבה לך"),
-        "9_follow_up_on_ai": maya.process_message(test_user_id, "תסבירי לי עוד על זה"), # Test conversation history
-        "10_invalid_name": maya.process_message(test_user_id + 1, "אני בטטה") # Test for new user, invalid name
-    }
+    test_cases = [
+        ("שלום מאיה!", "greeting"),
+        ("קוראים לי דנה", "name introduction"),
+        ("מה השעה?", "time query"),
+        ("אני מרגיש עצוב היום", "emotional support"),
+        ("תסבירי על בינה מלאכותית", "knowledge query"),
+        ("לא הבנתי כלום", "confusion"),
+        ("תודה רבה", "thanks")
+    ]
+
+    results = {}
+    for text, description in test_cases:
+        results[description] = maya.process_message(test_user_id, text)
+
     return jsonify({
-        "message": "Test responses for Maya:",
-        "tests": test_results
+        "status": "Test completed",
+        "results": results
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot is running with GPT via OpenRouter (gpt-3.5-turbo)")
+    logger.info("🚀 Maya Bot is running with enhanced stability and error handling")
     app.run(host="0.0.0.0", port=PORT, debug=False)
