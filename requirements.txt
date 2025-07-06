@@ -30,27 +30,16 @@ googletrans==4.0.0rc1
 
 # === Web Scraping & Parsing ===
 beautifulsoup4==4.12.2
-python-magic==0.4.27
-
-# === Data Processing ===
-pandas==2.1.4
-numpy==1.26.2
 
 # === Async Support ===
 aiohttp==3.9.1
-asyncio-throttle==1.0.2
+
+# === Data Processing (Optimized versions) ===
+pandas==1.5.3
+numpy==1.24.3
 
 # === Database ===
 # sqlite3 comes with Python standard library
 
-# === Scheduling & Background Tasks ===
-schedule==1.2.0
-
-# === Text Processing ===
-nltk==3.8.1
-textblob==0.17.1
-
 # === Additional Utilities ===
-python-slugify==8.0.1
 validators==0.22.0
-humanize==4.9.0
