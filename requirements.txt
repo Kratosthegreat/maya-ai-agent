@@ -1,34 +1,6 @@
-# === Core Framework ===
 flask==3.0.0
 gunicorn==21.2.0
-
-# === Environment & Configuration ===
-python-dotenv==1.0.0
-
-# === HTTP Requests ===
 requests==2.31.0
-
-# === AI & ML ===
 google-generativeai==0.3.2
-
-# === Timezone Handling ===
 pytz==2023.3.post1
-
-# === Knowledge & Data Sources ===
 wikipedia==1.4.0
-feedparser==6.0.10
-yfinance==0.2.18
-wolframalpha==5.0.0
-
-# === Translation & Language ===
-googletrans==3.1.0a0
-
-# === Web Scraping & Parsing ===
-beautifulsoup4==4.12.2
-
-# === Additional Utilities ===
-validators==0.22.0
-
-# === Data Processing (stable versions for Python 3.11) ===
-pandas==2.0.3
-numpy==1.25.2
