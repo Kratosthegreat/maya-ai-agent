@@ -1,38 +1,37 @@
 import os
 import requests
 from flask import Flask, request, abort
-
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    filters,
     ContextTypes,
+    filters,
 )
 
-# משתני סביבה
+# === משתני סביבה ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# Flask app
+# === אתחול אפליקציית Flask ===
 app = Flask(__name__)
 
-# אתחול הבוט של Telegram
+# === אתחול הבוט של Telegram ===
 telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
-# === HANDLERS רגילים ===
+# === Handlers לבוט ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("היי! אני מאיה 🤖 איך אפשר לעזור?")
+    await update.message.reply_text("היי! אני מאיה 😊 איך אפשר לעזור?")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("קיבלתי אותך. 💬 (בקרוב אענה בצורה חכמה יותר)")
+    await update.message.reply_text("קיבלתי אותך. בקרוב אענה בצורה חכמה יותר 😉")
 
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Webhook route ל־Telegram ===
+# === נתיב קבלת Webhook מ-Telegram ===
 @app.route("/webhook", methods=["POST"])
 def webhook():
     if WEBHOOK_SECRET_TOKEN:
@@ -44,13 +43,12 @@ def webhook():
     telegram_app.update_queue.put_nowait(update)
     return "OK", 200
 
-# === Route דיאגנוסטיקה: /diagnose ===
+# === נתיב לדיאגנוסטיקה בשרת: /diagnose ===
 @app.route("/diagnose", methods=["GET"])
 def diagnose():
     report = []
     def log(msg): report.append(msg)
 
-    # בדיקת משתני סביבה
     log("🔍 משתני סביבה:")
     for var in ["TELEGRAM_TOKEN", "HUGGINGFACE_API_KEY"]:
         val = os.getenv(var)
@@ -58,10 +56,9 @@ def diagnose():
     secret = os.getenv("WEBHOOK_SECRET_TOKEN")
     log(f"{'✅' if secret else '⚠️'} WEBHOOK_SECRET_TOKEN ({'מוגדר' if secret else 'לא חובה'})")
 
-    # Telegram getMe
-    token = os.getenv("TELEGRAM_TOKEN")
+    token = TELEGRAM_TOKEN
     if token:
-        log("\n🔍 בדיקת Telegram:")
+        log("\n🔍 Telegram getMe:")
         try:
             r = requests.get(f"https://api.telegram.org/bot{token}/getMe")
             data = r.json()
@@ -72,8 +69,7 @@ def diagnose():
         except Exception as e:
             log(f"❌ שגיאה: {e}")
 
-        # Webhook info
-        log("\n🔍 Webhook:")
+        log("\n🔍 Webhook Info:")
         try:
             r = requests.get(f"https://api.telegram.org/bot{token}/getWebhookInfo")
             data = r.json()
@@ -81,26 +77,14 @@ def diagnose():
                 result = data["result"]
                 log(f"📡 URL: {result.get('url', 'לא הוגדר')}")
                 log(f"📨 Pending: {result.get('pending_update_count', 0)}")
-                if result.get("last_error_message"):
-                    log(f"❌ שגיאה אחרונה: {result['last_error_message']}")
+                err = result.get("last_error_message")
+                if err:
+                    log(f"❌ שגיאה אחרונה: {err}")
                 else:
                     log("✅ אין שגיאות אחרונות")
             else:
-                log(f"❌ Webhook API error: {data}")
+                log(f"❌ שגיאת Webhook API: {data}")
         except Exception as e:
             log(f"❌ שגיאה: {e}")
-    else:
-        log("⚠️ לא מוגדר TELEGRAM_TOKEN - לא ניתן לבדוק Webhook")
 
     return "<pre>" + "\n".join(report) + "</pre>", 200
-
-# === הפעלת Gunicorn על פורט ברנדר ===
-if __name__ == "__main__":
-    import asyncio
-    import threading
-
-    def run_bot():
-        telegram_app.run_polling()
-
-    threading.Thread(target=run_bot).start()
-    app.run(host="0.0.0.0", port=10000)
