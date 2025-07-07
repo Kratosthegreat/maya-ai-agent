@@ -14,7 +14,9 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold # For safety settings
 
 # Assuming 'config' is a separate file like config.py
-import config
+# IMPORTANT: This assumes config.py defines variables directly,
+# not within a class unless you have 'config = Config()' at the end of config.py.
+import config # Changed from 'from config import config'
 
 # === ENHANCED LOGGING SETUP ===
 # We'll also capture recent logs in memory for /diagnostic endpoint
@@ -434,12 +436,6 @@ class AIService:
     5. **התאמה אישית**: זכרי הקשר ופרטים שחשובים למשתמש (שנשמרו ב"זיכרונות").
     6. **שימוש בכלים**: השתמשי ביכולות שלך (חיפוש, מזג אוויר) במידת הצורך כדי לספק את התשובה הטובה ביותר.
 
-    יכולות מיוחדות:
-    - **חיפוש מידע באינטרנט**: עבור שאלות הדורשות מידע עדכני או ספציפי (למשל: "מה מזג האוויר בתל אביב?", "מי נשיא ארה"ב?", "מה חדש בחדשות?").
-    - **מידע עדכני מובנה**: על אירועים גדולים וקבועים כמו מונדיאל או אולימפיאדה (מידע מתוכנן מראש).
-    - **זיכרון**: שמירת פרטים מהשיחה כדי לספק הקשר טוב יותר בתשובות עתידיות.
-    - **שיחה רגילה**: ניהול שיחות כלליות, עזרה בכתיבה, רעיונות וכו'.
-
     דגש: נסי למנוע תשובות גנריות של "אני מודל שפה גדול", אלא התנהגי כעוזרת וירטואלית ממשית.
     """
 
@@ -455,10 +451,6 @@ class AIService:
             if not config.GEMINI_API_KEY or not self.model:
                 logger.error(f"Gemini API key is missing or model not initialized for user {user_id}.")
                 return "אופס, בעיה בתצורה של שירות ה-AI. אנא דווח למפתח." # More specific error for debug
-
-            # --- Simplified logic for _deep_analyze_question and _determine_response_strategy ---
-            # Instead of separate steps, let's consolidate for better flow control for diagnostic.
-            # The actual logic inside these helper functions should still guide the decision.
 
             message_lower = message.lower()
             response_content = ""
@@ -820,7 +812,7 @@ def health_check():
             "status": "healthy",
             "service": "Maya Secretary Bot - Gemini", # Changed for clarity
             "version": "2.2.0-diagnostic-ready", # Updated version for diagnostics
-            "timestamp": datetime.utcnow().isoformat() + "Z", # UTC time, Z for Zulu time
+            "timestamp_utc": datetime.utcnow().isoformat() + "Z", # UTC time, Z for Zulu time
             "environment": config.ENVIRONMENT,
             "users": len(user_data),
             "storage": "JSON",
@@ -863,8 +855,8 @@ def api_stats():
         stats = {
             "total_users": len(user_data),
             "active_users": sum(1 for u in user_data.values() if u.get('is_active', True)),
-            "total_conversations": sum(len(conversations.get(uid, [])) for uid in conversations),
-            "total_memories": sum(len(memories.get(uid, [])) for uid in memories),
+            "total_conversations": sum(len(conv) for conv in conversations.values()),
+            "total_memories": sum(len(mem) for mem in memories.values()),
             "bot_status": "active",
             "storage_type": "JSON",
             "ai_model": config.GEMINI_MODEL,
@@ -885,7 +877,7 @@ def api_usage():
         logger.error(f"Usage stats error: {e}", exc_info=True)
         return jsonify({"error": "Usage stats unavailable"}), 500
 
-@app.route("/set_webhook", methods=["POST"])
+@app.route("/set_webhook", methods=["GET"]) # Changed to GET for easier manual testing
 def set_webhook():
     try:
         webhook_url = config.WEBHOOK_URL
@@ -915,8 +907,8 @@ def set_webhook():
         logger.error(f"Set webhook error: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-@app.route("/diagnostic", methods=["GET"])
-def diagnostic_info():
+@app.route("/debug", methods=["GET"])
+def debug_info():
     """Provides detailed diagnostic information about the bot's state."""
     if not config.DEBUG:
         return jsonify({"error": "Diagnostic endpoint is only available in DEBUG mode."}), 403
