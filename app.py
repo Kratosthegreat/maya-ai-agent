@@ -1,9 +1,10 @@
 import os
 import requests
 from flask import Flask, request, abort
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     Application,
+    ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
@@ -13,17 +14,19 @@ from telegram.ext import (
 # === משתני סביבה ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# === Flask App ===
+# === Flask ===
 app = Flask(__name__)
 
-# === הכנה ידנית של Application (ללא build()) ===
-bot = Bot(token=TELEGRAM_TOKEN)
-telegram_app = Application(bot=bot)
-telegram_app.initialize()  # חשוב! זו השורה שמונעת את הקריסה
+# === הכנת Application ללא polling/updater ===
+telegram_app = (
+    ApplicationBuilder()
+    .token(TELEGRAM_TOKEN)
+    .updater(None)  # חשוב! נטרול ה-Updater כדי לעבוד עם Flask בלבד
+    .build()
+)
 
-# === Handlers לבוט ===
+# === Handlers ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("היי! אני מאיה 😊 איך אפשר לעזור?")
 
@@ -33,7 +36,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === Webhook Route ===
+# === Webhook route ===
 @app.route("/webhook", methods=["POST"])
 def webhook():
     if WEBHOOK_SECRET_TOKEN:
@@ -41,7 +44,7 @@ def webhook():
         if token != WEBHOOK_SECRET_TOKEN:
             abort(403)
 
-    update = Update.de_json(request.get_json(force=True), bot)
+    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
     telegram_app.update_queue.put_nowait(update)
     return "OK", 200
 
@@ -52,7 +55,7 @@ def diagnose():
     def log(msg): report.append(msg)
 
     log("🔍 משתני סביבה:")
-    for var in ["TELEGRAM_TOKEN", "HUGGINGFACE_API_KEY"]:
+    for var in ["TELEGRAM_TOKEN"]:
         val = os.getenv(var)
         log(f"{'✅' if val else '❌'} {var} {'מוגדר' if val else '***חסר***'}")
     secret = os.getenv("WEBHOOK_SECRET_TOKEN")
