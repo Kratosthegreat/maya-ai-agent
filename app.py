@@ -1,7 +1,7 @@
 import os
 import requests
 from flask import Flask, request, abort
-from telegram import Update
+from telegram import Update, Bot
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -15,11 +15,13 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
-# === אתחול אפליקציית Flask ===
+# === Flask App ===
 app = Flask(__name__)
 
-# === אתחול הבוט של Telegram ===
-telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
+# === הכנה ידנית של Application (ללא build()) ===
+bot = Bot(token=TELEGRAM_TOKEN)
+telegram_app = Application(bot=bot)
+telegram_app.initialize()  # חשוב! זו השורה שמונעת את הקריסה
 
 # === Handlers לבוט ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -31,7 +33,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# === נתיב קבלת Webhook מ-Telegram ===
+# === Webhook Route ===
 @app.route("/webhook", methods=["POST"])
 def webhook():
     if WEBHOOK_SECRET_TOKEN:
@@ -39,11 +41,11 @@ def webhook():
         if token != WEBHOOK_SECRET_TOKEN:
             abort(403)
 
-    update = Update.de_json(request.get_json(force=True), telegram_app.bot)
+    update = Update.de_json(request.get_json(force=True), bot)
     telegram_app.update_queue.put_nowait(update)
     return "OK", 200
 
-# === נתיב לדיאגנוסטיקה בשרת: /diagnose ===
+# === דיאגנוסטיקה ===
 @app.route("/diagnose", methods=["GET"])
 def diagnose():
     report = []
