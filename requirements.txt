@@ -1,6 +1,9 @@
 Flask
 requests
-pytz
-google-generativeai
 google-api-core
 gunicorn
+python-telegram-bot[job-queue]==20.7
+google-generativeai==0.3.2
+httpx==0.25.2
+pytz==2023.3
+
