@@ -5,7 +5,7 @@ import secrets
 load_dotenv()
 
 class Config:
-“”“Configuration class for Maya Bot”””
+"""Configuration class for Maya Bot"""
 
 ```
 # === TELEGRAM SETTINGS ===
