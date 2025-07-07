@@ -93,3 +93,56 @@ def diagnose():
             log(f"❌ שגיאה: {e}")
 
     return "<pre>" + "\n".join(report) + "</pre>", 200
+
+import requests
+from flask import jsonify
+
+@app.route("/diagnose")
+def diagnose():
+    report = []
+    def log(line): report.append(line)
+
+    log("🩺 דיאגנוסטיקה כללית למאיה ב־Render\n")
+
+    # בדיקת משתנים חשובים
+    from os import getenv
+    TELEGRAM_TOKEN = getenv("TELEGRAM_TOKEN")
+    WEBHOOK_SECRET_TOKEN = getenv("WEBHOOK_SECRET_TOKEN")
+
+    log("🔐 משתני סביבה:")
+    log(f"{'✅' if TELEGRAM_TOKEN else '❌'} TELEGRAM_TOKEN: {'מוגדר' if TELEGRAM_TOKEN else '***חסר***'}")
+    log(f"{'✅' if WEBHOOK_SECRET_TOKEN else '⚠️'} WEBHOOK_SECRET_TOKEN: {'מוגדר' if WEBHOOK_SECRET_TOKEN else 'לא חובה'}\n")
+
+    if TELEGRAM_TOKEN:
+        try:
+            log("🤖 בדיקת getMe:")
+            r = requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe")
+            data = r.json()
+            if data.get("ok"):
+                log(f"✅ בוט פעיל (@{data['result']['username']})")
+            else:
+                log(f"❌ שגיאה: {data}")
+        except Exception as e:
+            log(f"❌ שגיאת בקשת getMe: {e}")
+
+        try:
+            log("\n🔗 בדיקת Webhook:")
+            r = requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getWebhookInfo")
+            data = r.json()
+            if data.get("ok"):
+                result = data["result"]
+                log(f"🌐 כתובת: {result.get('url', 'לא הוגדר')}")
+                log(f"📨 ממתינים: {result.get('pending_update_count', 0)}")
+                if result.get("last_error_message"):
+                    log(f"❌ שגיאה אחרונה: {result['last_error_message']}")
+                else:
+                    log("✅ אין שגיאות פעילות")
+            else:
+                log(f"❌ שגיאה ב־getWebhookInfo: {data}")
+        except Exception as e:
+            log(f"❌ שגיאת Webhook: {e}")
+    else:
+        log("🚫 לא ניתן לבדוק את הבוט – טוקן חסר")
+
+    return "<pre>" + "\n".join(report) + "</pre>", 200
+
