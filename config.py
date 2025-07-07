@@ -1,69 +1,15 @@
+# config.py
 import os
-from dotenv import load_dotenv
-import secrets
 
-load_dotenv()
+# --- IMPORTANT: Replace these with your actual values or environment variables ---
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://YOUR_RENDER_APP_NAME.onrender.com/webhook")
+SECRET_KEY = os.environ.get("FLASK_SECRET_KEY", "a_very_secret_key_for_flask") # Used by Flask
 
-class Config:
-"""Configuration class for Maya Bot"""
-
-```
-# === TELEGRAM SETTINGS ===
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL", "")
-
-# === AI SETTINGS ===
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-
-# === DATABASE SETTINGS ===
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///maya.db")
-
-# === SECURITY SETTINGS ===
-SECRET_KEY = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
-ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", secrets.token_urlsafe(32))
-
-# === APP SETTINGS ===
-DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
-PORT = int(os.getenv("PORT", 5000))
-
-# === RATE LIMITING ===
-MAX_REQUESTS_PER_MINUTE = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "30"))
-MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "20"))
-
-# === EXTERNAL SERVICES ===
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY", "")
-
-@classmethod
-def validate(cls):
-    """Validate required configuration"""
-    required_vars = [
-        ("TELEGRAM_TOKEN", cls.TELEGRAM_TOKEN),
-        ("GEMINI_API_KEY", cls.GEMINI_API_KEY),
-    ]
-    
-    missing = []
-    for var_name, var_value in required_vars:
-        if not var_value:
-            missing.append(var_name)
-    
-    if missing:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
-    
-    print("✅ Configuration validated successfully")
-    return True
-```
-
-# Create global config instance
-
-config = Config()
-
-# Validate configuration on import
-
-if **name** != "**main**":
-try:
-config.validate()
-except ValueError as e:
-print(f"❌ Configuration error: {e}")
-print("Please set the required environment variables in .env file or Render dashboard")
+# --- General Configuration ---
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development") # Set to "production" on Render
+DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t") # False for production
+PORT = int(os.environ.get("PORT", 10000)) # Render provides this
+MAX_REQUESTS_PER_MINUTE = int(os.environ.get("MAX_REQUESTS_PER_MINUTE", 20)) # Your custom rate limit
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-pro") # Or "gemini-1.5-pro-latest"
