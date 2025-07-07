@@ -61,9 +61,9 @@ config = Config()
 
 # Validate configuration on import
 
-if **name** != “**main**”:
+if **name** != "**main**":
 try:
 config.validate()
 except ValueError as e:
-print(f”❌ Configuration error: {e}”)
-print(“Please set the required environment variables in .env file or Render dashboard”)
+print(f"❌ Configuration error: {e}")
+print("Please set the required environment variables in .env file or Render dashboard")
