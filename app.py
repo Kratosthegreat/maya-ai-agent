@@ -15,7 +15,7 @@ WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 if not TELEGRAM_TOKEN:
     raise ValueError("Missing TELEGRAM_TOKEN")
 if not GOOGLE_API_KEY:
-    raise ValueError("Missing GOOGLE_API_KEY")
+    raise ValueError("Missing GEMINI_API_KEY")
 
 # Constants
 GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
