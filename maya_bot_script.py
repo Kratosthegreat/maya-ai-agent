@@ -1,3 +1,6 @@
+import sys
+print(f"📦 רץ על גרסת פייתון: {sys.version}")
+
 import logging
 import random
 import asyncio
