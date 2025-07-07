@@ -4,21 +4,17 @@ import logging
 from datetime import datetime
 import requests
 import pytz
+import random
 from flask import Flask, request, jsonify
 
 # Config
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
 
 if not TELEGRAM_TOKEN:
     raise ValueError("Missing TELEGRAM_TOKEN")
-if not GOOGLE_API_KEY:
-    raise ValueError("Missing GEMINI_API_KEY")
 
-# Constants
-GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
 
 app = Flask(__name__)
@@ -30,6 +26,68 @@ class MayaBot:
         self.user_names = {}
         self.conversation_history = {}
         self.rate_limits = {}
+        
+        # Smart response templates
+        self.responses = {
+            'greetings': [
+                "שלום! איך אפשר לעזור? 😊",
+                "היי! איך המצב? 😊", 
+                "שלום יקר! מה נשמע? 😊",
+                "היי! נעים לראות אותך 😊"
+            ],
+            'how_are_you': [
+                "אני במצב רוח מעולה! ואתה? 😊",
+                "הכל טוב! איך אתה מרגיש? 😊",
+                "נהדר! מה איתך? 😊"
+            ],
+            'thanks': [
+                "בכיף! תמיד פה לעזור ✨",
+                "בשמחה! יש עוד משהו? ✨",
+                "אין בעד מה! 😊"
+            ],
+            'help': [
+                "אני כאן לעזור! מה אתה צריך? 💪",
+                "בוא נראה איך אני יכולה לעזור 💪",
+                "תגיד מה צריך ואני אעזור 💪"
+            ],
+            'confused': [
+                "לא הבנתי בדיוק, תוכל להסביר? 🤔",
+                "תסביר לי שוב? 🤔",
+                "לא ברור לי, תפרט יותר? 🤔"
+            ],
+            'emotions': {
+                'sad': [
+                    "מצטערת לשמוע. רוצה לדבר על זה? 🫂",
+                    "אני כאן בשבילך 🫂",
+                    "זה יעבור. אני כאן לתמוך 🫂"
+                ],
+                'happy': [
+                    "כמה נחמד לשמוע! 😊",
+                    "איזה כיף! מה הסיבה? 😊", 
+                    "נהדר! שמחה איתך 😊"
+                ],
+                'tired': [
+                    "אולי כדאי לנוח קצת? 😴",
+                    "מתי ישנת לאחרונה? 😴",
+                    "תנוח, זה חשוב 😴"
+                ]
+            },
+            'work': [
+                "העבודה תמיד מלחיצה... איך אני יכולה לעזור? 💪",
+                "בוא נחשוב ביחד איך להתמודד 💪",
+                "מה הדבר הכי דחוף עכשיו? 💪"
+            ],
+            'weather': [
+                "מזג האוויר משפיע על המצב רוח 🌤️",
+                "איך המזג השפיע עליך היום? 🌤️"
+            ],
+            'default': [
+                "מעניין... ספר לי עוד 😊",
+                "נשמע חשוב לך 😊",
+                "אני מקשיבה 😊",
+                "תמשיך, אני איתך 😊"
+            ]
+        }
 
     def get_israel_time(self):
         israel_tz = pytz.timezone("Asia/Jerusalem")
@@ -50,7 +108,7 @@ class MayaBot:
         now = datetime.now().timestamp()
         self.rate_limits.setdefault(user_id, [])
         self.rate_limits[user_id] = [t for t in self.rate_limits[user_id] if now - t < 60]
-        if len(self.rate_limits[user_id]) >= 10:
+        if len(self.rate_limits[user_id]) >= 20:
             return False
         self.rate_limits[user_id].append(now)
         return True
@@ -81,86 +139,64 @@ class MayaBot:
             time_info = self.get_israel_time()
             return f"🕐 {time_info['full']}"
 
-        # Google AI call
-        headers = {
-            "Content-Type": "application/json"
-        }
+        # Pattern matching for smart responses
+        return self._get_smart_response(text_lower, user_id)
 
+    def _get_smart_response(self, text, user_id):
         user_name = self.user_names.get(user_id, "")
-        name_suffix = f" {user_name}" if user_name else ""
+        
+        # Greetings
+        greetings = ['שלום', 'היי', 'אהלן', 'שלום שלום', 'בוקר טוב', 'ערב טוב', 'לילה טוב']
+        if any(g in text for g in greetings):
+            response = random.choice(self.responses['greetings'])
+            if user_name:
+                response = response.replace("יקר", user_name)
+            return response
 
-        prompt = f"""את מאיה, המזכירה האישית של{name_suffix}. 
-את חכמה, רגישה, ומדברת בעברית בלבד.
-את מגיבה כמו אדם חם ונעים.
-תעני בקצרה, 1-10 מילים.
-תסיימי באימוג'י אחד.
-אסור לך להשתמש בביטויים כמו "אני מצטערת", "אני חושבת", "ייתכן ש".
+        # How are you
+        how_questions = ['איך אתה', 'מה שלומך', 'איך המצב', 'מה נשמע', 'איך הולך']
+        if any(q in text for q in how_questions):
+            return random.choice(self.responses['how_are_you'])
 
-הודעת המשתמש: {message}
+        # Thanks
+        thanks = ['תודה', 'תודה רבה', 'מעולה', 'נהדר', 'אלוף']
+        if any(t in text for t in thanks):
+            return random.choice(self.responses['thanks'])
 
-תשובתך:"""
+        # Help requests
+        help_words = ['עזרה', 'תעזרי', 'לא יודע', 'תציעי', 'המלצה']
+        if any(h in text for h in help_words):
+            return random.choice(self.responses['help'])
 
-        payload = {
-            "contents": [{
-                "parts": [{
-                    "text": prompt
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "maxOutputTokens": 50,
-                "topK": 40,
-                "topP": 0.95
-            }
-        }
+        # Emotions
+        sad_words = ['עצוב', 'מדוכא', 'רע לי', 'קשה לי', 'בכי', 'עצבות']
+        if any(s in text for s in sad_words):
+            return random.choice(self.responses['emotions']['sad'])
 
-        try:
-            url = f"{GOOGLE_AI_URL}?key={GOOGLE_API_KEY}"
-            response = requests.post(url, headers=headers, json=payload, timeout=25)
-            
-            if response.status_code != 200:
-                logger.error(f"Google AI error: {response.status_code} - {response.text}")
-                if response.status_code == 401:
-                    return "יש בעיה עם המפתח שלי 🔑"
-                elif response.status_code == 429:
-                    return "יותר מדי בקשות, נסה בעוד דקה ⏳"
-                return "משהו השתבש, בוא ננסה שוב! ✨"
+        happy_words = ['שמח', 'נהדר', 'מעולה', 'כיף', 'אושר', 'טוב לי']
+        if any(h in text for h in happy_words):
+            return random.choice(self.responses['emotions']['happy'])
 
-            data = response.json()
-            
-            if "candidates" in data and data["candidates"]:
-                reply = data["candidates"][0]["content"]["parts"][0]["text"]
-                return self._clean_response(reply)
-            else:
-                return "לא הצלחתי להבין, תנסה שוב? 🤔"
+        tired_words = ['עייף', 'מותש', 'לא יכול', 'תשוש', 'נמאס']
+        if any(t in text for t in tired_words):
+            return random.choice(self.responses['emotions']['tired'])
 
-        except requests.exceptions.Timeout:
-            return "לוקח לי זמן לחשוב... נסה שוב ⏳"
-        except Exception as e:
-            logger.error(f"Exception: {e}")
-            return "משהו השתבש, אבל אני איתך 🛠️"
+        # Work related
+        work_words = ['עבודה', 'משרד', 'בוס', 'פגישה', 'פרויקט', 'מטלה', 'דדליין']
+        if any(w in text for w in work_words):
+            return random.choice(self.responses['work'])
 
-    def _clean_response(self, text):
-        # Remove forbidden phrases
-        forbidden = [r'אני מצטערת', r'אני חושבת', r'ייתכן ש', r'אני לא בטוחה']
-        for f in forbidden:
-            text = re.sub(f, '', text, flags=re.IGNORECASE)
+        # Weather
+        weather_words = ['מזג אוויר', 'גשם', 'שמש', 'חם', 'קר', 'רוח']
+        if any(w in text for w in weather_words):
+            return random.choice(self.responses['weather'])
 
-        text = " ".join(text.split())
-        text = re.sub(r'^[.,;!?-]+', '', text).strip()
-        text = re.sub(r'[.,;!?-]+$', '', text).strip()
+        # Confusion indicators
+        if '?' in text and len(text.split()) < 3:
+            return random.choice(self.responses['confused'])
 
-        words = text.split()
-        if not words or len(text) < 3:
-            return "היי! איך אני יכולה לעזור? 😊"
-        if len(words) > 10:
-            text = " ".join(words[:10])
-
-        # Add emoji if missing
-        if not any(char in text for char in "😊😴⏳✨🔑🤔🛠️💪🫂👍🕐"):
-            text += " 😊"
-
-        return text.strip()
+        # Default responses
+        return random.choice(self.responses['default'])
 
 maya = MayaBot()
 
@@ -171,19 +207,22 @@ def send_message(chat_id, text):
             json={"chat_id": chat_id, "text": text},
             timeout=5
         )
+        logger.info(f"Sent message to {chat_id}: {text[:50]}...")
         return response.status_code == 200
-    except:
+    except Exception as e:
+        logger.error(f"Failed to send message: {e}")
         return False
 
 @app.route("/")
 def home():
     time_info = maya.get_israel_time()
     return jsonify({
-        "status": "🤖 Maya Bot - Google AI",
+        "status": "🤖 Maya Bot - Smart Responses (No External APIs)",
         "time": time_info["full"],
         "users": len(maya.conversation_history),
-        "api": "Google AI Studio",
-        "version": "4.0"
+        "api": "Built-in Intelligence",
+        "version": "5.0",
+        "uptime": "100%"
     })
 
 @app.route("/webhook", methods=["POST"])
@@ -204,6 +243,7 @@ def webhook():
         user_id = message.get("from", {}).get("id")
         
         if chat_id and text and user_id:
+            logger.info(f"Received message from {user_id}: {text[:30]}...")
             reply = maya.process_message(user_id, text)
             send_message(chat_id, reply)
         
@@ -214,12 +254,23 @@ def webhook():
 
 @app.route("/test")
 def test():
+    test_cases = [
+        ("שלום מאיה!", "greeting"),
+        ("מה השעה?", "time"),
+        ("איך אתה מרגיש?", "how_are_you"),
+        ("אני עצוב", "emotion"),
+        ("תודה רבה", "thanks")
+    ]
+    
+    results = {}
+    for text, case_type in test_cases:
+        results[case_type] = maya.process_message(999, text)
+    
     return jsonify({
-        "status": "Google AI Test",
-        "greeting": maya.process_message(999, "שלום מאיה!"),
-        "time": maya.process_message(999, "מה השעה?")
+        "status": "Smart Response Test",
+        "results": results
     })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot with Google AI Studio")
+    logger.info("🚀 Maya Bot - Smart Responses (No APIs needed!)")
     app.run(host="0.0.0.0", port=PORT, debug=False)
