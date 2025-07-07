@@ -4,27 +4,22 @@ import logging
 from datetime import datetime
 import requests
 import pytz
-import threading
 from flask import Flask, request, jsonify
 
-# Config - Load from environment with validation
+# Config
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-if not TELEGRAM_TOKEN:
-    raise ValueError("Missing TELEGRAM_TOKEN in environment variables")
-
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
-if not HUGGINGFACE_API_KEY:
-    raise ValueError("Missing HUGGINGFACE_API_KEY in environment variables")
-
+GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
 WEBHOOK_SECRET_TOKEN = os.getenv("WEBHOOK_SECRET_TOKEN")
-if not WEBHOOK_SECRET_TOKEN:
-    logging.warning("Running without WEBHOOK_SECRET_TOKEN - not recommended for production")
 
-HF_API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium"
+if not TELEGRAM_TOKEN:
+    raise ValueError("Missing TELEGRAM_TOKEN")
+if not GOOGLE_API_KEY:
+    raise ValueError("Missing GOOGLE_API_KEY")
+
+# Constants
+GOOGLE_AI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-MAX_HISTORY_LENGTH = 10
-REQUEST_TIMEOUT = 30
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -62,11 +57,11 @@ class MayaBot:
 
     def process_message(self, user_id, message):
         if not self._check_rate_limit(user_id):
-            logger.warning(f"Rate limit exceeded for user {user_id}")
             return "אני צריכה לנוח רגע, נדבר עוד דקה? 😴"
 
         text_lower = message.lower().strip()
 
+        # Name introduction
         name_patterns = [
             r'(?:שמי|קוראים לי|השם שלי) (?:הוא )?([א-ת\s]{2,15})(?:\s|$|\.)',
             r'אני ([א-ת\s]{2,15})(?:\s|$|\.)'
@@ -77,51 +72,67 @@ class MayaBot:
                 name = match.group(1).strip()
                 if name and name not in ["הוא", "היא", "אתה", "את"]:
                     self.user_names[user_id] = name
-                    self._add_to_history(user_id, "user", message)
-                    response = f"נעים מאוד להכיר אותך, {name}! 😊 אני מאיה, העוזרת הדיגיטלית שלך."
-                    self._add_to_history(user_id, "assistant", response)
-                    return response
+                    return f"נעים מאוד להכיר אותך, {name}! 😊 אני מאיה."
 
+        # Time queries
         time_phrases = ['מה השעה', 'איזה יום', 'מה התאריך', 'תאריך היום', 
                         'איזה תאריך', 'כמה השעה', 'מה הזמן', 'זמן עכשיו']
         if any(p in text_lower for p in time_phrases):
             time_info = self.get_israel_time()
-            self._add_to_history(user_id, "user", message)
-            response = f"🕐 {time_info['full']}"
-            self._add_to_history(user_id, "assistant", response)
-            return response
+            return f"🕐 {time_info['full']}"
 
-        headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+        # Google AI call
+        headers = {
+            "Content-Type": "application/json"
+        }
+
+        user_name = self.user_names.get(user_id, "")
+        name_suffix = f" {user_name}" if user_name else ""
+
+        prompt = f"""את מאיה, המזכירה האישית של{name_suffix}. 
+את חכמה, רגישה, ומדברת בעברית בלבד.
+את מגיבה כמו אדם חם ונעים.
+תעני בקצרה, 1-10 מילים.
+תסיימי באימוג'י אחד.
+אסור לך להשתמש בביטויים כמו "אני מצטערת", "אני חושבת", "ייתכן ש".
+
+הודעת המשתמש: {message}
+
+תשובתך:"""
+
         payload = {
-            "inputs": f"משתמש: {message}\nמאיה:",
-            "parameters": {
-                "max_new_tokens": 50,
+            "contents": [{
+                "parts": [{
+                    "text": prompt
+                }]
+            }],
+            "generationConfig": {
                 "temperature": 0.7,
-                "do_sample": True
+                "maxOutputTokens": 50,
+                "topK": 40,
+                "topP": 0.95
             }
         }
 
         try:
-            res = requests.post(HF_API_URL, headers=headers, json=payload, timeout=REQUEST_TIMEOUT)
-            if res.status_code != 200:
-                logger.error(f"HuggingFace error {res.status_code}: {res.text}")
-                if res.status_code == 401:
+            url = f"{GOOGLE_AI_URL}?key={GOOGLE_API_KEY}"
+            response = requests.post(url, headers=headers, json=payload, timeout=25)
+            
+            if response.status_code != 200:
+                logger.error(f"Google AI error: {response.status_code} - {response.text}")
+                if response.status_code == 401:
                     return "יש בעיה עם המפתח שלי 🔑"
-                elif res.status_code == 429:
+                elif response.status_code == 429:
                     return "יותר מדי בקשות, נסה בעוד דקה ⏳"
-                elif res.status_code == 503:
-                    return "השירות עמוס, נסה בעוד דקה 🔄"
-                return "משהו השתבש, ננסה שוב ✨"
+                return "משהו השתבש, בוא ננסה שוב! ✨"
 
-            data = res.json()
-            reply = data[0].get("generated_text", "") if isinstance(data, list) else str(data)
-            if "מאיה:" in reply:
-                reply = reply.split("מאיה:")[-1].strip()
-
-            cleaned = self._clean_llm_response(reply)
-            self._add_to_history(user_id, "user", message)
-            self._add_to_history(user_id, "assistant", cleaned)
-            return cleaned
+            data = response.json()
+            
+            if "candidates" in data and data["candidates"]:
+                reply = data["candidates"][0]["content"]["parts"][0]["text"]
+                return self._clean_response(reply)
+            else:
+                return "לא הצלחתי להבין, תנסה שוב? 🤔"
 
         except requests.exceptions.Timeout:
             return "לוקח לי זמן לחשוב... נסה שוב ⏳"
@@ -129,17 +140,12 @@ class MayaBot:
             logger.error(f"Exception: {e}")
             return "משהו השתבש, אבל אני איתך 🛠️"
 
-    def _add_to_history(self, user_id, role, content):
-        self.conversation_history.setdefault(user_id, []).append({"role": role, "content": content})
-        self.conversation_history[user_id] = self.conversation_history[user_id][-MAX_HISTORY_LENGTH:]
-
-    def _clean_llm_response(self, text):
-        forbidden = [r'אני מצטערת', r'אני חושבת', r'ייתכן ש', r'אני לא בטוחה', r'כמודל שפה']
+    def _clean_response(self, text):
+        # Remove forbidden phrases
+        forbidden = [r'אני מצטערת', r'אני חושבת', r'ייתכן ש', r'אני לא בטוחה']
         for f in forbidden:
             text = re.sub(f, '', text, flags=re.IGNORECASE)
 
-        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
-        text = re.sub(r'[*_`]', '', text)
         text = " ".join(text.split())
         text = re.sub(r'^[.,;!?-]+', '', text).strip()
         text = re.sub(r'[.,;!?-]+$', '', text).strip()
@@ -150,48 +156,34 @@ class MayaBot:
         if len(words) > 10:
             text = " ".join(words[:10])
 
-        emoji = "👍"
-        lower = text.lower()
-        if any(w in lower for w in ["נעים", "כיף", "טוב", "שמחה"]):
-            emoji = "😊"
-        elif any(w in lower for w in ["תודה", "בכיף"]):
-            emoji = "✨"
-        elif any(w in lower for w in ["שעה", "תאריך"]):
-            emoji = "🕐"
-        elif any(w in lower for w in ["עזרה", "לעזור"]):
-            emoji = "💪"
-        elif any(w in lower for w in ["לא מבין", "???", "!!!"]):
-            emoji = "🤔"
-        elif any(w in lower for w in ["תקוע", "עייף", "מתוסכל"]):
-            emoji = "🫂"
-        return f"{text} {emoji}".strip()
+        # Add emoji if missing
+        if not any(char in text for char in "😊😴⏳✨🔑🤔🛠️💪🫂👍🕐"):
+            text += " 😊"
+
+        return text.strip()
 
 maya = MayaBot()
 
 def send_message(chat_id, text):
     try:
-        res = requests.post(
+        response = requests.post(
             TELEGRAM_API_URL,
             json={"chat_id": chat_id, "text": text},
             timeout=5
         )
-        if res.status_code != 200:
-            logger.error(f"Telegram error: {res.status_code} - {res.text}")
-            return False
-        return True
-    except Exception as e:
-        logger.error(f"Telegram send failed: {e}")
+        return response.status_code == 200
+    except:
         return False
 
 @app.route("/")
 def home():
     time_info = maya.get_israel_time()
     return jsonify({
-        "status": "🤗 Maya Bot - HuggingFace",
+        "status": "🤖 Maya Bot - Google AI",
         "time": time_info["full"],
         "users": len(maya.conversation_history),
-        "model": "DialoGPT-medium",
-        "version": "3.0"
+        "api": "Google AI Studio",
+        "version": "4.0"
     })
 
 @app.route("/webhook", methods=["POST"])
@@ -201,26 +193,33 @@ def webhook():
         if not token or token != WEBHOOK_SECRET_TOKEN:
             return "Unauthorized", 403
 
-    update = request.get_json()
-    if not update or "message" not in update:
+    try:
+        update = request.get_json()
+        if not update or "message" not in update:
+            return "OK"
+
+        message = update["message"]
+        chat_id = message.get("chat", {}).get("id")
+        text = message.get("text", "")
+        user_id = message.get("from", {}).get("id")
+        
+        if chat_id and text and user_id:
+            reply = maya.process_message(user_id, text)
+            send_message(chat_id, reply)
+        
+        return "OK"
+    except Exception as e:
+        logger.error(f"Webhook error: {e}")
         return "OK"
 
-    # Reply to Telegram immediately
-    def async_handler():
-        try:
-            message = update["message"]
-            chat_id = message.get("chat", {}).get("id")
-            text = message.get("text", "")
-            user_id = message.get("from", {}).get("id")
-            if chat_id and text and user_id:
-                reply = maya.process_message(user_id, text)
-                send_message(chat_id, reply)
-        except Exception as e:
-            logger.error(f"Async handler error: {e}")
-
-    threading.Thread(target=async_handler).start()
-    return jsonify({"status": "accepted"})
+@app.route("/test")
+def test():
+    return jsonify({
+        "status": "Google AI Test",
+        "greeting": maya.process_message(999, "שלום מאיה!"),
+        "time": maya.process_message(999, "מה השעה?")
+    })
 
 if __name__ == "__main__":
-    logger.info("🚀 Maya Bot running on HuggingFace")
+    logger.info("🚀 Maya Bot with Google AI Studio")
     app.run(host="0.0.0.0", port=PORT, debug=False)
