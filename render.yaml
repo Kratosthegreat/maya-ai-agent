@@ -1,40 +1,25 @@
 services:
-  - type: web
-    name: maya-secretary-bot
-    env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app
-    envVars:
-      - key: TELEGRAM_TOKEN
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: WEBHOOK_URL
-        value: https://maya-secretary-bot.onrender.com/webhook
-      - key: SECRET_KEY
-        generateValue: true
-      - key: ENCRYPTION_KEY
-        generateValue: true
-      - key: ENVIRONMENT
-        value: production
-      - key: DEBUG
-        value: false
-      - key: GEMINI_MODEL
-        value: gemini-1.5-flash
-      - key: MAX_HISTORY_MESSAGES
-        value: 20
-      - key: MAX_REQUESTS_PER_MINUTE
-        value: 30
-      - key: DATABASE_URL
-        fromDatabase:
-          name: maya-db
-          property: connectionString
-    healthCheckPath: /
-    autoDeploy: true
-    
-databases:
-  - name: maya-db
-    databaseName: maya_secretary
-    user: maya_user
-    plan: free
+
+- type: web
+  name: maya-ai-agent
+  env: python
+  repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME
+  buildCommand: pip install -r requirements.txt
+  startCommand: python main.py
+  plan: free
+  region: oregon
+  branch: main
+  healthCheckPath: /health
+  envVars:
+  - key: TELEGRAM_BOT_TOKEN
+    sync: false
+  - key: GEMINI_API_KEY
+    sync: false
+  - key: PYTHON_VERSION
+    value: 3.11.0
+  - key: ENVIRONMENT
+    value: production
+    disk:
+    name: maya-storage
+    mountPath: /opt/render/project/storage
+    sizeGB: 1
