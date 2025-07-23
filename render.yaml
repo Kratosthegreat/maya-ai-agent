@@ -1,25 +1,51 @@
-services:
+# Maya AI Bot - Render.com Configuration
+# ======================================
 
-- type: web
-  name: maya-ai-agent
-  env: python
-  repo: https://github.com/YOUR_USERNAME/YOUR_REPO_NAME
-  buildCommand: pip install -r requirements.txt
-  startCommand: python main.py
-  plan: free
-  region: oregon
-  branch: main
-  healthCheckPath: /health
-  envVars:
-  - key: TELEGRAM_BOT_TOKEN
-    sync: false
-  - key: GEMINI_API_KEY
-    sync: false
-  - key: PYTHON_VERSION
-    value: 3.11.0
-  - key: ENVIRONMENT
-    value: production
-    disk:
-    name: maya-storage
-    mountPath: /opt/render/project/storage
-    sizeGB: 1
+services:
+  # Main Maya AI Bot Service
+  - type: web
+    name: maya-ai-bot
+    env: python
+    plan: free
+    region: frankfurt  # Closest to Israel
+    
+    # Build and deployment
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "python main.py"
+    
+    # Health monitoring (critical for keep-alive)
+    healthCheckPath: /
+    
+    # Auto-deploy settings
+    autoDeploy: true
+    
+    # Resource limits for free tier
+    numInstances: 1
+    
+    # Environment variables (non-sensitive)
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10"
+      - key: FLASK_ENV 
+        value: "production"
+      - key: TZ
+        value: "Asia/Jerusalem"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PORT
+        value: "5000"
+      - key: BOT_NAME
+        value: "Maya"
+      - key: BOT_LANGUAGE
+        value: "hebrew"
+    
+    # Persistent disk for logs and cache (optional)
+    disks:
+      - name: maya-storage
+        mountPath: /var/data
+        sizeGB: 1
+
+# Database service would be external (MongoDB Atlas)
+# Secrets (API keys, tokens) should be added via Render dashboard
