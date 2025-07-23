@@ -1,162 +1,250 @@
-# 🤖 Maya Secretary Bot
+# 🤖 Maya - Advanced AI Telegram Bot
 
-מאיה - מזכירה אישית חכמה בטלגרם עם בינה מלאכותית מתקדמת, זיכרון משתמש וכלים שימושיים.
+**Maya** היא בוט טלגרם חכם ומתקדם המבוסס על בינה מלאכותית של Google Gemini, עם תמיכה מלאה בעברית ויכולות אוטונומיות מתקדמות.
 
-## ✨ תכונות
+## ✨ תכונות עיקריות
 
-- 🧠 **זיכרון חכם** - זוכרת פרטים חשובים על כל משתמש
-- 🤖 **AI מתקדם** - מבוסס על Google Gemini
-- 🌤️ **מזג אוויר** - מידע מדויק לכל העיר
-- 📊 **סטטיסטיקות** - מעקב אחר שימוש
-- 🔒 **אבטחה** - הצפנת נתונים ומגבלות קצב
-- 💾 **דטאבייס** - PostgreSQL לייצוב מלא
-- 🚀 **מוכן לפרודקשן** - מותאם לRender
+### 🧠 בינה מלאכותית מתקדמת
+- **Google Gemini Pro**: מודל AI חדיש עם יכולות שיחה טבעיות
+- **זיכרון הקשרי**: זוכרת שיחות קודמות ומתאמת תשובות
+- **למידה אישית**: מתאמת את האופי לכל משתמש
+- **תמיכה בעברית**: מבינה ומגיבה בעברית טבעית ושוטפת
 
-## 🛠️ התקנה מהירה
+### 💬 ניהול שיחות חכם
+- **ממשק אינטואיטיבי**: תפריטים ידידותיים עם כפתורים
+- **מצבי שיחה**: מעבר חלק בין סוגי אינטראקציה שונים
+- **היסטוריית שיחות**: שמירה ומעקב אחר כל השיחות
+- **תגובות מהירות**: זמן תגובה מתחת ל-2 שניות
 
-### 1. הכן את הסביבה
+### 📊 ניהול נתונים מתקדם
+- **MongoDB Integration**: מסד נתונים מקצועי עם גיבויים
+- **סטטיסטיקות מתקדמות**: מעקב אחר שימוש והתנהגות משתמשים
+- **Fallback Storage**: פעולה גם ללא מסד נתונים חיצוני
+- **אבטחת מידע**: הצפנה ואבטחה מתקדמת
+
+### 🚀 תשתית ענן מתקדמת
+- **Render.com Ready**: קל לפריסה ולתחזוקה
+- **Keep-Alive System**: זמינות 24/7 עם UptimeRobot
+- **Docker Support**: קונטיינרים מוכנים לייצור
+- **Auto-scaling**: התאמה אוטומטית לעומס
+
+## 🛠️ התקנה והגדרה
+
+### שלב 1: הכנות ראשוניות
+
+1. **יצירת בוט ב-Telegram**:
+   - שלח `/newbot` ל-@BotFather
+   - בחר שם ושם משתמש לבוט
+   - שמור את הטוקן שתקבל
+
+2. **קבלת מפתח Gemini AI**:
+   - לך ל-[Google AI Studio](https://makersuite.google.com/app/apikey)
+   - צור מפתח API חדש
+   - שמור את המפתח
+
+3. **הגדרת MongoDB Atlas** (אופציונלי אך מומלץ):
+   - הירשם ל-[MongoDB Atlas](https://cloud.mongodb.com)
+   - צור Cluster חינמי
+   - קבל את connection string
+
+### שלב 2: הגדרת הפרויקט
 
 ```bash
-git clone https://github.com/yourusername/maya-secretary-bot.git
-cd maya-secretary-bot
-pip install -r requirements.txt
-```
+# שכפול המאגר
+git clone <repository-url>
+cd maya-ai-bot
 
-### 2. הגדר משתני סביבה
-
-```bash
+# יצירת קובץ הגדרות
 cp .env.example .env
-# ערוך את .env עם הנתונים שלך
+
+# עריכת הגדרות
+nano .env
 ```
 
-### 3. הרץ מקומית
+**מלא את הפרטים הבאים ב-`.env`**:
+```env
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+GEMINI_API_KEY=your_gemini_api_key_here
+MONGO_URI=your_mongodb_uri_here
+ADMIN_ID=your_telegram_user_id
+```
 
+### שלב 3: פריסה ל-Render.com
+
+1. **העלאה ל-GitHub**:
+   ```bash
+   git add .
+   git commit -m "Initial Maya bot setup"
+   git push origin main
+   ```
+
+2. **יצירת שירות ב-Render**:
+   - הירשם ל-[Render.com](https://render.com)
+   - צור Web Service חדש
+   - חבר את המאגר שלך
+   - Render יזהה את `render.yaml` אוטומטית
+
+3. **הוספת Secrets**:
+   - לך ל-Environment בעמוד השירות
+   - הוסף את המשתנים הרגישים:
+     - `TELEGRAM_BOT_TOKEN`
+     - `GEMINI_API_KEY`
+     - `MONGO_URI`
+     - `ADMIN_ID`
+
+4. **הגדרת Keep-Alive**:
+   - הירשם ל-[UptimeRobot](https://uptimerobot.com)
+   - צור monitor חדש עם URL של השירות
+   - הגדר בדיקה כל 5 דקות
+
+## 📋 שימוש
+
+### פקודות בסיסיות
+- `/start` - התחלת עבודה עם הבוט
+- `/help` - מדריך שימוש מפורט
+- `/feedback` - שליחת משוב למפתחים
+
+### פקודות מנהל
+- `/admin_stats` - סטטיסטיקות מתקדמות
+- `/broadcast` - שליחת הודעה לכל המשתמשים
+
+### תכונות מתקדמות
+- **שיחה טבעית**: שלח כל הודעה ומאיה תגיב בצורה חכמה
+- **זיכרון הקשרי**: מאיה זוכרת את השיחה ומתייחסת להקשר
+- **תפריטים אינטראקטיביים**: השתמש בכפתורים למעבר מהיר
+
+## 🏗️ ארכיטקטורה
+
+```
+Maya AI Bot
+├── 🤖 Core Bot (Telegram Integration)
+├── 🧠 AI Engine (Google Gemini)
+├── 💾 Database Manager (MongoDB)
+├── 🌐 Keep-Alive Server (Flask)
+├── 📊 Analytics & Stats
+└── 👑 Admin Panel
+```
+
+### רכיבי המערכת:
+- **MayaBot**: הבוט הראשי עם כל הhandlers
+- **MayaAI**: מנוע הAI עם Gemini
+- **DatabaseManager**: ניהול נתונים עם MongoDB
+- **Flask Server**: שרת keep-alive לRender
+
+## 🔧 פיתוח והתאמה
+
+### הוספת תכונות חדשות
+```python
+# הוספת פקודה חדשה
+async def my_new_command(self, update: Update, context):
+    await update.message.reply_text("תכונה חדשה!")
+
+# רישום הפקודה ב-main()
+application.add_handler(CommandHandler("new", maya.my_new_command))
+```
+
+### התאמת אישיות מאיה
+ערוך את `MAYA_PERSONALITY` ב-`main.py`:
+```python
+MAYA_PERSONALITY = """
+אני מאיה, בוט AI חכם עם אישיות מותאמת...
+"""
+```
+
+### הוספת יכולות AI חדשות
+```python
+# הוספת מידע ספציפי לפרומפט
+prompt = f"""
+{MAYA_PERSONALITY}
+
+מידע נוסף: {extra_context}
+שאלת המשתמש: {message}
+"""
+```
+
+## 📊 ניטור וביצועים
+
+### מטריקות מומלצות למעקב:
+- **זמן תגובה**: < 2 שניות ממוצע
+- **זמינות**: > 99% uptime
+- **דירוג משתמשים**: מעקב אחר שביעות רצון
+- **שימוש בAI**: מעקב עלויות וביצועים
+
+### לוגים וdiagnostics:
 ```bash
-python app.py
+# צפייה בלוגים ב-Render
+render logs -f
+
+# בדיקת בריאות המערכת
+curl https://your-bot.onrender.com/stats
 ```
-
-## 🌐 פריסה ב-Render
-
-### שלב 1: הכנת הקוד
-1. העלה את הקוד ל-GitHub
-2. וודא שכל הקבצים נמצאים במקום
-
-### שלב 2: יצירת שירותים ב-Render
-
-#### Web Service:
-- **Repository**: הריפו שלך ב-GitHub
-- **Name**: `maya-secretary-bot`
-- **Environment**: `Python 3`
-- **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 app:app`
-
-#### Database:
-- **Type**: PostgreSQL
-- **Name**: `maya-db`
-- **Plan**: Free
-
-### שלב 3: משתני סביבה ב-Render
-
-הגדר את המשתנים הבאים ב-Dashboard:
-
-```bash
-TELEGRAM_TOKEN=your_bot_token_from_botfather
-GEMINI_API_KEY=your_gemini_api_key
-WEBHOOK_URL=https://your-app-name.onrender.com/webhook
-DATABASE_URL=postgresql://... (Render יספק)
-SECRET_KEY=your_secret_key_32_chars
-ENCRYPTION_KEY=your_encryption_key_32_chars
-ENVIRONMENT=production
-DEBUG=false
-```
-
-### שלב 4: Deploy!
-לחץ על "Deploy" ב-Render והמתן 2-3 דקות.
-
-## 📱 פקודות הבוט
-
-### פקודות בסיסיות:
-- `/start` - התחלת העבודה
-- `/help` - רשימת פקודות
-- `/memory` - מה שמאיה זוכרת עליך
-- `/stats` - סטטיסטיקות שימוש
-- `/forget` - מחיקת זיכרון
-
-### פקודות מתקדמות:
-- `/weather [עיר]` - מזג אוויר
-- `מה השעה?` - זמן נוכחי
-- `איך מרגיש?` - שיחה כללית
-
-### דוגמאות שימוש:
-```
-👤 משתמש: מה מזג האוויר בתל אביב?
-🤖 מאיה: 🌤️ מזג האוויר בתל אביב:
-🌡️ 25°C
-💨 רוח: 10 קמ"ש
-
-👤 משתמש: תזכירי לי להתקשר לדני מחר
-🤖 מאיה: בוודאי! רשמתי שאתה צריך להתקשר לדני מחר. אזכיר לך כשתחזור לשוחח איתי.
-```
-
-## 🏗️ מבנה הפרויקט
-
-```
-maya-secretary-bot/
-├── app.py                 # הקוד הראשי
-├── config.py             # הגדרות המערכת
-├── requirements.txt      # תלויות Python
-├── set_webhook.py        # הגדרת webhook
-├── runtime.txt           # גרסת Python
-├── render.yaml           # הגדרת Render
-├── .env.example         # תבנית משתני סביבה
-├── README.md            # המדריך הזה
-└── utils/
-    └── lang_detect.py   # כלי עזר
-```
-
-## 🔧 פתרון בעיות
-
-### הבוט לא מגיב?
-1. **בדוק לוגים** ב-Render Dashboard
-2. **וודא webhook** - `python set_webhook.py info`
-3. **בדוק טוקנים** - כל המשתנים מוגדרים?
-
-### שגיאות דטאבייס?
-1. **חיבור לDB** - `DATABASE_URL` נכון?
-2. **טבלאות** - צריך לראות "Database tables created"
-
-### שגיאות AI?
-1. **Gemini API** - המפתח תקף?
-2. **Quota** - לא חרגת מהמכסה?
 
 ## 🔒 אבטחה
 
-### הגדרות אבטחה:
+### עקרונות אבטחה:
+- ✅ אף פעם לא שמירת טוקנים בקוד
+- ✅ שימוש ב-environment variables
+- ✅ הגבלת גישה לפקודות מנהל
+- ✅ ולידציה של כל קלט משתמש
 - ✅ הצפנת נתונים רגישים
-- ✅ Rate limiting (30 בקשות/דקה)
-- ✅ Validation של inputs
-- ✅ משתני סביבה בטוחים
-- ✅ לוגים בטוחים
 
-### גיבוי נתונים:
-```bash
-# גיבוי ידני של הדטאבייס
-pg_dump $DATABASE_URL > backup.sql
-```
+### מומלץ לביצוע:
+- רוטציה תקופתית של מפתחות
+- ניטור לוגים לפעילות חשודה
+- עדכון תלויות באופן קבוע
+- גיבויים תקופתיים של המסד נתונים
 
-## 📊 ניטור
+## 🚨 פתרון תקלות נפוצות
 
-### בדיקות תקינות:
-- `GET /` - health check
-- `GET /stats` - סטטיסטיקות API
-- `POST /set_webhook` - הגדרת webhook
+### הבוט לא מגיב
+1. בדוק שהטוקן נכון ב-Environment Variables
+2. ודא שהשירות ב-Render פועל
+3. בדוק שUptimeRobot פעיל
 
-### מטריקות חשובות:
-- זמן תגובה < 2 שניות
-- זמינות > 99%
-- שגיאות < 1%
+### שגיאות AI
+1. ודא שמפתח Gemini תקין
+2. בדוק מכסת השימוש ב-Google AI Studio
+3. בדוק את הלוגים לשגיאות ספציפיות
 
-## 🚀 שדרוגים עתידיים
+### בעיות מסד נתונים
+1. ודא ש-MongoDB Atlas זמין
+2. בדוק את ה-connection string
+3. הבוט ימשיך לפעול גם ללא MongoDB
 
-### בתוכנית:
-- [ ] אינטגרצ
+## 🤝 תרומה ופיתוח
+
+### איך לתרום:
+1. Fork את המאגר
+2. צור branch חדש לתכונה
+3. בצע שינויים ובדיקות
+4. שלח Pull Request
+
+### קווים מנחים:
+- קוד ברור עם הערות בעברית
+- בדיקות לכל תכונה חדשה
+- עדכון התיעוד
+- שמירה על תאימות לגרסאות קודמות
+
+## 📞 תמיכה וקהילה
+
+- **Issues**: דווח על בעיות ב-GitHub Issues
+- **Discussions**: שאלות כלליות ב-GitHub Discussions
+- **Discord**: [הצטרף לשרת הקהילה](link-to-discord)
+- **Email**: support@maya-bot.com
+
+## 📄 רישיון
+
+פרויקט זה מופץ תחת רישיון MIT. ראה את קובץ `LICENSE` לפרטים מלאים.
+
+## 🙏 תודות
+
+- **Google AI**: על Gemini API המדהים
+- **Python Telegram Bot**: על הספרייה המעולה
+- **MongoDB**: על מסד הנתונים החינמי
+- **Render.com**: על פלטפורמת הענן
+
+---
+
+**Maya AI Bot** - נבנה עם ❤️ עבור הקהילה הישראלית
+
+*גרסה 2.0 | עודכן: 2025*
