@@ -1,6 +1,15 @@
-# Python
+# Maya AI Bot - Git Ignore File
+# ==============================
 
-**pycache**/
+# Environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -23,9 +32,59 @@ share/python-wheels/
 *.egg
 MANIFEST
 
-# Environment variables
+# PyInstaller
+*.manifest
+*.spec
 
-.env
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
 .venv
 env/
 venv/
@@ -33,16 +92,38 @@ ENV/
 env.bak/
 venv.bak/
 
-# IDE
+# Spyder project settings
+.spyderproject
+.spyproject
 
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# IDEs and editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
-
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -52,50 +133,72 @@ ehthumbs.db
 Thumbs.db
 
 # Logs
-
-*.log
 logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Database
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
+# Database files
 *.db
 *.sqlite
 *.sqlite3
 
-# Cache
+# Temporary files
+tmp/
+temp/
+.tmp/
 
-.cache/
+# Bot specific
+bot_data/
+user_data/
+conversations/
+cache/
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Local configuration files
+config.local.json
+settings.local.json
+
+# Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# ChromaDB
+# Docker
+.dockerignore
+Dockerfile.dev
 
-chroma_db/
-*.chroma
+# Node.js (if using any JS tools)
+node_modules/
+package-lock.json
+yarn.lock
 
-# Model files
+# Media files (if bot handles file uploads)
+uploads/
+media/
+static/uploads/
 
+# AI model files (if storing locally)
+models/
+*.model
 *.pkl
 *.joblib
-*.model
 
-# Temporary files
+# Render specific
+.render/
 
-*.tmp
-*.temp
-.tmp/
-
-# Jupyter Notebook
-
-.ipynb_checkpoints
-
-# PyCharm
-
-.idea/
-
-# Replit specific
-
-.replit
-.upm/
-.pythonlibs/
+# Certificate files
+*.pem
+*.key
+*.crt
