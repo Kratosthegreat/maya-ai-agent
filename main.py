@@ -32,13 +32,12 @@ def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> I
         return InlineKeyboardMarkup(keyboard)
     
     def _generate_sync(self, prompt: str) -> str:
-        """Synchronous generation wrapper"""
         try:
             response = self.model.generate_content(prompt)
             return response.text
         except Exception as e:
-            logger.error(f"Gemini API error: {e}")
-            raise e
+            print(f"❌ שגיאה במהלך הפקת טקסט: {e}")
+            return "לא הצלחתי לחשוב על משהו כרגע... רוצה לנסות לנסח את זה אחרת?"
     
     def _fallback_response(self, message: str) -> str:
         """Enhanced fallback responses with task awareness"""
