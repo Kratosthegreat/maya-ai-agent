@@ -1319,4 +1319,695 @@ class MayaAI:
         keyboard = []
         
         # Task-related buttons if intent detected
-        if intent and intent[0] in ['reminder', 'meeting', 'schedule', 'email',
+        if intent and intent[0] in ['reminder', 'meeting', 'schedule', 'email', 'research']:
+            keyboard.append([
+                InlineKeyboardButton("📋 המשימות שלי", callback_data="my_tasks"),
+                InlineKeyboardButton("➕ משימה חדשה", callback_data="new_task")
+            ])
+        
+        # Get task summary for smart suggestions
+        task_summary = self.task_manager.get_user_tasks_summary(user_id)
+        
+        if task_summary['urgent'] > 0:
+            keyboard.append([
+                InlineKeyboardButton(f"🔥 משימות דחופות ({task_summary['urgent']})", callback_data="urgent_tasks")
+            ])
+        
+        if task_summary['overdue'] > 0:
+            keyboard.append([
+                InlineKeyboardButton(f"⏰ משימות באיחור ({task_summary['overdue']})", callback_data="overdue_tasks")
+            ])
+        
+        # Always available options
+        keyboard.extend([
+            [InlineKeyboardButton("🔄 המשך שיחה", callback_data="continue_chat")],
+            [InlineKeyboardButton("📊 סיכום משימות", callback_data="task_summary")],
+            [InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")]
+        ])
+        
+        return InlineKeyboardMarkup(keyboard)
+    
+    def _generate_sync(self, prompt: str) -> str:
+        """Synchronous generation wrapper"""
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}")
+            raise e
+    
+    def _fallback_response(self, message: str) -> str:
+        """Enhanced fallback responses with task awareness"""
+        message_lower = message.lower()
+        
+        # Task-related fallbacks
+        if any(word in message_lower for word in ["תזכור", "פגישה", "משימה"]):
+            return "אני מזכירה אישית חכמה! כרגע יש לי בעיה טכנית קטנה, אبل בקרוב אוכל לעזור לך עם משימות ותזכורות! 🗓️"
+        
+        # Regular fallbacks
+        if any(word in message_lower for word in ["שלום", "היי", "מה נשמע"]):
+            return f"שלום! אני מאיה, המזכירה האישית החכמה שלך! איך אוכל לעזור? 😊\n\nאני יכולה לעזור עם תزכורות, פגישות, מחקר ועוד!"
+        elif any(word in message_lower for word in ["תודה", "תנקיו"]):
+            return "אין בעד מה! זה התפקיד שלי לעזור לך! 💜"
+        elif "?" in message:
+            return "זו שאלה מעניינת! כרגע אני עסוקה, אבל חזור אליי בעוד רגע ואתן לך תשובה מפורטת 🤔"
+        
+        return "מצטערת, אני חווה קשיים טכניים כרגע. אוכל לעזור לך בעוד רגע! 🤖"
+
+# ============================
+# CONVERSATION STATES
+# ============================
+
+# Conversation states for complex interactions
+MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
+
+# ============================
+# UTILITY FUNCTIONS
+# ============================
+
+def admin_only(func):
+    """Decorator to restrict access to admin commands"""
+    @wraps(func)
+    async def wrapper(update: Update, context):
+        if not ADMIN_ID or update.effective_user.id != ADMIN_ID:
+            await update.message.reply_text(
+                "⛔ פקודה זו זמינה רק למנהלי הבוט\n"
+                f"המזהה שלך: {update.effective_user.id}"
+            )
+            return
+        return await func(update, context)
+    return wrapper
+
+def typing_action(func):
+    """Decorator to show typing action while processing"""
+    @wraps(func)
+    async def wrapper(update: Update, context):
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id, 
+            action="typing"
+        )
+        return await func(update, context)
+    return wrapper
+
+def extract_keywords(text: str) -> List[str]:
+    """Extract keywords from Hebrew text"""
+    # Simple keyword extraction for Hebrew
+    words = re.findall(r'[\u0590-\u05FF\w]+', text)
+    # Filter out common Hebrew stop words
+    stop_words = {'של', 'את', 'את', 'על', 'אל', 'כל', 'מה', 'זה', 'זו', 'היא', 'הוא'}
+    keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+    return keywords[:10]  # Return top 10 keywords
+
+# ============================
+# BOT HANDLERS
+# ============================
+
+class MayaBot:
+    """Main bot class with all handlers"""
+    
+    def __init__(self):
+        self.ai = MayaAI()
+        self.db = DatabaseManager()
+    
+    async def start_command(self, update: Update, context) -> int:
+        """Enhanced start command with personality"""
+        user = update.effective_user
+        
+        # Register user
+        user_data = {
+            "user_id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "language_code": user.language_code
+        }
+        self.db.register_user(user_data)
+        
+        # Get task summary for personalized welcome
+        task_summary = self.ai.task_manager.get_user_tasks_summary(user.id)
+        
+        # Create main menu keyboard with task info
+        keyboard = [
+            [InlineKeyboardButton("💬 שיחה עם AI", callback_data="ai_chat")],
+            [InlineKeyboardButton(
+                f"📋 המשימות שלי ({task_summary['pending']})", 
+                callback_data="my_tasks"
+            )],
+            [InlineKeyboardButton("⚙️ הגדרות", callback_data="settings")],
+            [InlineKeyboardButton("📊 סטטיסטיקות", callback_data="stats")],
+            [InlineKeyboardButton("❓ עזרה", callback_data="help")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        welcome_text = f"""
+🤖 שלום {user.first_name}, אני מאיה!
+
+אני בוט AI מתקדם שיכול לעזור לך במגוון נושאים:
+- שיחות טבעיות בעברית
+- יצירת וניהול משימות חכמות
+- תזכורות ותזמון פגישות
+- עזרה במשימות יומיומיות
+- למידה מכל שיחה שלנו"""
+        
+        if task_summary['pending'] > 0:
+            welcome_text += f"\n\n📋 יש לך {task_summary['pending']} משימות פעילות"
+            if task_summary['urgent'] > 0:
+                welcome_text += f" (כולל {task_summary['urgent']} דחופות! 🔥)"
+        
+        welcome_text += "\n\nאיך תרצה להתחיל?"
+        
+        await update.message.reply_text(
+            welcome_text, 
+            reply_markup=reply_markup
+        )
+        return MAIN_MENU
+    
+    @typing_action
+    async def handle_message(self, update: Update, context):
+        """Handle all text messages with enhanced AI and real-time task management"""
+        user = update.effective_user
+        message = update.message.text
+        
+        # Register user activity
+        user_data = {
+            "user_id": user.id,
+            "username": user.username,
+            "first_name": user.first_name
+        }
+        self.db.register_user(user_data)
+        
+        # Send typing indicator for better UX
+        await asyncio.sleep(0.5)  # Small delay for natural feeling
+        
+        # Generate AI response with enhanced task management
+        ai_response, response_keyboard, task_id = await self.ai.generate_response(
+            user_id=user.id,
+            message=message,
+            user_name=user.first_name or "משתמש"
+        )
+        
+        # Send response with appropriate keyboard
+        await update.message.reply_text(
+            ai_response, 
+            reply_markup=response_keyboard,
+            parse_mode='Markdown'
+        )
+        
+        # If a task was created, send additional confirmation
+        if task_id:
+            logger.info(f"Task {task_id} created for user {user.id}")
+    
+    async def button_handler(self, update: Update, context):
+        """Handle inline keyboard callbacks with task management"""
+        query = update.callback_query
+        await query.answer()
+        
+        data = query.data
+        
+        if data == "ai_chat":
+            await query.edit_message_text(
+                "💬 **מצב שיחה פעיל!**\n\n"
+                "שלח לי כל שאלה או נושא לדיון. אני כאן לעזור! 🤖\n\n"
+                "**💡 דוגמאות למה שאני יכולה לעזור:**\n"
+                "• תזכורות ומשימות: \"תזכור לי לקרוא לרופא מחר\"\n"
+                "• פגישות: \"תקבע פגישה עם הצוות\"\n"
+                "• מחקר: \"תחפש לי מידע על...\"\n"
+                "• כתיבה: \"תעזור לי לכתוב אימייל\"\n"
+                "• שאלות כלליות ועצות מקצועיות\n\n"
+                "פשוט כתוב לי בעברית טבעית! 😊"
+            )
+            return AI_CHAT
+            
+        elif data == "my_tasks":
+            # Show user tasks
+            user_id = query.from_user.id
+            user_tasks = [task for task in self.db.tasks.values() if task.get('user_id') == user_id]
+            
+            if not user_tasks:
+                keyboard = [[
+                    InlineKeyboardButton("➕ צור משימה ראשונה", callback_data="new_task"),
+                    InlineKeyboardButton("❓ איך זה עובד?", callback_data="tasks_help")
+                ]]
+                
+                await query.edit_message_text(
+                    "📋 **המשימות שלי**\n\n"
+                    "אין לך משימות פעילות כרגע.\n\n"
+                    "💡 **איך יוצרים משימות?**\n"
+                    "פשוט שלח לי הודעה כמו:\n"
+                    "• \"תזכור לי לקרוא לרופא מחר\"\n"
+                    "• \"תקבע פגישה עם הצוות השבוע\"\n"
+                    "• \"תזכיר לי לשלוח דוח עד יום חמישי\"\n\n"
+                    "אני אזהה אוטומטית שזו משימה ואיצור אותה עבורך! 🤖✨",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                return
+            
+            # Display tasks
+            pending_tasks = [t for t in user_tasks if t.get('status') == 'pending']
+            completed_tasks = [t for t in user_tasks if t.get('status') == 'completed']
+            
+            tasks_text = f"📋 **המשימות שלי** ({len(pending_tasks)} פעילות)\n\n"
+            
+            if pending_tasks:
+                tasks_text += "**🟡 פעילות:**\n"
+                for i, task in enumerate(pending_tasks[:5], 1):
+                    category_info = self.ai.task_manager.get_task_category_display(task.get('category', 'other'))
+                    priority_info = self.ai.task_manager.get_priority_display(task.get('priority', 'medium'))
+                    
+                    tasks_text += f"{i}. {category_info['emoji']} {task['title'][:35]}...\n"
+                    tasks_text += f"   {priority_info['emoji']} {priority_info['name']}"
+                    
+                    if task.get('due_date'):
+                        try:
+                            due_date = datetime.fromisoformat(task['due_date'])
+                            tasks_text += f" | 📅 {due_date.strftime('%d/%m')}"
+                        except:
+                            pass
+                    
+                    tasks_text += "\n\n"
+            
+            if completed_tasks:
+                tasks_text += f"**✅ הושלמו:** {len(completed_tasks)}\n\n"
+            
+            tasks_text += "💬 שלח לי משימה חדשה והיא תתווסף אוטומטית!"
+            
+            keyboard = [
+                [InlineKeyboardButton("➕ משימה חדשה", callback_data="new_task")],
+                [InlineKeyboardButton("✅ סמן הושלם", callback_data="complete_task")],
+                [InlineKeyboardButton("⬅️ תפריט ראשי", callback_data="main_menu")]
+            ]
+            
+            await query.edit_message_text(
+                tasks_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        elif data.startswith("complete_"):
+            # Mark specific task as complete
+            task_id = data.replace("complete_", "")
+            
+            if task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                
+                if task.get('user_id') != query.from_user.id:
+                    await query.edit_message_text("❌ אין לך הרשאה לערוך משימה זו")
+                    return
+                
+                task['status'] = 'completed'
+                task['completed_at'] = datetime.now().isoformat()
+                task['updated_at'] = datetime.now().isoformat()
+                
+                await query.edit_message_text(
+                    f"🎉 **משימה הושלמה!**\n\n"
+                    f"✅ {task['title']}\n\n"
+                    f"כל הכבוד! המשימה סומנה כהושלמה.\n"
+                    f"⏰ הושלמה: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("📋 למשימות שלי", callback_data="my_tasks"),
+                        InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")
+                    ]])
+                )
+            else:
+                await query.edit_message_text(
+                    "❌ לא מצאתי את המשימה",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
+                    ]])
+                )
+        
+        elif data == "complete_task":
+            # Show tasks to mark as complete
+            user_id = query.from_user.id
+            user_tasks = [task for task in self.db.tasks.values() 
+                         if task.get('user_id') == user_id and task.get('status') == 'pending']
+            
+            if not user_tasks:
+                await query.edit_message_text(
+                    "✅ **סימון משימות כהושלמו**\n\n"
+                    "אין לך משימות פעילות לסימון כרגע.\n"
+                    "כל הכבוד! נראה שסיימת הכל! 🎉",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
+                    ]])
+                )
+                return
+            
+            # Create keyboard with tasks to complete
+            keyboard = []
+            for task in user_tasks[:8]:  # Show max 8 tasks
+                keyboard.append([InlineKeyboardButton(
+                    f"✅ {task['title'][:30]}...",
+                    callback_data=f"complete_{task['id']}"
+                )])
+            
+            keyboard.append([InlineKeyboardButton("⬅️ חזור", callback_data="my_tasks")])
+            
+            await query.edit_message_text(
+                "✅ **בחר משימה לסימון כהושלמה:**\n\n"
+                "לחץ על המשימה שסיימת:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        elif data == "new_task":
+            await query.edit_message_text(
+                "➕ **יצירת משימה חדשה**\n\n"
+                "**🗣️ הדרך הקלה ביותר:**\n"
+                "פשוט שלח לי הודעה בעברית טבעית!\n\n"
+                "**📝 דוגמאות:**\n"
+                "⏰ \"תזכור לי לקרוא לרופא מחר בשעה 10\"\n"
+                "🤝 \"תקבע פגישה עם הצוות השבוע הבא\"\n"
+                "📧 \"תזכיר לי לשלוח דוח עד יום חמישי\"\n"
+                "🔍 \"תבדוק מחירים לנסיעה לברלין\"\n\n"
+                "**🎯 רמות עדיפות:**\n"
+                "🔥 דחוף - \"זה דחוף\"\n"
+                "⚡ חשוב - \"זה חשוב\"\n"
+                "📋 רגיל - ברירת מחדל\n\n"
+                "אני אזהה את הסוג, העדיפות והתאריך אוטומטית! 🤖✨",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
+                ]])
+            )
+        
+        elif data == "settings":
+            keyboard = [
+                [InlineKeyboardButton("🌐 שפה", callback_data="lang_settings")],
+                [InlineKeyboardButton("🔔 התראות", callback_data="notif_settings")],
+                [InlineKeyboardButton("🗑️ מחק היסטוריה", callback_data="clear_history")],
+                [InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(
+                "⚙️ הגדרות מאיה\n\nבחר את האפשרות שתרצה לערוך:",
+                reply_markup=reply_markup
+            )
+            return SETTINGS_MENU
+        
+        elif data == "stats":
+            # Enhanced stats with task information
+            stats = self.db.get_basic_stats()
+            
+            # Add task stats
+            user_id = query.from_user.id
+            task_summary = self.ai.task_manager.get_user_tasks_summary(user_id)
+            
+            stats_text = f"""
+📊 **סטטיסטיקות הבוט:**
+
+👥 **משתמשים רשומים:** {stats.get('total_users', 0)}
+⚡ **פעילים השבוע:** {stats.get('active_users_week', 0)}
+💬 **סה"כ שיחות:** {stats.get('total_conversations', 0)}
+
+📋 **המשימות שלך:**
+🟡 **פעילות:** {task_summary['pending']}
+✅ **הושלמו:** {task_summary['completed']}
+📈 **סה"כ יצרת:** {task_summary['total']}
+
+🤖 **מצב המערכת:**
+🟢 **AI Engine:** פעיל
+🟢 **Task Manager:** פעיל
+🟢 **Status:** {stats.get('uptime', 'Online')}
+
+אני לומדת ומשתפרת מכל שיחה ומשימה! 💜
+            """
+            
+            keyboard = [[InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(stats_text, reply_markup=reply_markup)
+        
+        elif data == "help":
+            help_text = """
+❓ **מדריך שימוש במאיה**
+
+🎯 **מה אני יכולה לעשות:**
+- לענות על שאלות בכל נושא
+- ליצור ולנהל משימות חכמות
+- לעזור בכתיבה ועריכה
+- לתת הסברים על נושאים מורכבים
+- לסייע במשימות מזכירות יומיומיות
+
+📋 **ניהול משימות חכם:**
+- שלח "תזכור לי..." - ואני אשמור תזכורת
+- שלח "תקבע פגישה..." - ואני אארגן פגישה
+- שלח "תבדוק..." - ואני אכין משימת מחקר
+
+💡 **טיפים לשימוש:**
+- כתוב בעברית טבעית
+- תאר בפירוט מה אתה צריך
+- אל תהסס לשאול שאלות המשך
+
+🔧 **פקודות זמינות:**
+/start - התחלה מחדש
+/tasks - המשימות שלי
+/feedback - שליחת משוב
+            """
+            
+            keyboard = [[InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            await query.edit_message_text(help_text, reply_markup=reply_markup)
+        
+        elif data == "main_menu":
+            # Enhanced main menu with task info
+            user_id = query.from_user.id
+            task_summary = self.ai.task_manager.get_user_tasks_summary(user_id)
+            
+            keyboard = [
+                [InlineKeyboardButton("💬 שיחה עם AI", callback_data="ai_chat")],
+                [InlineKeyboardButton(
+                    f"📋 המשימות שלי ({task_summary['pending']})", 
+                    callback_data="my_tasks"
+                )],
+                [InlineKeyboardButton("⚙️ הגדרות", callback_data="settings")],
+                [InlineKeyboardButton("📊 סטטיסטיקות", callback_data="stats")],
+                [InlineKeyboardButton("❓ עזרה", callback_data="help")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            welcome_text = "🤖 **מאיה - המזכירה החכמה שלך**\n\n"
+            if task_summary['pending'] > 0:
+                welcome_text += f"📋 יש לך {task_summary['pending']} משימות פעילות"
+                if task_summary['urgent'] > 0:
+                    welcome_text += f" (כולל {task_summary['urgent']} דחופות! 🔥)"
+                welcome_text += "\n\n"
+            welcome_text += "מה תרצה לעשות?"
+            
+            await query.edit_message_text(
+                welcome_text,
+                reply_markup=reply_markup
+            )
+            return MAIN_MENU
+    
+    async def tasks_command(self, update: Update, context):
+        """Show user tasks with management options"""
+        user_id = update.effective_user.id
+        user_tasks = [task for task in self.db.tasks.values() if task.get('user_id') == user_id]
+        
+        if not user_tasks:
+            keyboard = [[
+                InlineKeyboardButton("➕ צור משימה ראשונה", callback_data="new_task"),
+                InlineKeyboardButton("❓ איך זה עובד?", callback_data="tasks_help")
+            ]]
+            
+            await update.message.reply_text(
+                "📋 **המשימות שלי**\n\n"
+                "אין לך משימות פעילות כרגע.\n"
+                "אני יכולה לעזור לך ליצור משימות חדשות!\n\n"
+                "💡 פשוט שלח לי הודעה כמו:\n"
+                "• \"תזכור לי לקרוא לרופא מחר\"\n"
+                "• \"תקבע פגישה עם הצוות השבוע\"\n"
+                "• \"תזכיר לי לשלוח דוח עד יום חמישי\"",
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode='Markdown'
+            )
+            return
+        
+        # Create detailed task display  
+        await self.button_handler(update, context)  # Reuse the button handler logic
+    
+    @admin_only
+    async def admin_stats(self, update: Update, context):
+        """Enhanced admin statistics with task management data"""
+        stats = self.db.get_basic_stats()
+        task_stats = self.db.get_task_statistics()  # All users
+        
+        # Additional admin-only stats
+        admin_text = f"""👑 **פאנל מנהל - סטטיסטיקות מתקדמות**
+
+📊 **נתוני משתמשים:**
+- סה"כ משתמשים: {stats.get('total_users', 0)}
+- פעילים השבוע: {stats.get('active_users_week', 0)}
+- שיחות השבוע: {stats.get('total_conversations', 0)}
+
+📋 **נתוני משימות (כלל המערכת):**
+- סה"כ משימות: {task_stats.get('total', 0)}
+- נוצרו היום: {task_stats.get('created_today', 0)}
+- הושלמו היום: {task_stats.get('completed_today', 0)}
+
+🤖 **מצב המערכת:**
+- AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
+- Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
+- Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
+- Uptime: {stats.get('uptime', 'Online')}
+        """
+        
+        await update.message.reply_text(admin_text, parse_mode='Markdown')
+    
+    @admin_only
+    async def broadcast_message(self, update: Update, context):
+        """Send message to all users"""
+        if not context.args:
+            await update.message.reply_text(
+                "📢 שימוש: /broadcast הודעה לכל המשתמשים"
+            )
+            return
+        
+        message = " ".join(context.args)
+        await update.message.reply_text("📤 מתחיל שידור...")
+        
+        try:
+            sent_count = 0
+            failed_count = 0
+            
+            if hasattr(self.db.users, 'find'):  # MongoDB
+                async for user in self.db.users.find({"is_active": True}):
+                    try:
+                        await context.bot.send_message(
+                            user["user_id"], 
+                            f"📢 הודעה ממאיה:\n\n{message}"
+                        )
+                        sent_count += 1
+                    except Exception:
+                        failed_count += 1
+            else:  # In-memory
+                for user_id, user_data in self.db.users.items():
+                    try:
+                        await context.bot.send_message(
+                            user_id,
+                            f"📢 הודעה ממאיה:\n\n{message}"
+                        )
+                        sent_count += 1
+                    except Exception:
+                        failed_count += 1
+            
+            await update.message.reply_text(
+                f"✅ שידור הושלם!\n"
+                f"📤 נשלח: {sent_count}\n"
+                f"❌ נכשל: {failed_count}"
+            )
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ שגיאה בשידור: {e}")
+    
+    async def feedback_command(self, update: Update, context):
+        """Collect user feedback"""
+        if not context.args:
+            await update.message.reply_text(
+                "💬 שליחת משוב:\n\n"
+                "שתף אותי במחשבות שלך על השירות:\n"
+                "/feedback הטקסט שלך כאן"
+            )
+            return
+        
+        feedback = " ".join(context.args)
+        user = update.effective_user
+        
+        # If admin exists, forward feedback
+        if ADMIN_ID:
+            try:
+                await context.bot.send_message(
+                    ADMIN_ID,
+                    f" 📝 משוב חדש מ-{user.first_name} ({user.id}):\n\n{feedback}"
+               )
+           except Exception:
+               pass
+       
+       await update.message.reply_text(
+           "🙏 תודה על המשוב!\n\n"
+           "המשוב שלך חשוב לי מאוד ויעזור לי להשתפר. "
+           "אמשיך להתפתח ולהיות טובה יותר בעזרתך! 💜"
+       )
+
+# ============================
+# MAIN APPLICATION
+# ============================
+
+def main():
+   """Main function to run the bot"""
+   
+   # Validate required environment variables
+   if not BOT_TOKEN:
+       logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
+       return
+   
+   # Start Flask server for keep-alive
+   logger.info("🚀 Starting Keep-Alive server...")
+   flask_thread = Thread(target=run_flask, daemon=True)
+   flask_thread.start()
+   
+   # Initialize bot
+   logger.info("🤖 Initializing Maya AI Bot...")
+   maya = MayaBot()
+   
+   # Build application
+   application = Application.builder().token(BOT_TOKEN).build()
+   
+   # Create conversation handler for complex interactions
+   conv_handler = ConversationHandler(
+       entry_points=[CommandHandler("start", maya.start_command)],
+       states={
+           MAIN_MENU: [CallbackQueryHandler(maya.button_handler)],
+           SETTINGS_MENU: [CallbackQueryHandler(maya.button_handler)],
+           AI_CHAT: [
+               MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message),
+               CallbackQueryHandler(maya.button_handler)
+           ],
+           FEEDBACK: [MessageHandler(filters.TEXT & ~filters.COMMAND, maya.feedback_command)]
+       },
+       fallbacks=[
+           CommandHandler("start", maya.start_command),
+           MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message)
+       ]
+   )
+   
+   # Add handlers
+   application.add_handler(conv_handler)
+   application.add_handler(CommandHandler("admin_stats", maya.admin_stats))
+   application.add_handler(CommandHandler("broadcast", maya.broadcast_message))
+   application.add_handler(CommandHandler("feedback", maya.feedback_command))
+   application.add_handler(CommandHandler("tasks", maya.tasks_command))
+   
+   # Fallback handler for any text message
+   application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message))
+   
+   # Handle callback queries
+   application.add_handler(CallbackQueryHandler(maya.button_handler))
+   
+   # Error handler
+   async def error_handler(update: Update, context):
+       """Handle errors gracefully"""
+       logger.error(f"Error occurred: {context.error}")
+       if update and update.effective_message:
+           await update.effective_message.reply_text(
+               "😅 אופס! משהו השתבש. אני עובדת על תיקון הבעיה.\n"
+               "נסה שוב בעוד רגע או פנה למנהל אם הבעיה נמשכת."
+           )
+   
+   application.add_error_handler(error_handler)
+   
+   # Start the bot
+   logger.info("✅ Maya is starting up...")
+   logger.info("📡 Bot will be available soon...")
+   
+   try:
+       # Run bot with polling
+       application.run_polling(
+           drop_pending_updates=True,
+           allowed_updates=Update.ALL_TYPES
+       )
+   except Exception as e:
+       logger.error(f"❌ Failed to start bot: {e}")
+
+if __name__ == '__main__':
+   main()
