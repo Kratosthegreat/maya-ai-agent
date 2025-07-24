@@ -10,7 +10,9 @@ async def button_handler(self, update: Update, context):
                 "💬 **מצב שיחה פעיל!**\n\n"
                 "שלח לי כל שאלה או נושא לדיון. אני כאן לעזור! 🤖\n\n"
                 "**💡 דוגמאות למה שאני יכולה לעזור:**\n"
-                "• תזכורות ומשימות: \"תזכור לי"""
+                "• תזכורות ומשימות: \"תזכור לי#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
 Maya - Advanced AI Telegram Bot
 =====================================
 A sophisticated AI-powered Telegram bot with autonomous capabilities,
@@ -759,6 +761,7 @@ class MayaBot:
         # Create task display
         tasks_text = f"📋 **המשימות שלי** ({len(pending_tasks)} פעילות)\n\n"
         
+        # Priority emojis
         # Priority emojis
         priority_emoji = {'urgent': '🔥', 'high': '⚡', 'medium': '📋', 'low': '📝'}
         category_emoji = {
