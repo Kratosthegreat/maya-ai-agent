@@ -1,4 +1,264 @@
-async def button_handler(self, update: Update, context):
+elif data.startswith("edit_"):
+            # Edit specific task
+            task_id = data.replace("edit_", "")
+            
+            if hasattr(self.db, 'tasks') and task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                
+                if task.get('user_id') != query.from_user.id:
+                    await query.edit_message_text("❌ אין לך הרשאה לערוך משימה זו")
+                    return
+                
+                # Show edit options
+                keyboard = [
+                    [InlineKeyboardButton("📝 שנה כותרת", callback_data=f"edit_title_{task_id}")],
+                    [InlineKeyboardButton("🎯 שנה עדיפות", callback_data=f"edit_priority_{task_id}")],
+                    [InlineKeyboardButton("📅 שנה תאריך", callback_data=f"edit_date_{task_id}")],
+                    [InlineKeyboardButton("🗑️ מחק משימה", callback_data=f"delete_{task_id}")],
+                    [InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")]
+                ]
+                
+                category_info = self.ai.task_manager.get_task_category_display(task.get('category', 'other'))
+                priority_info = self.ai.task_manager.get_priority_display(task.get('priority', 'medium'))
+                
+                await query.edit_message_text(
+                    f"✏️ **עריכת משימה**\n\n"
+                    f"{category_info['emoji']} {task['title']}\n"
+                    f"{priority_info['emoji']} עדיפות: {priority_info['name']}\n"
+                    f"📊 סטטוס: {task.get('status', 'pending')}\n\n"
+                    f"מה תרצה לערוך?",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await query.edit_message_text(
+                    "❌ לא מצאתי את המשימה",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
+                    ]])
+                )
+        
+        elif data.startswith("delete_"):
+            # Delete specific task
+            task_id = data.replace("delete_", "")
+            
+            if hasattr(self.db, 'tasks') and task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                
+                if task.get('user_id') != query.from_user.id:
+                    await query.edit_message_text("❌ אין לך הרשאה למחוק משימה זו")
+                    return
+                
+                # Confirm deletion
+                keyboard = [
+                    [InlineKeyboardButton("🗑️ כן, מחק", callback_data=f"confirm_delete_{task_id}")],
+                    [InlineKeyboardButton("❌ ביטול", callback_data="my_tasks")]
+                ]
+                
+        elif data.startswith("edit_"):
+            # Edit specific task
+            task_id = data.replace("edit_", "")
+            
+            if hasattr(self.db, 'tasks') and task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                
+                if task.get('user_id') != query.from_user.id:
+                    await query.edit_message_text("❌ אין לך הרשאה לערוך משימה זו")
+                    return
+                
+                # Show edit options
+                keyboard = [
+                    [InlineKeyboardButton("📝 שנה כותרת", callback_data=f"edit_title_{task_id}")],
+                    [InlineKeyboardButton("🎯 שנה עדיפות", callback_data=f"edit_priority_{task_id}")],
+                    [InlineKeyboardButton("📅 שנה תאריך", callback_data=f"edit_date_{task_id}")],
+                    [InlineKeyboardButton("🗑️ מחק משימה", callback_data=f"delete_{task_id}")],
+                    [InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")]
+                ]
+                
+                category_info = self.ai.task_manager.get_task_category_display(task.get('category', 'other'))
+                priority_info = self.ai.task_manager.get_priority_display(task.get('priority', 'medium'))
+                
+                await query.edit_message_text(
+                    f"✏️ **עריכת משימה**\n\n"
+                    f"{category_info['emoji']} {task['title']}\n"
+                    f"{priority_info['emoji']} עדיפות: {priority_info['name']}\n"
+                    f"📊 סטטוס: {task.get('status', 'pending')}\n\n"
+                    f"מה תרצה לערוך?",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await query.edit_message_text(
+                    "❌ לא מצאתי את המשימה",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
+                    ]])
+                )
+        
+        elif data.startswith("delete_"):
+            # Delete specific task
+            task_id = data.replace("delete_", "")
+            
+            if hasattr(self.db, 'tasks') and task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                
+                if task.get('user_id') != query.from_user.id:
+                    await query.edit_message_text("❌ אין לך הרשאה למחוק משימה זו")
+                    return
+                
+                # Confirm deletion
+                keyboard = [
+                    [InlineKeyboardButton("🗑️ כן, מחק", callback_data=f"confirm_delete_{task_id}")],
+                    [InlineKeyboardButton("❌ ביטול", callback_data="my_tasks")]
+                ]
+                
+                await query.edit_message_text(
+                    f"🗑️ **מחיקת משימה**\n\n"
+                    f"האם אתה בטוח שברצונך למחוק את המשימה:\n"
+                    f"**{task['title']}**\n\n"
+                    f"⚠️ פעולה זו לא ניתנת לביטול!",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+        
+        elif data.startswith("confirm_delete_"):
+            # Actually delete the task
+            task_id = data.replace("confirm_delete_", "")
+            
+            if hasattr(self.db, 'tasks') and task_id in self.db.tasks:
+                task = self.db.tasks[task_id]
+                task_title = task['title']
+                
+                # Delete task
+                del self.db.tasks[task_id]
+                
+                await query.edit_message_text(
+                    f"✅ **משימה נמחקה**\n\n"
+                    f"המשימה **{task_title}** נמחקה בהצלחה.\n"
+                    f"🕐 נמחקה: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("📋 למשימות שלי", callback_data="my_tasks"),
+                        InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")
+                    ]])
+                )
+        
+        elif data == "urgent_tasks":
+            # Show only urgent tasks
+            user_id = query.from_user.id
+            all_tasks = getattr(self.db, 'tasks', {})
+            urgent_tasks = [
+                task for task in all_tasks.values() 
+                if task.get('user_id') == user_id 
+                and task.get('priority') == 'urgent' 
+                and task.get('status') == 'pending'
+            ]
+            
+            if not urgent_tasks:
+                await query.edit_message_text(
+                    "🎉 **אין משימות דחופות!**\n\n"
+                    "כל הכבוד! אין לך משימות עם עדיפות דחופה כרגע.\n"
+                    "זה זמן טוב להתקדם עם משימות אחרות או לתכנן קדימה.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("📋 כל המשימות", callback_data="my_tasks"),
+                        InlineKeyboardButton("➕ משימה חדשה", callback_data="new_task")
+                    ]])
+                )
+                return
+            
+            tasks_text = f"🔥 **משימות דחופות** ({len(urgent_tasks)})\n\n"
+            
+            for i, task in enumerate(urgent_tasks[:5], 1):
+                category_info = self.ai.task_manager.get_task_category_display(task.get('category', 'other'))
+                tasks_text += f"{i}. {category_info['emoji']} {task['title'][:35]}...\n"
+                
+                if task.get('due_date'):
+                    try:
+                        due_date = datetime.fromisoformat(task['due_date'])
+                        tasks_text += f"   📅 יעד: {due_date.strftime('%d/%m/%Y')}\n"
+                    except:
+                        pass
+                tasks_text += "\n"
+            
+            tasks_text += "💡 התמקד במשימות אלה קודם כל!"
+            
+            keyboard = [
+                [InlineKeyboardButton("✅ סמן הושלם", callback_data="complete_task")],
+                [InlineKeyboardButton("📋 כל המשימות", callback_data="my_tasks")],
+                [InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")]
+            ]
+            
+            await query.edit_message_text(
+                tasks_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        
+        elif data == "task_summary":
+            # Show comprehensive task summary
+            user_id = query.from_user.id
+            task_summary = self.ai.task_manager.get_user_tasks_summary(user_id)
+            
+            if task_summary['total'] == 0:
+                await query.edit_message_text(
+                    "📊 **סיכום משימות**\n\n"
+                    "עדיין לא יצרת משימות.\n\n"
+                    "💡 התחל על ידי שליחת הודעה כמו:\n"
+                    "• \"תזכור לי לקרוא לרופא מחר\"\n"
+                    "• \"תקבע פגישה עם הצוות\"\n"
+                    "• \"תבדוק מחירים לטיסה\"",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("💬 התחל שיחה", callback_data="ai_chat"),
+                        InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")
+                    ]])
+                )
+                return
+            
+            # Calculate completion rate
+            completion_rate = 0
+            if task_summary['total'] > 0:
+                completion_rate = round((task_summary['completed'] / task_summary['total']) * 100)
+            
+            summary_text = f"""📊 **סיכום המשימות שלך**
+
+📈 **נתונים כלליים:**
+• סה"כ משימות: {task_summary['total']}
+• פעילות: {task_summary['pending']} 📋
+• בתהליך: {task_summary['in_progress']} ⚡
+• הושלמו: {task_summary['completed']} ✅
+• שיעור השלמה: {completion_rate}% 📊
+
+🎯 **סטטוס מיוחד:**"""
+            
+            if task_summary['urgent'] > 0:
+                summary_text += f"\n• דחופות: {task_summary['urgent']} 🔥"
+            
+            if task_summary['overdue'] > 0:
+                summary_text += f"\n• באיחור: {task_summary['overdue']} ⏰"
+            
+            if task_summary['urgent'] == 0 and task_summary['overdue'] == 0:
+                summary_text += "\n• 🎉 הכל תחת שליטה!"
+            
+            # Add productivity tip
+            summary_text += f"\n\n💡 **טיפ יומי:**\n"
+            if completion_rate >= 80:
+                summary_text += "אתה מאוד יעיל! שקול להוסיף יותר משימות."
+            elif completion_rate >= 60:
+                summary_text += "עבודה טובה! נסה להתמקד במשימות דחופות."
+            elif completion_rate >= 40:
+                summary_text += "יש מקום לשיפור. תתחיל עם המשימות הקטנות."
+            else:
+                summary_text += "בוא נתארגן מחדש! אולי יש יותר מדי משימות?"
+            
+            keyboard = []
+            if task_summary['urgent'] > 0:
+                keyboard.append([InlineKeyboardButton(f"🔥 דחופות ({task_summary['urgent']})", callback_data="urgent_tasks")])
+            
+            keyboard.extend([
+                [InlineKeyboardButton("📋 כל המשימות", callback_data="my_tasks")],
+                [InlineKeyboardButton("➕ משימה חדשה", callback_data="new_task")],
+                [InlineKeyboardButton("🏠 תפריט ראשי", callback_data="main_menu")]
+            ])
+            
+            await query.edit_message_text(
+                summary_text,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )    async def button_handler(self, update: Update, context):
         """Handle inline keyboard callbacks with task management"""
         query = update.callback_query
         await query.answer()
@@ -188,8 +448,8 @@ class DatabaseManager:
             return False
     
     def log_conversation(self, user_id: int, message: str, response: str, 
-                        message_type: str = "text") -> bool:
-        """Log conversation for AI learning and analytics"""
+                        message_type: str = "text", metadata: str = None) -> bool:
+        """Enhanced conversation logging with metadata support"""
         try:
             conversation_data = {
                 "user_id": user_id,
@@ -198,7 +458,8 @@ class DatabaseManager:
                 "bot_response": response,
                 "message_type": message_type,
                 "response_length": len(response),
-                "ai_model": "gemini-pro"
+                "ai_model": "gemini-pro",
+                "metadata": metadata  # For task_id references, etc.
             }
             
             if hasattr(self.conversations, 'insert_one'):  # MongoDB
@@ -209,6 +470,62 @@ class DatabaseManager:
                 return True
         except Exception as e:
             logger.error(f"Error logging conversation: {e}")
+            return False
+    
+    def get_task_statistics(self, user_id: int = None) -> Dict:
+        """Get comprehensive task statistics"""
+        try:
+            if not hasattr(self, 'tasks'):
+                return {'error': 'No task system available'}
+            
+            all_tasks = list(self.tasks.values())
+            
+            if user_id:
+                all_tasks = [task for task in all_tasks if task.get('user_id') == user_id]
+            
+            if not all_tasks:
+                return {'total': 0, 'by_status': {}, 'by_category': {}, 'by_priority': {}}
+            
+            # Count by status
+            by_status = {}
+            for task in all_tasks:
+                status = task.get('status', 'pending')
+                by_status[status] = by_status.get(status, 0) + 1
+            
+            # Count by category
+            by_category = {}
+            for task in all_tasks:
+                category = task.get('category', 'other')
+                by_category[category] = by_category.get(category, 0) + 1
+            
+            # Count by priority
+            by_priority = {}
+            for task in all_tasks:
+                priority = task.get('priority', 'medium')
+                by_priority[priority] = by_priority.get(priority, 0) + 1
+            
+            return {
+                'total': len(all_tasks),
+                'by_status': by_status,
+                'by_category': by_category,
+                'by_priority': by_priority,
+                'created_today': len([t for t in all_tasks if self._is_today(t.get('created_at', ''))]),
+                'completed_today': len([t for t in all_tasks if self._is_today(t.get('completed_at', ''))])
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting task statistics: {e}")
+            return {'error': str(e)}
+    
+    def _is_today(self, date_string: str) -> bool:
+        """Check if a date string is from today"""
+        if not date_string:
+            return False
+        try:
+            date = datetime.fromisoformat(date_string)
+            today = datetime.now().date()
+            return date.date() == today
+        except:
             return False
     
     def get_user_context(self, user_id: int, last_n: int = 5) -> List[Dict]:
@@ -411,19 +728,165 @@ class TaskManager:
         return None
     
     def _save_task(self, task_details: Dict) -> str:
-        """Save task to storage (simplified)"""
+        """Save task to storage with improved structure"""
         import uuid
-        task_id = str(uuid.uuid4())
+        task_id = str(uuid.uuid4())[:8]  # Shorter ID for easier use
         task_details['id'] = task_id
         task_details['created_at'] = datetime.now().isoformat()
+        task_details['updated_at'] = datetime.now().isoformat()
+        
+        # Ensure all tasks have required fields
+        task_details.setdefault('status', 'pending')
+        task_details.setdefault('priority', 'medium')
+        task_details.setdefault('category', 'other')
         
         # Save to database or in-memory storage
-        if hasattr(self.db, 'tasks'):
-            if not hasattr(self.db, 'tasks'):
-                self.db.tasks = {}
-            self.db.tasks[task_id] = task_details
+        if not hasattr(self.db, 'tasks'):
+            self.db.tasks = {}
+        self.db.tasks[task_id] = task_details
         
+        logger.info(f"Task created: {task_id} - {task_details['title']}")
         return task_id
+    
+    def get_task_category_display(self, category: str) -> Dict:
+        """Get formatted category with emoji and metadata"""
+        category_map = {
+            'reminder': {'emoji': '⏰', 'name': 'תזכורת', 'color': 'blue'},
+            'meeting': {'emoji': '🤝', 'name': 'פגישה', 'color': 'green'},
+            'schedule': {'emoji': '📅', 'name': 'לוח זמנים', 'color': 'purple'},
+            'email': {'emoji': '📧', 'name': 'אימייל', 'color': 'red'},
+            'research': {'emoji': '🔍', 'name': 'מחקר', 'color': 'orange'},
+            'call': {'emoji': '📞', 'name': 'שיחה', 'color': 'cyan'},
+            'document': {'emoji': '📄', 'name': 'מסמך', 'color': 'gray'}
+        }
+        return category_map.get(category, {'emoji': '📋', 'name': 'משימה', 'color': 'gray'})
+    
+    def get_priority_display(self, priority: str) -> Dict:
+        """Get formatted priority with emoji and metadata"""
+        priority_map = {
+            'urgent': {'emoji': '🔥', 'name': 'דחוף', 'color': 'red'},
+            'high': {'emoji': '⚡', 'name': 'חשוב', 'color': 'orange'},
+            'medium': {'emoji': '📋', 'name': 'רגיל', 'color': 'blue'},
+            'low': {'emoji': '📝', 'name': 'נמוך', 'color': 'gray'}
+        }
+        return priority_map.get(priority, {'emoji': '📋', 'name': 'רגיל', 'color': 'blue'})
+    
+    async def create_and_notify_task(self, user_id: int, message: str) -> Optional[tuple]:
+        """Create task and return with interactive keyboard"""
+        intent_result = self.analyze_user_intent(message)
+        
+        if not intent_result:
+            return None
+        
+        intent, confidence = intent_result
+        
+        if confidence >= 1 and intent in ['reminder', 'meeting', 'schedule', 'email', 'research']:
+            task_details = self.extract_task_details(message)
+            task_details['user_id'] = user_id
+            task_details['created_by_ai'] = True
+            
+            # Save task
+            task_id = self._save_task(task_details)
+            
+            # Get display info
+            category_info = self.get_task_category_display(task_details['category'])
+            priority_info = self.get_priority_display(task_details['priority'])
+            
+            # Create response message
+            response = f"""✅ יצרתי עבורך משימה חדשה!
+
+{category_info['emoji']} **{task_details['title']}**
+{priority_info['emoji']} עדיפות: {priority_info['name']}"""
+            
+            if task_details.get('due_date'):
+                try:
+                    due_date = datetime.fromisoformat(task_details['due_date'])
+                    response += f"\n📅 תאריך יעד: {due_date.strftime('%d/%m/%Y')}"
+                except:
+                    pass
+            
+            # Create interactive keyboard
+            keyboard = [
+                [
+                    InlineKeyboardButton("✅ סמן כהושלם", callback_data=f"complete_{task_id}"),
+                    InlineKeyboardButton("✏️ ערוך", callback_data=f"edit_{task_id}")
+                ],
+                [
+                    InlineKeyboardButton("📋 כל המשימות", callback_data="my_tasks"),
+                    InlineKeyboardButton("🔄 המשך שיחה", callback_data="continue_chat")
+                ]
+            ]
+            
+            return response, InlineKeyboardMarkup(keyboard), task_id
+        
+        return None
+    
+    async def update_task_status(self, task_id: str, new_status: str, user_id: int) -> str:
+        """Update task status with notification"""
+        if not hasattr(self.db, 'tasks') or task_id not in self.db.tasks:
+            return "❌ לא מצאתי את המשימה"
+        
+        task = self.db.tasks[task_id]
+        
+        # Verify task ownership
+        if task.get('user_id') != user_id:
+            return "❌ אין לך הרשאה לערוך משימה זו"
+        
+        # Update task
+        old_status = task.get('status', 'pending')
+        task['status'] = new_status
+        task['updated_at'] = datetime.now().isoformat()
+        
+        if new_status == 'completed':
+            task['completed_at'] = datetime.now().isoformat()
+        
+        # Create status message
+        status_messages = {
+            'completed': '🎉 משימה הושלמה בהצלחה!',
+            'in_progress': '⚡ המשימה מסומנת כבתהליך',
+            'cancelled': '❌ המשימה בוטלה',
+            'pending': '📋 המשימה חזרה לרשימת הממתינות'
+        }
+        
+        category_info = self.get_task_category_display(task.get('category', 'other'))
+        
+        response = f"""{status_messages.get(new_status, 'המשימה עודכנה')}
+
+{category_info['emoji']} **{task['title']}**
+📊 סטטוס: {old_status} → {new_status}
+⏰ עודכן: {datetime.now().strftime('%d/%m/%Y %H:%M')}"""
+        
+        logger.info(f"Task {task_id} status updated: {old_status} → {new_status}")
+        return response
+    
+    def get_user_tasks_summary(self, user_id: int) -> Dict:
+        """Get comprehensive user tasks summary"""
+        if not hasattr(self.db, 'tasks'):
+            return {'total': 0, 'pending': 0, 'completed': 0, 'urgent': 0}
+        
+        user_tasks = [task for task in self.db.tasks.values() if task.get('user_id') == user_id]
+        
+        summary = {
+            'total': len(user_tasks),
+            'pending': len([t for t in user_tasks if t.get('status') == 'pending']),
+            'completed': len([t for t in user_tasks if t.get('status') == 'completed']),
+            'in_progress': len([t for t in user_tasks if t.get('status') == 'in_progress']),
+            'urgent': len([t for t in user_tasks if t.get('priority') == 'urgent' and t.get('status') == 'pending']),
+            'overdue': 0  # Will be calculated with due dates
+        }
+        
+        # Calculate overdue tasks
+        now = datetime.now()
+        for task in user_tasks:
+            if task.get('status') == 'pending' and task.get('due_date'):
+                try:
+                    due_date = datetime.fromisoformat(task['due_date'])
+                    if due_date < now:
+                        summary['overdue'] += 1
+                except:
+                    pass
+        
+        return summary
 
 # ============================
 # AI ENGINE WITH SMART FEATURES
@@ -1184,20 +1647,44 @@ class MayaBot:
     
     @admin_only
     async def admin_stats(self, update: Update, context):
-        """Advanced admin statistics"""
+        """Enhanced admin statistics with task management data"""
         stats = self.db.get_basic_stats()
+        task_stats = self.db.get_task_statistics()  # All users
         
         # Additional admin-only stats
-        admin_text = f"""
-👑 **פאנל מנהל - סטטיסטיקות מתקדמות**
+        admin_text = f"""👑 **פאנל מנהל - סטטיסטיקות מתקדמות**
 
 📊 **נתוני משתמשים:**
 • סה"כ משתמשים: {stats.get('total_users', 0)}
 • פעילים השבוע: {stats.get('active_users_week', 0)}
 • שיחות השבוע: {stats.get('total_conversations', 0)}
 
+📋 **נתוני משימות (כלל המערכת):**
+• סה"כ משימות: {task_stats.get('total', 0)}
+• נוצרו היום: {task_stats.get('created_today', 0)}
+• הושלמו היום: {task_stats.get('completed_today', 0)}
+
+📈 **פילוח לפי סטטוס:**"""
+        
+        by_status = task_stats.get('by_status', {})
+        for status, count in by_status.items():
+            status_emoji = {'pending': '📋', 'completed': '✅', 'in_progress': '⚡', 'cancelled': '❌'}
+            admin_text += f"\n• {status_emoji.get(status, '📋')} {status}: {count}"
+        
+        admin_text += f"""
+
+🎯 **פילוח לפי עדיפות:**"""
+        
+        by_priority = task_stats.get('by_priority', {})
+        for priority, count in by_priority.items():
+            priority_emoji = {'urgent': '🔥', 'high': '⚡', 'medium': '📋', 'low': '📝'}
+            admin_text += f"\n• {priority_emoji.get(priority, '📋')} {priority}: {count}"
+        
+        admin_text += f"""
+
 🤖 **מצב המערכת:**
 • AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
+• Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
 • Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
 • Uptime: {stats.get('uptime', 'Online')}
 
@@ -1205,6 +1692,7 @@ class MayaBot:
 • זמן תגובה ממוצע: < 2 שניות
 • שפות נתמכות: עברית, אנגלית
 • דגם AI: Gemini Pro
+• Task Creation Rate: {task_stats.get('created_today', 0)} היום
         """
         
         await update.message.reply_text(admin_text, parse_mode='Markdown')
