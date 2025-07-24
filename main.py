@@ -1,3 +1,34 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Maya - Advanced AI Telegram Bot
+"""
+
+import os
+import logging
+import asyncio
+import json
+from datetime import datetime, timedelta
+from threading import Thread
+from typing import Dict, List, Optional, Any
+import re
+from functools import wraps
+import uuid
+
+# Core imports
+from flask import Flask, jsonify
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, 
+    CallbackQueryHandler, ConversationHandler, filters
+)
+
+# AI and external services
+import google.generativeai as genai
+import requests
+from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure
+
 def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> InlineKeyboardMarkup:
     """Create smart context-aware keyboard"""
     keyboard = []
