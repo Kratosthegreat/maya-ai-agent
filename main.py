@@ -1,4 +1,4 @@
-def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> InlineKeyboardMarkup:
+    def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> InlineKeyboardMarkup:
         """Create smart context-aware keyboard"""
         keyboard = []
         
@@ -30,7 +30,7 @@ def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> I
         ])
         
         return InlineKeyboardMarkup(keyboard)
-    
+
     def _generate_sync(self, prompt: str) -> str:
         try:
             response = self.model.generate_content(prompt)
@@ -38,7 +38,8 @@ def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> I
         except Exception as e:
             print(f"❌ שגיאה במהלך הפקת טקסט: {e}")
             return "לא הצלחתי לחשוב על משהו כרגע... רוצה לנסות לנסח את זה אחרת?"
-    
+
+
     def _fallback_response(self, message: str) -> str:
         """Enhanced fallback responses with task awareness"""
         message_lower = message.lower()
@@ -57,18 +58,18 @@ def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> I
         
         return "מצטערת, אני חווה קשיים טכניים כרגע. אוכל לעזור לך בעוד רגע! 🤖"
 
-# ============================
-# CONVERSATION STATES
-# ============================
+    # ============================
+    # CONVERSATION STATES
+    # ============================
 
-# Conversation states for complex interactions
-MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
+    # Conversation states for complex interactions
+    MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
 
-# ============================
-# UTILITY FUNCTIONS
-# ============================
+    # ============================
+    # UTILITY FUNCTIONS
+    # ============================
 
-def admin_only(func):
+    def admin_only(func):
     """Decorator to restrict access to admin commands"""
     @wraps(func)
     async def wrapper(update: Update, context):
@@ -81,7 +82,7 @@ def admin_only(func):
         return await func(update, context)
     return wrapper
 
-def typing_action(func):
+    def typing_action(func):
     """Decorator to show typing action while processing"""
     @wraps(func)
     async def wrapper(update: Update, context):
@@ -92,7 +93,7 @@ def typing_action(func):
         return await func(update, context)
     return wrapper
 
-def extract_keywords(text: str) -> List[str]:
+    def extract_keywords(text: str) -> List[str]:
     """Extract keywords from Hebrew text"""
     # Simple keyword extraction for Hebrew
     words = re.findall(r'[\u0590-\u05FF\w]+', text)
@@ -101,17 +102,17 @@ def extract_keywords(text: str) -> List[str]:
     keywords = [word for word in words if len(word) > 2 and word not in stop_words]
     return keywords[:10]  # Return top 10 keywords
 
-# ============================
-# BOT HANDLERS
-# ============================
+    # ============================
+    # BOT HANDLERS
+    # ============================
 
-class MayaBot:
+    class MayaBot:
     """Main bot class with all handlers"""
-    
+
     def __init__(self):
         self.ai = MayaAI()
         self.db = DatabaseManager()
-    
+
     async def start_command(self, update: Update, context) -> int:
         """Enhanced start command with personality"""
         user = update.effective_user
@@ -143,14 +144,14 @@ class MayaBot:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         welcome_text = f"""
-🤖 שלום {user.first_name}, אני מאיה!
+    🤖 שלום {user.first_name}, אני מאיה!
 
-אני בוט AI מתקדם שיכול לעזור לך במגוון נושאים:
-• שיחות טבעיות בעברית
-• יצירת וניהול משימות חכמות
-• תזכורות ותזמון פגישות
-• עזרה במשימות יומיומיות
-• למידה מכל שיחה שלנו"""
+    אני בוט AI מתקדם שיכול לעזור לך במגוון נושאים:
+    • שיחות טבעיות בעברית
+    • יצירת וניהול משימות חכמות
+    • תזכורות ותזמון פגישות
+    • עזרה במשימות יומיומיות
+    • למידה מכל שיחה שלנו"""
         
         if task_summary['pending'] > 0:
             welcome_text += f"\n\n📋 יש לך {task_summary['pending']} משימות פעילות"
@@ -164,7 +165,7 @@ class MayaBot:
             reply_markup=reply_markup
         )
         return MAIN_MENU
-    
+
     @typing_action
     async def handle_message(self, update: Update, context):
         """Handle all text messages with enhanced AI and real-time task management"""
@@ -199,7 +200,7 @@ class MayaBot:
         # If a task was created, send additional confirmation
         if task_id:
             logger.info(f"Task {task_id} created for user {user.id}")
-    
+
     async def button_handler(self, update: Update, context):
         """Handle inline keyboard callbacks with task management"""
         query = update.callback_query
@@ -379,30 +380,30 @@ class MayaBot:
             task_summary = self.ai.task_manager.get_user_tasks_summary(user_id)
             
             stats_text = f"""
-📊 **סטטיסטיקות הבוט:**
+    📊 **סטטיסטיקות הבוט:**
 
-👥 **משתמשים רשומים:** {stats.get('total_users', 0)}
-⚡ **פעילים השבוע:** {stats.get('active_users_week', 0)}
-💬 **סה"כ שיחות:** {stats.get('total_conversations', 0)}
+    👥 **משתמשים רשומים:** {stats.get('total_users', 0)}
+    ⚡ **פעילים השבוע:** {stats.get('active_users_week', 0)}
+    💬 **סה"כ שיחות:** {stats.get('total_conversations', 0)}
 
-📋 **המשימות שלך:**
-🟡 **פעילות:** {task_summary['pending']}
-✅ **הושלמו:** {task_summary['completed']}
-📈 **סה"כ יצרת:** {task_summary['total']}
+    📋 **המשימות שלך:**
+    🟡 **פעילות:** {task_summary['pending']}
+    ✅ **הושלמו:** {task_summary['completed']}
+    📈 **סה"כ יצרת:** {task_summary['total']}
 
-🤖 **מצב המערכת:**
-🟢 **AI Engine:** פעיל
-🟢 **Task Manager:** פעיל
-🟢 **Status:** {stats.get('uptime', 'Online')}
+    🤖 **מצב המערכת:**
+    🟢 **AI Engine:** פעיל
+    🟢 **Task Manager:** פעיל
+    🟢 **Status:** {stats.get('uptime', 'Online')}
 
-אני לומדת ומשתפרת מכל שיחה ומשימה! 💜
+    אני לומדת ומשתפרת מכל שיחה ומשימה! 💜
             """
             
             keyboard = [[InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
             await query.edit_message_text(stats_text, reply_markup=reply_markup)
-    
+
     async def tasks_command(self, update: Update, context):
         """Show user tasks with management options"""
         user_id = update.effective_user.id
@@ -429,7 +430,7 @@ class MayaBot:
         
         # Create detailed task display
         await self.button_handler(update, context)  # Reuse the button handler logic
-    
+
     @admin_only
     async def admin_stats(self, update: Update, context):
         """Enhanced admin statistics with task management data"""
@@ -439,25 +440,25 @@ class MayaBot:
         # Additional admin-only stats
         admin_text = f"""👑 **פאנל מנהל - סטטיסטיקות מתקדמות**
 
-📊 **נתוני משתמשים:**
-• סה"כ משתמשים: {stats.get('total_users', 0)}
-• פעילים השבוע: {stats.get('active_users_week', 0)}
-• שיחות השבוע: {stats.get('total_conversations', 0)}
+    📊 **נתוני משתמשים:**
+    • סה"כ משתמשים: {stats.get('total_users', 0)}
+    • פעילים השבוע: {stats.get('active_users_week', 0)}
+    • שיחות השבוע: {stats.get('total_conversations', 0)}
 
-📋 **נתוני משימות (כלל המערכת):**
-• סה"כ משימות: {task_stats.get('total', 0)}
-• נוצרו היום: {task_stats.get('created_today', 0)}
-• הושלמו היום: {task_stats.get('completed_today', 0)}
+    📋 **נתוני משימות (כלל המערכת):**
+    • סה"כ משימות: {task_stats.get('total', 0)}
+    • נוצרו היום: {task_stats.get('created_today', 0)}
+    • הושלמו היום: {task_stats.get('completed_today', 0)}
 
-🤖 **מצב המערכת:**
-• AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
-• Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
-• Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
-• Uptime: {stats.get('uptime', 'Online')}
+    🤖 **מצב המערכת:**
+    • AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
+    • Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
+    • Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
+    • Uptime: {stats.get('uptime', 'Online')}
         """
         
         await update.message.reply_text(admin_text, parse_mode='Markdown')
-    
+
     @admin_only
     async def broadcast_message(self, update: Update, context):
         """Send message to all users"""
@@ -503,7 +504,7 @@ class MayaBot:
             
         except Exception as e:
             await update.message.reply_text(f"❌ שגיאה בשידור: {e}")
-    
+
     async def feedback_command(self, update: Update, context):
         """Collect user feedback"""
         if not context.args:
@@ -533,30 +534,30 @@ class MayaBot:
             "אמשיך להתפתח ולהיות טובה יותר בעזרתך! 💜"
         )
 
-# ============================
-# MAIN APPLICATION
-# ============================
+    # ============================
+    # MAIN APPLICATION
+    # ============================
 
-def main():
+    def main():
     """Main function to run the bot"""
-    
+
     # Validate required environment variables
     if not BOT_TOKEN:
         logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
         return
-    
+
     # Start Flask server for keep-alive
     logger.info("🚀 Starting Keep-Alive server...")
     flask_thread = Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    
+
     # Initialize bot
     logger.info("🤖 Initializing Maya AI Bot...")
     maya = MayaBot()
-    
+
     # Build application
     application = Application.builder().token(BOT_TOKEN).build()
-    
+
     # Create conversation handler for complex interactions
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", maya.start_command)],
@@ -574,20 +575,20 @@ def main():
             MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message)
         ]
     )
-    
+
     # Add handlers
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("admin_stats", maya.admin_stats))
     application.add_handler(CommandHandler("broadcast", maya.broadcast_message))
     application.add_handler(CommandHandler("feedback", maya.feedback_command))
     application.add_handler(CommandHandler("tasks", maya.tasks_command))
-    
+
     # Fallback handler for any text message
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message))
-    
+
     # Handle callback queries
     application.add_handler(CallbackQueryHandler(maya.button_handler))
-    
+
     # Error handler
     async def error_handler(update: Update, context):
         """Handle errors gracefully"""
@@ -597,13 +598,13 @@ def main():
                 "😅 אופס! משהו השתבש. אני עובדת על תיקון הבעיה.\n"
                 "נסה שוב בעוד רגע או פנה למנהל אם הבעיה נמשכת."
             )
-    
+
     application.add_error_handler(error_handler)
-    
+
     # Start the bot
     logger.info("✅ Maya is starting up...")
     logger.info("📡 Bot will be available soon...")
-    
+
     try:
         # Run bot with polling
         application.run_polling(
@@ -613,85 +614,85 @@ def main():
     except Exception as e:
         logger.error(f"❌ Failed to start bot: {e}")
 
-if __name__ == '__main__':
+    if __name__ == '__main__':
     main()#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Maya - Advanced AI Telegram Bot
-=====================================
-A sophisticated AI-powered Telegram bot with autonomous capabilities,
-Hebrew support, and advanced conversation management.
+    # -*- coding: utf-8 -*-
+    """
+    Maya - Advanced AI Telegram Bot
+    =====================================
+    A sophisticated AI-powered Telegram bot with autonomous capabilities,
+    Hebrew support, and advanced conversation management.
 
-Author: AI Development Team
-Version: 2.0
-License: MIT
-"""
+    Author: AI Development Team
+    Version: 2.0
+    License: MIT
+    """
 
-import os
-import logging
-import asyncio
-import json
-from datetime import datetime, timedelta
-from threading import Thread
-from typing import Dict, List, Optional, Any
-import re
-from functools import wraps
-import uuid
+    import os
+    import logging
+    import asyncio
+    import json
+    from datetime import datetime, timedelta
+    from threading import Thread
+    from typing import Dict, List, Optional, Any
+    import re
+    from functools import wraps
+    import uuid
 
-# Core imports
-from flask import Flask, jsonify
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
+    # Core imports
+    from flask import Flask, jsonify
+    from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.ext import (
     Application, CommandHandler, MessageHandler, 
     CallbackQueryHandler, ConversationHandler, filters
-)
+    )
 
-# AI and external services
-import google.generativeai as genai
-import requests
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
+    # AI and external services
+    import google.generativeai as genai
+    import requests
+    from pymongo import MongoClient
+    from pymongo.errors import ConnectionFailure
 
-# ============================
-# CONFIGURATION & SETUP
-# ============================
+    # ============================
+    # CONFIGURATION & SETUP
+    # ============================
 
-# Configure logging
-logging.basicConfig(
+    # Configure logging
+    logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=getattr(logging, os.getenv('LOG_LEVEL', 'INFO'))
-)
-logger = logging.getLogger(__name__)
+    )
+    logger = logging.getLogger(__name__)
 
-# Environment variables
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-MONGO_URI = os.getenv('MONGO_URI')
-ADMIN_ID = int(os.getenv('ADMIN_ID', 0)) if os.getenv('ADMIN_ID') else None
+    # Environment variables
+    BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    MONGO_URI = os.getenv('MONGO_URI')
+    ADMIN_ID = int(os.getenv('ADMIN_ID', 0)) if os.getenv('ADMIN_ID') else None
 
-# Configure Gemini AI
-if GEMINI_API_KEY:
+    # Configure Gemini AI
+    if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    
-# Maya's personality configuration
-MAYA_PERSONALITY = """
-אני מאיה, בוט AI חכם ומתקדם. אני:
-- מדברת בעברית טבעית וחמה
-- מבינה הקשר ונושאי שיחה מורכבים
-- יכולה לעזור במגוון רחב של נושאים
-- לומדת מכל שיחה ומתאמת את עצמי למשתמש
-- נותנת תשובות מקיפות ומועילות
-- שומרת על אופי ידידותי אך מקצועי
-"""
 
-# ============================
-# FLASK KEEP-ALIVE SERVER
-# ============================
+    # Maya's personality configuration
+    MAYA_PERSONALITY = """
+    אני מאיה, בוט AI חכם ומתקדם. אני:
+    - מדברת בעברית טבעית וחמה
+    - מבינה הקשר ונושאי שיחה מורכבים
+    - יכולה לעזור במגוון רחב של נושאים
+    - לומדת מכל שיחה ומתאמת את עצמי למשתמש
+    - נותנת תשובות מקיפות ומועילות
+    - שומרת על אופי ידידותי אך מקצועי
+    """
 
-app = Flask(__name__)
+    # ============================
+    # FLASK KEEP-ALIVE SERVER
+    # ============================
 
-@app.route('/')
-def health_check():
+    app = Flask(__name__)
+
+    @app.route('/')
+    def health_check():
     """Health check endpoint for uptime monitoring"""
     return jsonify({
         "status": "active",
@@ -700,8 +701,8 @@ def health_check():
         "version": "2.0"
     }), 200
 
-@app.route('/stats')
-def bot_stats():
+    @app.route('/stats')
+    def bot_stats():
     """Basic bot statistics endpoint"""
     try:
         db = DatabaseManager()
@@ -710,18 +711,18 @@ def bot_stats():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def run_flask():
+    def run_flask():
     """Run Flask server in separate thread"""
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
 
-# ============================
-# DATABASE MANAGEMENT
-# ============================
+    # ============================
+    # DATABASE MANAGEMENT
+    # ============================
 
-class DatabaseManager:
+    class DatabaseManager:
     """Advanced database management with MongoDB"""
-    
+
     def __init__(self):
         self.client = None
         self.db = None
@@ -730,7 +731,7 @@ class DatabaseManager:
         self.ai_memory = None
         self.tasks = {}  # Initialize tasks storage
         self._connect()
-    
+
     def _connect(self):
         """Establish database connection"""
         try:
@@ -751,7 +752,7 @@ class DatabaseManager:
             self.users = {}
             self.conversations = []
             self.ai_memory = {}
-    
+
     def register_user(self, user_data: Dict) -> bool:
         """Register or update user information"""
         try:
@@ -791,7 +792,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error registering user: {e}")
             return False
-    
+
     def log_conversation(self, user_id: int, message: str, response: str, 
                         message_type: str = "text", metadata: str = None) -> bool:
         """Enhanced conversation logging with metadata support"""
@@ -816,7 +817,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error logging conversation: {e}")
             return False
-    
+
     def get_user_context(self, user_id: int, last_n: int = 5) -> List[Dict]:
         """Get recent conversation context for AI"""
         try:
@@ -835,7 +836,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting user context: {e}")
             return []
-    
+
     def save_ai_memory(self, user_id: int, memory_key: str, memory_value: Any) -> bool:
         """Save AI memory for personalized responses"""
         try:
@@ -861,7 +862,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error saving AI memory: {e}")
             return False
-    
+
     def get_basic_stats(self) -> Dict:
         """Get basic bot statistics"""
         try:
@@ -889,7 +890,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
             return {"error": str(e)}
-    
+
     def get_task_statistics(self, user_id: int = None) -> Dict:
         """Get comprehensive task statistics"""
         try:
@@ -934,7 +935,7 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error getting task statistics: {e}")
             return {'error': str(e)}
-    
+
     def _is_today(self, date_string: str) -> bool:
         """Check if a date string is from today"""
         if not date_string:
@@ -946,16 +947,16 @@ class DatabaseManager:
         except:
             return False
 
-# ============================
-# TASK MANAGEMENT SYSTEM
-# ============================
+    # ============================
+    # TASK MANAGEMENT SYSTEM
+    # ============================
 
-class TaskManager:
+    class TaskManager:
     """Smart task management with AI integration"""
-    
+
     def __init__(self, db):
         self.db = db
-    
+
     def analyze_user_intent(self, message: str) -> Optional[tuple]:
         """Analyze user intent with confidence scoring"""
         task_patterns = {
@@ -977,7 +978,7 @@ class TaskManager:
                 confidence_scores[intent] = score
         
         return max(confidence_scores.items(), key=lambda x: x[1]) if confidence_scores else None
-    
+
     def extract_task_details(self, message: str) -> Dict:
         """Extract task details from message"""
         intent_result = self.analyze_user_intent(message)
@@ -1012,7 +1013,7 @@ class TaskManager:
             'due_date': due_date,
             'status': 'pending'
         }
-    
+
     def _extract_due_date(self, message: str) -> Optional[str]:
         """Extract due date from natural language"""
         message_lower = message.lower()
@@ -1030,7 +1031,7 @@ class TaskManager:
             return (today + timedelta(days=30)).isoformat()
         
         return None
-    
+
     def _save_task(self, task_details: Dict) -> str:
         """Save task to storage with improved structure"""
         task_id = str(uuid.uuid4())[:8]  # Shorter ID for easier use
@@ -1048,7 +1049,7 @@ class TaskManager:
         
         logger.info(f"Task created: {task_id} - {task_details['title']}")
         return task_id
-    
+
     def get_task_category_display(self, category: str) -> Dict:
         """Get formatted category with emoji and metadata"""
         category_map = {
@@ -1061,7 +1062,7 @@ class TaskManager:
             'document': {'emoji': '📄', 'name': 'מסמך', 'color': 'gray'}
         }
         return category_map.get(category, {'emoji': '📋', 'name': 'משימה', 'color': 'gray'})
-    
+
     def get_priority_display(self, priority: str) -> Dict:
         """Get formatted priority with emoji and metadata"""
         priority_map = {
@@ -1071,7 +1072,7 @@ class TaskManager:
             'low': {'emoji': '📝', 'name': 'נמוך', 'color': 'gray'}
         }
         return priority_map.get(priority, {'emoji': '📋', 'name': 'רגיל', 'color': 'blue'})
-    
+
     async def create_and_notify_task(self, user_id: int, message: str) -> Optional[tuple]:
         """Create task and return with interactive keyboard"""
         intent_result = self.analyze_user_intent(message)
@@ -1096,8 +1097,8 @@ class TaskManager:
             # Create response message
             response = f"""✅ יצרתי עבורך משימה חדשה!
 
-{category_info['emoji']} **{task_details['title']}**
-{priority_info['emoji']} עדיפות: {priority_info['name']}"""
+    {category_info['emoji']} **{task_details['title']}**
+    {priority_info['emoji']} עדיפות: {priority_info['name']}"""
             
             if task_details.get('due_date'):
                 try:
@@ -1121,7 +1122,7 @@ class TaskManager:
             return response, InlineKeyboardMarkup(keyboard), task_id
         
         return None
-    
+
     def get_user_tasks_summary(self, user_id: int) -> Dict:
         """Get comprehensive user tasks summary"""
         user_tasks = [task for task in self.db.tasks.values() if task.get('user_id') == user_id]
@@ -1148,19 +1149,19 @@ class TaskManager:
         
         return summary
 
-# ============================
-# AI ENGINE WITH SMART FEATURES
-# ============================
+    # ============================
+    # AI ENGINE WITH SMART FEATURES
+    # ============================
 
-class MayaAI:
+    class MayaAI:
     """Advanced AI engine with task management and smart responses"""
-    
+
     def __init__(self):
         self.model = None
         self.db = DatabaseManager()
         self.task_manager = TaskManager(self.db)
         self._initialize_model()
-    
+
     def _initialize_model(self):
         """Initialize Gemini AI model"""
         try:
@@ -1190,9 +1191,9 @@ class MayaAI:
                 logger.warning("⚠️ No Gemini API key provided")
         except Exception as e:
             logger.error(f"❌ Failed to initialize AI model: {e}")
-    
+
     async def generate_response(self, user_id: int, message: str, 
-                              user_name: str = "משתמש") -> tuple:
+                                user_name: str = "משתמש") -> tuple:
         """Generate intelligent response with enhanced task management"""
         try:
             if not self.model:
@@ -1221,9 +1222,9 @@ class MayaAI:
                 # Combine AI response with task creation
                 combined_response = f"""{ai_response}
 
----
+    ---
 
-{task_message}"""
+    {task_message}"""
                 
                 # Log conversation with task reference
                 self.db.log_conversation(user_id, message, combined_response, f"task_created:{task_id}")
@@ -1241,7 +1242,7 @@ class MayaAI:
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
             return self._fallback_response(message), None, None
-    
+
     async def build_rich_context(self, user_id: int, message: str, intent=None, task_summary=None) -> str:
         """Build comprehensive context with task and user awareness"""
         # Get conversation history
@@ -1295,24 +1296,24 @@ class MayaAI:
                 intent_str += "\n(הכן ליצור משימה אוטומטית)"
         
         return f"""
-{MAYA_PERSONALITY}
+    {MAYA_PERSONALITY}
 
-כמזכירה אישית חכמה ואקטיבית, תפקידי הוא:
-- להבין כוונות ולזהות משימות אוטומטית
-- לנהל משימות ותזכורות בצורה פרואקטיבית
-- לספק מעקב ועדכונים על התקדמות
-- להיות זמינה ומגיבה לצרכים משתנים
+    כמזכירה אישית חכמה ואקטיבית, תפקידי הוא:
+    - להבין כוונות ולזהות משימות אוטומטית
+    - לנהל משימות ותזכורות בצורה פרואקטיבית
+    - לספק מעקב ועדכונים על התקדמות
+    - להיות זמינה ומגיבה לצרכים משתנים
 
-{context_str}{tasks_str}{summary_str}{intent_str}
+    {context_str}{tasks_str}{summary_str}{intent_str}
 
-ההודעה הנוכחית: "{message}"
+    ההודעה הנוכחית: "{message}"
 
-הגב בעברית טבעית וידידותית. 
-אם זיהיתי כוונה למשימה - הסבר מה אני עושה.
-התייחס למשימות קיימות ולהיסטוריה אם רלוונטי.
-תן עצות פרואקטיביות לניהול זמן וארגון.
-"""
-    
+    הגב בעברית טבעית וידידותית. 
+    אם זיהיתי כוונה למשימה - הסבר מה אני עושה.
+    התייחס למשימות קיימות ולהיסטוריה אם רלוונטי.
+    תן עצות פרואקטיביות לניהול זמן וארגון.
+    """
+
     def _create_context_keyboard(self, message: str, user_id: int, intent=None) -> InlineKeyboardMarkup:
         """Create smart context-aware keyboard"""
         keyboard = []
@@ -1345,7 +1346,7 @@ class MayaAI:
         ])
         
         return InlineKeyboardMarkup(keyboard)
-    
+
     def _generate_sync(self, prompt: str) -> str:
         """Synchronous generation wrapper"""
         try:
@@ -1354,7 +1355,7 @@ class MayaAI:
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             raise e
-    
+
     def _fallback_response(self, message: str) -> str:
         """Enhanced fallback responses with task awareness"""
         message_lower = message.lower()
@@ -1373,18 +1374,18 @@ class MayaAI:
         
         return "מצטערת, אני חווה קשיים טכניים כרגע. אוכל לעזור לך בעוד רגע! 🤖"
 
-# ============================
-# CONVERSATION STATES
-# ============================
+    # ============================
+    # CONVERSATION STATES
+    # ============================
 
-# Conversation states for complex interactions
-MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
+    # Conversation states for complex interactions
+    MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
 
-# ============================
-# UTILITY FUNCTIONS
-# ============================
+    # ============================
+    # UTILITY FUNCTIONS
+    # ============================
 
-def admin_only(func):
+    def admin_only(func):
     """Decorator to restrict access to admin commands"""
     @wraps(func)
     async def wrapper(update: Update, context):
@@ -1397,7 +1398,7 @@ def admin_only(func):
         return await func(update, context)
     return wrapper
 
-def typing_action(func):
+    def typing_action(func):
     """Decorator to show typing action while processing"""
     @wraps(func)
     async def wrapper(update: Update, context):
@@ -1408,7 +1409,7 @@ def typing_action(func):
         return await func(update, context)
     return wrapper
 
-def extract_keywords(text: str) -> List[str]:
+    def extract_keywords(text: str) -> List[str]:
     """Extract keywords from Hebrew text"""
     # Simple keyword extraction for Hebrew
     words = re.findall(r'[\u0590-\u05FF\w]+', text)
@@ -1417,17 +1418,17 @@ def extract_keywords(text: str) -> List[str]:
     keywords = [word for word in words if len(word) > 2 and word not in stop_words]
     return keywords[:10]  # Return top 10 keywords
 
-# ============================
-# BOT HANDLERS
-# ============================
+    # ============================
+    # BOT HANDLERS
+    # ============================
 
-class MayaBot:
+    class MayaBot:
     """Main bot class with all handlers"""
-    
+
     def __init__(self):
         self.ai = MayaAI()
         self.db = DatabaseManager()
-    
+
     async def start_command(self, update: Update, context) -> int:
         """Enhanced start command with personality"""
         user = update.effective_user
@@ -1459,14 +1460,14 @@ class MayaBot:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         welcome_text = f"""
-🤖 שלום {user.first_name}, אני מאיה!
+    🤖 שלום {user.first_name}, אני מאיה!
 
-אני בוט AI מתקדם שיכול לעזור לך במגוון נושאים:
-- שיחות טבעיות בעברית
-- יצירת וניהול משימות חכמות
-- תזכורות ותזמון פגישות
-- עזרה במשימות יומיומיות
-- למידה מכל שיחה שלנו"""
+    אני בוט AI מתקדם שיכול לעזור לך במגוון נושאים:
+    - שיחות טבעיות בעברית
+    - יצירת וניהול משימות חכמות
+    - תזכורות ותזמון פגישות
+    - עזרה במשימות יומיומיות
+    - למידה מכל שיחה שלנו"""
         
         if task_summary['pending'] > 0:
             welcome_text += f"\n\n📋 יש לך {task_summary['pending']} משימות פעילות"
@@ -1480,7 +1481,7 @@ class MayaBot:
             reply_markup=reply_markup
         )
         return MAIN_MENU
-    
+
     @typing_action
     async def handle_message(self, update: Update, context):
         """Handle all text messages with enhanced AI and real-time task management"""
@@ -1515,7 +1516,7 @@ class MayaBot:
         # If a task was created, send additional confirmation
         if task_id:
             logger.info(f"Task {task_id} created for user {user.id}")
-    
+
     async def button_handler(self, update: Update, context):
         """Handle inline keyboard callbacks with task management"""
         query = update.callback_query
@@ -1638,7 +1639,7 @@ class MayaBot:
             # Show tasks to mark as complete
             user_id = query.from_user.id
             user_tasks = [task for task in self.db.tasks.values() 
-                         if task.get('user_id') == user_id and task.get('status') == 'pending']
+                            if task.get('user_id') == user_id and task.get('status') == 'pending']
             
             if not user_tasks:
                 await query.edit_message_text(
@@ -1711,23 +1712,23 @@ class MayaBot:
             task_summary = self.ai.task_manager.get_user_tasks_summary(user_id)
             
             stats_text = f"""
-📊 **סטטיסטיקות הבוט:**
+    📊 **סטטיסטיקות הבוט:**
 
-👥 **משתמשים רשומים:** {stats.get('total_users', 0)}
-⚡ **פעילים השבוע:** {stats.get('active_users_week', 0)}
-💬 **סה"כ שיחות:** {stats.get('total_conversations', 0)}
+    👥 **משתמשים רשומים:** {stats.get('total_users', 0)}
+    ⚡ **פעילים השבוע:** {stats.get('active_users_week', 0)}
+    💬 **סה"כ שיחות:** {stats.get('total_conversations', 0)}
 
-📋 **המשימות שלך:**
-🟡 **פעילות:** {task_summary['pending']}
-✅ **הושלמו:** {task_summary['completed']}
-📈 **סה"כ יצרת:** {task_summary['total']}
+    📋 **המשימות שלך:**
+    🟡 **פעילות:** {task_summary['pending']}
+    ✅ **הושלמו:** {task_summary['completed']}
+    📈 **סה"כ יצרת:** {task_summary['total']}
 
-🤖 **מצב המערכת:**
-🟢 **AI Engine:** פעיל
-🟢 **Task Manager:** פעיל
-🟢 **Status:** {stats.get('uptime', 'Online')}
+    🤖 **מצב המערכת:**
+    🟢 **AI Engine:** פעיל
+    🟢 **Task Manager:** פעיל
+    🟢 **Status:** {stats.get('uptime', 'Online')}
 
-אני לומדת ומשתפרת מכל שיחה ומשימה! 💜
+    אני לומדת ומשתפרת מכל שיחה ומשימה! 💜
             """
             
             keyboard = [[InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]]
@@ -1737,29 +1738,29 @@ class MayaBot:
         
         elif data == "help":
             help_text = """
-❓ **מדריך שימוש במאיה**
+    ❓ **מדריך שימוש במאיה**
 
-🎯 **מה אני יכולה לעשות:**
-- לענות על שאלות בכל נושא
-- ליצור ולנהל משימות חכמות
-- לעזור בכתיבה ועריכה
-- לתת הסברים על נושאים מורכבים
-- לסייע במשימות מזכירות יומיומיות
+    🎯 **מה אני יכולה לעשות:**
+    - לענות על שאלות בכל נושא
+    - ליצור ולנהל משימות חכמות
+    - לעזור בכתיבה ועריכה
+    - לתת הסברים על נושאים מורכבים
+    - לסייע במשימות מזכירות יומיומיות
 
-📋 **ניהול משימות חכם:**
-- שלח "תזכור לי..." - ואני אשמור תזכורת
-- שלח "תקבע פגישה..." - ואני אארגן פגישה
-- שלח "תבדוק..." - ואני אכין משימת מחקר
+    📋 **ניהול משימות חכם:**
+    - שלח "תזכור לי..." - ואני אשמור תזכורת
+    - שלח "תקבע פגישה..." - ואני אארגן פגישה
+    - שלח "תבדוק..." - ואני אכין משימת מחקר
 
-💡 **טיפים לשימוש:**
-- כתוב בעברית טבעית
-- תאר בפירוט מה אתה צריך
-- אל תהסס לשאול שאלות המשך
+    💡 **טיפים לשימוש:**
+    - כתוב בעברית טבעית
+    - תאר בפירוט מה אתה צריך
+    - אל תהסס לשאול שאלות המשך
 
-🔧 **פקודות זמינות:**
-/start - התחלה מחדש
-/tasks - המשימות שלי
-/feedback - שליחת משוב
+    🔧 **פקודות זמינות:**
+    /start - התחלה מחדש
+    /tasks - המשימות שלי
+    /feedback - שליחת משוב
             """
             
             keyboard = [[InlineKeyboardButton("⬅️ חזור", callback_data="main_menu")]]
@@ -1797,7 +1798,7 @@ class MayaBot:
                 reply_markup=reply_markup
             )
             return MAIN_MENU
-    
+
     async def tasks_command(self, update: Update, context):
         """Show user tasks with management options"""
         user_id = update.effective_user.id
@@ -1824,7 +1825,7 @@ class MayaBot:
         
         # Create detailed task display  
         await self.button_handler(update, context)  # Reuse the button handler logic
-    
+
     @admin_only
     async def admin_stats(self, update: Update, context):
         """Enhanced admin statistics with task management data"""
@@ -1834,25 +1835,25 @@ class MayaBot:
         # Additional admin-only stats
         admin_text = f"""👑 **פאנל מנהל - סטטיסטיקות מתקדמות**
 
-📊 **נתוני משתמשים:**
-- סה"כ משתמשים: {stats.get('total_users', 0)}
-- פעילים השבוע: {stats.get('active_users_week', 0)}
-- שיחות השבוע: {stats.get('total_conversations', 0)}
+    📊 **נתוני משתמשים:**
+    - סה"כ משתמשים: {stats.get('total_users', 0)}
+    - פעילים השבוע: {stats.get('active_users_week', 0)}
+    - שיחות השבוע: {stats.get('total_conversations', 0)}
 
-📋 **נתוני משימות (כלל המערכת):**
-- סה"כ משימות: {task_stats.get('total', 0)}
-- נוצרו היום: {task_stats.get('created_today', 0)}
-- הושלמו היום: {task_stats.get('completed_today', 0)}
+    📋 **נתוני משימות (כלל המערכת):**
+    - סה"כ משימות: {task_stats.get('total', 0)}
+    - נוצרו היום: {task_stats.get('created_today', 0)}
+    - הושלמו היום: {task_stats.get('completed_today', 0)}
 
-🤖 **מצב המערכת:**
-- AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
-- Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
-- Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
-- Uptime: {stats.get('uptime', 'Online')}
+    🤖 **מצב המערכת:**
+    - AI Engine: {'🟢 פעיל' if self.ai.model else '🔴 לא זמין'}
+    - Task Manager: {'🟢 פעיל' if hasattr(self.db, 'tasks') else '🟡 בסיסי'}
+    - Database: {'🟢 MongoDB' if hasattr(self.db.users, 'find') else '🟡 זיכרון'}
+    - Uptime: {stats.get('uptime', 'Online')}
         """
         
         await update.message.reply_text(admin_text, parse_mode='Markdown')
-    
+
     @admin_only
     async def broadcast_message(self, update: Update, context):
         """Send message to all users"""
@@ -1898,7 +1899,7 @@ class MayaBot:
             
         except Exception as e:
             await update.message.reply_text(f"❌ שגיאה בשידור: {e}")
-    
+
     async def feedback_command(self, update: Update, context):
         """Collect user feedback"""
         if not context.args:
@@ -1918,95 +1919,95 @@ class MayaBot:
                 await context.bot.send_message(
                     ADMIN_ID,
                     f" 📝 משוב חדש מ-{user.first_name} ({user.id}):\n\n{feedback}"
-               )
-           except Exception:
-               pass
-       
-       await update.message.reply_text(
-           "🙏 תודה על המשוב!\n\n"
-           "המשוב שלך חשוב לי מאוד ויעזור לי להשתפר. "
-           "אמשיך להתפתח ולהיות טובה יותר בעזרתך! 💜"
-       )
+                )
+            except Exception:
+                pass
+        
+        await update.message.reply_text(
+            "🙏 תודה על המשוב!\n\n"
+            "המשוב שלך חשוב לי מאוד ויעזור לי להשתפר. "
+            "אמשיך להתפתח ולהיות טובה יותר בעזרתך! 💜"
+        )
 
-# ============================
-# MAIN APPLICATION
-# ============================
+    # ============================
+    # MAIN APPLICATION
+    # ============================
 
-def main():
-   """Main function to run the bot"""
-   
-   # Validate required environment variables
-   if not BOT_TOKEN:
-       logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
-       return
-   
-   # Start Flask server for keep-alive
-   logger.info("🚀 Starting Keep-Alive server...")
-   flask_thread = Thread(target=run_flask, daemon=True)
-   flask_thread.start()
-   
-   # Initialize bot
-   logger.info("🤖 Initializing Maya AI Bot...")
-   maya = MayaBot()
-   
-   # Build application
-   application = Application.builder().token(BOT_TOKEN).build()
-   
-   # Create conversation handler for complex interactions
-   conv_handler = ConversationHandler(
-       entry_points=[CommandHandler("start", maya.start_command)],
-       states={
-           MAIN_MENU: [CallbackQueryHandler(maya.button_handler)],
-           SETTINGS_MENU: [CallbackQueryHandler(maya.button_handler)],
-           AI_CHAT: [
-               MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message),
-               CallbackQueryHandler(maya.button_handler)
-           ],
-           FEEDBACK: [MessageHandler(filters.TEXT & ~filters.COMMAND, maya.feedback_command)]
-       },
-       fallbacks=[
-           CommandHandler("start", maya.start_command),
-           MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message)
-       ]
-   )
-   
-   # Add handlers
-   application.add_handler(conv_handler)
-   application.add_handler(CommandHandler("admin_stats", maya.admin_stats))
-   application.add_handler(CommandHandler("broadcast", maya.broadcast_message))
-   application.add_handler(CommandHandler("feedback", maya.feedback_command))
-   application.add_handler(CommandHandler("tasks", maya.tasks_command))
-   
-   # Fallback handler for any text message
-   application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message))
-   
-   # Handle callback queries
-   application.add_handler(CallbackQueryHandler(maya.button_handler))
-   
-   # Error handler
-   async def error_handler(update: Update, context):
-       """Handle errors gracefully"""
-       logger.error(f"Error occurred: {context.error}")
-       if update and update.effective_message:
-           await update.effective_message.reply_text(
-               "😅 אופס! משהו השתבש. אני עובדת על תיקון הבעיה.\n"
-               "נסה שוב בעוד רגע או פנה למנהל אם הבעיה נמשכת."
-           )
-   
-   application.add_error_handler(error_handler)
-   
-   # Start the bot
-   logger.info("✅ Maya is starting up...")
-   logger.info("📡 Bot will be available soon...")
-   
-   try:
-       # Run bot with polling
-       application.run_polling(
-           drop_pending_updates=True,
-           allowed_updates=Update.ALL_TYPES
-       )
-   except Exception as e:
-       logger.error(f"❌ Failed to start bot: {e}")
+    def main():
+    """Main function to run the bot"""
 
-if __name__ == '__main__':
-   main()
+    # Validate required environment variables
+    if not BOT_TOKEN:
+        logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
+        return
+
+    # Start Flask server for keep-alive
+    logger.info("🚀 Starting Keep-Alive server...")
+    flask_thread = Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+
+    # Initialize bot
+    logger.info("🤖 Initializing Maya AI Bot...")
+    maya = MayaBot()
+
+    # Build application
+    application = Application.builder().token(BOT_TOKEN).build()
+
+    # Create conversation handler for complex interactions
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", maya.start_command)],
+        states={
+            MAIN_MENU: [CallbackQueryHandler(maya.button_handler)],
+            SETTINGS_MENU: [CallbackQueryHandler(maya.button_handler)],
+            AI_CHAT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message),
+                CallbackQueryHandler(maya.button_handler)
+            ],
+            FEEDBACK: [MessageHandler(filters.TEXT & ~filters.COMMAND, maya.feedback_command)]
+        },
+        fallbacks=[
+            CommandHandler("start", maya.start_command),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message)
+        ]
+    )
+
+    # Add handlers
+    application.add_handler(conv_handler)
+    application.add_handler(CommandHandler("admin_stats", maya.admin_stats))
+    application.add_handler(CommandHandler("broadcast", maya.broadcast_message))
+    application.add_handler(CommandHandler("feedback", maya.feedback_command))
+    application.add_handler(CommandHandler("tasks", maya.tasks_command))
+
+    # Fallback handler for any text message
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message))
+
+    # Handle callback queries
+    application.add_handler(CallbackQueryHandler(maya.button_handler))
+
+    # Error handler
+    async def error_handler(update: Update, context):
+        """Handle errors gracefully"""
+        logger.error(f"Error occurred: {context.error}")
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "😅 אופס! משהו השתבש. אני עובדת על תיקון הבעיה.\n"
+                "נסה שוב בעוד רגע או פנה למנהל אם הבעיה נמשכת."
+            )
+
+    application.add_error_handler(error_handler)
+
+    # Start the bot
+    logger.info("✅ Maya is starting up...")
+    logger.info("📡 Bot will be available soon...")
+
+    try:
+        # Run bot with polling
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+
+    if __name__ == '__main__':
+    main()
