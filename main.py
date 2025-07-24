@@ -70,44 +70,44 @@ MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
 # ============================
 
 def admin_only(func):
-"""Decorator to restrict access to admin commands"""
-@wraps(func)
-async def wrapper(update: Update, context):
-    if not ADMIN_ID or update.effective_user.id != ADMIN_ID:
-        await update.message.reply_text(
-            "⛔ פקודה זו זמינה רק למנהלי הבוט\n"
-            f"המזהה שלך: {update.effective_user.id}"
-        )
+    """Decorator to restrict access to admin commands"""
+    @wraps(func)
+    async def wrapper(update: Update, context):
+        if not ADMIN_ID or update.effective_user.id != ADMIN_ID:
+            await update.message.reply_text(
+                "⛔ פקודה זו זמינה רק למנהלי הבוט\n"
+                f"המזהה שלך: {update.effective_user.id}"
+            )
         return
-    return await func(update, context)
-return wrapper
+        return await func(update, context)
+    return wrapper
 
 def typing_action(func):
-"""Decorator to show typing action while processing"""
-@wraps(func)
-async def wrapper(update: Update, context):
-    await context.bot.send_chat_action(
-        chat_id=update.effective_chat.id, 
-        action="typing"
-    )
-    return await func(update, context)
-return wrapper
+    """Decorator to show typing action while processing"""
+    @wraps(func)
+    async def wrapper(update: Update, context):
+        await context.bot.send_chat_action(
+            chat_id=update.effective_chat.id, 
+            action="typing"
+        )
+        return await func(update, context)
+    return wrapper
 
-def extract_keywords(text: str) -> List[str]:
-"""Extract keywords from Hebrew text"""
-# Simple keyword extraction for Hebrew
-words = re.findall(r'[\u0590-\u05FF\w]+', text)
-# Filter out common Hebrew stop words
-stop_words = {'של', 'את', 'את', 'על', 'אל', 'כל', 'מה', 'זה', 'זו', 'היא', 'הוא'}
-keywords = [word for word in words if len(word) > 2 and word not in stop_words]
-return keywords[:10]  # Return top 10 keywords
+    def extract_keywords(text: str) -> List[str]:
+        """Extract keywords from Hebrew text"""
+        # Simple keyword extraction for Hebrew
+        words = re.findall(r'[\u0590-\u05FF\w]+', text)
+        # Filter out common Hebrew stop words
+        stop_words = {'של', 'את', 'את', 'על', 'אל', 'כל', 'מה', 'זה', 'זו', 'היא', 'הוא'}
+        keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+        return keywords[:10]  # Return top 10 keywords
 
 # ============================
 # BOT HANDLERS
 # ============================
 
 class MayaBot:
-"""Main bot class with all handlers"""
+    """Main bot class with all handlers"""
 
 def __init__(self):
     self.ai = MayaAI()
@@ -539,12 +539,22 @@ async def feedback_command(self, update: Update, context):
 # ============================
 
 def main():
-"""Main function to run the bot"""
+    """Main function to run the bot"""
+    # Validate required environment variables
+    if not BOT_TOKEN:
+        logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
+        return
+
+    if not GEMINI_API_KEY:
+        logger.warning("⚠️ GEMINI_API_KEY is not set, using basic AI features only")
+    
+    if not MONGO_URI:
+        logger.warning("⚠️ MONGO_URI is not set, using in-memory storage")
 
 # Validate required environment variables
-if not BOT_TOKEN:
-    logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
-    return
+    if not BOT_TOKEN:
+        logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
+        return
 
 # Start Flask server for keep-alive
 logger.info("🚀 Starting Keep-Alive server...")
@@ -615,7 +625,7 @@ except Exception as e:
     logger.error(f"❌ Failed to start bot: {e}")
 
 if __name__ == '__main__':
-main()#!/usr/bin/env python3
+    main()#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Maya - Advanced AI Telegram Bot
@@ -672,7 +682,7 @@ ADMIN_ID = int(os.getenv('ADMIN_ID', 0)) if os.getenv('ADMIN_ID') else None
 
 # Configure Gemini AI
 if GEMINI_API_KEY:
-genai.configure(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # Maya's personality configuration
 MAYA_PERSONALITY = """
@@ -693,8 +703,8 @@ app = Flask(__name__)
 
 @app.route('/')
 def health_check():
-"""Health check endpoint for uptime monitoring"""
-return jsonify({
+    """Health check endpoint for uptime monitoring"""
+    return jsonify({
     "status": "active",
     "bot": "Maya AI Agent",
     "timestamp": datetime.now().isoformat(),
@@ -703,16 +713,16 @@ return jsonify({
 
 @app.route('/stats')
 def bot_stats():
-"""Basic bot statistics endpoint"""
-try:
-    db = DatabaseManager()
-    stats = db.get_basic_stats()
-    return jsonify(stats), 200
-except Exception as e:
-    return jsonify({"error": str(e)}), 500
+    """Basic bot statistics endpoint"""
+    try:
+        db = DatabaseManager()
+        stats = db.get_basic_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def run_flask():
-"""Run Flask server in separate thread"""
+    """Run Flask server in separate thread"""
 port = int(os.environ.get('PORT', 5000))
 app.run(host='0.0.0.0', port=port, debug=False)
 
@@ -721,7 +731,7 @@ app.run(host='0.0.0.0', port=port, debug=False)
 # ============================
 
 class DatabaseManager:
-"""Advanced database management with MongoDB"""
+    """Advanced database management with MongoDB"""
 
 def __init__(self):
     self.client = None
@@ -952,7 +962,7 @@ def _is_today(self, date_string: str) -> bool:
 # ============================
 
 class TaskManager:
-"""Smart task management with AI integration"""
+    """Smart task management with AI integration"""
 
 def __init__(self, db):
     self.db = db
@@ -1154,7 +1164,7 @@ def get_user_tasks_summary(self, user_id: int) -> Dict:
 # ============================
 
 class MayaAI:
-"""Advanced AI engine with task management and smart responses"""
+    """Advanced AI engine with task management and smart responses"""
 
 def __init__(self):
     self.model = None
@@ -1386,7 +1396,7 @@ MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
 # ============================
 
 def admin_only(func):
-"""Decorator to restrict access to admin commands"""
+    """Decorator to restrict access to admin commands"""
 @wraps(func)
 async def wrapper(update: Update, context):
     if not ADMIN_ID or update.effective_user.id != ADMIN_ID:
@@ -1396,10 +1406,10 @@ async def wrapper(update: Update, context):
         )
         return
     return await func(update, context)
-return wrapper
+    return wrapper
 
 def typing_action(func):
-"""Decorator to show typing action while processing"""
+    """Decorator to show typing action while processing"""
 @wraps(func)
 async def wrapper(update: Update, context):
     await context.bot.send_chat_action(
@@ -1407,23 +1417,23 @@ async def wrapper(update: Update, context):
         action="typing"
     )
     return await func(update, context)
-return wrapper
+    return wrapper
 
 def extract_keywords(text: str) -> List[str]:
-"""Extract keywords from Hebrew text"""
+    """Extract keywords from Hebrew text"""
 # Simple keyword extraction for Hebrew
-words = re.findall(r'[\u0590-\u05FF\w]+', text)
+    words = re.findall(r'[\u0590-\u05FF\w]+', text)
 # Filter out common Hebrew stop words
-stop_words = {'של', 'את', 'את', 'על', 'אל', 'כל', 'מה', 'זה', 'זו', 'היא', 'הוא'}
-keywords = [word for word in words if len(word) > 2 and word not in stop_words]
-return keywords[:10]  # Return top 10 keywords
+    stop_words = {'של', 'את', 'את', 'על', 'אל', 'כל', 'מה', 'זה', 'זו', 'היא', 'הוא'}
+    keywords = [word for word in words if len(word) > 2 and word not in stop_words]
+    return keywords[:10]  # Return top 10 keywords
 
 # ============================
 # BOT HANDLERS
 # ============================
 
 class MayaBot:
-"""Main bot class with all handlers"""
+    """Main bot class with all handlers"""
 
 def __init__(self):
     self.ai = MayaAI()
@@ -1934,12 +1944,12 @@ async def feedback_command(self, update: Update, context):
 # ============================
 
 def main():
-"""Main function to run the bot"""
+    """Main function to run the bot"""
 
 # Validate required environment variables
-if not BOT_TOKEN:
-    logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
-    return
+    if not BOT_TOKEN:
+        logger.error("❌ TELEGRAM_BOT_TOKEN is required!")
+        return
 
 # Start Flask server for keep-alive
 logger.info("🚀 Starting Keep-Alive server...")
@@ -2010,4 +2020,4 @@ except Exception as e:
     logger.error(f"❌ Failed to start bot: {e}")
 
 if __name__ == '__main__':
-main()
+    main()
