@@ -1311,7 +1311,7 @@ class MayaBot:
 
         if not task:
             await query.edit_message_text(
-                "❌ ,לא מצאתי את המשימה"
+                "❌ לא מצאתי את המשימה",
                 reply_markup=InlineKeyboardMarkup([[
                     InlineKeyboardButton("⬅️ חזור למשימות", callback_data="my_tasks")
                 ]])
