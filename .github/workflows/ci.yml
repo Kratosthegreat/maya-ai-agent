@@ -16,8 +16,10 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Install pytest
-        run: pip install pytest
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          echo "Verifying pytest installation:"
+          python -m pytest --version
       - name: Run tests
-        run: pytest
+        run: python -m pytest -v
