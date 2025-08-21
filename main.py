@@ -22,6 +22,10 @@ import re
 from functools import wraps
 import uuid
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 # Core imports
 from flask import Flask, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -35,6 +39,9 @@ import google.generativeai as genai
 import requests
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+
+# Intelligent Maya Agent
+from intelligent_maya import IntelligentMayaAgent, init_intelligent_maya, intelligent_maya, smart_response
 
 # ============================
 # CONFIGURATION & SETUP
@@ -1048,8 +1055,22 @@ class MayaBot:
     """Main bot class with all handlers"""
 
     def __init__(self):
+        # Initialize database first
+        self.db = DatabaseManager()
+        
+        # Initialize intelligent Maya agent if Gemini API key is available
+        if GEMINI_API_KEY:
+            self.intelligent_agent = init_intelligent_maya(GEMINI_API_KEY)
+            logger.info("✅ IntelligentMayaAgent initialized successfully")
+        else:
+            self.intelligent_agent = None
+            logger.warning("⚠️ No Gemini API key - IntelligentMayaAgent disabled")
+            
+        # Keep the traditional AI as backup
         self.ai = MayaAI()
-        self.db = self.ai.db  # Use the same DB instance
+        
+        # Use the same DB instance
+        self.ai.db = self.db
 
     async def start_command(self, update: Update, context) -> int:
         """Enhanced start command with personality"""
@@ -1129,23 +1150,83 @@ class MayaBot:
         await asyncio.sleep(0.3)  # Small delay for natural feeling
 
         try:
-            # Generate AI response with enhanced task management
-            ai_response, response_keyboard, task_id = await self.ai.generate_response(
-                user_id=user.id,
-                message=message,
-                user_name=user.first_name or "משתמש"
-            )
+            # Use intelligent agent if available, otherwise fallback to traditional AI
+            if self.intelligent_agent:
+                # Generate intelligent response using the advanced agent
+                intelligent_response = await self.intelligent_agent.process_message(user.id, message)
+                ai_response = intelligent_response.content
+                
+                # Still try to create task if relevant using traditional task manager
+                task_result = await self.ai.task_manager.create_and_notify_task(user.id, message)
+                
+                if task_result:
+                    task_message, task_keyboard, task_id = task_result
+                    
+                    # Combine intelligent response with task creation
+                    combined_response = f"""{ai_response}
 
-            # Send response with appropriate keyboard
-            await update.message.reply_text(
-                ai_response, 
-                reply_markup=response_keyboard,
-                parse_mode='Markdown'
-            )
+---
 
-            # If a task was created, send additional confirmation
-            if task_id:
-                logger.info(f"Task {task_id} created for user {user.id}")
+{task_message}"""
+                    
+                    # Log conversation with task reference
+                    self.db.log_conversation(
+                        user.id, message, combined_response, 
+                        metadata={
+                            "task_created": task_id, 
+                            "intelligent_agent": True,
+                            "confidence": intelligent_response.confidence,
+                            "used_tools": intelligent_response.used_tools
+                        }
+                    )
+                    
+                    # Send response with task keyboard
+                    await update.message.reply_text(
+                        combined_response, 
+                        reply_markup=task_keyboard,
+                        parse_mode='Markdown'
+                    )
+                    
+                    logger.info(f"Task {task_id} created for user {user.id} via intelligent agent")
+                else:
+                    # Create smart keyboard based on intelligent understanding
+                    smart_keyboard = self._create_smart_keyboard_from_intelligent_response(intelligent_response)
+                    
+                    # Log regular conversation
+                    self.db.log_conversation(
+                        user.id, message, ai_response,
+                        metadata={
+                            "intelligent_agent": True,
+                            "confidence": intelligent_response.confidence,
+                            "used_tools": intelligent_response.used_tools,
+                            "emotional_state": intelligent_response.emotional_context.value if intelligent_response.emotional_context else None
+                        }
+                    )
+                    
+                    # Send intelligent response
+                    await update.message.reply_text(
+                        ai_response, 
+                        reply_markup=smart_keyboard,
+                        parse_mode='Markdown'
+                    )
+            else:
+                # Fallback to traditional AI system
+                ai_response, response_keyboard, task_id = await self.ai.generate_response(
+                    user_id=user.id,
+                    message=message,
+                    user_name=user.first_name or "משתמש"
+                )
+
+                # Send response with appropriate keyboard
+                await update.message.reply_text(
+                    ai_response, 
+                    reply_markup=response_keyboard,
+                    parse_mode='Markdown'
+                )
+
+                # If a task was created, send additional confirmation
+                if task_id:
+                    logger.info(f"Task {task_id} created for user {user.id} via traditional AI")
 
         except Exception as e:
             logger.error(f"Error handling message from user {user.id}: {e}")
@@ -1153,6 +1234,34 @@ class MayaBot:
                 "😅 מצטערת, קרתה שגיאה קטנה. אני עובדת על תיקון הבעיה.\n"
                 "נסה שוב בעוד רגע!"
             )
+
+    def _create_smart_keyboard_from_intelligent_response(self, intelligent_response) -> Optional[InlineKeyboardMarkup]:
+        """Create smart keyboard based on intelligent response suggestions"""
+        try:
+            keyboard = []
+            
+            # Add suggested actions from the intelligent response
+            if intelligent_response.suggestions:
+                for i, suggestion in enumerate(intelligent_response.suggestions[:3]):  # Limit to 3 suggestions
+                    keyboard.append([InlineKeyboardButton(f"💡 {suggestion[:25]}...", callback_data=f"suggest_{i}")])
+            
+            # Add emotional support if needed
+            if intelligent_response.emotional_context and intelligent_response.emotional_context.value in ['sad', 'frustrated', 'confused']:
+                keyboard.append([InlineKeyboardButton("🤗 אני צריך תמיכה", callback_data="emotional_support")])
+            
+            # Add quick actions
+            quick_actions = [
+                [InlineKeyboardButton("📋 המשימות שלי", callback_data="my_tasks")],
+                [InlineKeyboardButton("❓ עזרה", callback_data="help"), 
+                 InlineKeyboardButton("📊 הגדרות", callback_data="settings")]
+            ]
+            keyboard.extend(quick_actions)
+            
+            return InlineKeyboardMarkup(keyboard) if keyboard else None
+            
+        except Exception as e:
+            logger.error(f"Error creating smart keyboard: {e}")
+            return None
 
     async def button_handler(self, update: Update, context):
         """Handle inline keyboard callbacks with enhanced task management"""

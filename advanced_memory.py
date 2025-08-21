@@ -1,14 +1,36 @@
 import sqlite3
 import json
 import asyncio
+import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
-import chromadb
-from sentence_transformers import SentenceTransformer
-import numpy as np
-from pydantic import BaseModel
+
+# Optional dependencies for advanced features
+try:
+    import chromadb
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
+    print("⚠️ chromadb not available, using simple memory storage")
+
+try:
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    EMBEDDINGS_AVAILABLE = True
+except ImportError:
+    EMBEDDINGS_AVAILABLE = False
+    print("⚠️ sentence_transformers not available, using simple text matching")
+
+try:
+    from pydantic import BaseModel
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+    # Create a simple BaseModel substitute
+    class BaseModel:
+        pass
 
 class MemoryType(Enum):
     CONVERSATION = "conversation"
@@ -56,14 +78,28 @@ class AdvancedMemorySystem:
     
     def __init__(self, db_path: str = "advanced_memory.db"):
         self.db_path = db_path
-        self.embeddings = SentenceTransformer('all-MiniLM-L6-v2')
         
-        # Vector Database
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-        self.vector_collection = self.chroma_client.get_or_create_collection(
-            name="agent_memories",
-            metadata={"hnsw:space": "cosine"}
-        )
+        # Initialize embeddings if available
+        if EMBEDDINGS_AVAILABLE:
+            self.embeddings = SentenceTransformer('all-MiniLM-L6-v2')
+        else:
+            self.embeddings = None
+        
+        # Vector Database if available
+        if CHROMADB_AVAILABLE:
+            try:
+                self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+                self.vector_collection = self.chroma_client.get_or_create_collection(
+                    name="agent_memories",
+                    metadata={"hnsw:space": "cosine"}
+                )
+            except Exception as e:
+                print(f"⚠️ ChromaDB setup failed: {e}, using simple storage")
+                self.chroma_client = None
+                self.vector_collection = None
+        else:
+            self.chroma_client = None
+            self.vector_collection = None
         
         # SQLite for structured data
         self.init_database()
@@ -71,8 +107,14 @@ class AdvancedMemorySystem:
         # Context cache
         self.context_cache: Dict[int, ConversationContext] = {}
         
+        # Simple memory storage as fallback
+        self.simple_memories: Dict[int, List[Dict[str, Any]]] = {}
+        
         print("🧠 מערכת זיכרון מתקדמת מאותחלת")
-        print(f"📊 Vector embeddings: {self.embeddings.get_sentence_embedding_dimension()} dimensions")
+        if self.embeddings:
+            print(f"📊 Vector embeddings: {self.embeddings.get_sentence_embedding_dimension()} dimensions")
+        else:
+            print("📊 Vector embeddings: Simple text matching mode")
     
     def init_database(self):
         """יצירת מסד הנתונים המתקדם"""
@@ -140,32 +182,44 @@ class AdvancedMemorySystem:
         conn.commit()
         conn.close()
     
-    def generate_embedding(self, text: str) -> np.ndarray:
+    def generate_embedding(self, text: str):
         """יצירת embedding לטקסט"""
-        return self.embeddings.encode(text)
+        if self.embeddings and EMBEDDINGS_AVAILABLE:
+            return self.embeddings.encode(text)
+        else:
+            # Simple fallback - return hash-based representation
+            return hash(text.lower().strip()) % 1000000
     
     async def store_memory(self, user_id: int, content: str, memory_type: MemoryType, 
                           importance: float = 0.5, emotional_context: Optional[EmotionalState] = None,
                           metadata: Dict[str, Any] = None) -> str:
         """שמירת זיכרון חדש"""
-        memory_id = f"mem_{user_id}_{int(datetime.now().timestamp())}"
+        memory_id = f"mem_{user_id}_{uuid.uuid4().hex}"
         
         # יצירת embedding
         embedding = self.generate_embedding(content)
         
-        # שמירה בVectorDB
-        self.vector_collection.add(
-            embeddings=[embedding.tolist()],
-            documents=[content],
-            metadatas=[{
-                "user_id": user_id,
-                "memory_type": memory_type.value,
-                "importance": importance,
-                "emotional_context": emotional_context.value if emotional_context else None,
-                "created_at": datetime.now().isoformat()
-            }],
-            ids=[memory_id]
-        )
+        # שמירה בVectorDB אם זמין
+        if self.vector_collection:
+            try:
+                self.vector_collection.add(
+                    embeddings=[embedding.tolist() if hasattr(embedding, 'tolist') else [float(embedding)]],
+                    documents=[content],
+                    metadatas=[{
+                        "user_id": user_id,
+                        "memory_type": memory_type.value,
+                        "importance": importance,
+                        "emotional_context": emotional_context.value if emotional_context else None,
+                        "created_at": datetime.now().isoformat()
+                    }],
+                    ids=[memory_id]
+                )
+            except Exception as e:
+                print(f"⚠️ Vector storage failed: {e}, using simple storage")
+                self._store_in_simple_memory(user_id, content, memory_type, importance, emotional_context, memory_id)
+        else:
+            # Fallback to simple memory storage
+            self._store_in_simple_memory(user_id, content, memory_type, importance, emotional_context, memory_id)
         
         # שמירה בSQL
         conn = sqlite3.connect(self.db_path)
@@ -188,47 +242,103 @@ class AdvancedMemorySystem:
         print(f"💾 זיכרון נשמר: {memory_type.value} - {content[:50]}...")
         return memory_id
     
+    def _store_in_simple_memory(self, user_id: int, content: str, memory_type: MemoryType, 
+                               importance: float, emotional_context: Optional[EmotionalState], memory_id: str):
+        """שמירה בזיכרון פשוט כחלופה"""
+        if user_id not in self.simple_memories:
+            self.simple_memories[user_id] = []
+        
+        memory_entry = {
+            "id": memory_id,
+            "content": content,
+            "memory_type": memory_type.value,
+            "importance": importance,
+            "emotional_context": emotional_context.value if emotional_context else None,
+            "created_at": datetime.now().isoformat(),
+            "embedding": self.generate_embedding(content)
+        }
+        
+        self.simple_memories[user_id].append(memory_entry)
+        
+        # Keep only the most recent 100 memories per user
+        if len(self.simple_memories[user_id]) > 100:
+            self.simple_memories[user_id] = self.simple_memories[user_id][-100:]
+    
     async def retrieve_relevant_memories(self, user_id: int, query: str, 
                                        limit: int = 10, min_relevance: float = 0.3) -> List[Memory]:
         """שליפת זיכרונות רלוונטיים"""
         # חיפוש סמנטי
         query_embedding = self.generate_embedding(query)
         
-        results = self.vector_collection.query(
-            query_embeddings=[query_embedding.tolist()],
-            n_results=limit * 2,  # מביא יותר לפילטור
-            where={"user_id": user_id}
-        )
+        if self.vector_collection:
+            try:
+                results = self.vector_collection.query(
+                    query_embeddings=[query_embedding.tolist() if hasattr(query_embedding, 'tolist') else [float(query_embedding)]],
+                    n_results=limit * 2,  # מביא יותר לפילטור
+                    where={"user_id": user_id}
+                )
+                
+                # פילטור לפי רלוונטיות
+                relevant_memories = []
+                
+                if results['documents']:
+                    for i, (doc, metadata, distance) in enumerate(zip(
+                        results['documents'][0],
+                        results['metadatas'][0],
+                        results['distances'][0]
+                    )):
+                        relevance = 1 - distance  # המרה למדד רלוונטיות
+                        
+                        if relevance >= min_relevance:
+                            memory = Memory(
+                                id=results['ids'][0][i],
+                                user_id=user_id,
+                                content=doc,
+                                memory_type=MemoryType(metadata['memory_type']),
+                                importance=metadata['importance'],
+                                emotional_context=EmotionalState(metadata['emotional_context']) if metadata.get('emotional_context') else None,
+                                created_at=datetime.fromisoformat(metadata['created_at']),
+                                last_accessed=datetime.now(),
+                                access_count=1,
+                                relevance_score=relevance
+                            )
+                            relevant_memories.append(memory)
+                
+                return sorted(relevant_memories, key=lambda x: x.relevance_score, reverse=True)[:limit]
+            except Exception as e:
+                print(f"⚠️ Vector search failed: {e}, using simple search")
+                return self._search_simple_memories(user_id, query, limit)
+        else:
+            # Fallback to simple memory search
+            return self._search_simple_memories(user_id, query, limit)
+    
+    def _search_simple_memories(self, user_id: int, query: str, limit: int) -> List[Memory]:
+        """חיפוש פשוט בזיכרון"""
+        if user_id not in self.simple_memories:
+            return []
         
-        # פילטור לפי רלוונטיות
+        query_lower = query.lower()
         relevant_memories = []
         
-        if results['documents']:
-            for i, (doc, metadata, distance) in enumerate(zip(
-                results['documents'][0],
-                results['metadatas'][0],
-                results['distances'][0]
-            )):
-                relevance = 1 - distance  # המרה למדד רלוונטיות
-                
-                if relevance >= min_relevance:
-                    memory = Memory(
-                        id=results['ids'][0][i],
-                        user_id=user_id,
-                        content=doc,
-                        memory_type=MemoryType(metadata['memory_type']),
-                        importance=metadata['importance'],
-                        emotional_context=EmotionalState(metadata['emotional_context']) if metadata.get('emotional_context') else None,
-                        created_at=datetime.fromisoformat(metadata['created_at']),
-                        last_accessed=datetime.now(),
-                        access_count=0,
-                        metadata={"relevance": relevance}
-                    )
-                    relevant_memories.append(memory)
+        for memory_entry in self.simple_memories[user_id]:
+            # Simple text matching
+            if query_lower in memory_entry['content'].lower():
+                memory = Memory(
+                    id=memory_entry['id'],
+                    user_id=user_id,
+                    content=memory_entry['content'],
+                    memory_type=MemoryType(memory_entry['memory_type']),
+                    importance=memory_entry['importance'],
+                    emotional_context=EmotionalState(memory_entry['emotional_context']) if memory_entry.get('emotional_context') else None,
+                    created_at=datetime.fromisoformat(memory_entry['created_at']),
+                    last_accessed=datetime.now(),
+                    access_count=1,
+                    relevance_score=0.7  # Default relevance for simple matching
+                )
+                relevant_memories.append(memory)
         
-        # מיון לפי חשיבות ורלוונטיות
-        relevant_memories.sort(key=lambda m: m.importance * m.metadata['relevance'], reverse=True)
-        
+        # Sort by importance and return limited results
+        relevant_memories.sort(key=lambda m: m.importance, reverse=True)
         return relevant_memories[:limit]
     
     async def get_conversation_context(self, user_id: int) -> ConversationContext:
@@ -397,7 +507,18 @@ class AdvancedMemorySystem:
         # מחיקה מVector DB
         if old_memories:
             memory_ids = [mem[0] for mem in old_memories]
-            self.vector_collection.delete(ids=memory_ids)
+            if self.vector_collection:
+                try:
+                    self.vector_collection.delete(ids=memory_ids)
+                except Exception as e:
+                    print(f"⚠️ Vector deletion failed: {e}")
+            
+            # Also clean from simple memory
+            for user_id in self.simple_memories:
+                self.simple_memories[user_id] = [
+                    mem for mem in self.simple_memories[user_id] 
+                    if mem['id'] not in memory_ids
+                ]
             
             print(f"🧹 נוקו {len(old_memories)} זיכרונות ישנים")
     
