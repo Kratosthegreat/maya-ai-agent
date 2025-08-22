@@ -12,10 +12,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Install system dependencies for glfw and X11 support
+# Install system dependencies for glfw and X11/OpenGL support
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libgl1-mesa-dev \
     libx11-dev \
     libxrandr-dev \
     libxcursor-dev \
