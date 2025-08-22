@@ -16,6 +16,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libx11-dev \
+    libxrandr-dev \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker caching
