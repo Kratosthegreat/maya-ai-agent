@@ -12,10 +12,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# Install system dependencies for better performance
+# Install system dependencies for glfw and X11 support
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libx11-dev \
+    libxrandr-dev \
+    libxcursor-dev \
+    libxinerama-dev \
+    libxi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better Docker caching
