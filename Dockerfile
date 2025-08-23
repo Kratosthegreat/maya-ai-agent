@@ -1,6 +1,3 @@
-# Maya AI Telegram Bot - Production Dockerfile
-# =============================================
-
 FROM python:3.10-slim
 
 WORKDIR /app
@@ -9,20 +6,22 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-# התקנת כל התלויות הדרושות ל־GLFW ול־OpenGL בסביבת X11 כולל pkg-config
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     pkg-config \
     libgl1-mesa-dev \
+    libglu1-mesa-dev \
     libx11-dev \
     libxrandr-dev \
     libxcursor-dev \
     libxinerama-dev \
     libxi-dev \
-    libglu1-mesa-dev \
     libxext-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# הגדרה מפורשת של PKG_CONFIG_PATH כדי ש-go-gl/gl ימצא gl.pc
+ENV PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig"
 
 COPY requirements.txt .
 
