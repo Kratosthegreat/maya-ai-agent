@@ -7,6 +7,7 @@ Tests the integration of IntelligentMayaAgent with fallbacks
 
 import asyncio
 import os
+import pytest
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -64,6 +65,7 @@ def test_bot_initialization():
         print(f"❌ Bot initialization failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_simple_gemini():
     """Test simple Gemini API call"""
     print("\n🔍 Testing simple Gemini API call...")
@@ -91,6 +93,7 @@ async def test_simple_gemini():
         print(f"❌ Gemini API test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_traditional_ai():
     """Test traditional AI system"""
     print("\n🔍 Testing traditional AI system...")
@@ -121,6 +124,7 @@ async def test_traditional_ai():
         print(f"❌ Traditional AI test failed: {e}")
         return False
 
+@pytest.mark.asyncio
 async def test_message_handling():
     """Test complete message handling flow"""
     print("\n🔍 Testing complete message handling...")
