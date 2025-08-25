@@ -41,7 +41,23 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 
 # Intelligent Maya Agent
-from intelligent_maya import IntelligentMayaAgent, init_intelligent_maya, intelligent_maya, smart_response
+try:
+    from intelligent_maya import (
+        IntelligentMayaAgent,
+        init_intelligent_maya,
+        intelligent_maya,
+        smart_response,
+    )
+    INTELLIGENT_MAYA_AVAILABLE = True
+except ModuleNotFoundError:
+    IntelligentMayaAgent = None
+    intelligent_maya = None
+    smart_response = None
+
+    def init_intelligent_maya(*args, **kwargs):  # type: ignore
+        return None
+
+    INTELLIGENT_MAYA_AVAILABLE = False
 
 # ============================
 # CONFIGURATION & SETUP
@@ -208,6 +224,12 @@ class DatabaseManager:
         self.users = {}
         self.conversations = []
         self.ai_memory = {}
+        # Ensure task-related collections also fall back to in-memory
+        # storage when MongoDB isn't available. Without resetting these
+        # attributes, parts of the code might continue using a stale
+        # MongoDB collection reference which would lead to runtime errors.
+        self.tasks = {}
+        self.tasks_collection = None
 
     def _create_indexes(self):
         """Create database indexes for better performance"""
@@ -1058,13 +1080,15 @@ class MayaBot:
         # Initialize database first
         self.db = DatabaseManager()
         
-        # Initialize intelligent Maya agent if Gemini API key is available
-        if GEMINI_API_KEY:
+        # Initialize intelligent Maya agent if available
+        if GEMINI_API_KEY and INTELLIGENT_MAYA_AVAILABLE:
             self.intelligent_agent = init_intelligent_maya(GEMINI_API_KEY)
             logger.info("✅ IntelligentMayaAgent initialized successfully")
         else:
             self.intelligent_agent = None
-            logger.warning("⚠️ No Gemini API key - IntelligentMayaAgent disabled")
+            logger.warning(
+                "⚠️ IntelligentMayaAgent disabled - missing module or API key"
+            )
             
         # Keep the traditional AI as backup
         self.ai = MayaAI()
