@@ -208,6 +208,12 @@ class DatabaseManager:
         self.users = {}
         self.conversations = []
         self.ai_memory = {}
+        # Ensure task-related collections also fall back to in-memory
+        # storage when MongoDB isn't available. Without resetting these
+        # attributes, parts of the code might continue using a stale
+        # MongoDB collection reference which would lead to runtime errors.
+        self.tasks = {}
+        self.tasks_collection = None
 
     def _create_indexes(self):
         """Create database indexes for better performance"""
