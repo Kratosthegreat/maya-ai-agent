@@ -30,7 +30,12 @@ except ModuleNotFoundError:
     SUPER_AGENT_AVAILABLE = False
 
 # Load environment variables
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*args, **kwargs):
+        return False
+
 load_dotenv()
 
 # Core imports
@@ -42,7 +47,10 @@ from telegram.ext import (
 )
 
 # AI and external services
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ModuleNotFoundError:
+    genai = None
 import requests
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -84,7 +92,7 @@ MONGO_URI = os.getenv('MONGO_URI')
 ADMIN_ID = int(os.getenv('ADMIN_ID', 0)) if os.getenv('ADMIN_ID') else None
 
 # Configure Gemini AI
-if GEMINI_API_KEY:
+if GEMINI_API_KEY and genai:
     genai.configure(api_key=GEMINI_API_KEY)
 
 # Maya's personality configuration
@@ -849,7 +857,7 @@ class MayaAI:
     def _initialize_model(self):
         """Initialize Gemini AI model with enhanced configuration"""
         try:
-            if GEMINI_API_KEY:
+            if GEMINI_API_KEY and genai:
                 # Configure model settings for better Hebrew support
                 generation_config = {
                     "temperature": 0.7,
@@ -872,7 +880,10 @@ class MayaAI:
                 )
                 logger.info("✅ Gemini AI model initialized successfully")
             else:
-                logger.warning("⚠️ No Gemini API key provided")
+                if not genai:
+                    logger.warning("⚠️ google-generativeai package not installed - AI fallback mode")
+                else:
+                    logger.warning("⚠️ No Gemini API key provided")
         except Exception as e:
             logger.error(f"❌ Failed to initialize AI model: {e}")
 

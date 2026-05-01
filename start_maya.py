@@ -8,7 +8,11 @@ Starts the bot with proper error handling and monitoring
 import asyncio
 import os
 import sys
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*args, **kwargs):
+        return False
 
 def check_environment():
     """Check that required environment variables are set"""
