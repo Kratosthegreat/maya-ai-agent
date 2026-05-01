@@ -101,6 +101,20 @@ ADMIN_ID=your_telegram_user_id
    - צור monitor חדש עם URL של השירות
    - הגדר בדיקה כל 5 דקות
 
+### התאמת אווטאר אישי (Personal Secretary)
+ניתן להפוך את מאיה ל"סוכנת-על" אישית וחכמה במיוחד בעזרת משתני סביבה:
+
+```env
+MAYA_AVATAR_NAME=Nova
+MAYA_AVATAR_ROLE=העוזרת האישית הסופר-חכמה שלי
+```
+
+לאחר הגדרה זו, האישיות של מאיה תדגיש:
+- שיחה חמה ונעימה
+- פירוק כל בקשה למשימות ברורות
+- יצירה ומעקב של משימות יומיות לפי עדיפות
+- סיכום פעולה ברור: בוצע / בהמתנה / צעד הבא
+
 ### 🚀 הפעלה מקומית (Quick Start)
 
 לאחר הגדרת משתני הסביבה, ניתן להפעיל את הבוט בקלות:
@@ -124,6 +138,7 @@ python3 main.py
 - `/start` - התחלת עבודה עם הבוט
 - `/help` - מדריך שימוש מפורט
 - `/feedback` - שליחת משוב למפתחים
+- `/briefing` - תדרוך יומי חכם (משימות, דחיפות, צעד הבא)
 
 ### פקודות מנהל
 - `/admin_stats` - סטטיסטיקות מתקדמות
@@ -143,6 +158,7 @@ Maya AI Bot
 ├── 💾 Database Manager (MongoDB)
 ├── 🌐 Keep-Alive Server (Flask)
 ├── 📊 Analytics & Stats
+├── 🧠 Super Agent Planner (plans + daily briefing)
 └── 👑 Admin Panel
 ```
 
