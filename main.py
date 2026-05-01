@@ -22,6 +22,13 @@ import re
 from functools import wraps
 import uuid
 
+try:
+    from super_agent import SuperAgentPlanner
+    SUPER_AGENT_AVAILABLE = True
+except ModuleNotFoundError:
+    SuperAgentPlanner = None
+    SUPER_AGENT_AVAILABLE = False
+
 # Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
@@ -81,15 +88,23 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 # Maya's personality configuration
-MAYA_PERSONALITY = """
-אני מאיה, בוט AI חכם ומתקדם. אני:
-- מדברת בעברית טבעית וחמה
-- מבינה הקשר ונושאי שיחה מורכבים
-- יכולה לעזור במגוון רחב של נושאים
-- לומדת מכל שיחה ומתאמת את עצמי למשתמש
-- נותנת תשובות מקיפות ומועילות
-- שומרת על אופי ידידותי אך מקצועי
-"""
+AVATAR_NAME = os.getenv("MAYA_AVATAR_NAME", "מאיה")
+AVATAR_ROLE = os.getenv("MAYA_AVATAR_ROLE", "עוזרת אישית חכמה במיוחד")
+
+def build_maya_personality() -> str:
+    """Build a warm, highly-capable personal secretary persona."""
+    return f"""
+אני {AVATAR_NAME}, {AVATAR_ROLE}. אני:
+- חכמה מאוד, חמה ונעימה לשיחה
+- מבינה את ההקשר המלא ואת הדרך הנכונה לבצע כל משימה
+- פועלת כמו super-agent: מפרקת בקשות למשימות ברורות עם שלבים
+- יוצרת, מארגנת ועוקבת אחרי משימות יומיות לפי עדיפויות
+- יוזמת הצעות שיפור וניהול זמן כדי לעזור לך להספיק יותר
+- שומרת על דיסקרטיות, דיוק ותקשורת אנושית תומכת
+- מסכמת בסוף כל בקשה: מה בוצע, מה בהמתנה, ומה הצעד הבא
+""".strip()
+
+MAYA_PERSONALITY = build_maya_personality()
 
 # Conversation states for complex interactions
 MAIN_MENU, SETTINGS_MENU, AI_CHAT, FEEDBACK = range(4)
@@ -828,6 +843,7 @@ class MayaAI:
         self.model = None
         self.db = DatabaseManager()
         self.task_manager = TaskManager(self.db)
+        self.super_planner = SuperAgentPlanner() if SUPER_AGENT_AVAILABLE else None
         self._initialize_model()
 
     def _initialize_model(self):
@@ -888,20 +904,24 @@ class MayaAI:
             # Try to create task if relevant
             task_result = await self.task_manager.create_and_notify_task(user_id, message)
 
+            # Build super-agent plan only for complex requests
+            action_plan = None
+            if self.super_planner and self.super_planner.should_show_plan(message):
+                action_plan = self.super_planner.format_plan_markdown(
+                    self.super_planner.build_request_plan(message)
+                )
+
             if task_result:
                 task_message, task_keyboard, task_id = task_result
 
                 # Combine AI response with task creation
-                combined_response = f"""{ai_response}
-
----
-
-{task_message}"""
+                plan_section = f"\n\n---\n\n{action_plan}" if action_plan else ""
+                combined_response = f"{ai_response}{plan_section}\n\n---\n\n{task_message}"
 
                 # Log conversation with task reference
                 self.db.log_conversation(
                     user_id, message, combined_response, 
-                    metadata={"task_created": task_id, "intent": intent[0] if intent else None}
+                    metadata={"task_created": task_id, "intent": intent[0] if intent else None, "super_agent_plan": bool(action_plan)}
                 )
 
                 return combined_response, task_keyboard, task_id
@@ -912,10 +932,11 @@ class MayaAI:
                 # Log regular conversation
                 self.db.log_conversation(
                     user_id, message, ai_response,
-                    metadata={"intent": intent[0] if intent else None}
+                    metadata={"intent": intent[0] if intent else None, "super_agent_plan": bool(action_plan)}
                 )
 
-                return ai_response, smart_keyboard, None
+                response_text = f"{ai_response}\n\n{action_plan}" if action_plan else ai_response
+                return response_text, smart_keyboard, None
 
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
@@ -1180,6 +1201,13 @@ class MayaBot:
                 intelligent_response = await self.intelligent_agent.process_message(user.id, message)
                 ai_response = intelligent_response.content
                 
+                # Build optional action plan in this scope (avoids NameError)
+                action_plan = None
+                if self.ai.super_planner and self.ai.super_planner.should_show_plan(message):
+                    action_plan = self.ai.super_planner.format_plan_markdown(
+                        self.ai.super_planner.build_request_plan(message)
+                    )
+
                 # Still try to create task if relevant using traditional task manager
                 task_result = await self.ai.task_manager.create_and_notify_task(user.id, message)
                 
@@ -1187,11 +1215,8 @@ class MayaBot:
                     task_message, task_keyboard, task_id = task_result
                     
                     # Combine intelligent response with task creation
-                    combined_response = f"""{ai_response}
-
----
-
-{task_message}"""
+                    plan_section = f"\n\n---\n\n{action_plan}" if action_plan else ""
+                    combined_response = f"{ai_response}{plan_section}\n\n---\n\n{task_message}"
                     
                     # Log conversation with task reference
                     self.db.log_conversation(
@@ -1612,6 +1637,7 @@ class MayaBot:
 /start - התחלה מחדש
 /tasks - המשימות שלי
 /feedback - שליחת משוב
+/briefing - תדרוך יומי מהסוכנת
 
 **🌟 הטיפ הכי חשוב:**
 פשוט דבר איתי כמו עם מזכירה אמיתית! אני אבין מה אתה צריך 😊
@@ -1814,6 +1840,16 @@ class MayaBot:
             summary_text,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+    async def briefing_command(self, update: Update, context):
+        """Show a daily super-agent briefing for the user."""
+        user_id = update.effective_user.id
+        summary = self.ai.task_manager.get_user_tasks_summary(user_id)
+        if self.ai.super_planner:
+            briefing = self.ai.super_planner.build_daily_briefing(summary)
+        else:
+            briefing = "📅 תדרוך יומי\n• Super-agent planner אינו זמין כרגע."
+        await update.message.reply_text(briefing, parse_mode='Markdown')
 
     async def tasks_command(self, update: Update, context):
         """Show user tasks with management options"""
@@ -2107,6 +2143,7 @@ def main():
         application.add_handler(CommandHandler("broadcast", maya.broadcast_message))
         application.add_handler(CommandHandler("feedback", maya.feedback_command))
         application.add_handler(CommandHandler("tasks", maya.tasks_command))
+        application.add_handler(CommandHandler("briefing", maya.briefing_command))
 
         # Fallback handler for any text message not caught by conversation handler
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, maya.handle_message))
