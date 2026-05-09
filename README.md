@@ -268,4 +268,32 @@ curl https://your-bot.onrender.com/stats
 
 **Maya AI Bot** - נבנה עם ❤️ עבור הקהילה הישראלית
 
-*גרסה 2.0 | עודכן: 2025*
+# Maya Platform
+
+AI Operations Platform with:
+
+- Autonomous AI agents
+- Semantic memory
+- Infrastructure monitoring
+- Event-driven orchestration
+- Planning engine
+- Workflow automation
+- Multi-agent architecture
+
+## Components
+
+- maya-core
+- maya-memory
+- maya-monitor
+- maya-planner
+- maya-api
+- maya-ui
+
+## Stack
+
+- Python
+- Docker
+- Qdrant
+- Gemini
+- Telegram
+- AsyncIOגרסה 2.0 | עודכן: 2025*

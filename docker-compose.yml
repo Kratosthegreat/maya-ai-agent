@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+
+  maya-core:
+    build: ./services/maya-core
+    container_name: maya-core
+    restart: unless-stopped
+
+  maya-memory:
+    build: ./services/maya-memory
+    container_name: maya-memory
+    restart: unless-stopped
+
+  maya-monitor:
+    build: ./services/maya-monitor
+    container_name: maya-monitor
+    restart: unless-stopped
+
+  maya-planner:
+    build: ./services/maya-planner
+    container_name: maya-planner
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant
+    container_name: ai_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
