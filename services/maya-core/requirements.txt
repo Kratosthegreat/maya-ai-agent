@@ -1,0 +1,6 @@
+python-telegram-bot
+flask
+requests
+docker
+psutil
+qdrant-client
