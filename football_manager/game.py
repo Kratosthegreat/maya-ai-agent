@@ -18,7 +18,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import data as D
 from . import story as ST
-from .engine import MENTALITIES, MatchEvent, MatchResult, simulate_match
+from .engine import (MENTALITIES, MatchEvent, MatchResult, build_commentary,
+                     simulate_match)
 from .models import (Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from .progression import (end_of_season_development, retirement_pressure,
@@ -556,6 +557,10 @@ class GameState:
                 result.home_goals += 1
             else:
                 result.away_goals += 1
+            # התוצאה השתנתה — הפרשנות צריכה להיכתב מחדש
+            result.commentary = build_commentary(
+                result, self.clubs[result.home_id], self.clubs[result.away_id],
+                self.players, self.rng)
             lines.append("⚽ נכנסת מהספסל וכבשת!")
         me.season.add_match(rating, minutes)
         result.ratings[me.pid] = rating

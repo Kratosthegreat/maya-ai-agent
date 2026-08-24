@@ -411,6 +411,23 @@ def test_manager_path_and_tactics_take_effect():
     assert report.lines
 
 
+def test_sub_goal_refreshes_the_commentary():
+    """שער של מחליף משנה את התוצאה — והפרשנות חייבת להשתנות איתה."""
+    for seed in range(80):
+        game = GameState.new_game("מחליף כהן", "ST", "hapoel_carmel", age=17, seed=seed)
+        for _ in range(26):
+            if game.pending_event_id:
+                game.resolve_event(0)
+                continue
+            game.set_action("rest")
+            report = game.advance_week()
+            if report.match and any("נכנסת מהספסל וכבשת" in line for line in report.lines):
+                head = report.match.commentary[0]
+                assert f"{report.match.home_goals} - {report.match.away_goals}" in head
+                return
+    pytest.skip("לא נמצא שער של מחליף בזרעים שנבדקו")
+
+
 def test_money_accumulates_from_wages():
     game = GameState.new_game("עומר לוי", "ST", "hapoel_carmel", age=17, seed=40)
     start = game.money

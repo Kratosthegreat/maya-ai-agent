@@ -141,9 +141,13 @@ python3 main.py
 מנהל ספורטיבי, פרשן, סוכן או בעלים של מועדון).
 
 ```bash
-python3 play_football_manager.py            # משחק
+python3 play_football_manager.py            # משחק בטרמינל
 python3 play_football_manager.py --demo     # הדגמה אוטומטית
+python3 web/build.py                        # בונה גרסת ווב (web/index.html)
 ```
+
+יש גם גרסת ווב מלאה בתיקייה `web/` — קובץ HTML אחד עצמאי שרץ בדפדפן
+ומותאם לטלפון.
 
 המשחק כתוב בפייתון נקי ללא תלויות חיצוניות ואינו קשור לבוט.
 המדריך המלא: [FOOTBALL_MANAGER.md](FOOTBALL_MANAGER.md).

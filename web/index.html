@@ -1,0 +1,4530 @@
+<title>קריירה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Karantina:wght@700&display=swap">
+<style>
+/* ==========================================================================
+   קריירה — עיצוב "משחק לילה": מגרש חשוך, זרקור ענבר, טיפוגרפיה של תוכנייה.
+   ========================================================================== */
+
+:root {
+  /* בהיר — נייר של תוכניית משחק */
+  --bg: #F1F3ED;
+  --surface: #FFFFFF;
+  --surface-2: #E6EAE0;
+  --ink: #12211A;
+  --ink-soft: #56675D;
+  --line: #D3D9CD;
+  --accent: #A66F05;
+  --accent-fill: #F0B429;
+  --accent-ink: #241803;
+  --win: #1E7A4E;
+  --draw: #6B7A71;
+  --loss: #B3392F;
+  --shadow: 0 1px 2px rgba(18, 33, 26, .08), 0 8px 24px rgba(18, 33, 26, .06);
+  --radius: 4px;
+  --pitch: #DDE4D6;
+}
+
+:root:not([data-theme="light"]) {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B120E;
+    --surface: #131E17;
+    --surface-2: #1B291F;
+    --ink: #E9EFE6;
+    --ink-soft: #93A398;
+    --line: #26382C;
+    --accent: #F0B429;
+    --accent-fill: #F0B429;
+    --accent-ink: #1A1206;
+    --win: #4CAF7D;
+    --draw: #8A9A90;
+    --loss: #E06B60;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
+    --pitch: #16241B;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0B120E;
+  --surface: #131E17;
+  --surface-2: #1B291F;
+  --ink: #E9EFE6;
+  --ink-soft: #93A398;
+  --line: #26382C;
+  --accent: #F0B429;
+  --accent-fill: #F0B429;
+  --accent-ink: #1A1206;
+  --win: #4CAF7D;
+  --draw: #8A9A90;
+  --loss: #E06B60;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
+  --pitch: #16241B;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  direction: rtl;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Assistant", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+
+.display {
+  font-family: "Karantina", "Assistant", system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: .01em;
+  line-height: .95;
+}
+
+button { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
+
+/* ---------- מבנה ---------- */
+
+#app {
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 24px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .screen { animation: rise .18s ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+}
+
+/* ---------- רצועת הסטטוס ---------- */
+
+.strip {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--pitch);
+  border-bottom: 1px solid var(--line);
+  padding: 9px 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.strip .who { font-weight: 700; }
+.strip .meta {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.strip .spacer { flex: 1; }
+
+/* ---------- כרטיסים ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.rule { height: 1px; background: var(--line); border: 0; margin: 2px 0; }
+
+/* ---------- לוח התוצאות ---------- */
+
+.scoreboard {
+  background: var(--pitch);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.scoreline {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.scoreline .side { font-weight: 700; font-size: 15px; line-height: 1.2; }
+.scoreline .side.away { text-align: left; }
+.scoreline .side .mine { color: var(--accent); }
+.scoreline .versus {
+  font-size: 12px;
+  letter-spacing: .14em;
+  color: var(--ink-soft);
+  font-weight: 700;
+  padding: 0 4px;
+}
+.scoreline .score {
+  font-family: "Karantina", sans-serif;
+  font-weight: 700;
+  font-size: 46px;
+  line-height: .8;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.goals { display: flex; flex-direction: column; gap: 3px; }
+.goal-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.goal-row .min {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 30px;
+  font-size: 12px;
+}
+.goal-row.mine { color: var(--accent); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+  .goal-row { animation: slide .22s ease-out both; }
+  @keyframes slide { from { opacity: 0; transform: translateX(8px); } }
+}
+
+/* ---------- הביצוע האישי ---------- */
+
+.perf { display: flex; align-items: center; gap: 14px; }
+.perf .rating {
+  font-family: "Karantina", sans-serif;
+  font-size: 52px;
+  line-height: .8;
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  min-width: 74px;
+  text-align: center;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.perf .rating.good { background: var(--win); color: #fff; }
+.perf .rating.bad { background: var(--loss); color: #fff; }
+.perf .detail { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.perf .detail strong { font-size: 15px; }
+
+/* ---------- רשימות הודעות ---------- */
+
+.notes { display: flex; flex-direction: column; gap: 7px; }
+.note { display: flex; gap: 9px; align-items: flex-start; font-size: 14.5px; }
+.note .ico { flex: none; width: 20px; text-align: center; }
+.note.strong { font-weight: 700; }
+
+/* ---------- כפתורים ---------- */
+
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 13px 14px;
+  min-height: 46px;
+  text-align: right;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform .08s ease, border-color .12s ease;
+}
+.btn:active { transform: scale(.99); }
+.btn.primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-ink);
+  font-weight: 700;
+  justify-content: center;
+  font-size: 17px;
+}
+.btn.ghost { background: transparent; }
+.btn.wide { width: 100%; justify-content: center; }
+.btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  font-weight: 700;
+}
+.btn .k { flex: 1; }
+.btn .hint { font-size: 12.5px; color: var(--ink-soft); }
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-row .btn { flex: 1; justify-content: center; min-width: 96px; }
+
+.actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- הרציף התחתון ---------- */
+
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.dock .btn.primary { margin: 10px 12px; width: calc(100% - 24px); }
+
+.nav {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-top: 1px solid var(--line);
+}
+.dock .btn.primary + .nav { border-top: 0; }
+.nav button {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 11px 2px 13px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  position: relative;
+}
+.nav button[aria-current="true"] { color: var(--accent); font-weight: 700; }
+.nav button[aria-current="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 26%;
+  bottom: 6px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.nav button .dot {
+  position: absolute;
+  top: 9px;
+  inset-inline-start: 50%;
+  margin-inline-start: 22px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--loss);
+}
+
+/* ---------- טבלת ליגה ---------- */
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 7px 5px; text-align: center; }
+th {
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  color: var(--ink-soft);
+  font-weight: 700;
+  border-bottom: 1px solid var(--line);
+}
+td.club { text-align: right; font-weight: 600; }
+td { border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+tr.me td { background: var(--surface-2); }
+tr.me td.club { color: var(--accent); font-weight: 700; }
+td.pts { font-weight: 700; }
+tr.up td:first-child { box-shadow: inset 3px 0 0 var(--win); }
+tr.down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
+
+/* ---------- תכונות ---------- */
+
+.attrs { display: flex; flex-direction: column; gap: 7px; }
+.attr { display: grid; grid-template-columns: 88px 30px 1fr; align-items: center; gap: 8px; font-size: 14px; }
+.attr .val { font-variant-numeric: tabular-nums; font-weight: 700; text-align: center; }
+.bar { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent-fill); border-radius: 99px; }
+.bar.soft > i { background: var(--ink-soft); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 9px 6px;
+  text-align: center;
+}
+.stat .n {
+  font-family: "Karantina", sans-serif;
+  font-size: 28px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat .l { font-size: 11px; color: var(--ink-soft); letter-spacing: .04em; }
+
+/* ---------- אירוע עלילה (עמוד אחורי של העיתון) ---------- */
+
+.takeover {
+  min-height: 100dvh;
+  background: var(--pitch);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 16px 28px;
+}
+.takeover .kicker {
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+}
+.takeover h2 { font-size: 44px; }
+.takeover .body {
+  white-space: pre-wrap;
+  font-size: 16.5px;
+  line-height: 1.65;
+  color: var(--ink);
+  max-width: 46ch;
+}
+.takeover .outcome {
+  white-space: pre-wrap;
+  font-size: 16.5px;
+  line-height: 1.65;
+  border-right: 3px solid var(--accent-fill);
+  padding-right: 12px;
+}
+
+/* ---------- כותרת ראשית / מסך פתיחה ---------- */
+
+.hero { display: flex; flex-direction: column; gap: 6px; padding: 26px 0 6px; }
+.hero h1 { font-size: 76px; line-height: .82; }
+.hero .underline {
+  width: 92px;
+  height: 5px;
+  background: var(--accent-fill);
+  margin: 10px 0 4px;
+}
+.screen.menu { justify-content: center; }
+.hero .sub { color: var(--ink-soft); font-size: 15px; max-width: 40ch; }
+.hero .accent { color: var(--accent); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 8px 13px;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 40px;
+}
+.chip[aria-pressed="true"] {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+input[type="text"], select {
+  width: 100%;
+  padding: 12px;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.num { direction: ltr; unicode-bidi: isolate; }
+
+.muted { color: var(--ink-soft); font-size: 13.5px; }
+.center { text-align: center; }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--ink-soft);
+}
+.pill.w { background: var(--win); color: #fff; }
+.pill.l { background: var(--loss); color: #fff; }
+.pill.d { background: var(--draw); color: #fff; }
+
+.honour { display: flex; gap: 9px; font-size: 14.5px; align-items: baseline; }
+.honour .yr {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  min-width: 38px;
+}
+
+.squad-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.squad-row:last-child { border-bottom: 0; }
+.squad-row .pos { font-size: 12px; color: var(--ink-soft); }
+.squad-row .ovr {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 26px;
+  text-align: center;
+}
+.squad-row.me { color: var(--accent); font-weight: 700; }
+
+</style>
+<div id="app"></div>
+<script>
+// נוצר אוטומטית מ-football_manager/data.py — אין לערוך ידנית.
+const D = {
+ "POSITIONS": [
+  "GK",
+  "CB",
+  "LB",
+  "RB",
+  "DM",
+  "CM",
+  "AM",
+  "LW",
+  "RW",
+  "ST"
+ ],
+ "POSITION_NAMES_HE": {
+  "GK": "שוער",
+  "CB": "בלם",
+  "LB": "מגן שמאלי",
+  "RB": "מגן ימני",
+  "DM": "קשר הגנתי",
+  "CM": "קשר מרכזי",
+  "AM": "קשר התקפי",
+  "LW": "כנף שמאלית",
+  "RW": "כנף ימנית",
+  "ST": "חלוץ"
+ },
+ "ATTRIBUTES": [
+  "pace",
+  "shooting",
+  "passing",
+  "dribbling",
+  "defending",
+  "physical",
+  "mental"
+ ],
+ "ATTRIBUTE_NAMES_HE": {
+  "pace": "מהירות",
+  "shooting": "בעיטה",
+  "passing": "מסירה",
+  "dribbling": "כדרור",
+  "defending": "הגנה",
+  "physical": "כוח פיזי",
+  "mental": "קריאת משחק"
+ },
+ "POSITION_WEIGHTS": {
+  "GK": {
+   "pace": 0.05,
+   "shooting": 0.02,
+   "passing": 0.1,
+   "dribbling": 0.03,
+   "defending": 0.45,
+   "physical": 0.15,
+   "mental": 0.2
+  },
+  "CB": {
+   "pace": 0.1,
+   "shooting": 0.03,
+   "passing": 0.1,
+   "dribbling": 0.05,
+   "defending": 0.4,
+   "physical": 0.2,
+   "mental": 0.12
+  },
+  "LB": {
+   "pace": 0.22,
+   "shooting": 0.04,
+   "passing": 0.15,
+   "dribbling": 0.12,
+   "defending": 0.27,
+   "physical": 0.12,
+   "mental": 0.08
+  },
+  "RB": {
+   "pace": 0.22,
+   "shooting": 0.04,
+   "passing": 0.15,
+   "dribbling": 0.12,
+   "defending": 0.27,
+   "physical": 0.12,
+   "mental": 0.08
+  },
+  "DM": {
+   "pace": 0.08,
+   "shooting": 0.05,
+   "passing": 0.22,
+   "dribbling": 0.08,
+   "defending": 0.28,
+   "physical": 0.15,
+   "mental": 0.14
+  },
+  "CM": {
+   "pace": 0.1,
+   "shooting": 0.1,
+   "passing": 0.28,
+   "dribbling": 0.15,
+   "defending": 0.12,
+   "physical": 0.1,
+   "mental": 0.15
+  },
+  "AM": {
+   "pace": 0.13,
+   "shooting": 0.18,
+   "passing": 0.25,
+   "dribbling": 0.22,
+   "defending": 0.03,
+   "physical": 0.05,
+   "mental": 0.14
+  },
+  "LW": {
+   "pace": 0.25,
+   "shooting": 0.16,
+   "passing": 0.14,
+   "dribbling": 0.28,
+   "defending": 0.03,
+   "physical": 0.05,
+   "mental": 0.09
+  },
+  "RW": {
+   "pace": 0.25,
+   "shooting": 0.16,
+   "passing": 0.14,
+   "dribbling": 0.28,
+   "defending": 0.03,
+   "physical": 0.05,
+   "mental": 0.09
+  },
+  "ST": {
+   "pace": 0.2,
+   "shooting": 0.34,
+   "passing": 0.08,
+   "dribbling": 0.15,
+   "defending": 0.02,
+   "physical": 0.13,
+   "mental": 0.08
+  }
+ },
+ "POSITION_ROLE_SHARE": {
+  "GK": {
+   "def": 1.0,
+   "mid": 0.0,
+   "att": 0.0
+  },
+  "CB": {
+   "def": 0.9,
+   "mid": 0.1,
+   "att": 0.0
+  },
+  "LB": {
+   "def": 0.65,
+   "mid": 0.3,
+   "att": 0.05
+  },
+  "RB": {
+   "def": 0.65,
+   "mid": 0.3,
+   "att": 0.05
+  },
+  "DM": {
+   "def": 0.45,
+   "mid": 0.5,
+   "att": 0.05
+  },
+  "CM": {
+   "def": 0.2,
+   "mid": 0.6,
+   "att": 0.2
+  },
+  "AM": {
+   "def": 0.05,
+   "mid": 0.45,
+   "att": 0.5
+  },
+  "LW": {
+   "def": 0.05,
+   "mid": 0.25,
+   "att": 0.7
+  },
+  "RW": {
+   "def": 0.05,
+   "mid": 0.25,
+   "att": 0.7
+  },
+  "ST": {
+   "def": 0.0,
+   "mid": 0.1,
+   "att": 0.9
+  }
+ },
+ "FORMATIONS": {
+  "4-4-2": [
+   "GK",
+   "RB",
+   "CB",
+   "CB",
+   "LB",
+   "RW",
+   "CM",
+   "CM",
+   "LW",
+   "ST",
+   "ST"
+  ],
+  "4-3-3": [
+   "GK",
+   "RB",
+   "CB",
+   "CB",
+   "LB",
+   "DM",
+   "CM",
+   "CM",
+   "RW",
+   "ST",
+   "LW"
+  ],
+  "4-2-3-1": [
+   "GK",
+   "RB",
+   "CB",
+   "CB",
+   "LB",
+   "DM",
+   "DM",
+   "RW",
+   "AM",
+   "LW",
+   "ST"
+  ],
+  "3-5-2": [
+   "GK",
+   "CB",
+   "CB",
+   "CB",
+   "RB",
+   "DM",
+   "CM",
+   "CM",
+   "LB",
+   "ST",
+   "ST"
+  ],
+  "5-3-2": [
+   "GK",
+   "RB",
+   "CB",
+   "CB",
+   "CB",
+   "LB",
+   "DM",
+   "CM",
+   "CM",
+   "ST",
+   "ST"
+  ]
+ },
+ "LEAGUES": [
+  {
+   "id": "top",
+   "name": "ליגת העל",
+   "tier": 1,
+   "country": "ישראל"
+  },
+  {
+   "id": "national",
+   "name": "הליגה הלאומית",
+   "tier": 2,
+   "country": "ישראל"
+  },
+  {
+   "id": "euro",
+   "name": "ליגת האלופות האירופית",
+   "tier": 0,
+   "country": "אירופה"
+  }
+ ],
+ "CLUBS": [
+  [
+   "hapoel_yam",
+   "הפועל ים התיכון",
+   "היַמָּאים",
+   "top",
+   72,
+   26.0
+  ],
+  [
+   "maccabi_harel",
+   "מכבי הראל",
+   "הצהובים",
+   "top",
+   78,
+   34.0
+  ],
+  [
+   "bnei_negev",
+   "בני הנגב",
+   "בני המדבר",
+   "top",
+   63,
+   15.0
+  ],
+  [
+   "hapoel_carmel",
+   "הפועל הכרמל",
+   "האריות",
+   "top",
+   58,
+   11.0
+  ],
+  [
+   "maccabi_sharon",
+   "מכבי השרון",
+   "הירוקים",
+   "top",
+   61,
+   13.5
+  ],
+  [
+   "ironi_galil",
+   "עירוני גליל עליון",
+   "ההרים",
+   "top",
+   52,
+   8.0
+  ],
+  [
+   "beitar_zion",
+   "בית\"ר ציון",
+   "השחורים־צהובים",
+   "top",
+   66,
+   18.0
+  ],
+  [
+   "hapoel_ayalon",
+   "הפועל איילון",
+   "הפועלים",
+   "top",
+   49,
+   6.5
+  ],
+  [
+   "maccabi_yarden",
+   "מכבי ירדן",
+   "הנהר",
+   "top",
+   55,
+   9.0
+  ],
+  [
+   "shimshon_ashdod",
+   "שמשון אשדוד",
+   "אנשי החוף",
+   "top",
+   47,
+   5.5
+  ],
+  [
+   "hakoah_arava",
+   "הכוח ערבה",
+   "הסופה",
+   "top",
+   44,
+   4.5
+  ],
+  [
+   "ironi_kinneret",
+   "עירוני כנרת",
+   "הגלים",
+   "top",
+   41,
+   4.0
+  ],
+  [
+   "maccabi_tavor",
+   "מכבי תבור",
+   "הפסגה",
+   "national",
+   38,
+   3.2
+  ],
+  [
+   "hapoel_lachish",
+   "הפועל לכיש",
+   "השדות",
+   "national",
+   35,
+   2.6
+  ],
+  [
+   "ironi_modiin",
+   "עירוני מודיעין",
+   "המכבים",
+   "national",
+   37,
+   3.0
+  ],
+  [
+   "bnei_hasharon",
+   "בני השרון",
+   "התפוזים",
+   "national",
+   33,
+   2.2
+  ],
+  [
+   "maccabi_arad",
+   "מכבי ערד",
+   "המצוק",
+   "national",
+   30,
+   1.8
+  ],
+  [
+   "hapoel_ramla",
+   "הפועל רמלה",
+   "הצריחים",
+   "national",
+   32,
+   2.0
+  ],
+  [
+   "shimshon_dan",
+   "שמשון דן",
+   "הגוש",
+   "national",
+   29,
+   1.6
+  ],
+  [
+   "ironi_besor",
+   "עירוני הבשור",
+   "הנחל",
+   "national",
+   27,
+   1.4
+  ],
+  [
+   "maccabi_negba",
+   "מכבי נגבה",
+   "החומה",
+   "national",
+   26,
+   1.2
+  ],
+  [
+   "hapoel_ofakim",
+   "הפועל אופקים",
+   "האופק",
+   "national",
+   24,
+   1.0
+  ],
+  [
+   "bnei_zvulun",
+   "בני זבולון",
+   "העוגן",
+   "national",
+   25,
+   1.1
+  ],
+  [
+   "ironi_shomron",
+   "עירוני שומרון",
+   "הגבעות",
+   "national",
+   23,
+   0.9
+  ],
+  [
+   "real_castilla",
+   "ריאל קסטיליה",
+   "המלכותיים",
+   "euro",
+   94,
+   260.0
+  ],
+  [
+   "olympia_munchen",
+   "אולימפיה מינכן",
+   "הבווארים",
+   "euro",
+   93,
+   240.0
+  ],
+  [
+   "thames_united",
+   "תמז יונייטד",
+   "השדים",
+   "euro",
+   91,
+   230.0
+  ],
+  [
+   "inter_lazio",
+   "אינטר לאציו",
+   "הנחשים",
+   "euro",
+   88,
+   190.0
+  ],
+  [
+   "paris_luxe",
+   "פארי לוקס",
+   "הבירה",
+   "euro",
+   90,
+   220.0
+  ],
+  [
+   "ajax_noord",
+   "אייאקס נורד",
+   "בית הספר",
+   "euro",
+   82,
+   120.0
+  ],
+  [
+   "porto_atlantico",
+   "פורטו אטלנטיקו",
+   "הדרקונים",
+   "euro",
+   80,
+   100.0
+  ],
+  [
+   "galata_bosphorus",
+   "גלאטה בוספורוס",
+   "האריות",
+   "euro",
+   79,
+   95.0
+  ]
+ ],
+ "FIRST_NAMES": [
+  "איתי",
+  "עומר",
+  "יובל",
+  "נועם",
+  "אורי",
+  "רועי",
+  "דור",
+  "גיא",
+  "אלון",
+  "עידו",
+  "שגיא",
+  "ליאור",
+  "עמית",
+  "בר",
+  "ניר",
+  "טל",
+  "אסף",
+  "עדן",
+  "מתן",
+  "יונתן",
+  "אריאל",
+  "שחר",
+  "רון",
+  "נדב",
+  "איל",
+  "עומרי",
+  "יהב",
+  "אביב",
+  "חן",
+  "ספיר",
+  "מרקו",
+  "לוקאס",
+  "דייגו",
+  "אנזו",
+  "רפאל",
+  "בילאל",
+  "אמארה",
+  "יוסוף",
+  "טיאגו",
+  "פאבלו"
+ ],
+ "LAST_NAMES": [
+  "כהן",
+  "לוי",
+  "מזרחי",
+  "פרץ",
+  "ביטון",
+  "דהן",
+  "אברהם",
+  "פרידמן",
+  "שרון",
+  "אזולאי",
+  "בן־חיים",
+  "גולן",
+  "אשכנזי",
+  "טוויטו",
+  "זהבי",
+  "רפאלוב",
+  "חמד",
+  "מלמד",
+  "סבן",
+  "אוחיון",
+  "סילבה",
+  "מנדס",
+  "קוסטה",
+  "פרננדס",
+  "מולר",
+  "יאנסן",
+  "נובאק",
+  "פטרוב",
+  "אוקונקוו",
+  "דיאלו"
+ ],
+ "NATIONALITIES": [
+  [
+   "ישראל",
+   0.62
+  ],
+  [
+   "ברזיל",
+   0.06
+  ],
+  [
+   "ניגריה",
+   0.05
+  ],
+  [
+   "צרפת",
+   0.04
+  ],
+  [
+   "ספרד",
+   0.04
+  ],
+  [
+   "סרביה",
+   0.04
+  ],
+  [
+   "ארגנטינה",
+   0.03
+  ],
+  [
+   "פורטוגל",
+   0.03
+  ],
+  [
+   "גאנה",
+   0.03
+  ],
+  [
+   "קרואטיה",
+   0.03
+  ],
+  [
+   "הולנד",
+   0.03
+  ]
+ ],
+ "MANAGER_NAMES": [
+  "ז'וזה ריברו",
+  "אריק לוינסון",
+  "פאולו מנדס",
+  "יאן דה־בור",
+  "משה אלגרבלי",
+  "רוברטו סנטיני",
+  "דייויד קלארק",
+  "אמיר בן־שושן",
+  "טומאס נובאק",
+  "ניקולא פטרוביץ'",
+  "שלומי דגן",
+  "פרנק אוליביירה",
+  "מרקוס שטיין",
+  "עידן ברקוביץ'",
+  "קרלוס אלמדה"
+ ],
+ "TRAITS": {
+  "leader": {
+   "name": "מנהיג טבעי",
+   "desc": "מרים את הקבוצה ברגעים קשים."
+  },
+  "hothead": {
+   "name": "חם מזג",
+   "desc": "מקבל כרטיסים, אבל משחק עם אש."
+  },
+  "workhorse": {
+   "name": "סוס עבודה",
+   "desc": "מתאמן יותר מכולם ומתפתח מהר."
+  },
+  "glass": {
+   "name": "שביר",
+   "desc": "נוטה להיפצע."
+  },
+  "clutch": {
+   "name": "שחקן של רגעים",
+   "desc": "זורח במשחקים גדולים."
+  },
+  "loyal": {
+   "name": "נאמן",
+   "desc": "האוהדים מעריצים אותו, קשה לו לעזוב."
+  },
+  "media_darling": {
+   "name": "חביב התקשורת",
+   "desc": "יודע לדבר למצלמות."
+  },
+  "student": {
+   "name": "תלמיד של המשחק",
+   "desc": "לומד אימון מהר יותר."
+  }
+ },
+ "CAREER_STAGES_HE": {
+  "academy": "נערי הנוער",
+  "player": "שחקן מקצוען",
+  "veteran": "שחקן ותיק",
+  "retired": "פרישה",
+  "coach": "מאמן עוזר",
+  "manager": "מנג'ר ראשי",
+  "director": "מנהל ספורטיבי",
+  "pundit": "פרשן טלוויזיה",
+  "agent": "סוכן שחקנים",
+  "owner": "בעלים של מועדון",
+  "legend": "אגדה"
+ },
+ "TRAINING_FOCUS_HE": {
+  "pace": "ספרינטים ומהירות",
+  "shooting": "סיומות מול השער",
+  "passing": "מסירות ומשחק קצר",
+  "dribbling": "כדרור אחד על אחד",
+  "defending": "עבודה הגנתית",
+  "physical": "חדר כושר",
+  "mental": "וידאו וטקטיקה",
+  "rest": "מנוחה והתאוששות",
+  "badges": "לימודי אימון (תעודות)",
+  "media": "סדנת תקשורת",
+  "business": "לימודי ניהול ועסקים"
+ },
+ "INJURY_TYPES": [
+  [
+   "מתיחה בשריר הירך",
+   1,
+   3
+  ],
+  [
+   "נקע בקרסול",
+   2,
+   5
+  ],
+  [
+   "חבלה בברך",
+   4,
+   10
+  ],
+  [
+   "שבר בכף הרגל",
+   8,
+   18
+  ],
+  [
+   "קרע ברצועה הצולבת",
+   24,
+   40
+  ],
+  [
+   "זעזוע מוח",
+   1,
+   2
+  ],
+  [
+   "פציעת גב",
+   2,
+   6
+  ]
+ ],
+ "MENTALITIES": {
+  "ultra_defensive": [
+   "בטון מזוין",
+   0.72,
+   1.3,
+   -0.15
+  ],
+  "defensive": [
+   "הגנתי",
+   0.86,
+   1.15,
+   -0.07
+  ],
+  "balanced": [
+   "מאוזן",
+   1.0,
+   1.0,
+   0.0
+  ],
+  "attacking": [
+   "התקפי",
+   1.16,
+   0.88,
+   0.08
+  ],
+  "all_out": [
+   "הכל קדימה",
+   1.34,
+   0.7,
+   0.18
+  ]
+ },
+ "PRESSING": {
+  "low": [
+   "בלוק נמוך",
+   -0.05,
+   0.06,
+   0.6
+  ],
+  "medium": [
+   "לחץ מדוד",
+   0.0,
+   0.0,
+   1.0
+  ],
+  "high": [
+   "לחץ גבוה",
+   0.09,
+   -0.06,
+   1.5
+  ]
+ },
+ "AGE_CURVE": {
+  "16": 1.7,
+  "17": 1.6,
+  "18": 1.5,
+  "19": 1.4,
+  "20": 1.3,
+  "21": 1.18,
+  "22": 1.05,
+  "23": 0.92,
+  "24": 0.78,
+  "25": 0.62,
+  "26": 0.48,
+  "27": 0.34,
+  "28": 0.22,
+  "29": 0.12,
+  "30": 0.05,
+  "31": -0.05,
+  "32": -0.14,
+  "33": -0.26,
+  "34": -0.4,
+  "35": -0.55,
+  "36": -0.7,
+  "37": -0.85,
+  "38": -1.0
+ },
+ "DECLINE_SENSITIVITY": {
+  "pace": 1.7,
+  "physical": 1.4,
+  "dribbling": 1.1,
+  "shooting": 0.7,
+  "passing": 0.4,
+  "defending": 0.5,
+  "mental": -0.5
+ },
+ "SQUAD_TEMPLATE": [
+  "GK",
+  "GK",
+  "CB",
+  "CB",
+  "CB",
+  "LB",
+  "RB",
+  "DM",
+  "DM",
+  "CM",
+  "CM",
+  "AM",
+  "LW",
+  "RW",
+  "ST",
+  "ST",
+  "CM",
+  "CB"
+ ]
+};
+
+// ---------------------------------------------------------------------------
+// מנוע המשחק — פורט מ-football_manager (פייתון). ללא תלות ב-DOM.
+// ---------------------------------------------------------------------------
+
+const SEASON_WEEKS = 26;
+const CUP_WEEKS = { 5: "שמינית הגמר", 11: "רבע הגמר", 17: "חצי הגמר", 23: "גמר הגביע" };
+const SQUAD_MIN = 16;
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// -- מחולל מספרים אקראיים עם זרע (כדי ששמירה וטעינה יחזירו בדיוק אותו עולם) --
+class Rng {
+  constructor(seed) { this.s = (seed >>> 0) || 1; this.spare = null; }
+  random() {
+    this.s = (this.s + 0x6D2B79F5) >>> 0;
+    let t = this.s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  uniform(a, b) { return a + (b - a) * this.random(); }
+  randint(a, b) { return a + Math.floor(this.random() * (b - a + 1)); }
+  gauss(mu, sigma) {
+    if (this.spare !== null) { const v = this.spare; this.spare = null; return mu + sigma * v; }
+    let u = 0, v = 0, s = 0;
+    do { u = this.random() * 2 - 1; v = this.random() * 2 - 1; s = u * u + v * v; }
+    while (s >= 1 || s === 0);
+    const mul = Math.sqrt(-2 * Math.log(s) / s);
+    this.spare = v * mul;
+    return mu + sigma * u * mul;
+  }
+  choice(arr) { return arr[Math.floor(this.random() * arr.length)]; }
+  shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(this.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  weighted(pairs) {                       // [[value, weight], ...]
+    const total = pairs.reduce((a, p) => a + p[1], 0);
+    let roll = this.random() * total, upto = 0;
+    for (const [value, weight] of pairs) { upto += weight; if (roll <= upto) return value; }
+    return pairs[pairs.length - 1][0];
+  }
+  state() { return [this.s, this.spare]; }
+  static fromState(st) { const r = new Rng(1); r.s = st[0] >>> 0; r.spare = st[1]; return r; }
+}
+
+// ---------------------------------------------------------------------------
+// סטטיסטיקה
+// ---------------------------------------------------------------------------
+
+function newStats() {
+  return { apps: 0, goals: 0, assists: 0, cleanSheets: 0, yellow: 0, red: 0,
+           minutes: 0, ratingSum: 0, motm: 0, trophies: 0 };
+}
+function avgRating(s) { return s.apps ? Math.round((s.ratingSum / s.apps) * 100) / 100 : 0; }
+function mergeStats(target, other) {
+  for (const k of ["apps", "goals", "assists", "cleanSheets", "yellow", "red",
+                   "minutes", "ratingSum", "motm"]) target[k] += other[k];
+}
+
+// ---------------------------------------------------------------------------
+// שחקן
+// ---------------------------------------------------------------------------
+
+function overall(p) {
+  const w = D.POSITION_WEIGHTS[p.position];
+  let total = 0;
+  for (const attr of D.ATTRIBUTES) total += (p.attributes[attr] ?? 50) * w[attr];
+  return Math.round(total);
+}
+
+function effective(p) {
+  let base = overall(p);
+  base += (p.form - 50) * 0.12;
+  base += (p.morale - 50) * 0.05;
+  base *= 0.85 + 0.15 * (p.fitness / 100);
+  return clamp(base, 20, 99);
+}
+
+function playerValue(p) {
+  const ovr = overall(p);
+  const base = Math.pow(Math.max(0, ovr - 40), 3) * 55;
+  let ageMod;
+  if (p.age <= 20) ageMod = 1.35;
+  else if (p.age <= 23) ageMod = 1.25;
+  else if (p.age <= 27) ageMod = 1.0;
+  else if (p.age <= 30) ageMod = 0.7;
+  else if (p.age <= 33) ageMod = 0.4;
+  else ageMod = 0.18;
+  const potMod = 1 + Math.max(0, p.potential - ovr) * 0.02;
+  const repMod = 0.8 + p.reputation / 250;
+  return Math.round(base * ageMod * potMod * repMod);
+}
+
+function wageForOverall(ovr) {
+  return Math.round(clamp(8000 * Math.pow(Math.max(20, ovr) / 50, 6.85), 700, 1200000));
+}
+
+function isAvailable(p) { return p.injuryWeeks <= 0 && !p.retired; }
+function positionHe(p) { return D.POSITION_NAMES_HE[p.position]; }
+function hasTrait(p, t) { return p.traits.includes(t); }
+
+function generateAttributes(rng, position, target) {
+  const w = D.POSITION_WEIGHTS[position];
+  const attrs = {};
+  for (const attr of D.ATTRIBUTES) {
+    const spread = rng.gauss(0, 7);
+    attrs[attr] = Math.round(clamp(target + (w[attr] - 0.15) * 45 + spread, 15, 96));
+  }
+  const heaviest = D.ATTRIBUTES.reduce((a, b) => (w[a] >= w[b] ? a : b));
+  for (let i = 0; i < 40; i++) {
+    let current = 0;
+    for (const attr of D.ATTRIBUTES) current += attrs[attr] * w[attr];
+    const diff = target - current;
+    if (Math.abs(diff) < 0.6) break;
+    attrs[heaviest] = Math.round(clamp(attrs[heaviest] + (diff > 0 ? 1 : -1), 15, 96));
+  }
+  return attrs;
+}
+
+let PID_COUNTER = 0;
+function generatePlayer(rng, club, position, opts = {}) {
+  const usedNames = opts.usedNames || null;
+  const age = opts.age ?? rng.randint(17, 35);
+  const rep = club ? club.reputation : 40;
+  let quality = opts.quality;
+  if (quality === undefined) quality = Math.round(clamp(rng.gauss(rep * 0.70 + 20, 6), 28, 92));
+  if (age < 21) quality = Math.round(quality - (21 - age) * 2.5);
+  const potential = Math.round(clamp(
+    quality + Math.max(0, 26 - age) * rng.uniform(0.4, 1.6) + rng.gauss(0, 3), quality, 95));
+
+  let name = null;
+  for (let i = 0; i < 60 && name === null; i++) {
+    const candidate = `${rng.choice(D.FIRST_NAMES)} ${rng.choice(D.LAST_NAMES)}`;
+    if (!usedNames || !usedNames.has(candidate)) { name = candidate; if (usedNames) usedNames.add(candidate); }
+  }
+  if (name === null) name = `${rng.choice(D.FIRST_NAMES)} ${rng.choice(D.LAST_NAMES)} ${rng.randint(2, 99)}`;
+
+  const p = {
+    pid: "p" + (++PID_COUNTER),
+    name, age, position,
+    nationality: rng.weighted(D.NATIONALITIES),
+    attributes: generateAttributes(rng, position, quality),
+    growth: {},
+    potential,
+    clubId: club ? club.cid : null,
+    contract: { wage: 0, yearsLeft: rng.randint(1, 4) },
+    form: rng.uniform(40, 60),
+    morale: rng.uniform(45, 75),
+    fitness: 100,
+    injuryWeeks: 0,
+    injuryName: "",
+    reputation: clamp(quality - 25 + rng.gauss(0, 6), 1, 95),
+    traits: [],
+    isHuman: false,
+    coaching: clamp(rng.gauss(10, 6), 0, 40),
+    mediaSkill: clamp(rng.gauss(10, 6), 0, 40),
+    business: clamp(rng.gauss(8, 5), 0, 40),
+    badges: 0,
+    season: newStats(),
+    career: newStats(),
+    retired: false,
+  };
+  p.contract.wage = wageForOverall(overall(p));
+  if (rng.random() < 0.35) p.traits.push(rng.choice(Object.keys(D.TRAITS)));
+  return p;
+}
+
+function generateWorld(seed) {
+  const rng = new Rng(seed);
+  const clubs = {}, players = {}, usedNames = new Set();
+  for (const [cid, name, nickname, leagueId, rep, budget] of D.CLUBS) {
+    const club = {
+      cid, name, nickname, leagueId, reputation: rep, budget,
+      wageBudget: Math.round(budget * 1000000 / 10),
+      trainingFacilities: Math.round(clamp(rep + rng.gauss(0, 8), 15, 99)),
+      youthAcademy: Math.round(clamp(rep + rng.gauss(0, 12), 15, 99)),
+      managerName: rng.choice(D.MANAGER_NAMES),
+      managerTrust: 50,
+      boardConfidence: 60,
+      fanSupport: clamp(rep + rng.gauss(0, 10), 20, 99),
+      formation: rng.choice(Object.keys(D.FORMATIONS)),
+      squad: [],
+      seasonExpectation: "אמצע טבלה",
+      trophies: [],
+    };
+    for (const position of D.SQUAD_TEMPLATE) {
+      const p = generatePlayer(rng, club, position, { usedNames });
+      players[p.pid] = p;
+      club.squad.push(p.pid);
+    }
+    clubs[cid] = club;
+  }
+  return { clubs, players };
+}
+
+// ---------------------------------------------------------------------------
+// מנוע המשחקים
+// ---------------------------------------------------------------------------
+
+const FIT_GROUPS = [["CB"], ["LB", "RB"], ["DM", "CM"], ["CM", "AM"],
+                    ["LW", "RW", "AM"], ["ST", "LW", "RW"]];
+
+function positionFit(playerPos, slot) {
+  if (playerPos === slot) return 1.0;
+  if ((playerPos === "GK") !== (slot === "GK")) return 0.35;
+  for (const group of FIT_GROUPS) {
+    if (group.includes(playerPos) && group.includes(slot)) return 0.90;
+  }
+  return 0.72;
+}
+
+function pickLineup(club, players, formation, forced) {
+  formation = formation || club.formation;
+  const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
+  const available = club.squad.map(pid => players[pid]).filter(p => p && isAvailable(p));
+  const lineup = [];
+  const forcedLeft = (forced || []).slice();
+
+  for (const slot of slots) {
+    let pick = null;
+    for (let i = 0; i < forcedLeft.length; i++) {
+      const p = players[forcedLeft[i]];
+      if (p && isAvailable(p) && !lineup.includes(p.pid) && available.includes(p)) {
+        pick = p; forcedLeft.splice(i, 1); break;
+      }
+    }
+    if (!pick) {
+      const candidates = available.filter(p => !lineup.includes(p.pid));
+      if (!candidates.length) break;
+      pick = candidates.reduce((best, p) =>
+        effective(p) * positionFit(p.position, slot) >
+        effective(best) * positionFit(best.position, slot) ? p : best);
+    }
+    lineup.push(pick.pid);
+  }
+  return lineup;
+}
+
+function teamStrength(lineup, players, formation) {
+  const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
+  const sums = { def: 0, mid: 0, att: 0 };
+  const shares = { def: 0, mid: 0, att: 0 };
+  lineup.forEach((pid, idx) => {
+    const p = players[pid];
+    if (!p) return;
+    const slot = idx < slots.length ? slots[idx] : p.position;
+    const fit = positionFit(p.position, slot);
+    const power = effective(p) * (0.62 + 0.38 * fit);
+    const share = D.POSITION_ROLE_SHARE[slot];
+    for (const line of ["def", "mid", "att"]) {
+      sums[line] += power * share[line];
+      shares[line] += share[line];
+    }
+  });
+  const baselines = { def: 5.05, mid: 3.10, att: 2.85 };
+  const out = {};
+  for (const line of ["def", "mid", "att"]) {
+    const average = shares[line] > 0.01 ? sums[line] / shares[line] : 40;
+    out[line] = average * Math.pow(Math.max(0.4, shares[line]) / baselines[line], 0.4);
+  }
+  return out;
+}
+
+function poisson(rng, lam) {
+  lam = Math.max(0.02, lam);
+  const limit = Math.exp(-lam);
+  let k = 0, prod = rng.random();
+  while (prod > limit && k < 12) { k++; prod *= rng.random(); }
+  return k;
+}
+
+function simulateMatch(home, away, players, rng, opts = {}) {
+  const homeTac = opts.homeTactics || {};
+  const awayTac = opts.awayTactics || {};
+  const competition = opts.competition || "ליגה";
+  const neutral = !!opts.neutral;
+
+  const homeForm = homeTac.formation || home.formation;
+  const awayForm = awayTac.formation || away.formation;
+  const homeLineup = pickLineup(home, players, homeForm, homeTac.forced);
+  const awayLineup = pickLineup(away, players, awayForm, awayTac.forced);
+
+  const hs = teamStrength(homeLineup, players, homeForm);
+  const as = teamStrength(awayLineup, players, awayForm);
+
+  const hMent = D.MENTALITIES[homeTac.mentality || "balanced"];
+  const aMent = D.MENTALITIES[awayTac.mentality || "balanced"];
+  const hPress = D.PRESSING[homeTac.pressing || "medium"];
+  const aPress = D.PRESSING[awayTac.pressing || "medium"];
+
+  let ha = hs.att * hMent[1] * (1 + hPress[1]);
+  let hd = hs.def * hMent[2] * (1 + hPress[2]);
+  let hm = hs.mid;
+  let aa = as.att * aMent[1] * (1 + aPress[1]);
+  let ad = as.def * aMent[2] * (1 + aPress[2]);
+  const am = as.mid;
+
+  if (!neutral) {
+    ha *= 1 + home.fanSupport / 640;
+    hd *= 1.02;
+    hm *= 1.03;
+  }
+
+  const totalMid = hm + am;
+  const hControl = totalMid ? hm / totalMid : 0.5;
+  const aControl = 1 - hControl;
+
+  const expected = (attack, defence, control, talk) => {
+    const edge = (attack - defence) / 11;
+    let base = 1.48 * Math.exp(edge * 0.38);
+    base *= 0.55 + 0.9 * control;
+    base *= 0.9 + talk * 0.2;
+    return clamp(base, 0.12, 4.6);
+  };
+
+  const homeGoals = poisson(rng, expected(ha, ad, hControl, homeTac.talkBoost || 0));
+  const awayGoals = poisson(rng, expected(aa, hd, aControl, awayTac.talkBoost || 0));
+
+  const result = {
+    homeId: home.cid, awayId: away.cid, homeGoals, awayGoals,
+    events: [], ratings: {}, motm: null,
+    homeLineup, awayLineup, commentary: [], competition,
+  };
+
+  const total = homeGoals + awayGoals;
+  const minutes = [];
+  while (minutes.length < total) {
+    const m = rng.randint(1, 93);
+    if (!minutes.includes(m)) minutes.push(m);
+  }
+  minutes.sort((a, b) => a - b);
+
+  const queue = [];
+  for (let i = 0; i < homeGoals; i++) queue.push(home.cid);
+  for (let i = 0; i < awayGoals; i++) queue.push(away.cid);
+  rng.shuffle(queue);
+
+  queue.forEach((clubId, idx) => {
+    const minute = minutes[idx] ?? rng.randint(1, 93);
+    const lineup = clubId === home.cid ? homeLineup : awayLineup;
+    const scorer = pickScorer(lineup, players, rng);
+    if (!scorer) return;
+    players[scorer].season.goals += 1;
+    result.events.push({ minute, kind: "goal", clubId, playerId: scorer,
+                         text: `${minute}' ${players[scorer].name}` });
+    const assister = pickAssister(lineup, players, rng, scorer);
+    if (assister) {
+      players[assister].season.assists += 1;
+      result.events.push({ minute, kind: "assist", clubId, playerId: assister,
+                           text: `בישול: ${players[assister].name}` });
+    }
+  });
+
+  applyDiscipline(result, homeLineup, home.cid, players, rng, hPress[3]);
+  applyDiscipline(result, awayLineup, away.cid, players, rng, aPress[3]);
+  applyInjuries(result, homeLineup, home.cid, players, rng);
+  applyInjuries(result, awayLineup, away.cid, players, rng);
+  ratePlayers(result, homeLineup, home.cid, players, rng);
+  ratePlayers(result, awayLineup, away.cid, players, rng);
+
+  const rated = Object.keys(result.ratings);
+  if (rated.length) {
+    result.motm = rated.reduce((a, b) => (result.ratings[a] >= result.ratings[b] ? a : b));
+    players[result.motm].season.motm += 1;
+  }
+  if (awayGoals === 0 && homeLineup.length) players[homeLineup[0]].season.cleanSheets += 1;
+  if (homeGoals === 0 && awayLineup.length) players[awayLineup[0]].season.cleanSheets += 1;
+
+  result.commentary = buildCommentary(result, home, away, players);
+  return result;
+}
+
+function resultFor(result, clubId) {
+  if (result.homeGoals === result.awayGoals) return "D";
+  if (clubId === result.homeId) return result.homeGoals > result.awayGoals ? "W" : "L";
+  return result.awayGoals > result.homeGoals ? "W" : "L";
+}
+function goalsFor(result, clubId) { return clubId === result.homeId ? result.homeGoals : result.awayGoals; }
+function goalsAgainst(result, clubId) { return clubId === result.homeId ? result.awayGoals : result.homeGoals; }
+
+function pickScorer(lineup, players, rng) {
+  const weights = [];
+  for (const pid of lineup) {
+    const p = players[pid];
+    if (!p) continue;
+    const share = D.POSITION_ROLE_SHARE[p.position];
+    let w = share.att * 3.0 + share.mid * 0.7 + share.def * 0.12;
+    w *= Math.pow((p.attributes.shooting ?? 40) / 55, 1.5);
+    w *= 0.7 + p.form / 140;
+    weights.push([pid, Math.max(0.001, w)]);
+  }
+  return weights.length ? rng.weighted(weights) : null;
+}
+
+function pickAssister(lineup, players, rng, scorer) {
+  if (rng.random() < 0.26) return null;
+  const weights = [];
+  for (const pid of lineup) {
+    if (pid === scorer) continue;
+    const p = players[pid];
+    if (!p) continue;
+    const share = D.POSITION_ROLE_SHARE[p.position];
+    let w = share.att * 1.6 + share.mid * 1.8 + share.def * 0.2;
+    w *= Math.pow((p.attributes.passing ?? 40) / 55, 1.4);
+    weights.push([pid, Math.max(0.001, w)]);
+  }
+  return weights.length ? rng.weighted(weights) : null;
+}
+
+function applyDiscipline(result, lineup, clubId, players, rng, pressFactor) {
+  for (const pid of lineup) {
+    const p = players[pid];
+    if (!p) continue;
+    let chance = 0.055 * pressFactor;
+    if (hasTrait(p, "hothead")) chance *= 2.4;
+    chance *= 1 + D.POSITION_ROLE_SHARE[p.position].def * 0.6;
+    if (rng.random() < chance) {
+      const minute = rng.randint(5, 92);
+      if (rng.random() < 0.09) {
+        p.season.red += 1;
+        result.events.push({ minute, kind: "red", clubId, playerId: pid, text: `${minute}' ${p.name}` });
+      } else {
+        p.season.yellow += 1;
+        result.events.push({ minute, kind: "yellow", clubId, playerId: pid, text: `${minute}' ${p.name}` });
+      }
+    }
+  }
+}
+
+function applyInjuries(result, lineup, clubId, players, rng) {
+  for (const pid of lineup) {
+    const p = players[pid];
+    if (!p) continue;
+    let chance = 0.016;
+    chance *= 1 + Math.max(0, 70 - p.fitness) / 90;
+    chance *= 1 + Math.max(0, p.age - 30) * 0.09;
+    if (hasTrait(p, "glass")) chance *= 2.2;
+    if (rng.random() < chance) {
+      const [name, low, high] = rng.choice(D.INJURY_TYPES);
+      const weeks = rng.randint(low, high);
+      p.injuryWeeks = weeks;
+      p.injuryName = name;
+      p.fitness = Math.min(p.fitness, 55);
+      result.events.push({ minute: rng.randint(3, 90), kind: "injury", clubId, playerId: pid,
+                           text: `${p.name} — ${name} (${weeks} שבועות)` });
+    }
+  }
+}
+
+function ratePlayers(result, lineup, clubId, players, rng) {
+  const conceded = goalsAgainst(result, clubId);
+  const outcome = resultFor(result, clubId);
+  const teamMod = { W: 0.45, D: 0, L: -0.35 }[outcome];
+  const goalsBy = {}, assistsBy = {}, cards = {};
+  for (const ev of result.events) {
+    if (ev.clubId !== clubId) continue;
+    if (ev.kind === "goal") goalsBy[ev.playerId] = (goalsBy[ev.playerId] || 0) + 1;
+    else if (ev.kind === "assist") assistsBy[ev.playerId] = (assistsBy[ev.playerId] || 0) + 1;
+    else if (ev.kind === "yellow" || ev.kind === "red")
+      cards[ev.playerId] = (cards[ev.playerId] || 0) + (ev.kind === "yellow" ? 1 : 3);
+  }
+  for (const pid of lineup) {
+    const p = players[pid];
+    if (!p) continue;
+    let rating = 6.0 + teamMod + rng.gauss(0, 0.55);
+    rating += (effective(p) - 60) * 0.017;
+    rating += (goalsBy[pid] || 0) * 1.05;
+    rating += (assistsBy[pid] || 0) * 0.65;
+    rating -= (cards[pid] || 0) * 0.28;
+    const share = D.POSITION_ROLE_SHARE[p.position];
+    rating -= conceded * 0.24 * share.def;
+    if (conceded === 0) rating += 0.45 * share.def;
+    if (hasTrait(p, "clutch") && rng.random() < 0.4) rating += 0.4;
+    rating = Math.round(clamp(rating, 3, 10) * 10) / 10;
+    result.ratings[pid] = rating;
+
+    const minutes = rng.random() > 0.18 ? 90 : rng.randint(55, 89);
+    p.season.apps += 1;
+    p.season.minutes += minutes;
+    p.season.ratingSum += rating;
+    p.fitness = clamp(p.fitness - minutes * 0.13 - rng.uniform(0, 6), 8, 100);
+    p.form = clamp(p.form * 0.82 + (rating - 6.0) * 14 + 9, 5, 99);
+    p.morale = clamp(p.morale + (outcome === "W" ? 2.5 : outcome === "L" ? -2.0 : 0.3)
+                     + (rating - 6.5) * 1.6, 5, 99);
+  }
+}
+
+function buildCommentary(result, home, away, players) {
+  const lines = [];
+  const diff = result.homeGoals - result.awayGoals;
+  const total = result.homeGoals + result.awayGoals;
+  if (total === 0) lines.push("שני שוערים מצוינים, אפס דרמה. 0:0 שאף אחד לא יזכור.");
+  else if (Math.abs(diff) >= 3)
+    lines.push(`${diff > 0 ? home.name : away.name} פשוט דרסו. הקהל התחיל לצאת ברבע שעה האחרונה.`);
+  else if (diff === 0) lines.push("תיקו שמשאיר את שתי הקבוצות עם טעם מריר.");
+  else lines.push(`${diff > 0 ? home.name : away.name} לקחו את זה בשיניים. משחק צמוד עד השריקה האחרונה.`);
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// התפתחות
+// ---------------------------------------------------------------------------
+
+const OFF_PITCH = ["rest", "badges", "media", "business"];
+
+function ageFactor(age) {
+  if (age < 16) return 1.7;
+  if (age > 38) return -1.1;
+  return D.AGE_CURVE[String(age)];
+}
+
+function addGrowth(p, attr, delta) {
+  p.growth[attr] = (p.growth[attr] || 0) + delta;
+  const whole = Math.trunc(p.growth[attr]);
+  if (whole) {
+    p.attributes[attr] = Math.round(clamp((p.attributes[attr] ?? 50) + whole, 10, 97));
+    p.growth[attr] -= whole;
+  }
+}
+
+function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
+  const messages = [];
+  const facilities = club ? club.trainingFacilities : 45;
+
+  if (focus === "rest") {
+    p.fitness = clamp(p.fitness + 26, 0, 100);
+    p.morale = clamp(p.morale + 1.5, 0, 100);
+    if (p.injuryWeeks > 0) {
+      p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
+      if (rng.random() < 0.3) {
+        p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
+        messages.push({ icon: "🏥", text: "השיקום מתקדם מהר מהצפוי." });
+      }
+    }
+    return messages;
+  }
+
+  if (focus === "badges") {
+    let gain = (0.55 + (p.attributes.mental ?? 50) / 200) * intensity;
+    if (hasTrait(p, "student")) gain *= 1.4;
+    p.coaching = clamp(p.coaching + gain, 0, 100);
+    p.fitness = clamp(p.fitness + 10, 0, 100);
+    const newBadges = Math.min(4, Math.floor(p.coaching / 22));
+    if (newBadges > p.badges) {
+      p.badges = newBadges;
+      messages.push({ icon: "🎓", text: `השלמת תעודת אימון רמה ${p.badges}!` });
+    }
+    return messages;
+  }
+
+  if (focus === "media") {
+    p.mediaSkill = clamp(p.mediaSkill + 0.9 * intensity, 0, 100);
+    p.reputation = clamp(p.reputation + 0.25, 0, 100);
+    p.fitness = clamp(p.fitness + 9, 0, 100);
+    return messages;
+  }
+
+  if (focus === "business") {
+    p.business = clamp(p.business + 0.85 * intensity, 0, 100);
+    p.fitness = clamp(p.fitness + 9, 0, 100);
+    return messages;
+  }
+
+  p.fitness = clamp(p.fitness + 12 - 6 * intensity, 0, 100);
+  if (p.injuryWeeks > 0) {
+    p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
+    return [{ icon: "🩹", text: "אתה בשיקום — האימון היה קל בהרבה." }];
+  }
+
+  const gap = p.potential - overall(p);
+  const curve = ageFactor(p.age);
+  let base = 0.30 * intensity;
+  base *= 0.55 + facilities / 110;
+  base *= Math.max(0.15, curve);
+  base *= 1 + clamp(gap, -10, 25) * 0.05;
+  if (hasTrait(p, "workhorse")) base *= 1.30;
+  base *= 0.75 + p.morale / 200;
+  base *= rng.uniform(0.7, 1.35);
+
+  const headroom = p.potential - overall(p);
+  if (headroom <= 0) base *= 0.08;
+  else if (headroom < 4) base *= 0.25 + headroom * 0.18;
+
+  let current = (p.growth[focus] || 0) + base;
+  let gained = 0;
+  while (current >= 1.0 && (p.attributes[focus] ?? 50) < 97) {
+    p.attributes[focus] = (p.attributes[focus] ?? 50) + 1;
+    current -= 1;
+    gained += 1;
+  }
+  p.growth[focus] = current;
+  if (gained) {
+    messages.push({ icon: "📈", text:
+      `${D.ATTRIBUTE_NAMES_HE[focus]} עלתה ב-${gained} (עכשיו ${p.attributes[focus]}).` });
+  }
+  if (intensity > 1.15 && rng.random() < 0.035 * intensity) {
+    const weeks = rng.randint(1, 3);
+    p.injuryWeeks = weeks;
+    p.injuryName = "עומס יתר באימון";
+    messages.push({ icon: "🚑", text: `נמתחת באימון — ${weeks} שבועות בחוץ.` });
+  }
+  return messages;
+}
+
+function weeklyRecovery(p, played, rng) {
+  if (p.injuryWeeks > 0) {
+    p.injuryWeeks -= 1;
+    if (p.injuryWeeks === 0) { p.injuryName = ""; p.fitness = clamp(p.fitness + 15, 0, 100); }
+  }
+  if (!played) p.fitness = clamp(p.fitness + 9, 0, 100);
+  p.form = clamp(p.form + (played ? 0 : rng.uniform(-1.5, 1.5)), 5, 99);
+}
+
+function simulateAiWeek(players, rng, clubs, skip) {
+  for (const pid in players) {
+    const p = players[pid];
+    if (pid === skip || p.retired) continue;
+    const club = p.clubId ? clubs[p.clubId] : null;
+    if (p.injuryWeeks > 0) {
+      p.injuryWeeks -= 1;
+      if (p.injuryWeeks === 0) p.injuryName = "";
+      continue;
+    }
+    p.fitness = clamp(p.fitness + rng.uniform(6, 16), 0, 100);
+    if (rng.random() < 0.55) weeklyTraining(p, rng.choice(D.ATTRIBUTES), club, rng, 0.85);
+  }
+}
+
+function endOfSeasonDevelopment(p, rng, minutesShare = 0.5) {
+  p.age += 1;
+  const curve = ageFactor(p.age);
+  const exposure = 0.45 + minutesShare * 1.1;
+  for (const attr of D.ATTRIBUTES) {
+    const sensitivity = D.DECLINE_SENSITIVITY[attr];
+    let delta;
+    if (curve > 0) {
+      delta = curve * exposure * rng.uniform(0.4, 1.5);
+      if (overall(p) >= p.potential) delta *= 0.08;
+    } else {
+      delta = curve * Math.max(0.2, sensitivity) * rng.uniform(0.5, 1.5);
+    }
+    addGrowth(p, attr, delta);
+  }
+  const s = p.season;
+  if (s.apps) {
+    const contribution = (s.goals + s.assists) / Math.max(1, s.apps);
+    p.reputation = clamp(p.reputation + (avgRating(s) - 6.6) * 4 + contribution * 6, 1, 99);
+  }
+  mergeStats(p.career, s);
+  p.season = newStats();
+  p.fitness = 100;
+  p.form = 50;
+  if (p.contract.yearsLeft > 0) p.contract.yearsLeft -= 1;
+}
+
+function shouldRetire(p, rng) {
+  if (p.age < 32) return false;
+  let chance = (p.age - 31) * 0.16;
+  if (overall(p) < 55) chance += 0.18;
+  if (p.injuryWeeks > 12) chance += 0.25;
+  return rng.random() < clamp(chance, 0, 0.95);
+}
+
+function retirementPressure(p) {
+  let pressure = 0;
+  pressure += Math.max(0, p.age - 31) * 0.13;
+  pressure += Math.max(0, 62 - overall(p)) * 0.012;
+  if (p.injuryWeeks >= 10) pressure += 0.25;
+  if (p.contract.yearsLeft === 0 && p.age > 33) pressure += 0.15;
+  return clamp(pressure, 0, 1);
+}
+
+// ---------------------------------------------------------------------------
+// לוח משחקים
+// ---------------------------------------------------------------------------
+
+function roundRobin(teams, rng) {
+  teams = rng.shuffle(teams.slice());
+  if (teams.length % 2) teams.push("__bye__");
+  const n = teams.length;
+  const rounds = [];
+  for (let r = 0; r < n - 1; r++) {
+    const pairs = [];
+    for (let i = 0; i < n / 2; i++) {
+      const home = teams[i], away = teams[n - 1 - i];
+      if (home === "__bye__" || away === "__bye__") continue;
+      pairs.push(r % 2 === 0 ? [home, away] : [away, home]);
+    }
+    rounds.push(pairs);
+    teams = [teams[0], teams[n - 1], ...teams.slice(1, n - 1)];
+  }
+  return rounds.concat(rounds.map(rnd => rnd.map(([h, a]) => [a, h])));
+}
+
+function leagueWeeks() {
+  const out = [];
+  for (let w = 1; w <= SEASON_WEEKS; w++) if (!CUP_WEEKS[w]) out.push(w);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// מנוע העלילה — 28 צמתי החלטה. פורט מ-football_manager/story.py
+// ---------------------------------------------------------------------------
+
+const STORY = [];
+function ev(e) { STORY.push(e); return e; }
+
+// קיצורי אפקטים (g = GameState)
+const mor = (g, d) => { g.me.morale = clamp(g.me.morale + d, 5, 99); };
+const tru = (g, d) => { const c = g.myClub(); if (c) c.managerTrust = clamp(c.managerTrust + d, 0, 100); };
+const fan = (g, d) => { const c = g.myClub(); if (c) c.fanSupport = clamp(c.fanSupport + d, 0, 100); };
+const rep = (g, d) => { g.me.reputation = clamp(g.me.reputation + d, 1, 99); };
+const att = (g, a, d) => addGrowth(g.me, a, d);
+
+// ===========================================================================
+// שלב 1 — נוער ופריצה
+// ===========================================================================
+
+ev({
+  eid: "first_call_up", title: "קריאה מהמשרד", stages: ["academy"], weight: 6.0, once: true,
+  cond: g => g.week >= 2,
+  body: g => `עוזר המאמן עוצר אותך במסדרון של ${g.myClub().name}.\n` +
+    `"${g.myClub().managerName} רוצה אותך באימון של הבוגרים ביום חמישי. אל תדפוק את זה."\n\n` +
+    `אתה בן ${g.me.age}. חצי מהחדר הזה הם אנשים שראית בטלוויזיה.`,
+  choices: [
+    { label: "להיכנס חזק — שיזכרו את השם שלך", hint: "אמון המאמן ↑↑",
+      apply: g => { tru(g, 9); mor(g, 6); att(g, "physical", 0.7); g.setFlag("bold_debut", true);
+        return "נכנסת לקפטן בכניסה קשה. חצי מהקבוצה צחקה, המאמן רשם משהו במחברת. אתה בפנים."; } },
+    { label: "לשחק פשוט, בלי סיכונים", hint: "בטוח",
+      apply: g => { tru(g, 4); att(g, "passing", 0.6);
+        return "94% מסירות מדויקות ואפס טעויות. לא הרשמת אף אחד, אבל גם לא נתת סיבה להוריד אותך."; } },
+    { label: "להישאר בנוער עוד קצת", hint: "מסוכן",
+      apply: g => { mor(g, -4); tru(g, -6); g.setFlag("declined_first", true);
+        return "אמרת שאתה עוד לא מוכן. המאמן הנהן. לפעמים הנהון כזה עולה שנתיים."; } },
+  ],
+});
+
+ev({
+  eid: "youth_mentor", title: "הוותיק שבפינת ההלבשה", stages: ["academy", "player"], weight: 2.5, once: true,
+  cond: g => g.me.age <= 22,
+  body: () => 'הוותיק של הקבוצה מתיישב לידך אחרי אימון.\n' +
+    '"אני רואה אותך. יש לך רגליים. מה שאין לך זה ראש.\n' +
+    'בוא נשב על וידאו פעמיים בשבוע — בחינם. רק תבוא בזמן."',
+  choices: [
+    { label: "לבוא לכל מפגש", hint: "קריאת משחק ↑↑",
+      apply: g => { att(g, "mental", 2.0); mor(g, 3); g.setFlag("has_mentor", true);
+        return "שלושה חודשים של וידאו. פתאום אתה רואה מסירות שלפני חודש לא היו קיימות."; } },
+    { label: "תודה, אני מסתדר",
+      apply: g => { att(g, "dribbling", 0.8); return "המשכת לעבוד לבד על הכדור. הוא לא הציע שוב."; } },
+  ],
+});
+
+ev({
+  eid: "loan_offer", title: "הצעת השאלה", stages: ["player"], weight: 3.0, once: true,
+  cond: g => g.me.age <= 23 && g.minutesShare() < 0.35,
+  body: g => `אתה לא משחק. ${g.loanTargetName()} מהליגה הלאומית רוצים אותך בהשאלה לעונה.\n` +
+    `"אצלנו אתה משחק 90 דקות כל שבוע. אצלם אתה מחמם ספסל ומזדקן."`,
+  choices: [
+    { label: "לצאת להשאלה ולשחק", hint: "דקות משחק ↑↑, מוניטין ↓", apply: g => g.goOnLoan() },
+    { label: "להישאר ולהילחם על מקום",
+      apply: g => { tru(g, 5); mor(g, -2); return "נשארת. המאמן העריך את זה — עכשיו תוכיח שהוא צדק."; } },
+  ],
+});
+
+// ===========================================================================
+// שלב 2 — חיי שחקן מקצוען
+// ===========================================================================
+
+ev({
+  eid: "bench_frustration", title: "שבוע חמישי על הספסל", stages: ["player", "veteran"],
+  weight: 3.0, once: false,
+  cond: g => g.noStartStreak >= 4 && g.me.age >= 19,
+  body: g => `חמישה משחקים. אפס דקות.\nאתה עומד מול הדלת של ${g.myClub().managerName} ומחזיק את הידית.`,
+  choices: [
+    { label: "להיכנס ולהתעמת", hint: "מר-רווח: או שתשחק או שתיגמר", apply: g => g.confrontManager() },
+    { label: "לשתוק ולהתאמן כפול", hint: "אמון ↑, מורל ↓",
+      apply: g => { att(g, "physical", 1.0); tru(g, 6); mor(g, -5);
+        return "נשארת אחרי כל אימון. הצוות שם לב. הסבלנות עולה לך במצב רוח."; } },
+    { label: "לבקש מהסוכן למצוא מועדון אחר", hint: "פותח שוק העברות",
+      apply: g => { g.setFlag("wants_transfer", true); tru(g, -10);
+        return "הסוכן התחיל לעבוד. בחלון הקרוב יגיעו הצעות — והמאמן כבר יודע שאתה בדרך החוצה."; } },
+  ],
+});
+
+ev({
+  eid: "derby_week", title: "שבוע דרבי", stages: ["player", "veteran"], weight: 2.0, once: false,
+  cond: g => g.week >= 3,
+  body: g => `העיר לא ישנה. שלטי חוצות, אוהדים מחוץ למתחם האימונים,\n` +
+    `וכתבה שמצטטת שחקן מהיריבה: "${g.me.name}? לא מכיר."`,
+  choices: [
+    { label: "לענות לו בתקשורת", hint: "מוניטין ↑, לחץ ↑",
+      apply: g => { rep(g, 4); fan(g, 6); g.setFlag("derby_beef", true);
+        return "הכותרת שלך פתחה את המהדורה. עכשיו אסור לך לככב פחות מהמצוין."; } },
+    { label: "לשתוק ולעלות על המגרש",
+      apply: g => { mor(g, 4); att(g, "mental", 0.8);
+        return "לא אמרת מילה כל השבוע. בחדר ההלבשה זה נשמע חזק יותר מכל ציטוט."; } },
+    { label: "להזמין את המשפחה ליציע ולנשום",
+      apply: g => { mor(g, 7); return "ראית אותם ביציע בחימום. פתאום זה שוב רק כדורגל."; } },
+  ],
+});
+
+ev({
+  eid: "scandal_night", title: "צילום מהמועדון", stages: ["player", "veteran"], weight: 1.6, once: true,
+  cond: g => g.me.age >= 19 && g.me.reputation >= 30,
+  body: () => "3:40 לפנות בוקר. מישהו צילם אותך יוצא ממועדון לילה\n" +
+    "שני ימים לפני משחק. הסרטון כבר ברשת.\nהדובר מחכה לתשובה שלך עוד עשר דקות.",
+  choices: [
+    { label: "להתנצל בפומבי ולקחת אחריות",
+      apply: g => { rep(g, -3); tru(g, 4); fan(g, 2); mor(g, -2);
+        return "התנצלת בלי תירוצים. התקשורת התייבשה תוך יומיים. המאמן העריך את זה יותר ממה שהודה."; } },
+    { label: "להכחיש הכל", hint: "הימור", apply: g => g.denyScandal() },
+    { label: "לתרום את שכר השבוע ולא לומר מילה", hint: "עולה כסף",
+      apply: g => { g.spend(g.me.contract.wage); fan(g, 9); rep(g, 2);
+        return "העברת את שכר השבוע למועדון ילדים בשכונה. מישהו הדליף את זה. האוהדים אימצו אותך."; } },
+  ],
+});
+
+ev({
+  eid: "national_call", title: "המעטפה מהנבחרת", stages: ["player", "veteran"], weight: 5.0, once: true,
+  cond: g => g.me.reputation >= 52 && !g.flag("national_debut"),
+  body: () => "סגל הנבחרת פורסם. השם שלך שם, בשורה התחתונה, מודפס קטן.\n" +
+    "אמא שלך שלחה צילום מסך עם אחת עשרה נקודות קריאה.",
+  choices: [
+    { label: "לנסוע ולתת הכל", hint: "מוניטין ↑↑", apply: g => g.nationalDebut() },
+    { label: "להתנצל — הגוף צריך מנוחה",
+      apply: g => { rep(g, -5); g.me.fitness = 100; mor(g, -3);
+        return "ויתרת על הקריאה הראשונה. הסלקטור לא שכח."; } },
+  ],
+});
+
+ev({
+  eid: "big_club_interest", title: "שיחה מאירופה", stages: ["player", "veteran"], weight: 4.5, once: false,
+  cond: g => g.bigClubSuitor() !== null && [11, 12, 13].includes(g.week),
+  body: g => `הסוכן שלך מתקשר בשתיים בלילה.\n` +
+    `"${g.bigClubSuitor().name} שאלו עליך. לא סתם שאלו — הם שלחו צופה לשלושה משחקים.\n` +
+    `תגיד לי עכשיו: אם תגיע הצעה, אתה בפנים?"`,
+  choices: [
+    { label: "תגיד להם שאני מוכן", hint: "מגדיל סיכוי להצעה",
+      apply: g => { g.setFlag("open_to_europe", true); mor(g, 5);
+        return "המילה עברה. עכשיו כל משחק הוא מבחן קבלה."; } },
+    { label: "אני מרוכז במועדון שלי",
+      apply: g => { tru(g, 8); fan(g, 7); mor(g, 2);
+        return "הצהרת נאמנות. המועדון הרים לך את השכר בלי שביקשת."; } },
+  ],
+});
+
+ev({
+  eid: "captain_armband", title: "הסרט", stages: ["player", "veteran"], weight: 4.0, once: true,
+  cond: g => g.me.age >= 25 && g.myClub() && g.myClub().managerTrust >= 65,
+  body: g => `${g.myClub().managerName} סוגר את הדלת.\n` +
+    `"הקפטן הולך בסוף העונה. אני רוצה שאתה תיקח את הסרט.\n` +
+    `זה אומר גם את הפעמים שצריך לצעוק על מישהו שאתה אוהב."`,
+  choices: [
+    { label: "לקחת את הסרט", hint: "מנהיגות, אחריות, לחץ", apply: g => g.becomeCaptain() },
+    { label: "להציע במקומי את הוותיק",
+      apply: g => { tru(g, 3); mor(g, 2);
+        return "ויתרת לטובת מישהו אחר. חדר ההלבשה זכר לך את זה שנים."; } },
+  ],
+});
+
+ev({
+  eid: "serious_injury", title: "הרגל נתקעה בדשא", stages: ["player", "veteran"], weight: 3.0, once: false,
+  cond: g => g.me.injuryWeeks >= 8,
+  body: g => `${g.me.injuryName}. ${g.me.injuryWeeks} שבועות, אם הכל ילך טוב.\n` +
+    `הרופא מדבר, אתה שומע רק את המילה "אם".`,
+  choices: [
+    { label: "שיקום לפי הספר, בלי קיצורי דרך", hint: "בטוח",
+      apply: g => { att(g, "mental", 1.2); mor(g, -4); g.setFlag("clean_rehab", true);
+        return "חזרת בזמן, בלי הישנות. איבדת חצי עונה והרווחת גוף שמחזיק."; } },
+    { label: "לדחוף חזרה מוקדם — הקבוצה צריכה אותי", hint: "הימור מסוכן", apply: g => g.rushRehab() },
+    { label: "לנצל את הזמן ללימודי אימון", hint: "פותח דלתות לעתיד", apply: g => g.studyDuringInjury() },
+  ],
+});
+
+ev({
+  eid: "sponsor_deal", title: "חוזה פרסום", stages: ["player", "veteran"], weight: 2.2, once: false,
+  cond: g => g.me.reputation >= 45,
+  body: () => "חברת נעליים שמה על השולחן חוזה שנתי.\n" +
+    "הכסף מכובד. התנאי: שלושה ימי צילומים בעונה, אחד מהם בשבוע של משחק.",
+  choices: [
+    { label: "לחתום", hint: "₪450,000",
+      apply: g => { g.earn(450000); g.me.mediaSkill = clamp(g.me.mediaSkill + 6, 0, 100); tru(g, -3);
+        return "חתמת. הצטלמת. המאמן ראה את הפוסטר בכניסה למתחם ולא חייך."; } },
+    { label: "לסרב — לא בשבוע של משחק",
+      apply: g => { tru(g, 5); att(g, "mental", 0.5); return "סירבת. הסוכן כעס. הצוות המקצועי לא."; } },
+  ],
+});
+
+ev({
+  eid: "contract_talks", title: "שולחן המשא ומתן", stages: ["player", "veteran"], weight: 8.0, once: false,
+  cond: g => g.me.contract.yearsLeft <= 0 && g.myClub() !== null,
+  body: g => `החוזה שלך נגמר בסוף העונה.\n${g.myClub().name} הניחו הצעה על השולחן: ` +
+    `₪${fmt(g.renewalOffer())} לשבוע.`,
+  choices: [
+    { label: "לחתום מיד", hint: "ביטחון", apply: g => g.signRenewal(1.0) },
+    { label: "לדרוש יותר", hint: "הימור על היחסים", apply: g => g.demandRaise() },
+    { label: "לא לחתום — לצאת חופשי בקיץ", hint: "מסוכן, אבל משתלם",
+      apply: g => { g.setFlag("free_agent_soon", true); tru(g, -14); fan(g, -8);
+        return "לא חתמת. בקיץ תהיה חופשי — ועד אז אתה זר במועדון שלך."; } },
+  ],
+});
+
+ev({
+  eid: "dressing_room_split", title: "חדר הלבשה מפוצל", stages: ["player", "veteran"], weight: 2.0, once: false,
+  cond: g => g.myClub() && g.myClub().managerTrust <= 40,
+  body: g => `חצי מהקבוצה רוצה ש${g.myClub().managerName} ילך.\n` +
+    `מישהו כבר דיבר עם עיתונאי. עכשיו מסתכלים עליך — אתה בין הבכירים.`,
+  choices: [
+    { label: "לתמוך במאמן בפומבי",
+      apply: g => { tru(g, 16); mor(g, -3); g.setFlag("manager_ally", true);
+        return "עמדת מולו והצהרת. חלק מהחבר'ה הפסיקו לדבר איתך. המאמן לא יוריד אותך יותר לעולם."; } },
+    { label: "להצטרף למרד", hint: "עלול לפוצץ את העונה", apply: g => g.joinRevolt() },
+    { label: "לכנס את הקבוצה בלי המאמן", hint: "מנהיגות",
+      apply: g => { att(g, "mental", 1.5); mor(g, 5); g.setFlag("leader_moment", true);
+        return "כינסת את כולם. שעה של אמת בלי צוות מקצועי. מאותו יום אתה המנהיג של החדר."; } },
+  ],
+});
+
+ev({
+  eid: "youngster_threat", title: "הילד שהגיע לתפוס את המקום", stages: ["player", "veteran"], weight: 2.0, once: false,
+  cond: g => g.me.age >= 26 && g.rivalYoungster() !== null,
+  body: g => {
+    const kid = g.rivalYoungster();
+    return `${kid.name}, בן ${kid.age}, נכנס לקבוצה.\n` +
+      `אותה עמדה. אותן רגליים שהיו לך פעם. הצוות מדבר עליו בהתלהבות שכבר לא מדברים עליך.`;
+  },
+  choices: [
+    { label: "לקחת אותו תחת חסותך", hint: "פותח דלת לאימון בעתיד", apply: g => g.mentorYoungster() },
+    { label: "להילחם בו על כל דקה",
+      apply: g => { att(g, "physical", 1.2); mor(g, -3); tru(g, 4);
+        return "הפכת כל אימון לקרב. שנית בחזרה את הכיסא — לעונה אחת לפחות."; } },
+    { label: "לבקש מהמאמן לשחק במקום אחר במגרש", hint: "מאריך קריירה", apply: g => g.changePosition() },
+  ],
+});
+
+// ===========================================================================
+// שלב 3 — ותיק ופרישה
+// ===========================================================================
+
+ev({
+  eid: "body_signals", title: "הגוף מדבר", stages: ["veteran"], weight: 3.0, once: false,
+  cond: g => g.me.age >= 32,
+  body: g => `אתה בן ${g.me.age}. הבוקר לקח לך עשרים דקות לרדת מהמיטה.\n` +
+    `הפיזיותרפיסט אומר שאפשר להמשיך — עם מחיר.`,
+  choices: [
+    { label: "להוריד עומסים ולשחק חכם",
+      apply: g => { att(g, "mental", 1.4); att(g, "pace", -0.6); g.me.fitness = 100;
+        return "התחלת לשחק בראש במקום ברגליים. פחות ספרינטים, יותר מסירות נכונות."; } },
+    { label: "זריקות ולהמשיך כרגיל", hint: "מסוכן", apply: g => g.painkillers() },
+    { label: "להתחיל לתכנן את היום שאחרי", hint: "מכין את הקריירה הבאה",
+      apply: g => { mor(g, 2); return g.studyDuringInjury(); } },
+  ],
+});
+
+ev({
+  eid: "retirement_call", title: "ההחלטה", stages: ["veteran"], weight: 9.0, once: false,
+  cond: g => g.retirementReady(),
+  body: g => `${g.me.age}. ${g.me.career.apps + g.me.season.apps} משחקים בקריירה.\n` +
+    `${g.me.career.goals + g.me.season.goals} שערים.\n` +
+    `הסוכן שואל את השאלה שאתה מתחמק ממנה חודשים:\n` +
+    `"עוד עונה, או שאנחנו מתחילים לדבר על מה שאחרי?"`,
+  choices: [
+    { label: "עוד עונה אחת. אני עוד מסוגל.",
+      apply: g => { mor(g, 5); g.setFlag("one_more_year", true);
+        return "עוד עונה. הגוף ישלם, אבל אתה עוד לא מוכן להוריד את הנעליים."; } },
+    { label: "להכריז על פרישה בסוף העונה", hint: "פותח את הפרק הבא", apply: g => g.announceRetirement() },
+  ],
+});
+
+ev({
+  eid: "farewell_match", title: "משחק הפרידה", stages: ["retired"], weight: 10.0, once: true,
+  cond: g => g.flag("retired_announced"),
+  body: g => `${g.lastClubName()} מארגנים לך משחק פרידה.\n` +
+    `האצטדיון מלא. הילדים ביציע לובשים את החולצה עם השם שלך.`,
+  choices: [
+    { label: "לשחק 20 דקות ולצאת לתשואות",
+      apply: g => { rep(g, 6); g.recordHonour("משחק פרידה מול אצטדיון מלא"); g.earn(700000);
+        return "עשרים דקות, נגיעה אחת שהזכירה לכולם למה. יצאת כשכל האצטדיון עומד."; } },
+    { label: "לוותר על הטקס ולהיעלם בשקט",
+      apply: g => { rep(g, -2); g.setFlag("quiet_exit", true);
+        return "לא הגעת. חלק כיבדו את זה, רובם לא הבינו."; } },
+  ],
+});
+
+ev({
+  eid: "next_chapter", title: "הפרק הבא", stages: ["retired"], weight: 12.0, once: true,
+  cond: () => true,
+  body: g => `עברו שלושה חודשים מאז המשחק האחרון.\n` +
+    `הטלפון עדיין מצלצל — אבל עכשיו מציעים לך דברים אחרים.\n\n${g.careerOptionsSummary()}`,
+  choices: [
+    { label: "מסלול אימון — מאמן עוזר במועדון", hint: "דורש תעודות אימון", apply: g => g.startCoaching() },
+    { label: "אולפן — פרשן טלוויזיה", hint: "דורש כריזמה תקשורתית", apply: g => g.startPunditry() },
+    { label: "סוכנות שחקנים", hint: "דורש ראש עסקי", apply: g => g.startAgency() },
+    { label: "לקחת שנה חופש",
+      apply: g => { g.setFlag("gap_year", true); mor(g, 8);
+        return "שנה של כלום. משפחה, ים, שינה. כשחזרת, הטלפון עדיין צלצל."; } },
+  ],
+});
+
+// ===========================================================================
+// שלב 4 — מאמן ומנג'ר
+// ===========================================================================
+
+ev({
+  eid: "first_manager_offer", title: "הצעה לשבת בכיסא הגדול", stages: ["coach"], weight: 8.0, once: true,
+  cond: g => g.me.coaching >= 45,
+  body: g => `${g.managerJobOfferName()} מחפשים מנג'ר.\n` +
+    `הם רוצים מישהו שמכיר את המועדון מבפנים. הם רוצים אותך.\n` +
+    `התנאי: אתה לוקח את זה עכשיו, באמצע משבר.`,
+  choices: [
+    { label: "לקחת את התפקיד", hint: "הופך אותך למנג'ר ראשי", apply: g => g.takeManagerJob() },
+    { label: "עוד שנה כעוזר, ללמוד עוד",
+      apply: g => { g.me.coaching = clamp(g.me.coaching + 10, 0, 100);
+        return "נשארת ללמוד. ידע האימון שלך קפץ — וההצעה הבאה תהיה טובה יותר."; } },
+  ],
+});
+
+ev({
+  eid: "board_meeting", title: "ישיבת הנהלה", stages: ["manager"], weight: 4.0, once: false,
+  cond: g => [6, 13, 20].includes(g.week) && g.myClub() !== null,
+  body: g => `היו"ר פורש טבלה על השולחן.\n` +
+    `"ציפינו ל${g.myClub().seasonExpectation}. אנחנו במקום ${g.leaguePosition()}.\n` +
+    `תסביר לי מה קורה — ובלי סיסמאות."`,
+  choices: [
+    { label: "לקחת אחריות מלאה",
+      apply: g => { g.board(6); return "לקחת הכל על עצמך. ההנהלה נתנה לך עוד זמן."; } },
+    { label: "לדרוש תקציב להעברות", hint: "הימור על היחסים", apply: g => g.demandBudget() },
+    { label: "להאשים את השופטים ואת הפציעות",
+      apply: g => { g.board(-9); fan(g, 4);
+        return "האוהדים אהבו את זה. ההנהלה ספרה את המילים ולא התרשמה."; } },
+  ],
+});
+
+ev({
+  eid: "star_wants_out", title: "הכוכב רוצה ללכת", stages: ["manager"], weight: 3.0, once: false,
+  cond: g => g.squadStar() !== null,
+  body: g => {
+    const s = g.squadStar();
+    return `${s.name} (${overall(s)}) נכנס למשרד עם הסוכן.\n"יש הצעה מבחוץ. אני רוצה שתשחרר אותי."`;
+  },
+  choices: [
+    { label: "למכור ולהשקיע בסגל", hint: "תקציב ↑, איכות ↓", apply: g => g.sellStar() },
+    { label: "לסרב ולהחזיק אותו בכוח", hint: "מורל הקבוצה בסיכון", apply: g => g.keepStar() },
+    { label: "להציע לו את הקפטן והעלאה", hint: "עולה כסף", apply: g => g.promoteStar() },
+  ],
+});
+
+ev({
+  eid: "wonderkid", title: "ילד מהנוער", stages: ["manager"], weight: 3.0, once: false,
+  cond: g => g.myClub() !== null,
+  body: () => "מאמן הנוער מביא לך שם.\nבן 17. באימון הבוגרים הוריד שני בלמים בתנועה אחת.",
+  choices: [
+    { label: "להעלות אותו לסגל הבוגרים", hint: "הימור ארוך טווח", apply: g => g.promoteYouth() },
+    { label: "להשאיר אותו בנוער עוד שנה",
+      apply: g => { g.board(2); return "השארת אותו למטה. בטוח, אבל שקט מדי."; } },
+  ],
+});
+
+ev({
+  eid: "sack_race", title: "השם שלך בעיתון", stages: ["manager"], weight: 6.0, once: false,
+  cond: g => g.myClub() && g.myClub().boardConfidence <= 32,
+  body: g => `"${g.me.name} על הכוונת" — כותרת ראשית.\n` +
+    `אמון ההנהלה: ${Math.round(g.myClub().boardConfidence)}%. שלושה משחקים להוכיח.`,
+  choices: [
+    { label: "לשנות הכל — טקטיקה, הרכב, הכל", hint: "הימור גדול", apply: g => g.radicalChange() },
+    { label: "להמשיך בדרך שלי",
+      apply: g => { g.board(-2); g.setFlag("stubborn", true);
+        return "לא זזת מילימטר. אם זה יעבוד — אתה גאון. אם לא — אתה מובטל."; } },
+    { label: "להתפטר בכבוד", hint: "יוצא בתנאים שלך", apply: g => g.resign() },
+  ],
+});
+
+ev({
+  eid: "bigger_job", title: "מועדון גדול מתקשר", stages: ["manager"], weight: 4.0, once: false,
+  cond: g => g.managerSuitor() !== null,
+  body: g => `${g.managerSuitor().name} רוצים אותך.\n` +
+    `תקציב אחר, לחץ אחר, אצטדיון אחר.\nובמועדון שלך יש חוזה ואוהדים שקראו לך בשם.`,
+  choices: [
+    { label: "לעבור למועדון הגדול", hint: "מוניטין ↑↑", apply: g => g.moveManagerJob() },
+    { label: "להישאר ולסיים את הפרויקט",
+      apply: g => { g.board(10); fan(g, 12); rep(g, 3);
+        return "נשארת. בעיר הזאת לא ישכחו לך את זה."; } },
+  ],
+});
+
+// ===========================================================================
+// שלב 5 — אחרי הכל
+// ===========================================================================
+
+ev({
+  eid: "director_offer", title: "מהספסל למשרד", stages: ["manager"], weight: 3.0, once: true,
+  cond: g => g.me.age >= 50 && g.me.business >= 30,
+  body: () => "הבעלים מציע לך לעלות קומה: מנהל ספורטיבי.\n" +
+    "בלי אימונים בגשם, בלי שריקות. רק החלטות — ואחריות על כולן.",
+  choices: [
+    { label: "לעלות למשרד", hint: "שלב קריירה חדש", apply: g => g.becomeDirector() },
+    { label: "אני שייך לקו הצדדי",
+      apply: g => { mor(g, 4); return "סירבת. הדשא עוד קורא לך."; } },
+  ],
+});
+
+ev({
+  eid: "buy_childhood_club", title: "המועדון שבו התחלת",
+  stages: ["pundit", "agent", "director", "manager", "retired"], weight: 2.5, once: true,
+  cond: g => g.money >= 4000000,
+  body: g => `${g.firstClubName()} — המועדון שבו התחלת — בקשיים.\n` +
+    `מציעים לך לרכוש שליטה. המחיר: ₪4,000,000 והרבה כאב ראש.`,
+  choices: [
+    { label: "לקנות את המועדון", hint: "₪4,000,000 — הופך אותך לבעלים", apply: g => g.buyClub() },
+    { label: "לתרום ולהישאר בחוץ",
+      apply: g => { g.spend(500000); rep(g, 3);
+        return "תרמת חצי מיליון. שם המגרש הפך לשם שלך."; } },
+  ],
+});
+
+ev({
+  eid: "hall_of_fame", title: "היכל התהילה",
+  stages: ["retired", "coach", "manager", "pundit", "agent", "director", "owner"], weight: 4.0, once: true,
+  cond: g => g.me.career.apps >= 250 || g.honours.length >= 3,
+  body: g => `מכתב רשמי: אתה נכנס להיכל התהילה.\n` +
+    `${g.me.career.apps} משחקים. ${g.me.career.goals} שערים. ${g.honours.length} הישגים.`,
+  choices: [
+    { label: "לנאום ולהודות לכולם",
+      apply: g => { rep(g, 8); g.recordHonour("היכל התהילה");
+        return "עמדת שם עם הנאום ביד ולא הסתכלת בו אפילו פעם אחת."; } },
+  ],
+});
+
+ev({
+  eid: "child_debut", title: "הדור הבא",
+  stages: ["coach", "manager", "pundit", "agent", "director", "owner", "legend"], weight: 2.0, once: true,
+  cond: g => g.me.age >= 45,
+  body: () => "הבן שלך חתם חוזה נעורים.\n" +
+    "מאמן הנוער אומר שהוא טוב יותר ממה שאתה היית בגיל הזה.\n" +
+    "העיתונות כבר כותבת את השם המשפחה בכותרות.",
+  choices: [
+    { label: "להגן עליו מהתקשורת",
+      apply: g => { rep(g, 2); g.setFlag("protective_parent", true);
+        return "סגרת את הדלת בפני כולם. הוא גדל בשקט."; } },
+    { label: "לאמן אותו בעצמך",
+      apply: g => { g.me.coaching = clamp(g.me.coaching + 5, 0, 100); g.setFlag("coaching_child", true);
+        return "כל בוקר, שעה לפני כולם, במגרש הריק. זה הדבר הכי טוב שעשית מאז שפרשת."; } },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+
+function eligibleEvents(g) {
+  return STORY.filter(e => {
+    if (e.stages.length && !e.stages.includes(g.stage)) return false;
+    if (e.once && g.firedEvents.includes(e.eid)) return false;
+    try { return !!e.cond(g); } catch (err) { return false; }
+  });
+}
+
+function pickEvent(g, rng, chance = 0.34) {
+  const candidates = eligibleEvents(g);
+  if (!candidates.length) return null;
+  const forced = candidates.filter(e => e.weight >= 8.0);
+  if (!forced.length && rng.random() > chance) return null;
+  const pool = forced.length ? forced : candidates;
+  return rng.weighted(pool.map(e => [e, e.weight]));
+}
+
+function findEvent(eid) { return STORY.find(e => e.eid === eid) || null; }
+
+// ---------------------------------------------------------------------------
+// מצב המשחק — פורט מ-football_manager/game.py
+// ---------------------------------------------------------------------------
+
+function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+
+class Game {
+  constructor() {
+    this.seed = 0;
+    this.clubs = {}; this.players = {};
+    this.meId = ""; this.stage = "academy";
+    this.year = 2026; this.week = 1;
+    this.fixtures = {}; this.tables = {}; this.cup = {};
+    this.money = 0; this.flags = {}; this.honours = []; this.news = [];
+    this.firedEvents = []; this.pendingEventId = null; this.pendingEventBody = null;
+    this.managedClubId = null;
+    this.tactics = { mentality: "balanced", pressing: "medium", formation: "4-3-3", talkBoost: 0 };
+    this.trainingFocus = "shooting"; this.intensity = 1.0;
+    this.firstClubId = null; this.lastClubId = null;
+    this.history = []; this.caps = 0; this.intlGoals = 0;
+    this.noStartStreak = 0; this.gameOver = false;
+    this.rng = new Rng(1);
+  }
+
+  get me() { return this.players[this.meId]; }
+
+  myClub() {
+    if (["manager", "coach", "director", "owner"].includes(this.stage) && this.managedClubId)
+      return this.clubs[this.managedClubId] || null;
+    return this.me.clubId ? (this.clubs[this.me.clubId] || null) : null;
+  }
+  myLeague() { const c = this.myClub(); return c ? c.leagueId : null; }
+  flag(name, dflt = null) { return name in this.flags ? this.flags[name] : dflt; }
+  setFlag(name, value = true) { this.flags[name] = value; }
+  log(text) {
+    if (!text) return;
+    this.news.push(`[${this.year}/ש${this.week}] ${text}`);
+    if (this.news.length > 120) this.news = this.news.slice(-120);
+  }
+  recordHonour(text) {
+    this.honours.push(`${this.year}: ${text}`);
+    this.me.career.trophies += 1;
+    this.log(`🏆 ${text}`);
+    return text;
+  }
+  earn(amount) { this.money += Math.round(amount); return this.money; }
+  spend(amount) { this.money = Math.max(0, this.money - Math.round(amount)); return this.money; }
+
+  // ==================================================================
+  // משחק חדש
+  // ==================================================================
+
+  static newGame(name, position, clubId, age = 17, seed = null) {
+    const g = new Game();
+    g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
+    g.rng = new Rng(g.seed);
+    const world = generateWorld(g.seed);
+    g.clubs = world.clubs; g.players = world.players;
+    const club = g.clubs[clubId];
+
+    const me = generatePlayer(g.rng, club, position, {
+      age, quality: Math.round(clamp(club.reputation * 0.55 + 24, 48, 70)) });
+    me.name = name;
+    me.isHuman = true;
+    me.potential = Math.round(clamp(overall(me) + g.rng.randint(12, 30), 60, 94));
+    me.clubId = clubId;
+    me.contract = { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 };
+    me.morale = 70; me.reputation = 8;
+    me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
+    g.players[me.pid] = me;
+    club.squad.push(me.pid);
+    g.meId = me.pid;
+    g.firstClubId = clubId; g.lastClubId = clubId;
+    club.managerTrust = 45;
+
+    g.startSeason();
+    g.log(`התחלת את הדרך ב${club.name}.`);
+    return g;
+  }
+
+  // ==================================================================
+  // עונה
+  // ==================================================================
+
+  startSeason() {
+    this.week = 1;
+    this.fixtures = {}; this.tables = {};
+    for (const league of D.LEAGUES) {
+      const lid = league.id;
+      const clubIds = Object.values(this.clubs).filter(c => c.leagueId === lid).map(c => c.cid);
+      this.fixtures[lid] = roundRobin(clubIds, this.rng);
+      this.tables[lid] = {};
+      for (const cid of clubIds)
+        this.tables[lid][cid] = { clubId: cid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0 };
+    }
+    this.buildCup();
+    for (const club of Object.values(this.clubs)) club.seasonExpectation = this.expectation(club);
+  }
+
+  buildCup() {
+    const top = Object.values(this.clubs).filter(c => c.leagueId === "top").map(c => c.cid);
+    const national = Object.values(this.clubs).filter(c => c.leagueId === "national")
+      .sort((a, b) => b.reputation - a.reputation).slice(0, 4).map(c => c.cid);
+    const teams = this.rng.shuffle(top.concat(national)).slice(0, 16);
+    this.cup = { teams, round: "שמינית הגמר", winner: null, log: [] };
+  }
+
+  expectation(club) {
+    const peers = Object.values(this.clubs).filter(c => c.leagueId === club.leagueId)
+      .sort((a, b) => b.reputation - a.reputation);
+    const rank = peers.findIndex(c => c.cid === club.cid) + 1;
+    if (rank <= 2) return "אליפות";
+    if (rank <= 4) return "מקום באירופה";
+    if (rank <= peers.length - 3) return "אמצע טבלה";
+    return "הישרדות";
+  }
+
+  leagueRoundForWeek(leagueId, week) {
+    if (CUP_WEEKS[week]) return null;
+    const weeks = leagueWeeks();
+    const idx = weeks.indexOf(week);
+    if (idx < 0) return null;
+    const rounds = this.fixtures[leagueId] || [];
+    return idx < rounds.length ? idx : null;
+  }
+
+  myFixture(week) {
+    week = week || this.week;
+    const club = this.myClub();
+    if (!club) return null;
+    if (CUP_WEEKS[week]) return this.cupFixtureFor(club.cid);
+    const rnd = this.leagueRoundForWeek(club.leagueId, week);
+    if (rnd === null) return null;
+    for (const [home, away] of this.fixtures[club.leagueId][rnd])
+      if (home === club.cid || away === club.cid) return [home, away];
+    return null;
+  }
+
+  cupFixtureFor(cid) {
+    const teams = this.cup.teams || [];
+    const idx = teams.indexOf(cid);
+    if (idx < 0) return null;
+    const start = idx - (idx % 2);
+    if (start + 1 >= teams.length) return null;
+    return [teams[start], teams[start + 1]];
+  }
+
+  standings(leagueId) {
+    const rows = Object.values(this.tables[leagueId] || {});
+    rows.forEach(r => { r.points = r.won * 3 + r.drawn; r.gd = r.gf - r.ga; });
+    rows.sort((a, b) => (b.points - a.points) || (b.gd - a.gd) || (b.gf - a.gf));
+    return rows;
+  }
+
+  leaguePosition() {
+    const club = this.myClub();
+    if (!club) return 0;
+    const rows = this.standings(club.leagueId);
+    const idx = rows.findIndex(r => r.clubId === club.cid);
+    return idx < 0 ? 0 : idx + 1;
+  }
+
+  leagueName(leagueId) {
+    const league = D.LEAGUES.find(l => l.id === leagueId);
+    return league ? league.name : leagueId;
+  }
+
+  // ==================================================================
+  // התקדמות שבועית
+  // ==================================================================
+
+  availableActions() {
+    if (["academy", "player", "veteran"].includes(this.stage)) {
+      return D.ATTRIBUTES.concat(["rest", "badges", "media", "business"])
+        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+    }
+    if (["coach", "manager"].includes(this.stage)) {
+      return [["tactics", "עבודה טקטית עם הקבוצה"], ["individual", "אימון אישי לצעירים"],
+              ["scouting", "סקאוטינג ואיתור שחקנים"], ["media", "עבודה מול התקשורת"],
+              ["badges", "השתלמות מקצועית"], ["rest", "לתת לקבוצה לנשום"]];
+    }
+    if (this.stage === "pundit")
+      return [["studio", "אולפן שידור"], ["column", "טור בעיתון"],
+              ["badges", "לשמור על תעודות האימון"], ["rest", "חופש"]];
+    if (this.stage === "agent")
+      return [["clients", "לגייס לקוחות חדשים"], ["deals", "לסגור עסקאות"],
+              ["media", "לבנות קשרים בתקשורת"], ["rest", "חופש"]];
+    if (["director", "owner"].includes(this.stage))
+      return [["squad", "בניית סגל"], ["finance", "ניהול פיננסי"],
+              ["academy", "השקעה בנוער"], ["rest", "חופש"]];
+    return [["rest", "מנוחה"]];
+  }
+
+  setAction(key) { this.trainingFocus = key; }
+
+  advanceWeek() {
+    const report = { week: this.week, training: [], notes: [], match: null,
+                     personal: null, eventId: null, seasonEnded: false, seasonSummary: null };
+    if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
+    if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
+
+    report.training = this.doWeeklyAction();
+    this.simulateWeekMatches(report);
+    simulateAiWeek(this.players, this.rng, this.clubs, this.meId);
+
+    const event = pickEvent(this, this.rng);
+    if (event && this.armEvent(event)) report.eventId = event.eid;
+
+    this.weeklyIncome(report);
+
+    this.week += 1;
+    if (this.week > SEASON_WEEKS) {
+      report.seasonEnded = true;
+      report.seasonSummary = this.endSeason();
+    }
+    return report;
+  }
+
+  doWeeklyAction() {
+    const focus = this.trainingFocus;
+    const me = this.me;
+    const club = this.myClub();
+
+    if (["academy", "player", "veteran"].includes(this.stage))
+      return weeklyTraining(me, focus, club, this.rng, this.intensity);
+
+    const lines = [];
+    if (["coach", "manager"].includes(this.stage)) {
+      if (focus === "tactics") {
+        this.tactics.talkBoost = clamp((this.tactics.talkBoost || 0) + 0.25, 0, 0.6);
+        me.coaching = clamp(me.coaching + 0.6, 0, 100);
+        lines.push({ icon: "🧠", text: "עבדתם על תבניות. הקבוצה נכנסת מוכנה יותר למשחק." });
+      } else if (focus === "individual" && club) {
+        const young = club.squad.map(p => this.players[p]).filter(p => p && p.age <= 22);
+        if (young.length) {
+          const target = this.rng.choice(young);
+          weeklyTraining(target, this.rng.choice(D.ATTRIBUTES), club, this.rng, 1.2);
+          lines.push({ icon: "🎯", text: `עבודה אישית עם ${target.name} (${target.age}).` });
+        }
+      } else if (focus === "scouting" && club) {
+        this.setFlag("scouted", true);
+        lines.push({ icon: "🔍", text: "הצוות סרק שחקנים — בחלון ההעברות יהיו לך יעדים." });
+      } else if (focus === "media") {
+        me.mediaSkill = clamp(me.mediaSkill + 1.1, 0, 100);
+        if (club) club.fanSupport = clamp(club.fanSupport + 1.2, 0, 100);
+        lines.push({ icon: "🎤", text: "מסיבת עיתונאים טובה. הקהל נרגע." });
+      } else if (focus === "badges") {
+        me.coaching = clamp(me.coaching + 1.4, 0, 100);
+        lines.push({ icon: "📚", text: "השתלמות מקצועית — ידע האימון עלה." });
+      } else if (focus === "rest" && club) {
+        for (const pid of club.squad) {
+          const p = this.players[pid];
+          if (p) { p.fitness = clamp(p.fitness + 14, 0, 100); p.morale = clamp(p.morale + 1.5, 0, 100); }
+        }
+        lines.push({ icon: "😌", text: "שבוע קליל. הסגל רענן." });
+      }
+      return lines;
+    }
+
+    if (this.stage === "pundit") {
+      if (focus === "studio") {
+        const fee = Math.round(6000 + me.mediaSkill * 260 + me.reputation * 190);
+        this.earn(fee);
+        me.mediaSkill = clamp(me.mediaSkill + 1.4, 0, 100);
+        me.reputation = clamp(me.reputation + 0.3, 0, 99);
+        lines.push({ icon: "📺", text: `שידור באולפן. ₪${fmt(fee)}.` });
+      } else if (focus === "column") {
+        const fee = Math.round(3000 + me.mediaSkill * 120);
+        this.earn(fee);
+        me.mediaSkill = clamp(me.mediaSkill + 1.0, 0, 100);
+        lines.push({ icon: "📰", text: `טור שבועי. ₪${fmt(fee)}.` });
+      } else if (focus === "badges") {
+        me.coaching = clamp(me.coaching + 1.6, 0, 100);
+        lines.push({ icon: "📚", text: "שמרת על הכשרת האימון שלך." });
+      } else lines.push({ icon: "🌴", text: "שבוע חופש." });
+      return lines;
+    }
+
+    if (this.stage === "agent") {
+      if (focus === "clients") {
+        const gained = this.rng.random() < 0.35 + me.business / 220 ? 1 : 0;
+        this.flags.clients = (this.flag("clients", 0)) + gained;
+        me.business = clamp(me.business + 1.2, 0, 100);
+        lines.push({ icon: "🤝", text: gained ? "חתמת לקוח חדש." : "שיחות. בלי חתימות השבוע." });
+      } else if (focus === "deals") {
+        const clients = this.flag("clients", 0);
+        const fee = Math.round(clients * (3000 + me.business * 220) * this.rng.uniform(0.5, 1.5));
+        this.earn(fee);
+        lines.push({ icon: "💼", text: fee ? `עמלות מעסקאות: ₪${fmt(fee)}.` : "אין לקוחות — אין עמלות." });
+      } else if (focus === "media") {
+        me.mediaSkill = clamp(me.mediaSkill + 1.3, 0, 100);
+        lines.push({ icon: "🎤", text: "בנית קשרים. השם שלך חוזר בכתבות." });
+      } else lines.push({ icon: "🌴", text: "שבוע חופש." });
+      return lines;
+    }
+
+    if (["director", "owner"].includes(this.stage) && club) {
+      if (focus === "squad") {
+        club.reputation = Math.round(clamp(club.reputation + 0.3, 1, 99));
+        lines.push({ icon: "📋", text: "עבודת סגל. המועדון נראה מסודר יותר." });
+      } else if (focus === "finance") {
+        const income = Math.round(club.reputation * 9000 * this.rng.uniform(0.7, 1.4));
+        club.budget += income / 1000000;
+        if (this.stage === "owner") this.earn(Math.round(income * 0.15));
+        lines.push({ icon: "💰", text: `הכנסות: ₪${fmt(income)} לקופת המועדון.` });
+      } else if (focus === "academy") {
+        club.youthAcademy = Math.round(clamp(club.youthAcademy + 1.2, 1, 99));
+        lines.push({ icon: "🌱", text: "השקעה בנוער. הדור הבא יהיה טוב יותר." });
+      } else lines.push({ icon: "🌴", text: "שבוע חופש." });
+      return lines;
+    }
+    return lines;
+  }
+
+  // -- משחקים -----------------------------------------------------------
+
+  simulateWeekMatches(report) {
+    if (CUP_WEEKS[this.week]) { this.playCupRound(report); return; }
+    const myClub = this.myClub();
+    for (const league of D.LEAGUES) {
+      const lid = league.id;
+      const rnd = this.leagueRoundForWeek(lid, this.week);
+      if (rnd === null) continue;
+      for (const [homeId, awayId] of this.fixtures[lid][rnd]) {
+        const home = this.clubs[homeId], away = this.clubs[awayId];
+        const isMine = myClub && (myClub.cid === homeId || myClub.cid === awayId);
+        const result = this.simulateOne(home, away, isMine, "ליגה");
+        this.registerResult(lid, result);
+        if (isMine) {
+          report.match = { result, home, away, competition: "ליגה" };
+          this.myMatchLines(result, report);
+        }
+      }
+    }
+    if (myClub && !report.match) this.idleWeek(report);
+  }
+
+  simulateOne(home, away, isMine, competition, neutral = false) {
+    let homeTac = {}, awayTac = {};
+    if (isMine) {
+      const myClub = this.myClub();
+      let mine = ["manager", "coach"].includes(this.stage) ? Object.assign({}, this.tactics) : {};
+      if (["academy", "player", "veteran"].includes(this.stage) && this.selected())
+        mine = { forced: [this.meId] };
+      if (myClub && myClub.cid === home.cid) homeTac = mine; else awayTac = mine;
+    }
+    const result = simulateMatch(home, away, this.players, this.rng,
+      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral });
+    if (["manager", "coach"].includes(this.stage)) this.tactics.talkBoost = 0;
+    return result;
+  }
+
+  selected() {
+    const me = this.me, club = this.myClub();
+    if (!club || !isAvailable(me)) return false;
+    const rivals = club.squad.map(p => this.players[p])
+      .filter(p => p && p.pid !== this.meId && isAvailable(p) && p.position === me.position);
+    let myScore = effective(me) + (club.managerTrust - 50) * 0.14;
+    if (this.flag("captain")) myScore += 4;
+    const bestRival = rivals.reduce((m, p) => Math.max(m, effective(p)), 0);
+    return myScore >= bestRival - 1.0;
+  }
+
+  myMatchLines(result, report) {
+    const me = this.me;
+    if (["academy", "player", "veteran"].includes(this.stage)) {
+      if (me.pid in result.ratings) {
+        this.noStartStreak = 0;
+        report.personal = {
+          status: "started",
+          rating: result.ratings[me.pid],
+          goals: result.events.filter(e => e.kind === "goal" && e.playerId === me.pid).length,
+          assists: result.events.filter(e => e.kind === "assist" && e.playerId === me.pid).length,
+          motm: result.motm === me.pid,
+        };
+      } else if (isAvailable(me)) {
+        this.noStartStreak += 1;
+        if (this.rng.random() < 0.4) report.personal = this.subAppearance(result);
+        else {
+          me.morale = clamp(me.morale - 2.5, 5, 99);
+          report.personal = { status: "bench" };
+        }
+      } else {
+        report.personal = { status: "injured", injuryName: me.injuryName, weeks: me.injuryWeeks };
+      }
+    } else {
+      const club = this.myClub();
+      if (club) {
+        const outcome = resultFor(result, club.cid);
+        const delta = { W: 4.0, D: -0.5, L: -4.0 }[outcome];
+        club.boardConfidence = clamp(club.boardConfidence + delta, 0, 100);
+        club.fanSupport = clamp(club.fanSupport + delta * 0.7, 0, 100);
+        report.personal = { status: "manager", outcome,
+          board: Math.round(club.boardConfidence), fans: Math.round(club.fanSupport) };
+      }
+    }
+  }
+
+  subAppearance(result) {
+    const me = this.me, club = this.myClub();
+    const minutes = this.rng.randint(8, 32);
+    let rating = Math.round(clamp(5.9 + this.rng.gauss(0.25, 0.5) + (effective(me) - 60) * 0.012, 3, 10) * 10) / 10;
+    let scored = false;
+    if (this.rng.random() < 0.06 * ((me.attributes.shooting ?? 40) / 55) && club) {
+      scored = true;
+      me.season.goals += 1;
+      rating = Math.round(Math.min(10, rating + 1.2) * 10) / 10;
+      const minute = 90 - this.rng.randint(1, Math.max(1, minutes - 1));
+      result.events.push({ minute, kind: "goal", clubId: club.cid, playerId: me.pid,
+                           text: `${minute}' ${me.name}` });
+      if (club.cid === result.homeId) result.homeGoals += 1; else result.awayGoals += 1;
+      // התוצאה השתנתה — הפרשנות צריכה להיכתב מחדש
+      result.commentary = buildCommentary(result, this.clubs[result.homeId],
+                                          this.clubs[result.awayId], this.players);
+    }
+    me.season.apps += 1;
+    me.season.minutes += minutes;
+    me.season.ratingSum += rating;
+    result.ratings[me.pid] = rating;
+    me.fitness = clamp(me.fitness - minutes * 0.12, 8, 100);
+    me.morale = clamp(me.morale + (rating - 6.2), 5, 99);
+    return { status: "sub", minutes, rating, goals: scored ? 1 : 0, assists: 0, motm: false };
+  }
+
+  registerResult(leagueId, result) {
+    const table = this.tables[leagueId];
+    if (!table) return;
+    const reg = (row, scored, conceded) => {
+      row.played += 1; row.gf += scored; row.ga += conceded;
+      if (scored > conceded) row.won += 1;
+      else if (scored === conceded) row.drawn += 1;
+      else row.lost += 1;
+    };
+    reg(table[result.homeId], result.homeGoals, result.awayGoals);
+    reg(table[result.awayId], result.awayGoals, result.homeGoals);
+  }
+
+  playCupRound(report) {
+    const teams = this.cup.teams || [];
+    const roundName = CUP_WEEKS[this.week];
+    if (!teams.length || this.cup.winner) {
+      report.notes.push({ icon: "🏆", text: "הגביע כבר הוכרע — שבוע חופשי." });
+      this.idleWeek(report);
+      return;
+    }
+    this.cup.round = roundName;
+    const winners = [];
+    const myClub = this.myClub();
+    const neutral = roundName === "גמר הגביע";
+    for (let i = 0; i + 1 < teams.length; i += 2) {
+      const home = this.clubs[teams[i]], away = this.clubs[teams[i + 1]];
+      const isMine = myClub && (myClub.cid === home.cid || myClub.cid === away.cid);
+      const result = this.simulateOne(home, away, isMine, roundName, neutral);
+      let winner, penalties = null;
+      if (result.homeGoals === result.awayGoals) {
+        winner = this.rng.random() < 0.5 ? home.cid : away.cid;
+        penalties = this.clubs[winner].name;
+      } else {
+        winner = result.homeGoals > result.awayGoals ? result.homeId : result.awayId;
+      }
+      winners.push(winner);
+      if (isMine) {
+        report.match = { result, home, away, competition: roundName, penalties };
+        this.myMatchLines(result, report);
+      }
+    }
+    this.cup.teams = winners;
+    if (winners.length === 1) {
+      this.cup.winner = winners[0];
+      const champ = this.clubs[winners[0]];
+      report.notes.push({ icon: "🏆", text: `${champ.name} זוכים בגביע המדינה!` });
+      if (myClub && myClub.cid === winners[0]) this.recordHonour("גביע המדינה");
+    }
+    if (myClub && !winners.includes(myClub.cid) && !report.match)
+      report.notes.push({ icon: "📅", text: "אין לך משחק גביע השבוע." });
+    if (myClub && !report.match) this.idleWeek(report);
+  }
+
+  idleWeek(report) {
+    weeklyRecovery(this.me, false, this.rng);
+    report.notes.push({ icon: "📅", text: "שבוע בלי משחק — התאוששות ואימונים." });
+  }
+
+  weeklyIncome(report) {
+    const me = this.me;
+    if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
+    else if (["coach", "manager", "director"].includes(this.stage)) {
+      const club = this.myClub();
+      let base = this.stage === "coach" ? 4000 : 12000;
+      if (club) base += Math.round(club.reputation * (this.stage === "coach" ? 60 : 260));
+      this.earn(base);
+    }
+    const played = !!(report.match && me.pid in report.match.result.ratings);
+    weeklyRecovery(me, played, this.rng);
+  }
+
+  // ==================================================================
+  // אירועי עלילה
+  // ==================================================================
+
+  armEvent(event) {
+    let body;
+    try { body = event.body(this); } catch (err) { return false; }
+    if (!body) return false;
+    this.pendingEventId = event.eid;
+    this.pendingEventBody = body;
+    return true;
+  }
+
+  pendingEvent() {
+    if (!this.pendingEventId) return null;
+    const event = findEvent(this.pendingEventId);
+    if (!event) { this.pendingEventId = null; this.pendingEventBody = null; }
+    return event;
+  }
+
+  pendingEventText() {
+    if (this.pendingEventBody) return this.pendingEventBody;
+    const event = this.pendingEvent();
+    if (!event) return "";
+    try { return event.body(this); } catch (err) { return ""; }
+  }
+
+  resolveEvent(index) {
+    const event = this.pendingEvent();
+    if (!event) return "";
+    const choice = event.choices[Math.max(0, Math.min(index, event.choices.length - 1))];
+    const outcome = choice.apply(this) || "";
+    if (!this.firedEvents.includes(event.eid)) this.firedEvents.push(event.eid);
+    this.pendingEventId = null;
+    this.pendingEventBody = null;
+    this.log(`${event.title} — ${choice.label}`);
+    return outcome;
+  }
+
+  // ==================================================================
+  // שאילתות לעלילה
+  // ==================================================================
+
+  minutesShare() {
+    const weeks = Math.max(1, this.week - 1);
+    return clamp(this.me.season.minutes / (weeks * 90), 0, 1);
+  }
+
+  loanTargetName() {
+    const options = Object.values(this.clubs).filter(c => c.leagueId === "national");
+    return options.length ? this.rng.choice(options).name : "מועדון מהליגה הלאומית";
+  }
+
+  bigClubSuitor() {
+    const me = this.me;
+    const candidates = Object.values(this.clubs).filter(c =>
+      c.cid !== me.clubId && c.reputation > me.reputation + 12 && c.reputation < me.reputation + 45);
+    if (!candidates.length) return null;
+    return candidates.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+  }
+
+  managerSuitor() {
+    const club = this.myClub();
+    if (!club || club.boardConfidence < 55) return null;
+    const candidates = Object.values(this.clubs)
+      .filter(c => c.reputation > club.reputation + 10 && c.cid !== club.cid);
+    if (!candidates.length) return null;
+    return candidates.reduce((a, b) => (a.reputation <= b.reputation ? a : b));
+  }
+
+  managerJobTarget() {
+    const pool = Object.values(this.clubs).filter(c =>
+      ["top", "national"].includes(c.leagueId) && c.reputation <= 30 + this.me.coaching * 0.7);
+    if (!pool.length) return null;
+    return pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+  }
+  managerJobOfferName() { const c = this.managerJobTarget(); return c ? c.name : "מועדון מהליגה"; }
+
+  squadStar() {
+    const club = this.myClub();
+    if (!club) return null;
+    const squad = club.squad.map(p => this.players[p]).filter(p => p && p.pid !== this.meId);
+    if (!squad.length) return null;
+    return squad.reduce((a, b) => (overall(a) >= overall(b) ? a : b));
+  }
+
+  rivalYoungster() {
+    const club = this.myClub();
+    if (!club) return null;
+    const rivals = club.squad.map(p => this.players[p]).filter(p =>
+      p && p.pid !== this.meId && p.position === this.me.position && p.age <= 21);
+    if (!rivals.length) return null;
+    return rivals.reduce((a, b) => (a.potential >= b.potential ? a : b));
+  }
+
+  retirementReady() {
+    return retirementPressure(this.me) > 0.45 && !this.flag("retired_announced") && this.week >= 18;
+  }
+
+  lastClubName() { const c = this.clubs[this.lastClubId]; return c ? c.name : "המועדון שלך"; }
+  firstClubName() { const c = this.clubs[this.firstClubId]; return c ? c.name : "מועדון הילדות"; }
+
+  renewalOffer() {
+    const club = this.myClub(), me = this.me;
+    let target = wageForOverall(overall(me));
+    target = Math.round(target * (0.85 + me.reputation / 200));
+    if (club) target = Math.round(Math.min(target, club.wageBudget * 0.30));
+    return Math.round(Math.max(me.contract.wage * 0.9, target));
+  }
+
+  careerOptionsSummary() {
+    const me = this.me;
+    return `תעודות אימון: ${me.badges}/4 · ידע אימון ${Math.round(me.coaching)}\n` +
+      `כריזמה תקשורתית: ${Math.round(me.mediaSkill)} · ראש עסקי: ${Math.round(me.business)}\n` +
+      `מוניטין: ${Math.round(me.reputation)} · בחשבון: ₪${fmt(this.money)}`;
+  }
+
+  // ==================================================================
+  // אפקטים
+  // ==================================================================
+
+  goOnLoan() {
+    const target = Object.values(this.clubs).filter(c => c.leagueId === "national")
+      .reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+    this.transferMe(target.cid, Math.round(this.me.contract.wage * 0.8), 1, true);
+    this.me.reputation = clamp(this.me.reputation - 2, 1, 99);
+    return `יצאת בהשאלה ל${target.name}. שם תשחק כל שבוע — וזה בדיוק מה שהקריירה שלך צריכה.`;
+  }
+
+  confrontManager() {
+    const club = this.myClub();
+    const roll = this.rng.random() + (effective(this.me) - 62) * 0.012;
+    if (roll > 0.55) {
+      if (club) club.managerTrust = clamp(club.managerTrust + 14, 0, 100);
+      this.me.morale = clamp(this.me.morale + 6, 5, 99);
+      return 'צעקת. הוא צעק חזרה. ואז אמר: "תהיה מוכן ביום ראשון." אתה בהרכב.';
+    }
+    if (club) club.managerTrust = clamp(club.managerTrust - 18, 0, 100);
+    this.me.morale = clamp(this.me.morale - 8, 5, 99);
+    this.setFlag("frozen_out", true);
+    return 'הוא הקשיב בשקט ואז אמר: "תודה שבאת." מאז אתה אפילו לא בסגל.';
+  }
+
+  denyScandal() {
+    if (this.rng.random() < 0.45) {
+      this.me.reputation = clamp(this.me.reputation - 12, 1, 99);
+      const club = this.myClub();
+      if (club) {
+        club.managerTrust = clamp(club.managerTrust - 12, 0, 100);
+        club.fanSupport = clamp(club.fanSupport - 10, 0, 100);
+      }
+      this.me.morale = clamp(this.me.morale - 10, 5, 99);
+      return "יומיים אחרי ההכחשה פורסם סרטון נוסף. עכשיו זה לא הבילוי — זה השקר.";
+    }
+    this.me.reputation = clamp(this.me.reputation + 1, 1, 99);
+    return "הכחשת בתוקף והסיפור דעך. הפעם יצאת מזה.";
+  }
+
+  nationalDebut() {
+    this.caps += 1;
+    this.setFlag("national_debut", true);
+    this.me.reputation = clamp(this.me.reputation + 9, 1, 99);
+    this.me.morale = clamp(this.me.morale + 8, 5, 99);
+    this.recordHonour("בכורה בנבחרת");
+    if (this.rng.random() < 0.25) {
+      this.intlGoals += 1;
+      return "נכנסת בדקה 71 וכבשת בנגיעה הראשונה שלך בנבחרת. אין דבר כזה.";
+    }
+    return "המנון, 90 דקות, וחולצה ממוסגרת אצל ההורים.";
+  }
+
+  becomeCaptain() {
+    this.setFlag("captain", true);
+    const club = this.myClub();
+    if (club) {
+      club.managerTrust = clamp(club.managerTrust + 10, 0, 100);
+      club.fanSupport = clamp(club.fanSupport + 8, 0, 100);
+    }
+    this.me.morale = clamp(this.me.morale + 6, 5, 99);
+    this.me.reputation = clamp(this.me.reputation + 4, 1, 99);
+    if (!this.me.traits.includes("leader")) this.me.traits.push("leader");
+    this.me.coaching = clamp(this.me.coaching + 6, 0, 100);
+    return "אתה הקפטן. עכשיו כל הפסד הוא גם שלך.";
+  }
+
+  rushRehab() {
+    if (this.rng.random() < 0.42) {
+      this.me.injuryWeeks = Math.max(1, Math.floor(this.me.injuryWeeks / 2));
+      this.me.morale = clamp(this.me.morale + 5, 5, 99);
+      const club = this.myClub();
+      if (club) club.managerTrust = clamp(club.managerTrust + 8, 0, 100);
+      return "חזרת חודש לפני הזמן והחזקת. המאמן לא שכח את זה.";
+    }
+    const extra = this.rng.randint(6, 14);
+    this.me.injuryWeeks += extra;
+    this.me.attributes.pace = Math.round(clamp((this.me.attributes.pace ?? 50) - 3, 10, 97));
+    this.me.morale = clamp(this.me.morale - 12, 5, 99);
+    return `נכנסת מוקדם מדי. הפציעה חזרה, ועוד ${extra} שבועות. המהירות שלך לא תחזור לגמרי.`;
+  }
+
+  studyDuringInjury() {
+    this.me.coaching = clamp(this.me.coaching + 5, 0, 100);
+    const newBadges = Math.min(4, Math.floor(this.me.coaching / 22));
+    let extra = "";
+    if (newBadges > this.me.badges) {
+      this.me.badges = newBadges;
+      extra = ` השלמת תעודת אימון רמה ${this.me.badges}.`;
+    }
+    return "במקום להסתובב במסדרונות, ישבת עם הצוות המקצועי על ניתוחי משחק." + extra;
+  }
+
+  signRenewal(multiplier) {
+    const offer = Math.round(this.renewalOffer() * multiplier);
+    this.me.contract = { wage: offer, yearsLeft: 3 };
+    const club = this.myClub();
+    if (club) {
+      club.managerTrust = clamp(club.managerTrust + 6, 0, 100);
+      club.fanSupport = clamp(club.fanSupport + 5, 0, 100);
+    }
+    this.me.morale = clamp(this.me.morale + 5, 5, 99);
+    return `חתמת לשלוש עונות על ₪${fmt(offer)} לשבוע.`;
+  }
+
+  demandRaise() {
+    const club = this.myClub();
+    const leverage = (this.me.reputation + overall(this.me)) / 2 - 50;
+    if (this.rng.random() * 100 < 45 + leverage) return this.signRenewal(1.45);
+    if (club) club.managerTrust = clamp(club.managerTrust - 10, 0, 100);
+    this.setFlag("contract_stalled", true);
+    this.me.morale = clamp(this.me.morale - 6, 5, 99);
+    return "ההנהלה משכה את ההצעה מהשולחן. עכשיו אתה משחק על החוזה שלך כל שבוע.";
+  }
+
+  joinRevolt() {
+    const club = this.myClub();
+    if (!club) return "";
+    if (this.rng.random() < 0.5) {
+      club.managerName = this.rng.choice(D.MANAGER_NAMES);
+      club.managerTrust = 50;
+      return `המאמן הודח. ${club.managerName} נכנס במקומו — ואתה מתחיל מאפס מול מישהו שיודע בדיוק מי הדליף.`;
+    }
+    club.managerTrust = clamp(club.managerTrust - 25, 0, 100);
+    this.setFlag("frozen_out", true);
+    return "המאמן שרד. אתה הוצאת מהסגל עד סוף העונה.";
+  }
+
+  mentorYoungster() {
+    const kid = this.rivalYoungster();
+    this.me.coaching = clamp(this.me.coaching + 4, 0, 100);
+    const club = this.myClub();
+    if (club) club.managerTrust = clamp(club.managerTrust + 6, 0, 100);
+    if (kid) {
+      kid.potential = Math.round(clamp(kid.potential + 2, 40, 95));
+      this.setFlag("protege", kid.pid);
+      return `לקחת את ${kid.name} תחת חסותך. הוא ייקח את המקום שלך — אבל הוא ייקח אותו כשאתה תלמד אותו איך.`;
+    }
+    return "התחלת להעביר ידע לצעירים.";
+  }
+
+  changePosition() {
+    const me = this.me;
+    const moves = { ST: "AM", LW: "AM", RW: "AM", AM: "CM", CM: "DM",
+                    DM: "CB", LB: "CB", RB: "CB", CB: "CB", GK: "GK" };
+    const old = positionHe(me);
+    me.position = moves[me.position] || "CM";
+    me.attributes.mental = Math.round(clamp((me.attributes.mental ?? 50) + 4, 10, 97));
+    return `עברת מ${old} ל${positionHe(me)}. פחות ריצה, יותר ראש — ועוד כמה שנים בקריירה.`;
+  }
+
+  painkillers() {
+    if (this.rng.random() < 0.55) {
+      this.me.form = clamp(this.me.form + 12, 5, 99);
+      return "הזריקות עובדות. שיחקת עונה שלמה כאילו אתה בן 26.";
+    }
+    const weeks = this.rng.randint(8, 16);
+    this.me.injuryWeeks = weeks;
+    this.me.attributes.physical = Math.round(clamp((this.me.attributes.physical ?? 50) - 4, 10, 97));
+    return `הגוף אמר די. ${weeks} שבועות, והפעם זה כואב גם כשאתה יושב.`;
+  }
+
+  announceRetirement() {
+    this.setFlag("retired_announced", true);
+    this.me.reputation = clamp(this.me.reputation + 4, 1, 99);
+    this.log("הודעת על פרישה בסוף העונה.");
+    return "עמדת מול המצלמות ואמרת את המשפט. בסוף העונה אתה תולה את הנעליים.";
+  }
+
+  startCoaching() {
+    if (this.me.badges < 1) {
+      this.me.coaching = clamp(this.me.coaching + 8, 0, 100);
+      return "אין לך אפילו תעודה אחת. שלחו אותך לקורס מאמנים בסיסי — תחזור לזה בעוד קצת.";
+    }
+    let club = this.clubs[this.lastClubId] || this.clubs[this.firstClubId];
+    if (!club) club = this.rng.choice(Object.values(this.clubs));
+    this.stage = "coach";
+    this.managedClubId = club.cid;
+    this.me.clubId = null;
+    this.trainingFocus = "tactics";
+    this.log(`התחלת לאמן — עוזר מאמן ב${club.name}.`);
+    return `אתה עוזר מאמן ב${club.name}. שעה לפני כולם במגרש, שעתיים אחרי כולם בחדר וידאו.`;
+  }
+
+  startPunditry() {
+    this.stage = "pundit";
+    this.managedClubId = null;
+    this.me.clubId = null;
+    this.trainingFocus = "studio";
+    const bonus = Math.round(200000 + this.me.reputation * 12000);
+    this.earn(bonus);
+    this.log("חתמת בערוץ הספורט כפרשן.");
+    return `חתמת כפרשן. מקדמה של ₪${fmt(bonus)}, ואור אדום שנדלק בדיוק כשאתה באמצע משפט.`;
+  }
+
+  startAgency() {
+    this.stage = "agent";
+    this.managedClubId = null;
+    this.me.clubId = null;
+    this.trainingFocus = "clients";
+    this.flags.clients = 1;
+    this.log("פתחת סוכנות שחקנים.");
+    return "פתחת משרד עם שולחן אחד ולקוח אחד — ילד בן 16 שאף אחד עוד לא שמע עליו.";
+  }
+
+  takeManagerJob() {
+    const club = this.managerJobTarget();
+    if (!club) return "לא נמצא מועדון מתאים כרגע.";
+    this.stage = "manager";
+    this.managedClubId = club.cid;
+    club.managerName = this.me.name;
+    club.boardConfidence = 55;
+    this.trainingFocus = "tactics";
+    this.tactics.formation = club.formation;
+    this.log(`מונית למנג'ר של ${club.name}.`);
+    return `אתה המנג'ר של ${club.name}. הציפייה: ${club.seasonExpectation}. הסבלנות: קצרה.`;
+  }
+
+  moveManagerJob() {
+    const target = this.managerSuitor();
+    if (!target) return "ההצעה נעלמה.";
+    const old = this.myClub();
+    if (old) { old.managerName = this.rng.choice(D.MANAGER_NAMES); old.boardConfidence = 55; }
+    this.managedClubId = target.cid;
+    target.managerName = this.me.name;
+    target.boardConfidence = 60;
+    this.me.reputation = clamp(this.me.reputation + 6, 1, 99);
+    this.log(`עברת לאמן את ${target.name}.`);
+    return `אתה המנג'ר של ${target.name}. ליגה אחרת, לחץ אחר.`;
+  }
+
+  board(delta) {
+    const club = this.myClub();
+    if (club) club.boardConfidence = clamp(club.boardConfidence + delta, 0, 100);
+    return "";
+  }
+
+  demandBudget() {
+    const club = this.myClub();
+    if (!club) return "";
+    if (club.boardConfidence > 55) {
+      club.budget += 6;
+      club.boardConfidence = clamp(club.boardConfidence - 4, 0, 100);
+      return "קיבלת ₪6,000,000 להעברות. עכשיו זה עליך.";
+    }
+    club.boardConfidence = clamp(club.boardConfidence - 12, 0, 100);
+    return 'היו"ר צחק. "תעשה קודם תוצאות." אמון ההנהלה ירד.';
+  }
+
+  sellStar() {
+    const star = this.squadStar(), club = this.myClub();
+    if (!star || !club) return "";
+    const fee = playerValue(star);
+    club.budget += fee / 1000000;
+    club.squad = club.squad.filter(p => p !== star.pid);
+    const buyer = Object.values(this.clubs).filter(c => c.cid !== club.cid)
+      .reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+    buyer.squad.push(star.pid);
+    star.clubId = buyer.cid;
+    club.boardConfidence = clamp(club.boardConfidence + 5, 0, 100);
+    club.fanSupport = clamp(club.fanSupport - 12, 0, 100);
+    return `מכרת את ${star.name} ל${buyer.name} תמורת ₪${fmt(fee)}. האוהדים בטראומה.`;
+  }
+
+  keepStar() {
+    const star = this.squadStar(), club = this.myClub();
+    if (!star || !club) return "";
+    star.morale = clamp(star.morale - 25, 5, 99);
+    club.fanSupport = clamp(club.fanSupport + 8, 0, 100);
+    this.setFlag("unhappy_star", star.pid);
+    return `${star.name} נשאר — ומצב הרוח שלו ייראה על המגרש.`;
+  }
+
+  promoteStar() {
+    const star = this.squadStar(), club = this.myClub();
+    if (!star || !club) return "";
+    const cost = Math.round(star.contract.wage * 0.6);
+    star.contract.wage += cost;
+    star.morale = clamp(star.morale + 20, 5, 99);
+    club.budget -= cost * 40 / 1000000;
+    return `נתת ל${star.name} את הסרט ותוספת של ₪${fmt(cost)} לשבוע. הוא נשאר, והשכר מכביד על התקציב.`;
+  }
+
+  promoteYouth() {
+    const club = this.myClub();
+    if (!club) return "";
+    const kid = generatePlayer(this.rng, club, this.rng.choice(D.POSITIONS),
+      { age: 17, quality: Math.round(clamp(club.youthAcademy * 0.5 + 20, 35, 60)) });
+    kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(10, 32), 60, 93));
+    this.players[kid.pid] = kid;
+    club.squad.push(kid.pid);
+    this.setFlag("wonderkid", kid.pid);
+    return `העלית את ${kid.name} (${kid.age}) לסגל. פוטנציאל מוערך: ${kid.potential}. עכשיו תתפלל.`;
+  }
+
+  radicalChange() {
+    const club = this.myClub();
+    if (!club) return "";
+    this.tactics.formation = this.rng.choice(Object.keys(D.FORMATIONS));
+    this.tactics.mentality = this.rng.choice(Object.keys(D.MENTALITIES));
+    if (this.rng.random() < 0.5) {
+      club.boardConfidence = clamp(club.boardConfidence + 14, 0, 100);
+      for (const pid of club.squad) {
+        const p = this.players[pid];
+        if (p) p.morale = clamp(p.morale + 10, 5, 99);
+      }
+      return `שינית הכל למערך ${this.tactics.formation} ובמנטליות ` +
+             `${D.MENTALITIES[this.tactics.mentality][0]}. הקבוצה נדלקה.`;
+    }
+    club.boardConfidence = clamp(club.boardConfidence - 8, 0, 100);
+    return "שינית הכל והקבוצה נראתה אבודה. לפעמים תזוזה היא הפסד.";
+  }
+
+  resign() {
+    const club = this.myClub();
+    if (club) { club.managerName = this.rng.choice(D.MANAGER_NAMES); club.boardConfidence = 55; }
+    this.managedClubId = null;
+    this.stage = "coach";
+    this.log("התפטרת מתפקיד המנג'ר.");
+    return "התפטרת לפני שהדיחו אותך. בעולם הזה זה נחשב ניצחון קטן. עכשיו אתה מחכה לטלפון הבא.";
+  }
+
+  becomeDirector() {
+    const club = this.myClub();
+    if (!club) return "";
+    this.stage = "director";
+    club.managerName = this.rng.choice(D.MANAGER_NAMES);
+    this.trainingFocus = "squad";
+    this.log(`מונית למנהל ספורטיבי ב${club.name}.`);
+    return `אתה מנהל ספורטיבי ב${club.name}. עכשיו אתה זה שמפטר מאמנים.`;
+  }
+
+  buyClub() {
+    const club = this.clubs[this.firstClubId];
+    if (!club) return "";
+    this.spend(4000000);
+    this.stage = "owner";
+    this.managedClubId = club.cid;
+    club.budget += 2;
+    this.setFlag("owner_of", club.cid);
+    this.log(`רכשת את ${club.name}.`);
+    return `קנית את ${club.name}. הילד שהתאמן פה בגיל 12 מחזיק עכשיו את המפתחות.`;
+  }
+
+  transferMe(clubId, wage, years, loan = false) {
+    const me = this.me;
+    const old = this.clubs[me.clubId];
+    if (old) old.squad = old.squad.filter(p => p !== me.pid);
+    const next = this.clubs[clubId];
+    next.squad.push(me.pid);
+    me.clubId = clubId;
+    me.contract = { wage, yearsLeft: years };
+    next.managerTrust = loan ? 65 : 55;
+    this.lastClubId = clubId;
+    this.noStartStreak = 0;
+    this.log(`${loan ? "הושאלת ל" : "עברת ל"}${next.name}.`);
+    return next.name;
+  }
+
+  // ==================================================================
+  // סוף עונה
+  // ==================================================================
+
+  endSeason() {
+    const summary = { title: `סיכום עונת ${this.year}/${this.year + 1}`, lines: [] };
+    const add = (icon, text, strong) => summary.lines.push({ icon, text, strong: !!strong });
+    const myClub = this.myClub();
+
+    for (const league of D.LEAGUES) {
+      const table = this.standings(league.id);
+      if (!table.length) continue;
+      const champ = this.clubs[table[0].clubId];
+      champ.trophies.push(`${league.name} ${this.year}`);
+      add("🥇", `אלוף ${league.name}: ${champ.name} (${table[0].points} נק')`);
+      if (myClub && myClub.cid === champ.cid) {
+        this.recordHonour(`אליפות ${league.name}`);
+        add("🎉", "אתה אלוף!", true);
+      }
+    }
+    if (this.cup.winner) add("🏆", `זוכת גביע המדינה: ${this.clubs[this.cup.winner].name}`);
+
+    this.seasonAwards(add);
+    this.personalSummary(add);
+    this.promotionRelegation(add);
+    this.developEveryone();
+    this.processRetirements();
+    this.transferWindow(add);
+    this.advanceCareerStage(add);
+
+    this.history.push({
+      year: this.year, stage: this.stage,
+      club: myClub ? myClub.name : "-",
+      apps: this.me.career.apps, goals: this.me.career.goals,
+      honours: this.honours.length,
+    });
+
+    this.year += 1;
+    this.startSeason();
+    return summary;
+  }
+
+  seasonAwards(add) {
+    const leagueId = this.myLeague() || "top";
+    const clubIds = new Set(Object.values(this.clubs).filter(c => c.leagueId === leagueId).map(c => c.cid));
+    const squad = Object.values(this.players).filter(p => clubIds.has(p.clubId) && p.season.apps > 0);
+    if (!squad.length) return;
+    const scorer = squad.reduce((a, b) =>
+      (a.season.goals > b.season.goals || (a.season.goals === b.season.goals && a.season.assists >= b.season.assists)) ? a : b);
+    add("👑", `מלך השערים: ${scorer.name} — ${scorer.season.goals} שערים`);
+    const best = squad.reduce((a, b) =>
+      (avgRating(a.season) > avgRating(b.season) || (avgRating(a.season) === avgRating(b.season) && a.season.apps >= b.season.apps)) ? a : b);
+    add("⭐", `שחקן העונה: ${best.name} (ציון ${avgRating(best.season).toFixed(1)})`);
+    if (scorer.pid === this.meId) { this.recordHonour("מלך השערים"); add("🎉", "מלך השערים — אתה!", true); }
+    if (best.pid === this.meId) { this.recordHonour("שחקן העונה"); add("🎉", "שחקן העונה — אתה!", true); }
+  }
+
+  personalSummary(add) {
+    const me = this.me;
+    if (["academy", "player", "veteran"].includes(this.stage)) {
+      const s = me.season;
+      add("📊", `העונה שלך: ${s.apps} משחקים · ${s.goals} שערים · ${s.assists} בישולים · ציון ${avgRating(s).toFixed(1)}`);
+      add("📈", `דירוג ${overall(me)} (פוטנציאל ${me.potential}) · מוניטין ${Math.round(me.reputation)} · שווי ₪${fmt(playerValue(me))}`);
+    } else {
+      const club = this.myClub();
+      if (club) {
+        add("📊", `${club.name} — מקום ${this.leaguePosition()} ב${this.leagueName(club.leagueId)}`);
+        add("🏛️", `אמון ההנהלה ${Math.round(club.boardConfidence)}% · אהדת הקהל ${Math.round(club.fanSupport)}%`);
+      }
+    }
+    add("💰", `בחשבון: ₪${fmt(this.money)}`);
+  }
+
+  promotionRelegation(add) {
+    const topTable = this.standings("top");
+    const natTable = this.standings("national");
+    if (topTable.length < 4 || natTable.length < 4) return;
+    const relegated = topTable.slice(-2).map(r => r.clubId);
+    const promoted = natTable.slice(0, 2).map(r => r.clubId);
+    for (const cid of relegated) {
+      this.clubs[cid].leagueId = "national";
+      this.clubs[cid].reputation = Math.round(clamp(this.clubs[cid].reputation - 6, 5, 99));
+    }
+    for (const cid of promoted) {
+      this.clubs[cid].leagueId = "top";
+      this.clubs[cid].reputation = Math.round(clamp(this.clubs[cid].reputation + 6, 5, 99));
+    }
+    add("⬇️", `יורדות: ${relegated.map(c => this.clubs[c].name).join(", ")}`);
+    add("⬆️", `עולות: ${promoted.map(c => this.clubs[c].name).join(", ")}`);
+    const myClub = this.myClub();
+    if (myClub && relegated.includes(myClub.cid)) {
+      add("💔", "ירדת ליגה. העונה הבאה תיראה אחרת לגמרי.", true);
+      this.me.morale = clamp(this.me.morale - 12, 5, 99);
+    }
+    if (myClub && promoted.includes(myClub.cid)) {
+      add("🎊", "עלית ליגה!", true);
+      this.recordHonour("עלייה לליגת העל");
+    }
+  }
+
+  developEveryone() {
+    for (const p of Object.values(this.players)) {
+      if (p.retired) { if (p.pid === this.meId) p.age += 1; continue; }
+      const share = clamp(p.season.minutes / (SEASON_WEEKS * 90), 0, 1);
+      endOfSeasonDevelopment(p, this.rng, share);
+    }
+  }
+
+  processRetirements() {
+    for (const p of Object.values(this.players)) {
+      if (p.pid === this.meId || p.retired) continue;
+      if (shouldRetire(p, this.rng)) {
+        p.retired = true;
+        const club = this.clubs[p.clubId];
+        if (club) club.squad = club.squad.filter(x => x !== p.pid);
+        p.clubId = null;
+      }
+    }
+    for (const club of Object.values(this.clubs)) {
+      while (club.squad.length < 18) {
+        const kid = generatePlayer(this.rng, club, this.rng.choice(D.POSITIONS),
+          { age: this.rng.randint(16, 19) });
+        kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(6, 28), 45, 94));
+        this.players[kid.pid] = kid;
+        club.squad.push(kid.pid);
+      }
+    }
+  }
+
+  transferWindow(add) {
+    const me = this.me;
+    const movers = Object.values(this.players).filter(p =>
+      p.pid !== this.meId && !p.retired && p.contract.yearsLeft <= 0 && p.clubId).slice(0, 40);
+    for (const p of movers) {
+      if (this.rng.random() < 0.35) {
+        const target = this.rng.choice(Object.values(this.clubs));
+        const old = this.clubs[p.clubId];
+        if (old && old.squad.includes(p.pid) && old.squad.length > 16) {
+          old.squad = old.squad.filter(x => x !== p.pid);
+          target.squad.push(p.pid);
+          p.clubId = target.cid;
+        }
+      }
+      p.contract.yearsLeft = this.rng.randint(1, 4);
+    }
+    if (["player", "veteran"].includes(this.stage)) {
+      const suitor = this.transferOfferForMe();
+      if (suitor) {
+        const wage = Math.round(Math.max(me.contract.wage * 1.25,
+          Math.min(suitor.wageBudget * 0.28,
+            wageForOverall(overall(me)) * (0.9 + me.reputation / 220))));
+        this.flags.pending_offer = { club: suitor.cid, wage, years: 4 };
+        add("📨", `הצעה על השולחן: ${suitor.name} — ₪${fmt(wage)} לשבוע`, true);
+      }
+    }
+  }
+
+  transferOfferForMe() {
+    const me = this.me;
+    let ceiling = overall(me) + 8 + (me.reputation - 40) * 0.25 + (avgRating(me.season) - 6.5) * 8;
+    if (this.flag("open_to_europe")) ceiling += 6;
+    if (this.flag("wants_transfer") || this.flag("free_agent_soon")) ceiling += 4;
+    const pool = Object.values(this.clubs).filter(c =>
+      c.cid !== me.clubId && c.reputation >= ceiling - 28 && c.reputation <= ceiling);
+    if (!pool.length || this.rng.random() > 0.55) return null;
+    return pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+  }
+
+  acceptOffer() {
+    const offer = this.flag("pending_offer");
+    if (!offer) return "אין הצעה פתוחה.";
+    const club = this.clubs[offer.club];
+    this.transferMe(club.cid, offer.wage, offer.years);
+    delete this.flags.pending_offer;
+    delete this.flags.wants_transfer;
+    this.me.morale = clamp(this.me.morale + 8, 5, 99);
+    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע.`;
+  }
+
+  rejectOffer() {
+    const offer = this.flag("pending_offer");
+    if (!offer) return "אין הצעה פתוחה.";
+    delete this.flags.pending_offer;
+    const club = this.myClub();
+    if (club) {
+      club.fanSupport = clamp(club.fanSupport + 6, 0, 100);
+      club.managerTrust = clamp(club.managerTrust + 5, 0, 100);
+    }
+    return "דחית את ההצעה ונשארת. במועדון שמעו על זה.";
+  }
+
+  advanceCareerStage(add) {
+    const me = this.me;
+    const club = this.myClub();
+
+    if (this.stage === "academy") {
+      if (me.age >= 18 || (club && club.managerTrust >= 55)) {
+        this.stage = "player";
+        add("📈", "אתה כבר לא נער — אתה שחקן בסגל הבוגרים.", true);
+      }
+    } else if (this.stage === "player" && me.age >= 31) {
+      this.stage = "veteran";
+      add("🧓", "עברת לשלב הוותיקים. הניסיון מחליף את הרגליים.", true);
+    } else if (this.stage === "veteran") {
+      const forced = me.age >= 40 || overall(me) < 45;
+      if (this.flag("retired_announced") || forced) {
+        this.stage = "retired";
+        me.retired = true;
+        if (me.clubId) {
+          const old = this.clubs[me.clubId];
+          if (old) old.squad = old.squad.filter(p => p !== me.pid);
+          this.lastClubId = me.clubId;
+          me.clubId = null;
+        }
+        add("🎬", "תלית את הנעליים.", true);
+        add("📖", `סה"כ: ${me.career.apps} משחקים, ${me.career.goals} שערים, ` +
+                  `${me.career.assists} בישולים, ${this.honours.length} הישגים.`);
+        this.setFlag("retired_announced", true);
+      }
+    }
+
+    if (["coach", "manager", "director", "pundit", "agent", "owner"].includes(this.stage)) {
+      if (me.age >= 68) {
+        this.stage = "legend";
+        this.gameOver = true;
+        add("🕰️", "הגיע הזמן לרדת מהבמה. הקריירה הושלמה.", true);
+      }
+    }
+
+    if (this.stage === "manager" && club && club.boardConfidence <= 12) {
+      club.managerName = this.rng.choice(D.MANAGER_NAMES);
+      this.managedClubId = null;
+      this.stage = "coach";
+      add("📉", "פוטרת. ההנהלה איבדה סבלנות.", true);
+    }
+  }
+
+  // ==================================================================
+  // שמירה וטעינה
+  // ==================================================================
+
+  toJSON() {
+    return {
+      v: 1, seed: this.seed, clubs: this.clubs, players: this.players,
+      meId: this.meId, stage: this.stage, year: this.year, week: this.week,
+      fixtures: this.fixtures, tables: this.tables, cup: this.cup,
+      money: this.money, flags: this.flags, honours: this.honours,
+      news: this.news.slice(-60), firedEvents: this.firedEvents,
+      pendingEventId: this.pendingEventId, pendingEventBody: this.pendingEventBody,
+      managedClubId: this.managedClubId, tactics: this.tactics,
+      trainingFocus: this.trainingFocus, intensity: this.intensity,
+      firstClubId: this.firstClubId, lastClubId: this.lastClubId,
+      history: this.history, caps: this.caps, intlGoals: this.intlGoals,
+      noStartStreak: this.noStartStreak, gameOver: this.gameOver,
+      rngState: this.rng.state(), pidCounter: PID_COUNTER,
+    };
+  }
+
+  static fromJSON(raw) {
+    const g = new Game();
+    Object.assign(g, {
+      seed: raw.seed, clubs: raw.clubs, players: raw.players, meId: raw.meId,
+      stage: raw.stage, year: raw.year, week: raw.week, fixtures: raw.fixtures,
+      tables: raw.tables, cup: raw.cup, money: raw.money, flags: raw.flags,
+      honours: raw.honours, news: raw.news, firedEvents: raw.firedEvents,
+      pendingEventId: raw.pendingEventId, pendingEventBody: raw.pendingEventBody,
+      managedClubId: raw.managedClubId, tactics: raw.tactics,
+      trainingFocus: raw.trainingFocus, intensity: raw.intensity,
+      firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
+      history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
+      noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
+    });
+    g.rng = Rng.fromState(raw.rngState);
+    PID_COUNTER = Math.max(PID_COUNTER, raw.pidCounter || 0);
+    return g;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ממשק המשתמש
+// ---------------------------------------------------------------------------
+
+const SAVE_KEY = "fm_career_save_v1";
+let game = null;
+let view = "menu";
+let viewData = null;
+
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// -- שמירה --------------------------------------------------------------
+
+function saveGame() {
+  if (!game) return false;
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(game.toJSON()));
+    return true;
+  } catch (err) { return false; }
+}
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    return Game.fromJSON(JSON.parse(raw));
+  } catch (err) { return null; }
+}
+function hasSave() {
+  try { return !!localStorage.getItem(SAVE_KEY); } catch (err) { return false; }
+}
+function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (err) {} }
+
+// -- ניווט --------------------------------------------------------------
+
+function go(next, data = null) {
+  view = next;
+  viewData = data;
+  render();
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+}
+
+function render() {
+  const app = $("#app");
+  let html = "";
+  if (view === "menu") html = screenMenu();
+  else if (view === "new") html = screenNew();
+  else if (view === "event") html = screenEvent();
+  else if (view === "outcome") html = screenOutcome();
+  else if (view === "week") html = screenWeek();
+  else if (view === "season") html = screenSeason();
+  else if (view === "end") html = screenEnd();
+  else html = screenMain();
+  app.innerHTML = html;
+  bind();
+}
+
+// ---------------------------------------------------------------------------
+// מסכים
+// ---------------------------------------------------------------------------
+
+function screenMenu() {
+  const saved = hasSave();
+  return `
+  <div class="screen menu">
+    <div class="hero">
+      <div class="eyebrow">משחק ניהול כדורגל</div>
+      <h1 class="display">קריירה</h1>
+      <div class="underline"></div>
+      <p class="sub">מנער בקבוצת הנוער ועד המשרד של הבעלים. כל שבוע זו החלטה,
+      וכל החלטה נשארת איתך עד סוף הדרך.</p>
+    </div>
+    <div class="actions">
+      ${saved ? `<button class="btn primary" data-act="continue">להמשיך קריירה</button>` : ""}
+      <button class="btn ${saved ? "" : "primary"}" data-act="new">
+        <span class="k">${saved ? "קריירה חדשה" : "להתחיל קריירה"}</span>
+        ${saved ? `<span class="hint">מוחק את השמורה</span>` : ""}
+      </button>
+    </div>
+    <div class="card">
+      <div class="eyebrow">מה יש כאן</div>
+      <div class="notes">
+        <div class="note"><span class="ico">⚽</span><span>3 ליגות, 32 מועדונים, סימולציה מלאה של כל משחק בעונה.</span></div>
+        <div class="note"><span class="ico">📖</span><span>28 צמתי עלילה — פציעות, מריבות, הצעות מאירופה, פרישה.</span></div>
+        <div class="note"><span class="ico">🎓</span><span>מה שתלמד בזמן הקריירה יקבע מה תעשה אחריה.</span></div>
+      </div>
+    </div>
+    <p class="muted center">המשחק נשמר בדפדפן הזה אוטומטית.</p>
+  </div>`;
+}
+
+function screenNew() {
+  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 17 });
+  const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
+  return `
+  <div class="screen">
+    <div class="hero" style="padding-top:14px">
+      <div class="eyebrow">קריירה חדשה</div>
+      <h1 class="display" style="font-size:44px">מי אתה?</h1>
+    </div>
+
+    <div class="card">
+      <label class="eyebrow" for="pname">שם השחקן</label>
+      <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">עמדה</div>
+      <div class="chips">
+        ${D.POSITIONS.map(p => `<button class="chip" data-pos="${p}"
+          aria-pressed="${state.position === p}">${D.POSITION_NAMES_HE[p]}</button>`).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">גיל התחלה</div>
+      <div class="chips">
+        ${[16, 17, 18].map(a => `<button class="chip" data-age="${a}"
+          aria-pressed="${state.age === a}">${a}</button>`).join("")}
+      </div>
+      <p class="muted">צעיר יותר = יותר זמן להתפתח, אבל דרך ארוכה יותר להרכב.</p>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">מועדון פתיחה</div>
+      <select id="pclub">
+        ${clubs.map(c => `<option value="${c[0]}" ${state.club === c[0] ? "selected" : ""}>
+          ${esc(c[1])} — מוניטין ${c[4]}</option>`).join("")}
+      </select>
+      <p class="muted">מועדון חלש = דקות משחק מיד. מועדון חזק = ספסל, אבל במה גדולה יותר.</p>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" data-act="start">להתחיל</button>
+      <button class="btn ghost" data-act="menu">חזרה</button>
+    </div>
+  </div>`;
+}
+
+function strip() {
+  const me = game.me;
+  const club = game.myClub();
+  const stage = D.CAREER_STAGES_HE[game.stage] || game.stage;
+  return `
+  <div class="strip">
+    <span class="who">${esc(me.name)}</span>
+    <span class="meta">${stage}${club ? " · " + esc(club.name) : ""}</span>
+    <span class="spacer"></span>
+    <span class="meta">${game.year}/${game.year + 1} · שבוע ${game.week}/${SEASON_WEEKS}</span>
+  </div>`;
+}
+
+function dock(showPlay) {
+  const items = [["main", "ראשי"], ["profile", "פרופיל"], ["table", "טבלה"],
+                 ["squad", "סגל"], ["news", "יומן"]];
+  const offer = !!game.flag("pending_offer");
+  return `<div class="dock">
+    ${showPlay ? `<button class="btn primary" data-act="play">לשחק את השבוע</button>` : ""}
+    <nav class="nav">${items.map(([k, l]) =>
+      `<button data-go="${k}" aria-current="${view === k}">${l}${
+        k === "main" && offer ? '<span class="dot"></span>' : ""}</button>`).join("")}</nav>
+  </div>`;
+}
+
+function screenMain() {
+  if (view === "profile") return strip() + screenProfile() + dock(false);
+  if (view === "table") return strip() + screenTable() + dock(false);
+  if (view === "squad") return strip() + screenSquad() + dock(false);
+  if (view === "news") return strip() + screenNews() + dock(false);
+  return strip() + screenHub() + dock(true);
+}
+
+function screenHub() {
+  const me = game.me;
+  const club = game.myClub();
+  const isPlayer = ["academy", "player", "veteran"].includes(game.stage);
+  const actions = game.availableActions();
+  const offer = game.flag("pending_offer");
+
+  let fixture = "";
+  const fx = game.myFixture();
+  if (fx) {
+    const [homeId, awayId] = fx;
+    const home = game.clubs[homeId], away = game.clubs[awayId];
+    const comp = CUP_WEEKS[game.week] || "ליגה";
+    const rival = club && club.cid === homeId ? away : home;
+    const where = club && club.cid === homeId ? "בית" : "חוץ";
+    fixture = `
+      <div class="scoreboard">
+        <div class="eyebrow">${esc(comp)} · ${where}</div>
+        <div class="scoreline">
+          <div class="side"><span class="${club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
+          <div class="versus">נגד</div>
+          <div class="side away"><span class="${club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+        </div>
+        <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}</div>
+      </div>`;
+  } else {
+    fixture = `<div class="scoreboard"><div class="eyebrow">השבוע</div>
+      <div>אין משחק — שבוע של עבודה.</div></div>`;
+  }
+
+  const status = isPlayer ? `
+    <div class="stat-grid">
+      <div class="stat"><div class="n">${overall(me)}</div><div class="l">כללי</div></div>
+      <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
+      <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
+    </div>
+    ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span><span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
+    ${club ? `<div class="attr"><span>אמון המאמן</span><span class="val">${Math.round(club.managerTrust)}</span>
+      <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}
+  ` : club ? `
+    <div class="stat-grid">
+      <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
+      <div class="stat"><div class="n">${Math.round(club.boardConfidence)}</div><div class="l">הנהלה</div></div>
+      <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">קהל</div></div>
+    </div>
+    <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>
+  ` : `<div class="muted">ידע אימון ${Math.round(me.coaching)} · תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+
+  return `
+  <div class="screen">
+    ${fixture}
+    <div class="card">
+      <div class="eyebrow">המצב שלך</div>
+      ${status}
+      <div class="muted">בחשבון: ₪${fmt(game.money)}</div>
+    </div>
+
+    ${offer ? `
+    <div class="card" style="border-color:var(--accent)">
+      <div class="eyebrow">הצעת העברה</div>
+      <div><strong>${esc(game.clubs[offer.club].name)}</strong> — ₪${fmt(offer.wage)} לשבוע</div>
+      <div class="muted">החוזה הנוכחי שלך: ₪${fmt(me.contract.wage)} לשבוע</div>
+      <div class="btn-row">
+        <button class="btn primary" data-act="accept">לחתום</button>
+        <button class="btn" data-act="reject">לדחות</button>
+      </div>
+    </div>` : ""}
+
+    <div class="card">
+      <div class="eyebrow">על מה נעבוד השבוע</div>
+      <div class="chips">
+        ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
+          aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
+      </div>
+      ${isPlayer ? `
+      <hr class="rule">
+      <div class="eyebrow">עצימות</div>
+      <div class="chips">
+        ${[[1.0, "רגילה"], [1.3, "גבוהה"], [0.75, "קלה"]].map(([v, l]) =>
+          `<button class="chip" data-int="${v}" aria-pressed="${game.intensity === v}">${l}</button>`).join("")}
+      </div>` : ""}
+    </div>
+
+    ${["manager", "coach"].includes(game.stage) ? tacticsCard() : ""}
+
+    <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
+  </div>`;
+}
+
+function tacticsCard() {
+  const t = game.tactics;
+  return `
+  <div class="card">
+    <div class="eyebrow">טקטיקה</div>
+    <div class="chips">
+      ${Object.keys(D.FORMATIONS).map(f => `<button class="chip" data-form="${f}"
+        aria-pressed="${t.formation === f}">${f}</button>`).join("")}
+    </div>
+    <div class="chips">
+      ${Object.entries(D.MENTALITIES).map(([k, v]) => `<button class="chip" data-ment="${k}"
+        aria-pressed="${t.mentality === k}">${esc(v[0])}</button>`).join("")}
+    </div>
+    <div class="chips">
+      ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-press="${k}"
+        aria-pressed="${t.pressing === k}">${esc(v[0])}</button>`).join("")}
+    </div>
+  </div>`;
+}
+
+function screenWeek() {
+  const report = viewData;
+  const me = game.me;
+  let html = `<div class="screen">`;
+
+  if (report.match) {
+    const { result, home, away, competition, penalties } = report.match;
+    const club = game.myClub();
+    const goals = result.events.filter(e => e.kind === "goal")
+      .sort((a, b) => a.minute - b.minute);
+    html += `
+    <div class="scoreboard">
+      <div class="eyebrow">${esc(competition)}</div>
+      <div class="scoreline">
+        <div class="side"><span class="${club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
+        <div class="score">${result.homeGoals} : ${result.awayGoals}</div>
+        <div class="side away"><span class="${club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
+      </div>
+      ${penalties ? `<div class="muted center">הוכרע בפנדלים — ${esc(penalties)}</div>` : ""}
+      ${goals.length ? `<hr class="rule"><div class="goals">${goals.map((e, i) => `
+        <div class="goal-row ${e.playerId === me.pid ? "mine" : ""}" style="animation-delay:${i * 60}ms">
+          <span class="min">${e.minute}'</span>
+          <span>${esc(game.players[e.playerId] ? game.players[e.playerId].name : "")}</span>
+          <span class="muted">${esc(e.clubId === home.cid ? home.name : away.name)}</span>
+        </div>`).join("")}</div>` : ""}
+      <div class="muted">${esc(result.commentary[0] || "")}</div>
+    </div>`;
+  }
+
+  if (report.personal) html += personalCard(report.personal);
+
+  const notes = (report.training || []).concat(report.notes || []);
+  if (notes.length) {
+    html += `<div class="card"><div class="eyebrow">השבוע</div><div class="notes">
+      ${notes.map(n => `<div class="note"><span class="ico">${n.icon}</span><span>${esc(n.text)}</span></div>`).join("")}
+    </div></div>`;
+  }
+
+  html += `<button class="btn primary wide" data-act="after-week">המשך</button></div>`;
+  return strip() + html;
+}
+
+function personalCard(p) {
+  if (p.status === "manager") {
+    const label = { W: "ניצחון", D: "תיקו", L: "הפסד" }[p.outcome];
+    const cls = { W: "w", D: "d", L: "l" }[p.outcome];
+    return `<div class="card">
+      <div class="eyebrow">מהספסל</div>
+      <div><span class="pill ${cls}">${label}</span></div>
+      <div class="muted">אמון ההנהלה ${p.board}% · אהדת הקהל ${p.fans}%</div>
+    </div>`;
+  }
+  if (p.status === "bench")
+    return `<div class="card"><div class="eyebrow">אתה</div>
+      <div class="note"><span class="ico">🪑</span><span>ישבת 90 דקות על הספסל.</span></div>
+      <div class="muted">${game.noStartStreak} משחקים ברצף בלי להתחיל.</div></div>`;
+  if (p.status === "injured")
+    return `<div class="card"><div class="eyebrow">אתה</div>
+      <div class="note"><span class="ico">🚑</span><span>${esc(p.injuryName)} — עוד ${p.weeks} שבועות.</span></div></div>`;
+
+  const cls = p.rating >= 7.5 ? "good" : p.rating < 5.5 ? "bad" : "";
+  const bits = [];
+  if (p.goals) bits.push(p.goals === 1 ? "שער אחד" : `${p.goals} שערים`);
+  if (p.assists) bits.push(p.assists === 1 ? "בישול אחד" : `${p.assists} בישולים`);
+  if (p.motm) bits.push("⭐ מצטיין המשחק");
+  return `<div class="card">
+    <div class="eyebrow">${p.status === "sub" ? "נכנסת מהספסל" : "ההופעה שלך"}</div>
+    <div class="perf">
+      <div class="rating ${cls}">${p.rating.toFixed(1)}</div>
+      <div class="detail">
+        <strong>${p.status === "sub" ? p.minutes + " דקות" : "90 דקות"}</strong>
+        <span>${bits.length ? esc(bits.join(" · ")) : "משחק שקט."}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+function screenEvent() {
+  const event = game.pendingEvent();
+  if (!event) { go("main"); return ""; }
+  return `
+  <div class="takeover">
+    <div class="kicker">${esc(D.CAREER_STAGES_HE[game.stage] || "")} · שבוע ${game.week}</div>
+    <h2 class="display">${esc(event.title)}</h2>
+    <hr class="rule">
+    <div class="body">${esc(game.pendingEventText())}</div>
+    <div class="actions" style="margin-top:auto">
+      ${event.choices.map((c, i) => `<button class="btn" data-choice="${i}">
+        <span class="k">${esc(c.label)}</span>
+        ${c.hint ? `<span class="hint">${esc(c.hint)}</span>` : ""}
+      </button>`).join("")}
+    </div>
+  </div>`;
+}
+
+function screenOutcome() {
+  return `
+  <div class="takeover">
+    <div class="kicker">מה שקרה</div>
+    <h2 class="display">${esc(viewData.title)}</h2>
+    <hr class="rule">
+    <div class="outcome">${esc(viewData.text)}</div>
+    <div class="actions" style="margin-top:auto">
+      <button class="btn primary" data-act="after-outcome">להמשיך</button>
+    </div>
+  </div>`;
+}
+
+function screenSeason() {
+  const s = viewData;
+  return `
+  <div class="screen">
+    <div class="hero" style="padding-top:10px">
+      <div class="eyebrow">סוף עונה</div>
+      <h1 class="display" style="font-size:40px">${esc(s.title)}</h1>
+    </div>
+    <div class="card"><div class="notes">
+      ${s.lines.map(l => `<div class="note ${l.strong ? "strong" : ""}">
+        <span class="ico">${l.icon}</span><span>${esc(l.text)}</span></div>`).join("")}
+    </div></div>
+    <button class="btn primary wide" data-act="after-season">לעונה הבאה</button>
+  </div>`;
+}
+
+function screenProfile() {
+  const me = game.me;
+  const club = game.myClub();
+  const isPlayer = ["academy", "player", "veteran"].includes(game.stage);
+  const s = me.season, c = me.career;
+  return `
+  <div class="screen">
+    <div class="card">
+      <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
+      <h2 class="display" style="font-size:34px">${esc(me.name)}</h2>
+      <div class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}
+        ${club ? "· " + esc(club.name) : ""}</div>
+      ${me.traits.length ? `<div class="chips">${me.traits.map(t =>
+        `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>` : ""}
+    </div>
+
+    ${isPlayer ? `
+    <div class="card">
+      <div class="eyebrow">דירוג ${overall(me)} · פוטנציאל ${me.potential}</div>
+      <div class="attrs">
+        ${D.ATTRIBUTES.map(a => `<div class="attr">
+          <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
+          <span class="val">${me.attributes[a]}</span>
+          <span class="bar"><i style="width:${me.attributes[a]}%"></i></span>
+        </div>`).join("")}
+      </div>
+      <hr class="rule">
+      <div class="attr"><span>מורל</span><span class="val">${Math.round(me.morale)}</span>
+        <span class="bar soft"><i style="width:${Math.round(me.morale)}%"></i></span></div>
+      <div class="attr"><span>מוניטין</span><span class="val">${Math.round(me.reputation)}</span>
+        <span class="bar soft"><i style="width:${Math.round(me.reputation)}%"></i></span></div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">העונה</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${s.apps}</div><div class="l">משחקים</div></div>
+        <div class="stat"><div class="n">${s.goals}</div><div class="l">שערים</div></div>
+        <div class="stat"><div class="n">${avgRating(s).toFixed(1)}</div><div class="l">ציון</div></div>
+      </div>
+      <div class="eyebrow">בקריירה</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${c.apps}</div><div class="l">משחקים</div></div>
+        <div class="stat"><div class="n">${c.goals}</div><div class="l">שערים</div></div>
+        <div class="stat"><div class="n">${c.assists}</div><div class="l">בישולים</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="eyebrow">חוזה</div>
+      <div>₪${fmt(me.contract.wage)} לשבוע · ${me.contract.yearsLeft} עונות</div>
+      <div class="muted">שווי שוק מוערך: ₪${fmt(playerValue(me))}</div>
+    </div>` : `
+    <div class="card">
+      <div class="eyebrow">הכישורים שלך</div>
+      <div class="attrs">
+        <div class="attr"><span>ידע אימון</span><span class="val">${Math.round(me.coaching)}</span>
+          <span class="bar"><i style="width:${Math.round(me.coaching)}%"></i></span></div>
+        <div class="attr"><span>תקשורת</span><span class="val">${Math.round(me.mediaSkill)}</span>
+          <span class="bar"><i style="width:${Math.round(me.mediaSkill)}%"></i></span></div>
+        <div class="attr"><span>עסקים</span><span class="val">${Math.round(me.business)}</span>
+          <span class="bar"><i style="width:${Math.round(me.business)}%"></i></span></div>
+      </div>
+      <div class="muted">תעודות אימון: ${me.badges}/4</div>
+      <hr class="rule">
+      <div class="eyebrow">קריירת השחקן</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${c.apps}</div><div class="l">משחקים</div></div>
+        <div class="stat"><div class="n">${c.goals}</div><div class="l">שערים</div></div>
+        <div class="stat"><div class="n">${game.caps}</div><div class="l">נבחרת</div></div>
+      </div>
+    </div>`}
+
+    ${isPlayer ? `
+    <div class="card">
+      <div class="eyebrow">הכישורים לקריירה שאחרי</div>
+      <div class="attrs">
+        <div class="attr"><span>ידע אימון</span><span class="val">${Math.round(me.coaching)}</span>
+          <span class="bar soft"><i style="width:${Math.round(me.coaching)}%"></i></span></div>
+        <div class="attr"><span>תקשורת</span><span class="val">${Math.round(me.mediaSkill)}</span>
+          <span class="bar soft"><i style="width:${Math.round(me.mediaSkill)}%"></i></span></div>
+        <div class="attr"><span>עסקים</span><span class="val">${Math.round(me.business)}</span>
+          <span class="bar soft"><i style="width:${Math.round(me.business)}%"></i></span></div>
+      </div>
+      <div class="muted">תעודות אימון: ${me.badges}/4 — פותחות את מסלול האימון והניהול.</div>
+    </div>` : ""}
+  </div>`;
+}
+
+function screenTable() {
+  const club = game.myClub();
+  const leagueId = (viewData && viewData.league) || game.myLeague() || "top";
+  const rows = game.standings(leagueId);
+  const isDomestic = leagueId !== "euro";
+  return `
+  <div class="screen">
+    <div class="card">
+      <div class="chips">
+        ${D.LEAGUES.map(l => `<button class="chip" data-league="${l.id}"
+          aria-pressed="${leagueId === l.id}">${esc(l.name)}</button>`).join("")}
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th style="text-align:right">קבוצה</th><th>מש</th>
+            <th>נצ</th><th>תק</th><th>הפ</th><th>הפרש</th><th>נק</th></tr></thead>
+          <tbody>
+            ${rows.map((r, i) => {
+              const c = game.clubs[r.clubId];
+              const mine = club && c.cid === club.cid;
+              const cls = [mine ? "me" : "",
+                isDomestic && leagueId === "national" && i < 2 ? "up" : "",
+                isDomestic && leagueId === "top" && i >= rows.length - 2 ? "down" : ""].join(" ");
+              return `<tr class="${cls}"><td>${i + 1}</td><td class="club">${esc(c.name)}</td>
+                <td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>
+                <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td><td class="pts">${r.points}</td></tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+      ${leagueId === "top" ? `<div class="muted">שתי האחרונות יורדות לליגה הלאומית.</div>` : ""}
+      ${leagueId === "national" ? `<div class="muted">שתי הראשונות עולות לליגת העל.</div>` : ""}
+    </div>
+    ${game.cup && game.cup.teams ? `<div class="card">
+      <div class="eyebrow">גביע המדינה</div>
+      <div class="muted">${game.cup.winner
+        ? "זוכה: " + esc(game.clubs[game.cup.winner].name)
+        : "שלב: " + esc(game.cup.round) + " · " + game.cup.teams.length + " קבוצות נותרו"}</div>
+    </div>` : ""}
+  </div>`;
+}
+
+function screenSquad() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אין לך מועדון כרגע.</div></div>`;
+  const squad = club.squad.map(p => game.players[p]).filter(Boolean)
+    .sort((a, b) => overall(b) - overall(a));
+  return `
+  <div class="screen">
+    <div class="card">
+      <div class="eyebrow">${esc(club.name)} · ${esc(club.nickname)}</div>
+      <div class="muted">מאמן: ${esc(club.managerName)} · מערך: ${esc(club.formation)}
+        · מתקנים ${club.trainingFacilities}</div>
+      <hr class="rule">
+      ${squad.map(p => `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
+        <span>${esc(p.name)}${p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
+        <span class="pos">${esc(positionHe(p))} · ${p.age}</span>
+        <span class="ovr">${overall(p)}</span>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function screenNews() {
+  return `
+  <div class="screen">
+    ${game.honours.length ? `<div class="card">
+      <div class="eyebrow">הישגים</div>
+      ${game.honours.slice().reverse().map(h => {
+        const [yr, ...rest] = h.split(": ");
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+      }).join("")}
+    </div>` : ""}
+    ${game.history.length ? `<div class="card">
+      <div class="eyebrow">עונות</div>
+      ${game.history.slice().reverse().map(h => `<div class="honour">
+        <span class="yr">${h.year}</span>
+        <span>${esc(D.CAREER_STAGES_HE[h.stage] || h.stage)} · ${esc(h.club)} — ${h.apps} משחקים, ${h.goals} שערים</span>
+      </div>`).join("")}
+    </div>` : ""}
+    <div class="card">
+      <div class="eyebrow">יומן</div>
+      <div class="notes">
+        ${game.news.slice(-25).reverse().map(n =>
+          `<div class="note"><span class="ico">·</span><span>${esc(n)}</span></div>`).join("")
+          || '<div class="muted">עוד לא קרה כלום. זה יגיע.</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+function screenEnd() {
+  const me = game.me;
+  const score = game.honours.length * 2 + me.career.apps / 100 + game.caps / 10;
+  const verdict = score > 18 ? "אגדה. ילדים ייוולדו עם השם שלך על הגב."
+    : score > 10 ? "קריירה גדולה. האוהדים יזכרו כל אחד מהתארים."
+    : score > 5 ? "קריירה מכובדת מאוד. עשית את זה כמו שצריך."
+    : score > 2 ? "קריירה יפה. לא כולם מגיעים עד לשם."
+    : "לא הכל הלך. אבל שיחקת כדורגל בשביל להתפרנס — וזה משהו.";
+  return `
+  <div class="screen">
+    <div class="hero">
+      <div class="eyebrow">סוף הדרך</div>
+      <h1 class="display" style="font-size:52px">${esc(me.name)}</h1>
+      <p class="sub">${esc(verdict)}</p>
+    </div>
+    <div class="card">
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${me.career.apps}</div><div class="l">משחקים</div></div>
+        <div class="stat"><div class="n">${me.career.goals}</div><div class="l">שערים</div></div>
+        <div class="stat"><div class="n">${game.honours.length}</div><div class="l">הישגים</div></div>
+      </div>
+      <div class="muted center">הון: ₪${fmt(game.money)} · ${game.caps} הופעות בנבחרת</div>
+    </div>
+    ${game.honours.length ? `<div class="card"><div class="eyebrow">ארון התארים</div>
+      ${game.honours.map(h => {
+        const [yr, ...rest] = h.split(": ");
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+      }).join("")}</div>` : ""}
+    <button class="btn primary wide" data-act="restart">קריירה חדשה</button>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// אירועי לחיצה
+// ---------------------------------------------------------------------------
+
+function bind() {
+  const app = $("#app");
+  app.querySelectorAll("[data-go]").forEach(el =>
+    el.addEventListener("click", () => go(el.dataset.go)));
+  app.querySelectorAll("[data-choice]").forEach(el =>
+    el.addEventListener("click", () => resolveChoice(+el.dataset.choice)));
+  app.querySelectorAll("[data-focus]").forEach(el =>
+    el.addEventListener("click", () => { game.setAction(el.dataset.focus); render(); }));
+  app.querySelectorAll("[data-int]").forEach(el =>
+    el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
+  app.querySelectorAll("[data-pos]").forEach(el =>
+    el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
+  app.querySelectorAll("[data-age]").forEach(el =>
+    el.addEventListener("click", () => { viewData.age = +el.dataset.age; render(); }));
+  app.querySelectorAll("[data-league]").forEach(el =>
+    el.addEventListener("click", () => go("table", { league: el.dataset.league })));
+  app.querySelectorAll("[data-form]").forEach(el =>
+    el.addEventListener("click", () => { game.tactics.formation = el.dataset.form; render(); }));
+  app.querySelectorAll("[data-ment]").forEach(el =>
+    el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
+  app.querySelectorAll("[data-press]").forEach(el =>
+    el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+
+  const nameInput = $("#pname");
+  if (nameInput) nameInput.addEventListener("input", e => { viewData.name = e.target.value; });
+  const clubSelect = $("#pclub");
+  if (clubSelect) clubSelect.addEventListener("change", e => { viewData.club = e.target.value; });
+
+  app.querySelectorAll("[data-act]").forEach(el =>
+    el.addEventListener("click", () => act(el.dataset.act)));
+}
+
+function act(what) {
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 17 }); }
+  else if (what === "menu") { if (game) saveGame(); go("menu"); }
+  else if (what === "continue") {
+    const loaded = loadGame();
+    if (!loaded) { alert("לא נמצאה שמורה תקינה."); return; }
+    game = loaded;
+    go(game.gameOver ? "end" : "main");
+  }
+  else if (what === "start") {
+    const name = (viewData.name || "").trim() || "עומר לוי";
+    game = Game.newGame(name, viewData.position, viewData.club, viewData.age);
+    saveGame();
+    go("main");
+  }
+  else if (what === "play") playWeek();
+  else if (what === "after-week") afterWeek();
+  else if (what === "after-outcome") afterOutcome();
+  else if (what === "after-season") { saveGame(); go(game.gameOver ? "end" : "main"); }
+  else if (what === "accept") { showOutcome("הצעת העברה", game.acceptOffer()); }
+  else if (what === "reject") { showOutcome("הצעת העברה", game.rejectOffer()); }
+  else if (what === "restart") { clearSave(); game = null; go("menu"); }
+}
+
+let pendingSeason = null;
+
+function playWeek() {
+  const report = game.advanceWeek();
+  window.lastReport = report;
+  pendingSeason = report.seasonEnded ? report.seasonSummary : null;
+  saveGame();
+  go("week", report);
+}
+
+function afterWeek() {
+  if (game.pendingEventId) { go("event"); return; }
+  if (pendingSeason) { const s = pendingSeason; pendingSeason = null; go("season", s); return; }
+  if (game.gameOver) { go("end"); return; }
+  go("main");
+}
+
+function resolveChoice(index) {
+  const title = game.pendingEvent().title;
+  const text = game.resolveEvent(index);
+  saveGame();
+  showOutcome(title, text || "…");
+}
+
+function showOutcome(title, text) { go("outcome", { title, text }); }
+
+function afterOutcome() {
+  saveGame();
+  if (game.pendingEventId) { go("event"); return; }
+  if (pendingSeason) { const s = pendingSeason; pendingSeason = null; go("season", s); return; }
+  if (game.gameOver) { go("end"); return; }
+  go("main");
+}
+
+// ---------------------------------------------------------------------------
+
+function boot() {
+  const saved = hasSave();
+  if (saved) {
+    const loaded = loadGame();
+    if (loaded) { game = loaded; }
+  }
+  go("menu");
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+
+</script>
