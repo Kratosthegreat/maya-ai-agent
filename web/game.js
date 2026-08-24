@@ -51,7 +51,15 @@ class Game {
   // משחק חדש
   // ==================================================================
 
-  static newGame(name, position, clubId, age = 15, seed = null) {
+  /** השלב שמתאים לגיל שבו מתחילים. */
+  static stageForAge(age) {
+    if (age <= 15) return "youth";
+    if (age <= 17) return "academy";
+    if (age <= 30) return "player";
+    return "veteran";
+  }
+
+  static newGame(name, position, clubId, age = 15, seed = null, role = "player") {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -59,31 +67,91 @@ class Game {
     g.clubs = world.clubs; g.players = world.players;
     const club = g.clubs[clubId];
 
-    const me = generatePlayer(g.rng, club, position, {
-      age, quality: Math.round(clamp(club.reputation * 0.55 + 24, 48, 70)) });
+    if (role === "manager") return g.startAsManager(name, club, age);
+
+    // ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
+    const quality = age <= 17
+      ? Math.round(clamp(club.reputation * 0.55 + 24, 48, 70))
+      : Math.round(clamp(club.reputation * 0.66 + 12 + Math.min(8, (age - 17) * 1.4), 42, 82));
+    const me = generatePlayer(g.rng, club, position, { age, quality });
     me.name = name;
     me.isHuman = true;
     // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
     me.potential = Math.round(clamp(
-      overall(me) + g.rng.randint(12, 30) + Math.max(0, 17 - age) * 4, 58, 94));
+      overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
+      overall(me) + 2, 94));
     me.clubId = clubId;
-    // בגילי הנוער אין חוזה מקצועני
-    me.contract = age >= 16
-      ? { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 }
-      : { wage: 0, yearsLeft: 0 };
-    me.morale = 70; me.reputation = age >= 16 ? 8 : 3;
+    // חוזה שמתאים לגיל ולרמה
+    if (age <= 15) me.contract = { wage: 0, yearsLeft: 0 };
+    else if (age <= 17)
+      me.contract = { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)),
+                      yearsLeft: 3 };
+    else
+      me.contract = { wage: wageForOverall(overall(me)), yearsLeft: g.rng.randint(2, 4) };
+
+    me.morale = 70;
+    me.reputation = age <= 15 ? 3 : age <= 17 ? 8
+      : clamp(overall(me) - 28 + (age - 18) * 1.2, 5, 70);
+
+    // מי שמתחיל אחרי גיל 18 — כבר יש לו עבר
+    if (age >= 19) {
+      const seasons = Math.min(12, age - 17);
+      me.career.apps = Math.round(seasons * g.rng.uniform(14, 26));
+      const share = D.POSITION_ROLE_SHARE[position].att;
+      me.career.goals = Math.round(me.career.apps * share * g.rng.uniform(0.10, 0.34));
+      me.career.assists = Math.round(me.career.apps * g.rng.uniform(0.04, 0.13));
+      me.career.minutes = me.career.apps * 78;
+      me.career.ratingSum = me.career.apps * g.rng.uniform(6.3, 7.0);
+      me.coaching = clamp(me.coaching + (age - 18) * 1.1, 0, 60);
+    }
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
     assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
-    g.stage = age <= 15 ? "youth" : "academy";
-    club.managerTrust = 45;
+    g.stage = Game.stageForAge(age);
+    club.managerTrust = age <= 17 ? 45 : clamp(35 + (overall(me) - 55) * 1.4, 25, 78);
 
     g.startSeason();
     g.log(`התחלת את הדרך ב${club.name}.`);
     return g;
+  }
+
+  /** קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל. */
+  startAsManager(name, club, age) {
+    const me = generatePlayer(this.rng, club, "CM", { age: Math.min(age, 40), quality: 55 });
+    me.name = name;
+    me.isHuman = true;
+    me.age = age;
+    me.retired = true;
+    me.clubId = null;
+    me.contract = { wage: 0, yearsLeft: 0 };
+    me.coaching = clamp(28 + (age - 32) * 1.9 + this.rng.uniform(0, 12), 20, 92);
+    me.badges = Math.min(4, Math.floor(me.coaching / 22));
+    me.mediaSkill = clamp(15 + (age - 32) * 0.9, 5, 70);
+    me.business = clamp(10 + (age - 32) * 0.8, 5, 60);
+    me.reputation = clamp(12 + (age - 32) * 1.1, 5, 60);
+    if (this.rng.random() < 0.65) {          // עבר כשחקן — לא לכל מנג'ר יש
+      me.career.apps = this.rng.randint(60, 380);
+      me.career.goals = Math.round(me.career.apps * this.rng.uniform(0.02, 0.22));
+      me.career.assists = Math.round(me.career.apps * this.rng.uniform(0.03, 0.12));
+      me.career.ratingSum = me.career.apps * this.rng.uniform(6.2, 6.9);
+    }
+    this.players[me.pid] = me;
+    this.meId = me.pid;
+
+    this.stage = "manager";
+    this.managedClubId = club.cid;
+    this.firstClubId = club.cid;
+    this.lastClubId = club.cid;
+    club.managerName = name;
+    club.boardConfidence = 58;
+    this.tactics.formation = club.formation;
+    this.trainingFocus = "tactics";
+    this.startSeason();
+    this.log(`מונית למנג'ר של ${club.name}.`);
+    return this;
   }
 
   // ==================================================================

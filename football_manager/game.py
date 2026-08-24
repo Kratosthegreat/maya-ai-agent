@@ -166,10 +166,22 @@ class GameState:
     # יצירת משחק חדש
     # ==================================================================
 
+    @staticmethod
+    def stage_for_age(age: int) -> str:
+        """השלב שמתאים לגיל שבו מתחילים."""
+        if age <= 15:
+            return "youth"
+        if age <= 17:
+            return "academy"
+        if age <= 30:
+            return "player"
+        return "veteran"
+
     @classmethod
     def new_game(cls, name: str, position: str, club_id: str,
                  age: int = 15, seed: Optional[int] = None,
-                 stage: Optional[str] = None) -> "GameState":
+                 stage: Optional[str] = None,
+                 role: str = "player") -> "GameState":
         """פותח קריירה חדשה של שחקן צעיר."""
         state = cls()
         state.seed = seed if seed is not None else random.randrange(1, 10 ** 8)
@@ -177,33 +189,90 @@ class GameState:
         state.clubs, state.players = generate_world(state.seed)
         club = state.clubs[club_id]
 
-        me = generate_player(state.rng, club, position, age=age,
-                             quality=int(clamp(club.reputation * 0.55 + 24, 48, 70)))
+        if role == "manager":
+            return state._start_as_manager(name, club, age)
+
+        # ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
+        if age <= 17:
+            quality = int(clamp(club.reputation * 0.55 + 24, 48, 70))
+        else:
+            quality = int(clamp(club.reputation * 0.66 + 12 + min(8, (age - 17) * 1.4), 42, 82))
+        me = generate_player(state.rng, club, position, age=age, quality=quality)
         me.name = name
         me.is_human = True
         # מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
-        me.potential = int(clamp(me.overall + state.rng.randint(12, 30)
-                                 + max(0, 17 - age) * 4, 58, 94))
+        me.potential = int(clamp(me.overall + state.rng.randint(6, 22)
+                                 + max(0, 24 - age) * 2.2, me.overall + 2, 94))
         me.club_id = club_id
-        if age >= 16:
+        if age <= 15:
+            me.contract = Contract(wage=0, years_left=0)   # בגיל הנוער אין חוזה
+        elif age <= 17:
             me.contract = Contract(wage=max(2500, wage_for_overall(me.overall) // 2),
                                    years_left=3)
         else:
-            me.contract = Contract(wage=0, years_left=0)   # בגיל הנוער אין חוזה
+            me.contract = Contract(wage=wage_for_overall(me.overall),
+                                   years_left=state.rng.randint(2, 4))
         me.morale = 70.0
-        me.reputation = 8.0 if age >= 16 else 3.0
+        me.reputation = (3.0 if age <= 15 else 8.0 if age <= 17
+                         else clamp(me.overall - 28 + (age - 18) * 1.2, 5, 70))
+
+        # מי שמתחיל אחרי גיל 18 — כבר יש לו עבר
+        if age >= 19:
+            seasons = min(12, age - 17)
+            me.career.apps = int(seasons * state.rng.uniform(14, 26))
+            share = D.POSITION_ROLE_SHARE[position]["att"]
+            me.career.goals = int(me.career.apps * share * state.rng.uniform(0.10, 0.34))
+            me.career.assists = int(me.career.apps * state.rng.uniform(0.04, 0.13))
+            me.career.minutes = me.career.apps * 78
+            me.career.rating_sum = me.career.apps * state.rng.uniform(6.3, 7.0)
+            me.coaching = clamp(me.coaching + (age - 18) * 1.1, 0, 60)
         me.traits = [state.rng.choice(list(D.TRAITS.keys()))]
         state.players[me.pid] = me
         club.squad.append(me.pid)
         state.me_id = me.pid
         state.first_club_id = club_id
         state.last_club_id = club_id
-        state.stage = stage or ("youth" if age <= 15 else "academy")
-        club.manager_trust = 45.0
+        state.stage = stage or cls.stage_for_age(age)
+        club.manager_trust = (45.0 if age <= 17
+                              else clamp(35 + (me.overall - 55) * 1.4, 25, 78))
 
         state.start_season(first=True)
         state.log(f"התחלת את הדרך ב{club.name}.")
         return state
+
+    def _start_as_manager(self, name: str, club: Club, age: int) -> "GameState":
+        """קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל."""
+        me = generate_player(self.rng, club, "CM", age=min(age, 40), quality=55)
+        me.name = name
+        me.is_human = True
+        me.age = age
+        me.retired = True
+        me.club_id = None
+        me.contract = Contract(wage=0, years_left=0)
+        me.coaching = clamp(28 + (age - 32) * 1.9 + self.rng.uniform(0, 12), 20, 92)
+        me.badges = min(4, int(me.coaching // 22))
+        me.media_skill = clamp(15 + (age - 32) * 0.9, 5, 70)
+        me.business = clamp(10 + (age - 32) * 0.8, 5, 60)
+        me.reputation = clamp(12 + (age - 32) * 1.1, 5, 60)
+        if self.rng.random() < 0.65:          # עבר כשחקן — לא לכל מנג'ר יש
+            me.career.apps = self.rng.randint(60, 380)
+            me.career.goals = int(me.career.apps * self.rng.uniform(0.02, 0.22))
+            me.career.assists = int(me.career.apps * self.rng.uniform(0.03, 0.12))
+            me.career.rating_sum = me.career.apps * self.rng.uniform(6.2, 6.9)
+        self.players[me.pid] = me
+        self.me_id = me.pid
+
+        self.stage = "manager"
+        self.managed_club_id = club.cid
+        self.first_club_id = club.cid
+        self.last_club_id = club.cid
+        club.manager_name = name
+        club.board_confidence = 58.0
+        self.tactics["formation"] = club.formation
+        self.training_focus = "tactics"
+        self.start_season(first=True)
+        self.log(f"מונית למנג'ר של {club.name}.")
+        return self
 
     # ==================================================================
     # עונה

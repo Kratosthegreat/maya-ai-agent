@@ -307,6 +307,35 @@ test("משחק חדש מציב את השחקן בסגל", () => {
   assert(A.overall(g.me) < g.me.potential, "אין לאן להתפתח");
 });
 
+test("אפשר להתחיל קריירה בכל גיל", () => {
+  const expected = { 13: "youth", 15: "youth", 16: "academy", 17: "academy",
+                     18: "player", 25: "player", 30: "player", 31: "veteran", 36: "veteran" };
+  for (const [ageStr, stage] of Object.entries(expected)) {
+    const age = +ageStr;
+    const g = A.Game.newGame("בודק", "ST", "maccabi_sharon", age, 5);
+    assert(g.stage === stage, `גיל ${age}: ${g.stage} במקום ${stage}`);
+    assert(g.me.age === age, "הגיל לא נשמר");
+    assert(g.me.potential >= A.overall(g.me), "פוטנציאל נמוך מהדירוג");
+    if (age >= 19) {
+      assert(g.me.career.apps > 0, `גיל ${age} בלי עבר`);
+      assert(g.me.contract.wage > 0, `גיל ${age} בלי חוזה`);
+    }
+    if (age <= 15) assert(g.me.contract.wage === 0, "ילד עם חוזה");
+  }
+});
+
+test("אפשר להתחיל קריירה כמנג'ר", () => {
+  const g = A.Game.newGame("דני מנג'ר", "CM", "hapoel_carmel", 45, 11, "manager");
+  assert(g.stage === "manager", `שלב ${g.stage}`);
+  assert(g.me.retired && g.me.clubId === null, "מנג'ר לא אמור להיות בסגל");
+  assert(g.myClub() && g.myClub().managerName === "דני מנג'ר", "לא מונה למועדון");
+  assert(g.me.coaching > 20, "בלי ידע אימון");
+  g.setAction("tactics");
+  const r = g.advanceWeek();
+  assert(g.week === 2, "השבוע לא התקדם");
+  assert(r.match || r.notes.length, "לא קרה כלום בשבוע");
+});
+
 test("קריירה שמתחילה בגיל 13 עוברת דרך שלב הנוער", () => {
   const g = A.Game.newGame("ילד מהשכונה", "ST", "hapoel_carmel", 13, 77);
   assert(g.stage === "youth", `שלב פתיחה ${g.stage}`);

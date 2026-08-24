@@ -375,6 +375,39 @@ def test_promotion_and_relegation_change_leagues():
         assert count == 12
 
 
+def test_career_can_start_at_any_age():
+    """הגיל שנבחר קובע את השלב, את החוזה ואת העבר."""
+    expected = {13: "youth", 15: "youth", 16: "academy", 17: "academy",
+                18: "player", 25: "player", 30: "player", 31: "veteran", 36: "veteran"}
+    for age, stage in expected.items():
+        game = GameState.new_game("בודק", "ST", "maccabi_sharon", age=age, seed=5)
+        assert game.stage == stage, f"גיל {age}: {game.stage} במקום {stage}"
+        assert game.me.age == age
+        assert game.me.potential >= game.me.overall
+        if age >= 19:
+            assert game.me.career.apps > 0, f"גיל {age} בלי עבר"
+            assert game.me.contract.wage > 0
+        if age <= 15:
+            assert game.me.contract.wage == 0
+            assert game.me.career.apps == 0
+
+
+def test_a_career_can_start_as_a_manager():
+    """מסלול מנג'ר: בלי קריירת שחקן פעילה, עם קבוצה מהשבוע הראשון."""
+    game = GameState.new_game("דני מנג'ר", "CM", "hapoel_carmel",
+                              age=45, seed=11, role="manager")
+    assert game.stage == "manager"
+    assert game.me.retired
+    assert game.me.club_id is None
+    assert game.my_club is not None
+    assert game.my_club.manager_name == "דני מנג'ר"
+    assert game.me.coaching > 20
+    game.set_action("tactics")
+    report = game.advance_week()
+    assert report.lines or report.match
+    assert game.week == 2
+
+
 def test_career_starting_at_thirteen_goes_through_the_youth_stage():
     """קריירה שמתחילה בגיל 13 — שנות נוער, בלי שכר, ואז חוזה ראשון."""
     game = GameState.new_game("ילד מהשכונה", "ST", "hapoel_carmel", age=13, seed=77)

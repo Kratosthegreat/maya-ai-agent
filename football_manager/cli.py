@@ -380,9 +380,16 @@ def _verdict(game: GameState) -> str:
 
 def new_game_wizard() -> GameState:
     header("⚽ קריירה חדשה")
-    name = ask("איך קוראים לך?", "עומר לוי")
-    positions = [f"{D.POSITION_NAMES_HE[p]} ({p})" for p in D.POSITIONS]
-    position = D.POSITIONS[choose("באיזו עמדה אתה משחק?", positions, default=9)]
+    role = ["player", "manager"][choose(
+        "מה המסלול?", ["שחקן — מהמגרש ועד הפרישה ומה שאחריה",
+                       "מנג'ר — ישר לספסל האימונים"])]
+    name = ask("איך קוראים לך?", "עומר לוי" if role == "player" else "דני מנג'ר")
+    if role == "player":
+        positions = [f"{D.POSITION_NAMES_HE[p]} ({p})" for p in D.POSITIONS]
+        position = D.POSITIONS[choose("באיזו עמדה אתה משחק?", positions, default=9)]
+    else:
+        position = "CM"
+    low, high, default_age = (32, 62, 42) if role == "manager" else (13, 38, 15)
 
     starters = [c for c in _club_pool() if c[3] in ("top", "national")]
     starters.sort(key=lambda c: c[4])
@@ -390,20 +397,26 @@ def new_game_wizard() -> GameState:
     club_idx = choose("באיזה מועדון אתה מתחיל?", labels, default=len(labels) // 2)
     club_id = starters[club_idx][0]
 
-    ages = [
-        ("13 — ילד בקבוצת הנוער", 13),
-        ("14 — עוד שנה בנוער", 14),
-        ("15 — השנה האחרונה בנוער", 15),
-        ("16 — נערי הנוער הבוגרת", 16),
-        ("17 — על סף הבוגרים", 17),
-        ("18 — כבר בסגל", 18),
-    ]
-    age = ages[choose("בן כמה אתה מתחיל?", [label for label, _ in ages], default=2)][1]
-    game = GameState.new_game(name, position, club_id, age=age)
+    while True:
+        raw = ask(f"בן כמה אתה מתחיל? [{low}-{high}]:", str(default_age))
+        try:
+            age = int(raw)
+        except ValueError:
+            out("מספר לא תקין.")
+            continue
+        if low <= age <= high:
+            break
+        out(f"הגיל חייב להיות בין {low} ל-{high}.")
+    game = GameState.new_game(name, position, club_id, age=age, role=role)
     header("הסיפור מתחיל")
-    out(f"{game.me.name}, בן {game.me.age}, {game.me.position_he} של "
-        f"{game.my_club.name}.")
-    out(f"דירוג נוכחי: {game.me.overall}. מה שיהיה — תלוי בך.")
+    if role == "manager":
+        out(f"{game.me.name}, בן {game.me.age}, המנג'ר של {game.my_club.name}.")
+        out(f"ידע אימון: {int(game.me.coaching)} · תעודות: {game.me.badges}/4")
+        out(f"ציפיית ההנהלה: {game.my_club.season_expectation}.")
+    else:
+        out(f"{game.me.name}, בן {game.me.age}, {game.me.position_he} של "
+            f"{game.my_club.name}.")
+        out(f"דירוג נוכחי: {game.me.overall}. מה שיהיה — תלוי בך.")
     ask("\n[Enter כדי להתחיל]")
     return game
 

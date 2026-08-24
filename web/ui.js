@@ -96,47 +96,90 @@ function screenMenu() {
   </div>`;
 }
 
+function ageBlurb(age, role) {
+  if (role === "manager")
+    return age <= 38 ? "מנג'ר צעיר שרק קיבל תעודות. ההנהלה תיתן לך זמן — לא הרבה."
+      : age <= 50 ? "מנג'ר בשיא הדרך: מספיק ניסיון כדי שיקשיבו לך."
+      : "מנג'ר ותיק. השם שלך מקדים אותך, וגם הציפיות.";
+  if (age <= 15) return "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה הכי גבוהה.";
+  if (age <= 17) return "קבוצת הנוער הבוגרת, חוזה ראשון, וספסל של קבוצה בוגרת שנראה רחוק.";
+  if (age <= 23) return "שחקן צעיר בסגל הבוגרים. יש עוד לאן להתפתח, ויש כבר מה להפסיד.";
+  if (age <= 29) return "בשיא. הדירוג כמעט סופי, אבל אלה השנים שבהן נקבעים התארים.";
+  if (age <= 33) return "ותיק. הרגליים כבר לא מה שהיו, הראש דווקא כן — וכדאי להתחיל לחשוב על היום שאחרי.";
+  return "בסוף הדרך. עוד עונה או שתיים, ואז ההחלטה הגדולה.";
+}
+
 function screenNew() {
-  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 15 });
+  const state = viewData || (viewData = { name: "", position: "ST",
+    club: "hapoel_carmel", age: 15, role: "player" });
+  const isManager = state.role === "manager";
   const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
+  const minAge = isManager ? 32 : 13;
+  const maxAge = isManager ? 62 : 38;
+  const age = Math.max(minAge, Math.min(maxAge, state.age));
+
   return `
   <div class="screen">
-    <div class="hero" style="padding-top:14px">
+    <div class="hero" style="padding-top:10px">
       <div class="eyebrow">קריירה חדשה</div>
-      <h1 class="display" style="font-size:44px">מי אתה?</h1>
+      <h1 class="display" style="font-size:40px">מי אתה?</h1>
     </div>
 
-    <div class="card">
-      <label class="eyebrow" for="pname">שם השחקן</label>
-      <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">עמדה</div>
-      <div class="chips">
-        ${D.POSITIONS.map(p => `<button class="chip" data-pos="${p}"
-          aria-pressed="${state.position === p}">${D.POSITION_NAMES_HE[p]}</button>`).join("")}
+    <div class="panel">
+      <div class="panel-head"><span class="t">מסלול</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          <button class="chip" data-role="player" aria-pressed="${!isManager}">שחקן</button>
+          <button class="chip" data-role="manager" aria-pressed="${isManager}">מנג'ר</button>
+        </div>
+        <div class="muted">${isManager
+          ? "מתחילים ישר על הקו: אתה בוחר מערך, הרכב וטקטיקה, וההנהלה סופרת נקודות."
+          : "מתחילים על המגרש: מתאמנים, נלחמים על מקום בהרכב, ובסוף מחליטים מה עושים אחרי הפרישה."}</div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="eyebrow">גיל התחלה</div>
-      <div class="chips">
-        ${[13, 14, 15, 16, 17, 18].map(a => `<button class="chip" data-age="${a}"
-          aria-pressed="${state.age === a}">${a}</button>`).join("")}
+    <div class="panel">
+      <div class="panel-head"><span class="t">שם</span></div>
+      <div class="panel-body">
+        <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
       </div>
-      <p class="muted">${state.age <= 15
-        ? "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה גבוהה."
-        : "ישר לקבוצת הנוער הבוגרת, עם חוזה ראשון ופחות זמן להתפתח."}</p>
     </div>
 
-    <div class="card">
-      <div class="eyebrow">מועדון פתיחה</div>
-      <select id="pclub">
-        ${clubs.map(c => `<option value="${c[0]}" ${state.club === c[0] ? "selected" : ""}>
-          ${esc(c[1])} — מוניטין ${c[4]}</option>`).join("")}
-      </select>
-      <p class="muted">מועדון חלש = דקות משחק מיד. מועדון חזק = ספסל, אבל במה גדולה יותר.</p>
+    ${isManager ? "" : `
+    <div class="panel">
+      <div class="panel-head"><span class="t">עמדה</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${D.POSITIONS.map(p => `<button class="chip" data-pos="${p}"
+            aria-pressed="${state.position === p}">${D.POSITION_NAMES_HE[p]}</button>`).join("")}
+        </div>
+      </div>
+    </div>`}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">גיל</span>
+        <span class="r"><span class="num">${age}</span></span></div>
+      <div class="panel-body">
+        <input type="range" id="page" min="${minAge}" max="${maxAge}" step="1" value="${age}">
+        <div class="row" style="padding:0;border:0">
+          <span class="muted">${minAge}</span><span class="grow"></span>
+          <span class="muted">${maxAge}</span>
+        </div>
+        <div class="muted">${esc(ageBlurb(age, state.role))}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מועדון</span></div>
+      <div class="panel-body">
+        <select id="pclub">
+          ${clubs.map(c => `<option value="${c[0]}" ${state.club === c[0] ? "selected" : ""}>
+            ${esc(c[1])} — מוניטין ${c[4]}</option>`).join("")}
+        </select>
+        <div class="muted">${isManager
+          ? "מועדון חלש = ציפיות נמוכות ומקום לטעות. מועדון חזק = אפס סבלנות."
+          : "מועדון חלש = דקות משחק מיד. מועדון חזק = ספסל, אבל במה גדולה יותר."}</div>
+      </div>
     </div>
 
     <div class="actions">
@@ -146,37 +189,122 @@ function screenNew() {
   </div>`;
 }
 
-function strip() {
+const MONTHS_HE = ["אוג", "אוג", "ספט", "ספט", "ספט", "אוק", "אוק", "אוק", "נוב", "נוב",
+                   "נוב", "דצמ", "דצמ", "ינו", "ינו", "פבר", "פבר", "מרץ", "מרץ", "אפר",
+                   "אפר", "מאי", "מאי", "מאי", "יונ", "יונ"];
+
+/** התאריך המשוער של השבוע — נותן תחושה של לוח שנה אמיתי. */
+function weekDate() {
+  const w = Math.min(SEASON_WEEKS, game.week);
+  const day = 1 + ((w * 7) % 28);
+  const month = MONTHS_HE[w - 1] || "יונ";
+  return { d: `${day} ${month}`, w: `שבוע ${w}/${SEASON_WEEKS}` };
+}
+
+function appbar() {
   const me = game.me;
   const club = game.myClub();
   const stage = D.CAREER_STAGES_HE[game.stage] || game.stage;
+  const date = weekDate();
   return `
-  <div class="strip">
-    <span class="who">${esc(me.name)}</span>
-    <span class="meta">${stage}${club ? " · " + esc(club.name) : ""}</span>
-    <span class="spacer"></span>
-    <span class="meta">${game.year}/${game.year + 1} · שבוע ${game.week}/${SEASON_WEEKS}</span>
-  </div>`;
+  <header class="appbar">
+    <div class="appbar-top">
+      <div class="brand">
+        ${club ? crest(club, 30) : avatar(me, null, 30)}
+        <span class="who">
+          <span class="nm">${esc(club ? club.name : me.name)}</span>
+          <span class="sub">${esc(stage)}${club ? " · " + esc(me.name) : ""}</span>
+        </span>
+      </div>
+      <span class="spacer"></span>
+      <div class="date">
+        <div class="d">${date.d}</div>
+        <div class="w">${game.year}/${game.year + 1}</div>
+      </div>
+      <button class="btn-continue" data-act="play">
+        המשך <span class="chev">‹</span>
+      </button>
+    </div>
+    ${tabsBar()}
+  </header>`;
+}
+
+function tabsBar() {
+  const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
+                 ["profile", "פרופיל"], ["news", "יומן"]];
+  if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
+  const offers = game.flag("pending_offer") ? 1 : 0;
+  return `<nav class="tabs">${items.map(([k, l]) =>
+    `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
+      k === "main" && offers ? `<span class="badge">${offers}</span>` : ""}</button>`).join("")}</nav>`;
 }
 
 function dock(showPlay) {
-  const items = [["main", "ראשי"], ["profile", "פרופיל"], ["table", "טבלה"],
-                 ["squad", "סגל"], ["news", "יומן"]];
-  const offer = !!game.flag("pending_offer");
+  if (!showPlay) return "";
   return `<div class="dock">
-    ${showPlay ? `<button class="btn primary" data-act="play">לשחק את השבוע</button>` : ""}
-    <nav class="nav">${items.map(([k, l]) =>
-      `<button data-go="${k}" aria-current="${view === k}">${l}${
-        k === "main" && offer ? '<span class="dot"></span>' : ""}</button>`).join("")}</nav>
+    <button class="btn primary" data-act="play">לשחק את השבוע</button>
   </div>`;
 }
 
 function screenMain() {
-  if (view === "profile") return strip() + screenProfile() + dock(false);
-  if (view === "table") return strip() + screenTable() + dock(false);
-  if (view === "squad") return strip() + screenSquad() + dock(false);
-  if (view === "news") return strip() + screenNews() + dock(false);
-  return strip() + screenHub() + dock(true);
+  if (view === "profile") return appbar() + screenProfile();
+  if (view === "table") return appbar() + screenTable();
+  if (view === "squad") return appbar() + screenSquad();
+  if (view === "news") return appbar() + screenNews();
+  if (view === "tactics") return appbar() + screenTactics();
+  return appbar() + screenHub() + dock(true);
+}
+
+/** מסך טקטיקה — מגרש עם ההרכב ובחירות המנג'ר. */
+function screenTactics() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אין לך קבוצה לאמן.</div></div>`;
+  const formation = game.tactics.formation || club.formation;
+  const lineup = pickLineup(club, game.players, formation, null);
+  const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">מערך</span><span class="r">${esc(formation)}</span></div>
+      <div class="panel-body">
+        ${pitch(lineup, formation, game.players, game.meId, club)}
+        <div class="chips">
+          ${Object.keys(D.FORMATIONS).map(f => `<button class="chip" data-form="${f}"
+            aria-pressed="${formation === f}">${f}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">גישה</span></div>
+      <div class="panel-body">
+        <div class="muted">מנטליות</div>
+        <div class="chips">
+          ${Object.entries(D.MENTALITIES).map(([k, v]) => `<button class="chip" data-ment="${k}"
+            aria-pressed="${game.tactics.mentality === k}">${esc(v[0])}</button>`).join("")}
+        </div>
+        <div class="muted">לחץ</div>
+        <div class="chips">
+          ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-press="${k}"
+            aria-pressed="${game.tactics.pressing === k}">${esc(v[0])}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">ההרכב הפותח</span><span class="r">11 שחקנים</span></div>
+      <div class="panel-body tight">
+        ${lineup.map((pid, i) => {
+          const p = game.players[pid];
+          if (!p) return "";
+          return `<div class="row ${pid === game.meId ? "me" : ""}">
+            ${avatarChip(p, club, 28)}
+            <span class="grow"><span class="nm">${esc(p.name)}</span>
+              <span class="sub">${esc(D.POSITION_NAMES_HE[slots[i]] || "")} · בן ${p.age}</span></span>
+            <span class="val">${overall(p)}</span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>`;
 }
 
 function screenHub() {
@@ -185,22 +313,24 @@ function screenHub() {
   const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
   const actions = game.availableActions();
   const offer = game.flag("pending_offer");
-
   const fx = game.myFixture();
-  let fixture = "";
+
+  // --- פאנל המשחק הבא ---
+  let nextMatch = "";
   if (game.stage === "youth") {
     const isMatchWeek = game.week % 2 === 1;
-    fixture = `
-      <div class="scoreboard">
-        <span class="comp-tag">${isMatchWeek ? "ליגת הנוער" : "שבוע אימונים"}</span>
-        <div class="avatar-row">
-          ${avatar(me, club, 46)}
-          <span class="nm">${isMatchWeek
-            ? "משחק נוער השבוע. המאמן מסתכל."
-            : "בלי משחק השבוע — רק אימונים."}</span>
+    nextMatch = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">השבוע</span>
+          <span class="r">${isMatchWeek ? "ליגת הנוער" : "אימונים"}</span></div>
+        <div class="panel-body">
+          <div class="avatar-row">${avatar(me, club, 44)}
+            <span class="grow">${isMatchWeek
+              ? "משחק נוער השבוע. המאמן מסתכל."
+              : "בלי משחק — שבוע אימונים."}</span></div>
+          ${fx ? `<div class="muted">הקבוצה הבוגרת: ${esc(game.clubs[fx[0]].name)}
+            נגד ${esc(game.clubs[fx[1]].name)}</div>` : ""}
         </div>
-        ${fx ? `<div class="muted">הקבוצה הבוגרת: ${
-          esc(game.clubs[fx[0]].name)} נגד ${esc(game.clubs[fx[1]].name)}</div>` : ""}
       </div>`;
   } else if (fx) {
     const [homeId, awayId] = fx;
@@ -208,88 +338,146 @@ function screenHub() {
     const comp = CUP_WEEKS[game.week] || "ליגה";
     const rival = club && club.cid === homeId ? away : home;
     const where = club && club.cid === homeId ? "בית" : "חוץ";
-    fixture = `
-      <div class="scoreboard">
-        <div class="eyebrow">${esc(comp)} · ${where}</div>
-        <div class="scoreline">
-          <div class="side">${crest(home, 30)}<span class="nm ${
-            club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
-          <div class="versus">נגד</div>
-          <div class="side away">${crest(away, 30)}<span class="nm ${
-            club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+    nextMatch = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">המשחק הבא</span>
+          <span class="r">${esc(comp)} · ${where}</span></div>
+        <div class="panel-body">
+          <div class="scoreline">
+            <div class="side">${crest(home, 34)}<span class="nm ${
+              club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
+            <div class="versus">נגד</div>
+            <div class="side away">${crest(away, 34)}<span class="nm ${
+              club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+          </div>
+          <div class="scoreline" style="font-size:12px">
+            <div class="side">${formGuide(home)}</div><div></div>
+            <div class="side away">${formGuide(away)}</div>
+          </div>
+          <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}${
+            club ? " · מקום " + game.leaguePosition() : ""}</div>
         </div>
-        <div class="scoreline" style="font-size:12px">
-          <div class="side">${formGuide(home)}</div>
-          <div></div>
-          <div class="side away">${formGuide(away)}</div>
-        </div>
-        <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}</div>
       </div>`;
   } else {
-    fixture = `<div class="scoreboard"><div class="eyebrow">השבוע</div>
-      <div>אין משחק — שבוע של עבודה.</div></div>`;
+    nextMatch = `<div class="panel"><div class="panel-head"><span class="t">השבוע</span></div>
+      <div class="panel-body"><div class="muted">אין משחק — שבוע של עבודה.</div></div></div>`;
   }
 
-  const status = isPlayer ? `
-    <div class="stat-grid">
-      <div class="stat"><div class="n">${overall(me)}</div><div class="l">כללי</div></div>
-      <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
-      <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
-    </div>
-    ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span><span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
-    ${club ? `<div class="attr"><span>אמון המאמן</span><span class="val">${Math.round(club.managerTrust)}</span>
-      <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}
-  ` : club ? `
-    <div class="stat-grid">
-      <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
-      <div class="stat"><div class="n">${Math.round(club.boardConfidence)}</div><div class="l">הנהלה</div></div>
-      <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">קהל</div></div>
-    </div>
-    <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>
-  ` : `<div class="muted">ידע אימון ${Math.round(me.coaching)} · תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+  // --- פאנל המצב ---
+  const statusBody = isPlayer ? `
+      <div class="avatar-row">${avatar(me, club, 46)}
+        <span class="grow"><span class="nm"><strong>${esc(me.name)}</strong></span>
+          <span class="sub">${esc(positionHe(me))} · בן ${me.age}${
+            me.number ? " · מספר " + me.number : ""}</span></span>
+        <span class="val" style="font-size:22px">${overall(me)}</span></div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
+        <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
+        <div class="stat"><div class="n">${Math.round(me.morale)}</div><div class="l">מורל</div></div>
+      </div>
+      ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span>
+        <span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
+      ${club ? `<div class="attr"><span>אמון המאמן</span>
+        <span class="val">${Math.round(club.managerTrust)}</span>
+        <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}`
+    : club ? `
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
+        <div class="stat"><div class="n">${Math.round(club.boardConfidence)}</div><div class="l">הנהלה</div></div>
+        <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">קהל</div></div>
+      </div>
+      <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>`
+    : `<div class="muted">ידע אימון ${Math.round(me.coaching)} ·
+       תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+
+  // --- טבלה מקוצרת ---
+  let tableSnip = "";
+  if (club && game.tables[club.leagueId]) {
+    const rows = game.standings(club.leagueId);
+    const idx = rows.findIndex(r => r.clubId === club.cid);
+    const from = Math.max(0, Math.min(idx - 2, rows.length - 5));
+    tableSnip = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">${esc(game.leagueName(club.leagueId))}</span>
+          <span class="r">מחזור ${Math.max(0, game.week - 1)}</span></div>
+        <div class="panel-body tight">
+          ${rows.slice(from, from + 5).map((r, i) => {
+            const c = game.clubs[r.clubId];
+            return `<div class="row ${c.cid === club.cid ? "me" : ""}">
+              <span class="val" style="min-width:18px">${from + i + 1}</span>
+              ${crest(c, 22)}
+              <span class="grow"><span class="nm">${esc(c.name)}</span></span>
+              ${formGuide(c)}
+              <span class="val">${r.points}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+  }
+
+  // --- הודעות ---
+  const news = game.news.slice(-4).reverse();
+  const messages = news.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">הודעות</span>
+        <span class="r">${news.length}</span></div>
+      <div class="panel-body tight">
+        ${news.map(n => {
+          const text = n.replace(/^\[[^\]]+\]\s*/, "");
+          const when = (n.match(/^\[([^\]]+)\]/) || ["", ""])[1];
+          return `<div class="row">
+            ${avatarChip(me, club, 26)}
+            <span class="grow"><span class="nm">${esc(text)}</span>
+              <span class="sub">${esc(when)}</span></span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>` : "";
 
   return `
   <div class="screen">
-    ${fixture}
-    <div class="card">
-      <div class="eyebrow">המצב שלך</div>
-      ${isPlayer ? `<div class="avatar-row" style="margin-bottom:2px">
-        ${avatar(me, club, 56)}
-        <span class="nm"><strong>${esc(me.name)}</strong><br>
-          <span class="muted">${esc(positionHe(me))} · בן ${me.age}${
-            me.number ? " · מספר " + me.number : ""}</span></span>
-      </div>` : ""}
-      ${status}
-      <div class="muted">בחשבון: ₪${fmt(game.money)}</div>
-    </div>
+    ${nextMatch}
 
     ${offer ? `
-    <div class="card" style="border-color:var(--accent)">
-      <div class="eyebrow">הצעת העברה</div>
-      <div><strong>${esc(game.clubs[offer.club].name)}</strong> — ₪${fmt(offer.wage)} לשבוע</div>
-      <div class="muted">החוזה הנוכחי שלך: ₪${fmt(me.contract.wage)} לשבוע</div>
-      <div class="btn-row">
-        <button class="btn primary" data-act="accept">לחתום</button>
-        <button class="btn" data-act="reject">לדחות</button>
+    <div class="panel" style="border-color:var(--accent)">
+      <div class="panel-head"><span class="t">הצעת העברה</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(game.clubs[offer.club], 30)}
+          <span class="nm"><strong>${esc(game.clubs[offer.club].name)}</strong><br>
+          <span class="muted">₪${fmt(offer.wage)} לשבוע · עכשיו ₪${fmt(me.contract.wage)}</span></span>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" data-act="accept">לחתום</button>
+          <button class="btn" data-act="reject">לדחות</button>
+        </div>
       </div>
     </div>` : ""}
 
-    <div class="card">
-      <div class="eyebrow">על מה נעבוד השבוע</div>
-      <div class="chips">
-        ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
-          aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
-      </div>
-      ${isPlayer ? `
-      <hr class="rule">
-      <div class="eyebrow">עצימות</div>
-      <div class="chips">
-        ${[[1.0, "רגילה"], [1.3, "גבוהה"], [0.75, "קלה"]].map(([v, l]) =>
-          `<button class="chip" data-int="${v}" aria-pressed="${game.intensity === v}">${l}</button>`).join("")}
-      </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">המצב שלך</span>
+        <span class="r">₪${fmt(game.money)}</span></div>
+      <div class="panel-body">${statusBody}</div>
     </div>
 
-    ${["manager", "coach"].includes(game.stage) ? tacticsCard() : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">תוכנית השבוע</span>
+        <span class="r">${esc((actions.find(a => a[0] === game.trainingFocus) || ["", ""])[1])}</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
+            aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
+        </div>
+        ${isPlayer ? `<hr class="rule">
+        <div class="muted">עצימות</div>
+        <div class="chips">
+          ${[[1.0, "רגילה"], [1.3, "גבוהה"], [0.75, "קלה"]].map(([v, l]) =>
+            `<button class="chip" data-int="${v}" aria-pressed="${game.intensity === v}">${l}</button>`).join("")}
+        </div>` : ""}
+      </div>
+    </div>
+
+    ${tableSnip}
+    ${messages}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
   </div>`;
@@ -395,7 +583,7 @@ function screenWeek() {
   }
 
   html += `<button class="btn primary wide" data-act="after-week">המשך</button></div>`;
-  return strip() + html;
+  return appbar() + html;
 }
 
 function youthCard(y) {
@@ -803,8 +991,22 @@ function bind() {
     el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
-  app.querySelectorAll("[data-age]").forEach(el =>
-    el.addEventListener("click", () => { viewData.age = +el.dataset.age; render(); }));
+  app.querySelectorAll("[data-role]").forEach(el =>
+    el.addEventListener("click", () => {
+      viewData.role = el.dataset.role;
+      viewData.age = el.dataset.role === "manager" ? 42 : 15;
+      render();
+    }));
+  const ageInput = $("#page");
+  if (ageInput) {
+    ageInput.addEventListener("input", e => {
+      viewData.age = +e.target.value;
+      const head = app.querySelector(".panel-head .r .num");
+      if (head) head.textContent = viewData.age;
+      const blurb = ageInput.closest(".panel-body").querySelector(".muted:last-child");
+      if (blurb) blurb.textContent = ageBlurb(viewData.age, viewData.role);
+    });
+  }
   app.querySelectorAll("[data-league]").forEach(el =>
     el.addEventListener("click", () => go("table", { league: el.dataset.league })));
   app.querySelectorAll("[data-form]").forEach(el =>
@@ -824,7 +1026,7 @@ function bind() {
 }
 
 function act(what) {
-  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15 }); }
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15, role: "player" }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -833,8 +1035,9 @@ function act(what) {
     go(game.gameOver ? "end" : "main");
   }
   else if (what === "start") {
-    const name = (viewData.name || "").trim() || "עומר לוי";
-    game = Game.newGame(name, viewData.position, viewData.club, viewData.age);
+    const name = (viewData.name || "").trim() || (viewData.role === "manager" ? "דני מנג'ר" : "עומר לוי");
+    game = Game.newGame(name, viewData.position, viewData.club, viewData.age,
+                        null, viewData.role);
     saveGame();
     go("main");
   }

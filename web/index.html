@@ -4,90 +4,67 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Karantina:wght@700&display=swap">
 <style>
 /* ==========================================================================
-   קריירה — עיצוב "משחק לילה": מגרש חשוך, זרקור ענבר, טיפוגרפיה של תוכנייה.
+   קריירה — ממשק בשפה של משחקי ניהול כדורגל:
+   סרגל עליון עם תפריטים, פאנלים צפופים, טבלאות עם סמלים, וכפתור "המשך".
    ========================================================================== */
 
 :root {
-  /* בהיר — נייר של תוכניית משחק */
-  --bg: #EFF2EA;
-  --surface: #FFFFFF;
-  --surface-2: #E3E8DB;
-  --ink: #0E1C15;
-  --ink-soft: #4F6157;
-  --line: #CED6C6;
-  --accent: #8A5A00;
-  --accent-fill: #FFC42E;
-  --accent-ink: #201603;
-  --win: #12734A;
-  --draw: #63736A;
-  --loss: #B32B20;
-  --shadow: 0 1px 2px rgba(18, 33, 26, .08), 0 8px 24px rgba(18, 33, 26, .06);
-  --radius: 4px;
-  --pitch: #DDE4D6;
+  color-scheme: dark;
+
+  --bg: #0D0B16;
+  --bg-2: #12101F;
+  --panel: #191627;
+  --panel-2: #201C31;
+  --panel-3: #282341;
+  --line: #2E2945;
+  --line-soft: #241F39;
+
+  --ink: #ECEAF6;
+  --ink-2: #B6B1CC;
+  --ink-soft: #837D9C;
+
+  --accent: #A78BFA;
+  --accent-2: #E879F9;
+  --accent-grad: linear-gradient(93deg, #7C3AED 0%, #C026D3 55%, #DB2777 100%);
+  --gold: #F5B62C;
+
+  --good: #22C55E;
+  --warn: #F59E0B;
+  --bad: #F0484B;
+  --neutral: #6E6889;
+
+  --pitch-turf: #16301F;
+  --pitch-stripe: #1A3724;
+  --pitch-line: #4E6B57;
+  --pitch: #171429;
+
+  --radius: 7px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 12px 34px rgba(0, 0, 0, .38);
+  --bar-h: 52px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #EFEEF5;
+  --bg-2: #E7E5F0;
+  --panel: #FFFFFF;
+  --panel-2: #F4F3F9;
+  --panel-3: #E9E7F3;
+  --line: #D8D5E6;
+  --line-soft: #E5E2EF;
+  --ink: #171331;
+  --ink-2: #4A4468;
+  --ink-soft: #6E6889;
+  --accent: #6D28D9;
+  --accent-2: #C026D3;
+  --gold: #B07908;
+  --good: #12854B;
+  --bad: #C42026;
   --pitch-turf: #CBD8C2;
   --pitch-stripe: #C0CFB6;
   --pitch-line: #F4F7F1;
-  --scene-sky: #E4E9DC;
-  --scene-far: #D3DBC9;
-  --scene-mid: #BEC9B3;
-  --scene-near: #A2B199;
-  --scene-line: #71805F;
-}
-
-:root:not([data-theme="light"]) {
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #070D0A;
-    --surface: #0E1813;
-    --surface-2: #16241B;
-    --ink: #EEF4EA;
-    --ink-soft: #90A497;
-    --line: #24382B;
-    --accent: #FFC42E;
-    --accent-fill: #FFC42E;
-    --accent-ink: #1A1204;
-    --win: #35D07F;
-    --draw: #7E9089;
-    --loss: #FF5A4E;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
-    --pitch: #16241B;
-    --pitch-turf: #16301F;
-    --pitch-stripe: #1A3724;
-    --pitch-line: #3E6B4C;
-    --scene-sky: #0E1712;
-    --scene-far: #14201A;
-    --scene-mid: #1C2E23;
-    --scene-near: #27412F;
-    --scene-line: #4C6B55;
-  }
-}
-
-:root[data-theme="dark"] {
-  --bg: #0B120E;
-  --surface: #131E17;
-  --surface-2: #1B291F;
-  --ink: #E9EFE6;
-  --ink-soft: #93A398;
-  --line: #26382C;
-  --accent: #F0B429;
-  --accent-fill: #F0B429;
-  --accent-ink: #1A1206;
-  --win: #4CAF7D;
-  --draw: #8A9A90;
-  --loss: #E06B60;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
-  --pitch: #16241B;
-    --pitch-turf: #16301F;
-    --pitch-stripe: #1A3724;
-    --pitch-line: #3E6B4C;
-    --scene-sky: #0E1712;
-    --scene-far: #14201A;
-    --scene-mid: #1C2E23;
-    --scene-near: #27412F;
-    --scene-line: #4C6B55;
+  --pitch: #E7E5F0;
+  --shadow: 0 1px 2px rgba(23, 19, 49, .08), 0 10px 26px rgba(23, 19, 49, .07);
 }
 
 * { box-sizing: border-box; }
@@ -96,19 +73,20 @@ body {
   direction: rtl;
   margin: 0;
   background:
-    radial-gradient(120% 60% at 50% 0%,
-      color-mix(in srgb, var(--accent-fill) 5%, transparent) 0%, transparent 60%),
+    radial-gradient(130% 70% at 50% -10%, rgba(124, 58, 237, .16) 0%, transparent 58%),
     var(--bg);
   background-attachment: fixed;
   color: var(--ink);
   font-family: "Assistant", "Segoe UI", system-ui, -apple-system, sans-serif;
-  font-size: 16px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.5;
   -webkit-text-size-adjust: 100%;
   overflow-x: hidden;
 }
 
 h1, h2, h3 { margin: 0; text-wrap: balance; }
+button { font-family: inherit; font-size: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .display {
   font-family: "Karantina", "Assistant", system-ui, sans-serif;
@@ -117,229 +95,271 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   line-height: .95;
 }
 
-button { font-family: inherit; font-size: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 2px; }
-
-/* ---------- מבנה ---------- */
-
 #app {
-  max-width: 560px;
+  max-width: 620px;
   margin: 0 auto;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--bg-2);
+  box-shadow: 0 0 60px rgba(0, 0, 0, .5);
 }
+
+/* ---------- הסרגל העליון ---------- */
+
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+  border-bottom: 1px solid var(--line);
+}
+.appbar-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  min-height: var(--bar-h);
+}
+.appbar .brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.appbar .brand .who { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.appbar .brand .nm {
+  font-weight: 700;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.appbar .brand .sub { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.appbar .spacer { flex: 1; }
+.appbar .date {
+  text-align: center;
+  line-height: 1.1;
+  padding-inline: 8px;
+  border-inline-start: 1px solid var(--line);
+}
+.appbar .date .d { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.appbar .date .w { font-size: 10.5px; color: var(--ink-soft); }
+
+.btn-continue {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 9px 16px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(192, 38, 211, .35);
+  white-space: nowrap;
+}
+.btn-continue:active { transform: translateY(1px); }
+.btn-continue .chev { font-size: 15px; line-height: 1; }
+
+/* ---------- תפריט וטאבים ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 6px;
+  background: var(--panel);
+  border-top: 1px solid var(--line-soft);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 11px 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+}
+.tab[aria-current="true"] { color: var(--ink); border-bottom-color: var(--accent-2); }
+.tab .badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 0 4px;
+  margin-inline-start: 5px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---------- פאנלים ---------- */
 
 .screen {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px 14px 24px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .screen { animation: rise .18s ease-out both; }
-  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
-}
-
-/* ---------- רצועת הסטטוס ---------- */
-
-.strip {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--pitch);
-  border-bottom: 1px solid var(--line);
-  padding: 9px 14px;
-  display: flex;
-  align-items: baseline;
   gap: 10px;
-  flex-wrap: wrap;
+  padding: 10px;
 }
-.strip .who { font-weight: 700; }
-.strip .meta {
-  font-size: 12.5px;
-  color: var(--ink-soft);
-  letter-spacing: .02em;
-  font-variant-numeric: tabular-nums;
+@media (prefers-reduced-motion: no-preference) {
+  .screen { animation: rise .16s ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(5px); } }
 }
-.strip .spacer { flex: 1; }
 
-/* ---------- כרטיסים ---------- */
-
-.card {
-  background: var(--surface);
+.panel, .card {
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  overflow: hidden;
 }
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line);
+}
+.panel-head .t {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.panel-head .r { margin-inline-start: auto; font-size: 11.5px; color: var(--ink-soft); }
+.panel-body { padding: 11px; display: flex; flex-direction: column; gap: 10px; }
+.panel-body.tight { padding: 0; }
+.panel-body.flat { gap: 6px; }
+
+.card { padding: 11px; display: flex; flex-direction: column; gap: 9px; }
 
 .eyebrow {
   font-size: 11px;
-  letter-spacing: .16em;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--accent);
   font-weight: 700;
 }
+.rule { height: 1px; background: var(--line); border: 0; margin: 1px 0; }
+.muted { color: var(--ink-soft); font-size: 12.5px; }
+.center { text-align: center; }
+.num { direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
 
-.rule { height: 1px; background: var(--line); border: 0; margin: 2px 0; }
+/* ---------- שורות מידע ---------- */
 
-/* ---------- לוח התוצאות ---------- */
-
-.scoreboard {
-  background: var(--pitch);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 12px 12px;
+.row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.scoreline {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 10px;
-}
-.scoreline .side { font-weight: 700; font-size: 15px; line-height: 1.2; }
-.scoreline .side.away { text-align: left; }
-.scoreline .side .mine { color: var(--accent); }
-.scoreline .versus {
-  font-size: 12px;
-  letter-spacing: .14em;
-  color: var(--ink-soft);
-  font-weight: 700;
-  padding: 0 4px;
-}
-.scoreline .score {
-  font-family: "Karantina", sans-serif;
-  font-weight: 700;
-  font-size: 46px;
-  line-height: .8;
-  font-variant-numeric: tabular-nums;
-  padding: 0 6px;
-  white-space: nowrap;
-}
-.goals { display: flex; flex-direction: column; gap: 3px; }
-.goal-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  gap: 9px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line-soft);
   font-size: 13.5px;
-  color: var(--ink-soft);
 }
-.goal-row .min {
-  direction: ltr;
-  unicode-bidi: isolate;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--ink);
-  min-width: 30px;
-  font-size: 12px;
-}
-.goal-row.mine { color: var(--accent); font-weight: 700; }
-@media (prefers-reduced-motion: no-preference) {
-  .goal-row { animation: slide .22s ease-out both; }
-  @keyframes slide { from { opacity: 0; transform: translateX(8px); } }
-}
-
-/* ---------- הביצוע האישי ---------- */
-
-.perf { display: flex; align-items: center; gap: 14px; }
-.perf .rating {
-  font-family: "Karantina", sans-serif;
-  font-size: 52px;
-  line-height: .8;
-  font-variant-numeric: tabular-nums;
-  direction: ltr;
-  min-width: 74px;
-  text-align: center;
-  padding: 6px 4px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-}
-.perf .rating.good { background: var(--win); color: #fff; }
-.perf .rating.bad { background: var(--loss); color: #fff; }
-.perf .detail { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
-.perf .detail strong { font-size: 15px; }
-
-/* ---------- רשימות הודעות ---------- */
-
-.notes { display: flex; flex-direction: column; gap: 7px; }
-.note { display: flex; gap: 9px; align-items: flex-start; font-size: 14.5px; }
-.note .ico { flex: none; width: 20px; text-align: center; }
-.note.strong { font-weight: 700; }
+.row:last-child { border-bottom: 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row .nm { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .sub { font-size: 11.5px; color: var(--ink-soft); }
+.row .val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.row.me { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.row.link { cursor: pointer; }
 
 /* ---------- כפתורים ---------- */
 
 .btn {
   appearance: none;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: var(--panel-2);
   border-radius: var(--radius);
-  padding: 13px 14px;
-  min-height: 46px;
+  padding: 11px 13px;
+  min-height: 44px;
   text-align: right;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: transform .08s ease, border-color .12s ease;
+  font-size: 14px;
+  transition: border-color .12s ease, background .12s ease;
 }
-.btn:active { transform: scale(.99); }
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: translateY(1px); }
 .btn.primary {
-  background: var(--accent-fill);
-  border-color: var(--accent-fill);
-  color: var(--accent-ink);
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
   font-weight: 700;
   justify-content: center;
-  font-size: 17px;
+  box-shadow: 0 4px 16px rgba(192, 38, 211, .3);
 }
 .btn.ghost { background: transparent; }
 .btn.wide { width: 100%; justify-content: center; }
-.btn[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--surface-2);
+.btn .k { flex: 1; }
+.btn .hint { font-size: 12px; color: var(--ink-soft); }
+.btn.primary .hint { color: rgba(255, 255, 255, .82); }
+.btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
+.btn-row .btn { flex: 1; justify-content: center; min-width: 92px; }
+.actions { display: flex; flex-direction: column; gap: 7px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  min-height: 36px;
+  color: var(--ink-2);
+}
+.chip[aria-pressed="true"] {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
   font-weight: 700;
 }
-.btn .k { flex: 1; }
-.btn .hint { font-size: 12.5px; color: var(--ink-soft); }
 
-.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn-row .btn { flex: 1; justify-content: center; min-width: 96px; }
-
-.actions { display: flex; flex-direction: column; gap: 8px; }
+input[type="text"], select {
+  width: 100%;
+  padding: 11px;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 16px;
+}
+input[type="range"] { width: 100%; accent-color: var(--accent-2); height: 32px; }
 
 /* ---------- הרציף התחתון ---------- */
 
 .dock {
   position: sticky;
   bottom: 0;
-  z-index: 20;
-  background: var(--surface);
+  z-index: 30;
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
-.dock .btn.primary { margin: 10px 12px; width: calc(100% - 24px); }
-
-.nav {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  border-top: 1px solid var(--line);
-}
+.dock .btn.primary { margin: 9px 10px; width: calc(100% - 20px); }
+.nav { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line-soft); }
 .dock .btn.primary + .nav { border-top: 0; }
 .nav button {
   appearance: none;
   background: none;
   border: 0;
-  padding: 11px 2px 13px;
-  font-size: 13px;
+  padding: 10px 2px 12px;
+  font-size: 12.5px;
   color: var(--ink-soft);
   cursor: pointer;
   position: relative;
@@ -348,473 +368,339 @@ button { font-family: inherit; font-size: inherit; color: inherit; }
 .nav button[aria-current="true"]::after {
   content: "";
   position: absolute;
-  inset-inline: 26%;
+  inset-inline: 28%;
   bottom: 6px;
   height: 2px;
-  background: var(--accent);
   border-radius: 2px;
+  background: var(--accent-grad);
 }
 .nav button .dot {
   position: absolute;
-  top: 9px;
+  top: 8px;
   inset-inline-start: 50%;
-  margin-inline-start: 22px;
+  margin-inline-start: 20px;
   width: 7px; height: 7px;
   border-radius: 50%;
-  background: var(--loss);
+  background: var(--bad);
 }
 
-/* ---------- טבלת ליגה ---------- */
+/* ---------- לוח תוצאות ---------- */
 
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 7px 5px; text-align: center; }
-th {
-  font-size: 10.5px;
-  letter-spacing: .08em;
-  color: var(--ink-soft);
-  font-weight: 700;
-  border-bottom: 1px solid var(--line);
-}
-td.club { text-align: right; font-weight: 600; }
-td { border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
-tr.me td { background: var(--surface-2); }
-tr.me td.club { color: var(--accent); font-weight: 700; }
-td.pts { font-weight: 700; }
-tr.up td:first-child { box-shadow: inset 3px 0 0 var(--win); }
-tr.down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
-
-/* ---------- תכונות ---------- */
-
-.attrs { display: flex; flex-direction: column; gap: 7px; }
-.attr { display: grid; grid-template-columns: 88px 30px 1fr; align-items: center; gap: 8px; font-size: 14px; }
-.attr .val { font-variant-numeric: tabular-nums; font-weight: 700; text-align: center; }
-.bar { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
-.bar > i { display: block; height: 100%; background: var(--accent-fill); border-radius: 99px; }
-.bar.soft > i { background: var(--ink-soft); }
-
-.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stat {
-  background: var(--surface-2);
+.scoreboard {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 9px 6px;
-  text-align: center;
-}
-.stat .n {
-  font-family: "Karantina", sans-serif;
-  font-size: 28px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.stat .l { font-size: 11px; color: var(--ink-soft); letter-spacing: .04em; }
-
-/* ---------- אירוע עלילה (עמוד אחורי של העיתון) ---------- */
-
-.takeover {
-  min-height: 100dvh;
-  background:
-    repeating-linear-gradient(180deg,
-      transparent 0 26px,
-      color-mix(in srgb, var(--ink) 3%, transparent) 26px 52px),
-    var(--pitch);
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 22px 16px 28px;
+  gap: 9px;
+  position: relative;
+  overflow: hidden;
 }
-.takeover .kicker {
-  font-size: 11px;
-  letter-spacing: .22em;
-  text-transform: uppercase;
-  color: var(--accent);
+.scoreboard.result::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent-grad);
+}
+.comp-tag {
+  align-self: flex-start;
+  background: var(--accent-grad);
+  color: #fff;
+  font-size: 10.5px;
   font-weight: 700;
+  letter-spacing: .1em;
+  padding: 3px 10px;
+  border-radius: 999px;
 }
-.takeover h2 { font-size: 44px; }
-.takeover .body {
-  white-space: pre-wrap;
-  font-size: 16.5px;
-  line-height: 1.65;
-  color: var(--ink);
-  max-width: 46ch;
+.scoreline { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 9px; }
+.scoreline .side { display: flex; align-items: center; gap: 8px; }
+.scoreline .side.away { flex-direction: row-reverse; }
+.scoreline .side .nm { font-weight: 700; font-size: 14px; line-height: 1.15; }
+.scoreline .side .mine { color: var(--accent); }
+.scoreline .versus {
+  font-size: 11px; letter-spacing: .14em; color: var(--ink-soft); font-weight: 700;
 }
-.takeover .outcome {
-  white-space: pre-wrap;
-  font-size: 16.5px;
-  line-height: 1.65;
-  border-right: 3px solid var(--accent-fill);
-  padding-right: 12px;
-}
-
-/* ---------- כותרת ראשית / מסך פתיחה ---------- */
-
-.hero { display: flex; flex-direction: column; gap: 6px; padding: 26px 0 6px; }
-.hero h1 { font-size: 76px; line-height: .82; }
-.hero .underline {
-  width: 92px;
-  height: 5px;
-  background: var(--accent-fill);
-  margin: 10px 0 4px;
-  margin-inline-end: auto;
-}
-.screen.menu { justify-content: flex-start; }
-.hero .sub { color: var(--ink-soft); font-size: 15px; max-width: 40ch; }
-.hero .accent { color: var(--accent); }
-
-.chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.chip {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 99px;
-  padding: 8px 13px;
-  font-size: 14px;
-  cursor: pointer;
-  min-height: 40px;
-}
-.chip[aria-pressed="true"] {
-  background: var(--accent-fill);
-  border-color: var(--accent-fill);
-  color: var(--accent-ink);
+.scoreline .score {
+  font-family: "Karantina", sans-serif;
   font-weight: 700;
+  font-size: 44px;
+  line-height: .8;
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.goals { display: flex; flex-direction: column; gap: 3px; }
+.goal-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.goal-row .min {
+  direction: ltr; unicode-bidi: isolate;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700; color: var(--ink); min-width: 30px; font-size: 11.5px;
+}
+.goal-row.mine { color: var(--accent); font-weight: 700; }
+@media (prefers-reduced-motion: no-preference) {
+  .goal-row { animation: slide .22s ease-out both; }
+  @keyframes slide { from { opacity: 0; transform: translateX(8px); } }
+  .scoreboard.result .side { animation: sideIn .42s cubic-bezier(.2,.7,.3,1) both; }
+  .scoreboard.result .side.away { animation-name: sideInAway; }
+  .scoreboard.result .score { animation: scorePop .5s .18s cubic-bezier(.2,1.4,.4,1) both; }
+  @keyframes sideIn { from { opacity: 0; transform: translateX(16px); } }
+  @keyframes sideInAway { from { opacity: 0; transform: translateX(-16px); } }
+  @keyframes scorePop { from { opacity: 0; transform: scale(.62); } }
+  .timeline { animation: fadeUp .4s .32s ease-out both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } }
 }
 
-input[type="text"], select {
-  width: 100%;
-  padding: 12px;
-  min-height: 46px;
-  border: 1px solid var(--line);
+.perf { display: flex; align-items: center; gap: 12px; }
+.perf .rating {
+  font-family: "Karantina", sans-serif;
+  font-size: 48px; line-height: .8;
+  font-variant-numeric: tabular-nums; direction: ltr;
+  min-width: 70px; text-align: center;
+  padding: 6px 4px; border-radius: var(--radius);
+  background: var(--panel-3);
+}
+.perf .rating.good { background: linear-gradient(160deg, #16A34A, #22C55E); color: #fff; }
+.perf .rating.bad { background: linear-gradient(160deg, #B91C1C, #F0484B); color: #fff; }
+.perf .detail { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; }
+
+.my-goal-flash {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--accent-grad);
+  color: #fff;
   border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 16px;
-}
-
-.num { direction: ltr; unicode-bidi: isolate; }
-
-.muted { color: var(--ink-soft); font-size: 13.5px; }
-.center { text-align: center; }
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 9px;
-  border-radius: 99px;
-  font-size: 12px;
+  padding: 10px 13px;
   font-weight: 700;
-  background: var(--surface-2);
-  color: var(--ink-soft);
+  box-shadow: 0 6px 20px rgba(192, 38, 211, .34);
 }
-.pill.w { background: var(--win); color: #fff; }
-.pill.l { background: var(--loss); color: #fff; }
-.pill.d { background: var(--draw); color: #fff; }
-
-.honour { display: flex; gap: 9px; font-size: 14.5px; align-items: baseline; }
-.honour .yr {
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-soft);
-  font-size: 12.5px;
-  min-width: 38px;
+.my-goal-flash .big { font-family: "Karantina", sans-serif; font-size: 30px; line-height: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  .my-goal-flash { animation: flashIn .45s .48s cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes flashIn { from { opacity: 0; transform: scale(.9) translateY(8px); } }
 }
 
-.squad-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  align-items: center;
-  padding: 7px 0;
+/* ---------- טבלאות ---------- */
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 6px; text-align: center; }
+th {
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 700;
+  background: var(--panel-2);
   border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  position: sticky; top: 0;
 }
-.squad-row:last-child { border-bottom: 0; }
-.squad-row .pos { font-size: 12px; color: var(--ink-soft); }
-.squad-row .ovr {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  min-width: 26px;
+td { border-bottom: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+td.club { text-align: right; font-weight: 600; }
+tr.me td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+tr.me td.club { color: var(--accent); font-weight: 700; }
+td.pts { font-weight: 700; }
+tr.up td:first-child { box-shadow: inset 3px 0 0 var(--good); }
+tr.down td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+.mv { font-size: 10px; }
+.mv.up { color: var(--good); }
+.mv.down { color: var(--bad); }
+.mv.same { color: var(--neutral); }
+
+/* ---------- מדדים ---------- */
+
+.attrs { display: flex; flex-direction: column; gap: 6px; }
+.attr { display: grid; grid-template-columns: 84px 28px 1fr; align-items: center; gap: 8px; font-size: 13px; }
+.attr .val { font-variant-numeric: tabular-nums; font-weight: 700; text-align: center; }
+.bar { height: 6px; background: var(--panel-3); border-radius: 99px; overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 99px; background: var(--accent-grad); }
+.bar.soft > i { background: var(--neutral); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.stat {
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 8px 6px;
   text-align: center;
 }
-.squad-row.me { color: var(--accent); font-weight: 700; }
+.stat .n { font-family: "Karantina", sans-serif; font-size: 27px; line-height: 1; font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 10.5px; color: var(--ink-soft); letter-spacing: .04em; }
 
-
-/* ---------- גרפיקה ---------- */
-
-.crest { flex: none; display: block; }
-
-.crest-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.crest-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.scoreline .side { display: flex; align-items: center; gap: 9px; }
-.scoreline .side.away { flex-direction: row-reverse; }
-.scoreline .side .nm { font-weight: 700; font-size: 15px; line-height: 1.15; }
-
-.pitch {
-  width: 100%;
-  max-width: 240px;
-  margin: 0 auto;
-  display: block;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
+.pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700;
+  background: var(--panel-3); color: var(--ink-2);
 }
-.timeline { width: 100%; display: block; }
+.pill.w { background: var(--good); color: #06210F; }
+.pill.l { background: var(--bad); color: #fff; }
+.pill.d { background: var(--neutral); color: #fff; }
 
 .form { display: inline-flex; gap: 3px; vertical-align: middle; }
 .form .f {
-  width: 17px; height: 17px;
-  border-radius: 3px;
-  font-size: 10.5px;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 17px; height: 17px; border-radius: 4px;
+  font-size: 10.5px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
   color: #fff;
 }
-.form .f-w { background: var(--win); }
-.form .f-d { background: var(--draw); }
-.form .f-l { background: var(--loss); }
+.form .f-w { background: var(--good); color: #06210F; }
+.form .f-d { background: var(--neutral); }
+.form .f-l { background: var(--bad); }
 
-.chart { width: 100%; display: block; overflow: visible; }
-
-.stadium {
-  width: 100%;
-  display: block;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  margin-bottom: 4px;
-}
-
-.trophy { flex: none; vertical-align: -3px; }
-
-.kit-row { display: flex; align-items: center; gap: 16px; }
-.kit-row .kit-meta { display: flex; flex-direction: column; gap: 2px; }
-.kit-row .kit-meta .big {
-  font-family: "Karantina", sans-serif;
-  font-size: 30px;
-  line-height: 1;
-}
-
-td.club .crest-row { gap: 6px; }
-td.form-cell { width: 1%; white-space: nowrap; }
-.squad-row .crest-row { gap: 7px; }
-.squad-row .num {
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-soft);
-  font-size: 12px;
-  min-width: 18px;
-  text-align: center;
-}
-
-
-/* ---------- סצנות ---------- */
+/* ---------- סצנות ותמונות ---------- */
 
 .scene {
-  display: block;
-  margin: 0;
-  position: relative;
-  width: 100%;
-  aspect-ratio: 900 / 372;
-  overflow: hidden;
-  background: var(--surface-2);
+  display: block; margin: 0; position: relative;
+  width: 100%; aspect-ratio: 900 / 372;
+  overflow: hidden; background: var(--panel-2);
 }
-.scene img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.scene img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .scene .scene-tint {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--bg) 10%, transparent) 0%,
-    transparent 30%,
-    color-mix(in srgb, var(--bg) 28%, transparent) 88%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 100%);
+    rgba(13, 11, 22, .28) 0%, rgba(13, 11, 22, 0) 34%, rgba(13, 11, 22, .55) 100%);
 }
-.scene-frame {
-  position: relative;
-  margin-inline: -16px;
-  border-bottom: 1px solid var(--line);
-  overflow: hidden;
-}
-.screen .scene-frame { margin-inline: -14px; }
-.scene-frame.inset {
-  margin: -14px -14px 2px;
-  border-radius: var(--radius) var(--radius) 0 0;
-}
+.scene-frame { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+.screen > .scene-frame, .takeover > .scene-frame { margin-inline: -10px; }
+.takeover > .scene-frame { margin-inline: -14px; }
+.scene-frame.inset { margin: -11px -11px 2px; border-radius: var(--radius) var(--radius) 0 0; }
 .takeover.flush, .screen.flush { padding-top: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .scene-frame .scene img { animation: sceneIn .7s ease-out both; }
   @keyframes sceneIn { from { opacity: 0; transform: scale(1.05); } }
 }
 
-/* ---------- דיוקנים ---------- */
-
 .avatar { display: block; flex: none; border-radius: 50%; }
-.avatar-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar-row { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.crest { flex: none; display: block; }
+.crest-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.crest-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.pitch {
+  width: 100%; max-width: 260px; margin: 0 auto; display: block;
+  border-radius: var(--radius); border: 1px solid var(--line);
+}
+.timeline { width: 100%; display: block; }
+.chart { width: 100%; display: block; overflow: visible; }
+.trophy { flex: none; vertical-align: -3px; }
 
 /* ---------- כרטיס שחקן ---------- */
 
 .pcard {
-  border-radius: 10px;
-  padding: 14px;
+  border-radius: 10px; padding: 13px;
   background: linear-gradient(150deg, var(--card-a) 0%, var(--card-b) 78%);
   color: var(--card-ink);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
+  display: flex; flex-direction: column; gap: 9px;
+  box-shadow: var(--shadow); position: relative; overflow: hidden;
 }
 .pcard::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(200deg, rgba(255,255,255,.14), transparent 55%);
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(200deg, rgba(255,255,255,.15), transparent 55%);
   pointer-events: none;
 }
 .pcard-top { display: flex; align-items: flex-start; gap: 10px; }
-.pcard-rating { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 62px; }
-.pcard-rating .n {
-  font-family: "Karantina", sans-serif;
-  font-size: 54px;
-  line-height: .82;
-}
-.pcard-rating .pos { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-.pcard-rating .rule { width: 26px; height: 1.5px; background: currentColor; opacity: .5; margin: 3px 0; }
-.pcard-rating .nat { font-size: 11px; opacity: .85; }
+.pcard-rating { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 60px; }
+.pcard-rating .n { font-family: "Karantina", sans-serif; font-size: 52px; line-height: .82; }
+.pcard-rating .pos { font-size: 12.5px; font-weight: 700; }
+.pcard-rating .rule { width: 24px; height: 1.5px; background: currentColor; opacity: .5; margin: 3px 0; }
+.pcard-rating .nat { font-size: 10.5px; opacity: .85; }
 .pcard-art { flex: 1; display: flex; justify-content: center; }
-.pcard-art .avatar {
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
-  border: 2px solid rgba(255, 255, 255, .18);
-}
+.pcard-art .avatar { box-shadow: 0 6px 18px rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.2); }
 .pcard-kit { align-self: flex-end; opacity: .95; }
 .pcard-name {
-  font-family: "Karantina", sans-serif;
-  font-size: 34px;
-  line-height: 1;
-  border-top: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  padding: 5px 0;
-  text-align: center;
+  font-family: "Karantina", sans-serif; font-size: 32px; line-height: 1;
+  border-top: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  padding: 4px 0; text-align: center;
 }
 .pcard-attrs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 4px; }
 .pcard-attrs .pa { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
-.pcard-attrs .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.pcard-attrs .k { font-size: 11px; opacity: .8; }
+.pcard-attrs .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pcard-attrs .k { font-size: 10.5px; opacity: .82; }
 .pcard-foot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  opacity: .92;
-  border-top: 1px solid currentColor;
-  padding-top: 8px;
+  display: flex; align-items: center; gap: 7px; font-size: 11.5px; opacity: .92;
+  border-top: 1px solid currentColor; padding-top: 7px;
 }
 .pcard-foot .spacer { flex: 1; }
 
-/* ---------- לוח תוצאות דרמטי ---------- */
+/* ---------- דפי החלטה ---------- */
 
-.scoreboard.result { position: relative; overflow: hidden; }
-.scoreboard.result::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--accent-fill);
+.takeover {
+  min-height: 100dvh;
+  background:
+    repeating-linear-gradient(180deg, transparent 0 26px, rgba(255,255,255,.014) 26px 52px),
+    var(--bg-2);
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px 14px 24px;
 }
-.comp-tag {
-  align-self: flex-start;
-  background: var(--accent-fill);
-  color: var(--accent-ink);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .1em;
-  padding: 2px 9px;
-  border-radius: 2px;
+.takeover .kicker {
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700;
 }
-
-@media (prefers-reduced-motion: no-preference) {
-  .scoreboard.result .side { animation: sideIn .42s cubic-bezier(.2,.7,.3,1) both; }
-  .scoreboard.result .side.away { animation-name: sideInAway; }
-  .scoreboard.result .score { animation: scorePop .5s .2s cubic-bezier(.2,1.4,.4,1) both; }
-  @keyframes sideIn { from { opacity: 0; transform: translateX(18px); } }
-  @keyframes sideInAway { from { opacity: 0; transform: translateX(-18px); } }
-  @keyframes scorePop { from { opacity: 0; transform: scale(.6); } }
-  .timeline { animation: fadeUp .4s .34s ease-out both; }
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } }
+.takeover h2 { font-size: 42px; }
+.takeover .body { white-space: pre-wrap; font-size: 16px; line-height: 1.62; max-width: 46ch; }
+.takeover .outcome {
+  white-space: pre-wrap; font-size: 16px; line-height: 1.62;
+  border-inline-start: 3px solid var(--accent-2); padding-inline-start: 12px;
 }
-
-.my-goal-flash {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--accent-fill);
-  color: var(--accent-ink);
-  border-radius: var(--radius);
-  padding: 11px 13px;
-  font-weight: 700;
-}
-.my-goal-flash .big {
-  font-family: "Karantina", sans-serif;
-  font-size: 30px;
-  line-height: 1;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .my-goal-flash { animation: flashIn .45s .5s cubic-bezier(.2,1.3,.4,1) both; }
-  @keyframes flashIn { from { opacity: 0; transform: scale(.9) translateY(8px); } }
-}
-
-/* ---------- משחק נוער ---------- */
-
-.youth-card { display: flex; flex-direction: column; gap: 10px; }
-.youth-score {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-family: "Karantina", sans-serif;
-  font-size: 34px;
-  line-height: 1;
-}
-.youth-score .vs { font-family: "Assistant", sans-serif; font-size: 13px; color: var(--ink-soft); }
-
-/* ---------- כותרת עונה ---------- */
-
-.season-hero { position: relative; }
-.season-hero .season-title {
-  position: absolute;
-  inset-inline-start: 16px;
-  bottom: 12px;
-  font-family: "Karantina", sans-serif;
-  font-size: 40px;
-  line-height: .9;
-  color: var(--ink);
-  text-shadow: 0 2px 12px var(--scene-sky);
-}
-
-
-/* רצועת הקשר בדפי ההחלטה */
-.context-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
+.context-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .context-strip .cpill {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  padding: 4px 11px;
-  font-size: 12.5px;
+  display: inline-flex; align-items: baseline; gap: 5px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 4px 11px; font-size: 12.5px;
 }
 .context-strip .cpill b { font-size: 14px; font-variant-numeric: tabular-nums; }
 .context-strip .cpill.accent { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- מסך פתיחה ---------- */
+
+.hero { display: flex; flex-direction: column; gap: 5px; padding: 18px 0 4px; }
+.hero h1 { font-size: 70px; line-height: .82; }
+.hero .sub { color: var(--ink-2); font-size: 14.5px; max-width: 40ch; }
+.hero .underline {
+  width: 90px; height: 5px; border-radius: 3px;
+  background: var(--accent-grad); margin: 8px 0 2px; margin-inline-end: auto;
+}
+.screen.menu { justify-content: flex-start; }
+
+.honour { display: flex; gap: 9px; font-size: 13.5px; align-items: baseline; }
+.honour .yr { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 12px; min-width: 38px; }
+
+.squad-row {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  padding: 7px 0; border-bottom: 1px solid var(--line-soft);
+  font-size: 13.5px;
+}
+.squad-row:last-child { border-bottom: 0; }
+.squad-row .pos { font-size: 11.5px; color: var(--ink-soft); }
+.squad-row .ovr {
+  font-variant-numeric: tabular-nums; font-weight: 700;
+  min-width: 30px; text-align: center;
+  background: var(--panel-3); border-radius: 5px; padding: 2px 0;
+}
+.squad-row.me { color: var(--accent); font-weight: 700; }
+.squad-row .num { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 11.5px; min-width: 18px; text-align: center; }
+
+.youth-card { display: flex; flex-direction: column; gap: 9px; }
+.youth-score {
+  display: flex; align-items: center; gap: 11px;
+  font-family: "Karantina", sans-serif; font-size: 32px; line-height: 1;
+}
+.youth-score .vs { font-family: "Assistant", sans-serif; font-size: 12.5px; color: var(--ink-soft); }
+
+.season-hero { position: relative; }
+.season-hero .season-title {
+  position: absolute; inset-inline-start: 14px; bottom: 10px;
+  font-family: "Karantina", sans-serif; font-size: 38px; line-height: .9;
+  color: #fff; text-shadow: 0 2px 16px rgba(0,0,0,.8);
+}
+
+.kit-row { display: flex; align-items: center; gap: 14px; }
+.kit-row .kit-meta { display: flex; flex-direction: column; gap: 2px; }
+.kit-row .kit-meta .big { font-family: "Karantina", sans-serif; font-size: 28px; line-height: 1; }
+
+.notes { display: flex; flex-direction: column; gap: 6px; }
+.note { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; }
+.note .ico { flex: none; width: 20px; text-align: center; }
+.note.strong { font-weight: 700; }
 
 </style>
 <div id="app"></div>
@@ -3075,7 +2961,15 @@ class Game {
   // משחק חדש
   // ==================================================================
 
-  static newGame(name, position, clubId, age = 15, seed = null) {
+  /** השלב שמתאים לגיל שבו מתחילים. */
+  static stageForAge(age) {
+    if (age <= 15) return "youth";
+    if (age <= 17) return "academy";
+    if (age <= 30) return "player";
+    return "veteran";
+  }
+
+  static newGame(name, position, clubId, age = 15, seed = null, role = "player") {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -3083,31 +2977,91 @@ class Game {
     g.clubs = world.clubs; g.players = world.players;
     const club = g.clubs[clubId];
 
-    const me = generatePlayer(g.rng, club, position, {
-      age, quality: Math.round(clamp(club.reputation * 0.55 + 24, 48, 70)) });
+    if (role === "manager") return g.startAsManager(name, club, age);
+
+    // ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
+    const quality = age <= 17
+      ? Math.round(clamp(club.reputation * 0.55 + 24, 48, 70))
+      : Math.round(clamp(club.reputation * 0.66 + 12 + Math.min(8, (age - 17) * 1.4), 42, 82));
+    const me = generatePlayer(g.rng, club, position, { age, quality });
     me.name = name;
     me.isHuman = true;
     // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
     me.potential = Math.round(clamp(
-      overall(me) + g.rng.randint(12, 30) + Math.max(0, 17 - age) * 4, 58, 94));
+      overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
+      overall(me) + 2, 94));
     me.clubId = clubId;
-    // בגילי הנוער אין חוזה מקצועני
-    me.contract = age >= 16
-      ? { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 }
-      : { wage: 0, yearsLeft: 0 };
-    me.morale = 70; me.reputation = age >= 16 ? 8 : 3;
+    // חוזה שמתאים לגיל ולרמה
+    if (age <= 15) me.contract = { wage: 0, yearsLeft: 0 };
+    else if (age <= 17)
+      me.contract = { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)),
+                      yearsLeft: 3 };
+    else
+      me.contract = { wage: wageForOverall(overall(me)), yearsLeft: g.rng.randint(2, 4) };
+
+    me.morale = 70;
+    me.reputation = age <= 15 ? 3 : age <= 17 ? 8
+      : clamp(overall(me) - 28 + (age - 18) * 1.2, 5, 70);
+
+    // מי שמתחיל אחרי גיל 18 — כבר יש לו עבר
+    if (age >= 19) {
+      const seasons = Math.min(12, age - 17);
+      me.career.apps = Math.round(seasons * g.rng.uniform(14, 26));
+      const share = D.POSITION_ROLE_SHARE[position].att;
+      me.career.goals = Math.round(me.career.apps * share * g.rng.uniform(0.10, 0.34));
+      me.career.assists = Math.round(me.career.apps * g.rng.uniform(0.04, 0.13));
+      me.career.minutes = me.career.apps * 78;
+      me.career.ratingSum = me.career.apps * g.rng.uniform(6.3, 7.0);
+      me.coaching = clamp(me.coaching + (age - 18) * 1.1, 0, 60);
+    }
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
     assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
-    g.stage = age <= 15 ? "youth" : "academy";
-    club.managerTrust = 45;
+    g.stage = Game.stageForAge(age);
+    club.managerTrust = age <= 17 ? 45 : clamp(35 + (overall(me) - 55) * 1.4, 25, 78);
 
     g.startSeason();
     g.log(`התחלת את הדרך ב${club.name}.`);
     return g;
+  }
+
+  /** קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל. */
+  startAsManager(name, club, age) {
+    const me = generatePlayer(this.rng, club, "CM", { age: Math.min(age, 40), quality: 55 });
+    me.name = name;
+    me.isHuman = true;
+    me.age = age;
+    me.retired = true;
+    me.clubId = null;
+    me.contract = { wage: 0, yearsLeft: 0 };
+    me.coaching = clamp(28 + (age - 32) * 1.9 + this.rng.uniform(0, 12), 20, 92);
+    me.badges = Math.min(4, Math.floor(me.coaching / 22));
+    me.mediaSkill = clamp(15 + (age - 32) * 0.9, 5, 70);
+    me.business = clamp(10 + (age - 32) * 0.8, 5, 60);
+    me.reputation = clamp(12 + (age - 32) * 1.1, 5, 60);
+    if (this.rng.random() < 0.65) {          // עבר כשחקן — לא לכל מנג'ר יש
+      me.career.apps = this.rng.randint(60, 380);
+      me.career.goals = Math.round(me.career.apps * this.rng.uniform(0.02, 0.22));
+      me.career.assists = Math.round(me.career.apps * this.rng.uniform(0.03, 0.12));
+      me.career.ratingSum = me.career.apps * this.rng.uniform(6.2, 6.9);
+    }
+    this.players[me.pid] = me;
+    this.meId = me.pid;
+
+    this.stage = "manager";
+    this.managedClubId = club.cid;
+    this.firstClubId = club.cid;
+    this.lastClubId = club.cid;
+    club.managerName = name;
+    club.boardConfidence = 58;
+    this.tactics.formation = club.formation;
+    this.trainingFocus = "tactics";
+    this.startSeason();
+    this.log(`מונית למנג'ר של ${club.name}.`);
+    return this;
   }
 
   // ==================================================================
@@ -5245,47 +5199,90 @@ function screenMenu() {
   </div>`;
 }
 
+function ageBlurb(age, role) {
+  if (role === "manager")
+    return age <= 38 ? "מנג'ר צעיר שרק קיבל תעודות. ההנהלה תיתן לך זמן — לא הרבה."
+      : age <= 50 ? "מנג'ר בשיא הדרך: מספיק ניסיון כדי שיקשיבו לך."
+      : "מנג'ר ותיק. השם שלך מקדים אותך, וגם הציפיות.";
+  if (age <= 15) return "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה הכי גבוהה.";
+  if (age <= 17) return "קבוצת הנוער הבוגרת, חוזה ראשון, וספסל של קבוצה בוגרת שנראה רחוק.";
+  if (age <= 23) return "שחקן צעיר בסגל הבוגרים. יש עוד לאן להתפתח, ויש כבר מה להפסיד.";
+  if (age <= 29) return "בשיא. הדירוג כמעט סופי, אבל אלה השנים שבהן נקבעים התארים.";
+  if (age <= 33) return "ותיק. הרגליים כבר לא מה שהיו, הראש דווקא כן — וכדאי להתחיל לחשוב על היום שאחרי.";
+  return "בסוף הדרך. עוד עונה או שתיים, ואז ההחלטה הגדולה.";
+}
+
 function screenNew() {
-  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 15 });
+  const state = viewData || (viewData = { name: "", position: "ST",
+    club: "hapoel_carmel", age: 15, role: "player" });
+  const isManager = state.role === "manager";
   const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
+  const minAge = isManager ? 32 : 13;
+  const maxAge = isManager ? 62 : 38;
+  const age = Math.max(minAge, Math.min(maxAge, state.age));
+
   return `
   <div class="screen">
-    <div class="hero" style="padding-top:14px">
+    <div class="hero" style="padding-top:10px">
       <div class="eyebrow">קריירה חדשה</div>
-      <h1 class="display" style="font-size:44px">מי אתה?</h1>
+      <h1 class="display" style="font-size:40px">מי אתה?</h1>
     </div>
 
-    <div class="card">
-      <label class="eyebrow" for="pname">שם השחקן</label>
-      <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
-    </div>
-
-    <div class="card">
-      <div class="eyebrow">עמדה</div>
-      <div class="chips">
-        ${D.POSITIONS.map(p => `<button class="chip" data-pos="${p}"
-          aria-pressed="${state.position === p}">${D.POSITION_NAMES_HE[p]}</button>`).join("")}
+    <div class="panel">
+      <div class="panel-head"><span class="t">מסלול</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          <button class="chip" data-role="player" aria-pressed="${!isManager}">שחקן</button>
+          <button class="chip" data-role="manager" aria-pressed="${isManager}">מנג'ר</button>
+        </div>
+        <div class="muted">${isManager
+          ? "מתחילים ישר על הקו: אתה בוחר מערך, הרכב וטקטיקה, וההנהלה סופרת נקודות."
+          : "מתחילים על המגרש: מתאמנים, נלחמים על מקום בהרכב, ובסוף מחליטים מה עושים אחרי הפרישה."}</div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="eyebrow">גיל התחלה</div>
-      <div class="chips">
-        ${[13, 14, 15, 16, 17, 18].map(a => `<button class="chip" data-age="${a}"
-          aria-pressed="${state.age === a}">${a}</button>`).join("")}
+    <div class="panel">
+      <div class="panel-head"><span class="t">שם</span></div>
+      <div class="panel-body">
+        <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
       </div>
-      <p class="muted">${state.age <= 15
-        ? "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה גבוהה."
-        : "ישר לקבוצת הנוער הבוגרת, עם חוזה ראשון ופחות זמן להתפתח."}</p>
     </div>
 
-    <div class="card">
-      <div class="eyebrow">מועדון פתיחה</div>
-      <select id="pclub">
-        ${clubs.map(c => `<option value="${c[0]}" ${state.club === c[0] ? "selected" : ""}>
-          ${esc(c[1])} — מוניטין ${c[4]}</option>`).join("")}
-      </select>
-      <p class="muted">מועדון חלש = דקות משחק מיד. מועדון חזק = ספסל, אבל במה גדולה יותר.</p>
+    ${isManager ? "" : `
+    <div class="panel">
+      <div class="panel-head"><span class="t">עמדה</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${D.POSITIONS.map(p => `<button class="chip" data-pos="${p}"
+            aria-pressed="${state.position === p}">${D.POSITION_NAMES_HE[p]}</button>`).join("")}
+        </div>
+      </div>
+    </div>`}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">גיל</span>
+        <span class="r"><span class="num">${age}</span></span></div>
+      <div class="panel-body">
+        <input type="range" id="page" min="${minAge}" max="${maxAge}" step="1" value="${age}">
+        <div class="row" style="padding:0;border:0">
+          <span class="muted">${minAge}</span><span class="grow"></span>
+          <span class="muted">${maxAge}</span>
+        </div>
+        <div class="muted">${esc(ageBlurb(age, state.role))}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מועדון</span></div>
+      <div class="panel-body">
+        <select id="pclub">
+          ${clubs.map(c => `<option value="${c[0]}" ${state.club === c[0] ? "selected" : ""}>
+            ${esc(c[1])} — מוניטין ${c[4]}</option>`).join("")}
+        </select>
+        <div class="muted">${isManager
+          ? "מועדון חלש = ציפיות נמוכות ומקום לטעות. מועדון חזק = אפס סבלנות."
+          : "מועדון חלש = דקות משחק מיד. מועדון חזק = ספסל, אבל במה גדולה יותר."}</div>
+      </div>
     </div>
 
     <div class="actions">
@@ -5295,37 +5292,122 @@ function screenNew() {
   </div>`;
 }
 
-function strip() {
+const MONTHS_HE = ["אוג", "אוג", "ספט", "ספט", "ספט", "אוק", "אוק", "אוק", "נוב", "נוב",
+                   "נוב", "דצמ", "דצמ", "ינו", "ינו", "פבר", "פבר", "מרץ", "מרץ", "אפר",
+                   "אפר", "מאי", "מאי", "מאי", "יונ", "יונ"];
+
+/** התאריך המשוער של השבוע — נותן תחושה של לוח שנה אמיתי. */
+function weekDate() {
+  const w = Math.min(SEASON_WEEKS, game.week);
+  const day = 1 + ((w * 7) % 28);
+  const month = MONTHS_HE[w - 1] || "יונ";
+  return { d: `${day} ${month}`, w: `שבוע ${w}/${SEASON_WEEKS}` };
+}
+
+function appbar() {
   const me = game.me;
   const club = game.myClub();
   const stage = D.CAREER_STAGES_HE[game.stage] || game.stage;
+  const date = weekDate();
   return `
-  <div class="strip">
-    <span class="who">${esc(me.name)}</span>
-    <span class="meta">${stage}${club ? " · " + esc(club.name) : ""}</span>
-    <span class="spacer"></span>
-    <span class="meta">${game.year}/${game.year + 1} · שבוע ${game.week}/${SEASON_WEEKS}</span>
-  </div>`;
+  <header class="appbar">
+    <div class="appbar-top">
+      <div class="brand">
+        ${club ? crest(club, 30) : avatar(me, null, 30)}
+        <span class="who">
+          <span class="nm">${esc(club ? club.name : me.name)}</span>
+          <span class="sub">${esc(stage)}${club ? " · " + esc(me.name) : ""}</span>
+        </span>
+      </div>
+      <span class="spacer"></span>
+      <div class="date">
+        <div class="d">${date.d}</div>
+        <div class="w">${game.year}/${game.year + 1}</div>
+      </div>
+      <button class="btn-continue" data-act="play">
+        המשך <span class="chev">‹</span>
+      </button>
+    </div>
+    ${tabsBar()}
+  </header>`;
+}
+
+function tabsBar() {
+  const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
+                 ["profile", "פרופיל"], ["news", "יומן"]];
+  if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
+  const offers = game.flag("pending_offer") ? 1 : 0;
+  return `<nav class="tabs">${items.map(([k, l]) =>
+    `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
+      k === "main" && offers ? `<span class="badge">${offers}</span>` : ""}</button>`).join("")}</nav>`;
 }
 
 function dock(showPlay) {
-  const items = [["main", "ראשי"], ["profile", "פרופיל"], ["table", "טבלה"],
-                 ["squad", "סגל"], ["news", "יומן"]];
-  const offer = !!game.flag("pending_offer");
+  if (!showPlay) return "";
   return `<div class="dock">
-    ${showPlay ? `<button class="btn primary" data-act="play">לשחק את השבוע</button>` : ""}
-    <nav class="nav">${items.map(([k, l]) =>
-      `<button data-go="${k}" aria-current="${view === k}">${l}${
-        k === "main" && offer ? '<span class="dot"></span>' : ""}</button>`).join("")}</nav>
+    <button class="btn primary" data-act="play">לשחק את השבוע</button>
   </div>`;
 }
 
 function screenMain() {
-  if (view === "profile") return strip() + screenProfile() + dock(false);
-  if (view === "table") return strip() + screenTable() + dock(false);
-  if (view === "squad") return strip() + screenSquad() + dock(false);
-  if (view === "news") return strip() + screenNews() + dock(false);
-  return strip() + screenHub() + dock(true);
+  if (view === "profile") return appbar() + screenProfile();
+  if (view === "table") return appbar() + screenTable();
+  if (view === "squad") return appbar() + screenSquad();
+  if (view === "news") return appbar() + screenNews();
+  if (view === "tactics") return appbar() + screenTactics();
+  return appbar() + screenHub() + dock(true);
+}
+
+/** מסך טקטיקה — מגרש עם ההרכב ובחירות המנג'ר. */
+function screenTactics() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אין לך קבוצה לאמן.</div></div>`;
+  const formation = game.tactics.formation || club.formation;
+  const lineup = pickLineup(club, game.players, formation, null);
+  const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">מערך</span><span class="r">${esc(formation)}</span></div>
+      <div class="panel-body">
+        ${pitch(lineup, formation, game.players, game.meId, club)}
+        <div class="chips">
+          ${Object.keys(D.FORMATIONS).map(f => `<button class="chip" data-form="${f}"
+            aria-pressed="${formation === f}">${f}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">גישה</span></div>
+      <div class="panel-body">
+        <div class="muted">מנטליות</div>
+        <div class="chips">
+          ${Object.entries(D.MENTALITIES).map(([k, v]) => `<button class="chip" data-ment="${k}"
+            aria-pressed="${game.tactics.mentality === k}">${esc(v[0])}</button>`).join("")}
+        </div>
+        <div class="muted">לחץ</div>
+        <div class="chips">
+          ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-press="${k}"
+            aria-pressed="${game.tactics.pressing === k}">${esc(v[0])}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">ההרכב הפותח</span><span class="r">11 שחקנים</span></div>
+      <div class="panel-body tight">
+        ${lineup.map((pid, i) => {
+          const p = game.players[pid];
+          if (!p) return "";
+          return `<div class="row ${pid === game.meId ? "me" : ""}">
+            ${avatarChip(p, club, 28)}
+            <span class="grow"><span class="nm">${esc(p.name)}</span>
+              <span class="sub">${esc(D.POSITION_NAMES_HE[slots[i]] || "")} · בן ${p.age}</span></span>
+            <span class="val">${overall(p)}</span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>`;
 }
 
 function screenHub() {
@@ -5334,22 +5416,24 @@ function screenHub() {
   const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
   const actions = game.availableActions();
   const offer = game.flag("pending_offer");
-
   const fx = game.myFixture();
-  let fixture = "";
+
+  // --- פאנל המשחק הבא ---
+  let nextMatch = "";
   if (game.stage === "youth") {
     const isMatchWeek = game.week % 2 === 1;
-    fixture = `
-      <div class="scoreboard">
-        <span class="comp-tag">${isMatchWeek ? "ליגת הנוער" : "שבוע אימונים"}</span>
-        <div class="avatar-row">
-          ${avatar(me, club, 46)}
-          <span class="nm">${isMatchWeek
-            ? "משחק נוער השבוע. המאמן מסתכל."
-            : "בלי משחק השבוע — רק אימונים."}</span>
+    nextMatch = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">השבוע</span>
+          <span class="r">${isMatchWeek ? "ליגת הנוער" : "אימונים"}</span></div>
+        <div class="panel-body">
+          <div class="avatar-row">${avatar(me, club, 44)}
+            <span class="grow">${isMatchWeek
+              ? "משחק נוער השבוע. המאמן מסתכל."
+              : "בלי משחק — שבוע אימונים."}</span></div>
+          ${fx ? `<div class="muted">הקבוצה הבוגרת: ${esc(game.clubs[fx[0]].name)}
+            נגד ${esc(game.clubs[fx[1]].name)}</div>` : ""}
         </div>
-        ${fx ? `<div class="muted">הקבוצה הבוגרת: ${
-          esc(game.clubs[fx[0]].name)} נגד ${esc(game.clubs[fx[1]].name)}</div>` : ""}
       </div>`;
   } else if (fx) {
     const [homeId, awayId] = fx;
@@ -5357,88 +5441,146 @@ function screenHub() {
     const comp = CUP_WEEKS[game.week] || "ליגה";
     const rival = club && club.cid === homeId ? away : home;
     const where = club && club.cid === homeId ? "בית" : "חוץ";
-    fixture = `
-      <div class="scoreboard">
-        <div class="eyebrow">${esc(comp)} · ${where}</div>
-        <div class="scoreline">
-          <div class="side">${crest(home, 30)}<span class="nm ${
-            club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
-          <div class="versus">נגד</div>
-          <div class="side away">${crest(away, 30)}<span class="nm ${
-            club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+    nextMatch = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">המשחק הבא</span>
+          <span class="r">${esc(comp)} · ${where}</span></div>
+        <div class="panel-body">
+          <div class="scoreline">
+            <div class="side">${crest(home, 34)}<span class="nm ${
+              club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
+            <div class="versus">נגד</div>
+            <div class="side away">${crest(away, 34)}<span class="nm ${
+              club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+          </div>
+          <div class="scoreline" style="font-size:12px">
+            <div class="side">${formGuide(home)}</div><div></div>
+            <div class="side away">${formGuide(away)}</div>
+          </div>
+          <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}${
+            club ? " · מקום " + game.leaguePosition() : ""}</div>
         </div>
-        <div class="scoreline" style="font-size:12px">
-          <div class="side">${formGuide(home)}</div>
-          <div></div>
-          <div class="side away">${formGuide(away)}</div>
-        </div>
-        <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}</div>
       </div>`;
   } else {
-    fixture = `<div class="scoreboard"><div class="eyebrow">השבוע</div>
-      <div>אין משחק — שבוע של עבודה.</div></div>`;
+    nextMatch = `<div class="panel"><div class="panel-head"><span class="t">השבוע</span></div>
+      <div class="panel-body"><div class="muted">אין משחק — שבוע של עבודה.</div></div></div>`;
   }
 
-  const status = isPlayer ? `
-    <div class="stat-grid">
-      <div class="stat"><div class="n">${overall(me)}</div><div class="l">כללי</div></div>
-      <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
-      <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
-    </div>
-    ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span><span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
-    ${club ? `<div class="attr"><span>אמון המאמן</span><span class="val">${Math.round(club.managerTrust)}</span>
-      <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}
-  ` : club ? `
-    <div class="stat-grid">
-      <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
-      <div class="stat"><div class="n">${Math.round(club.boardConfidence)}</div><div class="l">הנהלה</div></div>
-      <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">קהל</div></div>
-    </div>
-    <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>
-  ` : `<div class="muted">ידע אימון ${Math.round(me.coaching)} · תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+  // --- פאנל המצב ---
+  const statusBody = isPlayer ? `
+      <div class="avatar-row">${avatar(me, club, 46)}
+        <span class="grow"><span class="nm"><strong>${esc(me.name)}</strong></span>
+          <span class="sub">${esc(positionHe(me))} · בן ${me.age}${
+            me.number ? " · מספר " + me.number : ""}</span></span>
+        <span class="val" style="font-size:22px">${overall(me)}</span></div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
+        <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
+        <div class="stat"><div class="n">${Math.round(me.morale)}</div><div class="l">מורל</div></div>
+      </div>
+      ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span>
+        <span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
+      ${club ? `<div class="attr"><span>אמון המאמן</span>
+        <span class="val">${Math.round(club.managerTrust)}</span>
+        <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}`
+    : club ? `
+      <div class="stat-grid">
+        <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
+        <div class="stat"><div class="n">${Math.round(club.boardConfidence)}</div><div class="l">הנהלה</div></div>
+        <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">קהל</div></div>
+      </div>
+      <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>`
+    : `<div class="muted">ידע אימון ${Math.round(me.coaching)} ·
+       תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+
+  // --- טבלה מקוצרת ---
+  let tableSnip = "";
+  if (club && game.tables[club.leagueId]) {
+    const rows = game.standings(club.leagueId);
+    const idx = rows.findIndex(r => r.clubId === club.cid);
+    const from = Math.max(0, Math.min(idx - 2, rows.length - 5));
+    tableSnip = `
+      <div class="panel">
+        <div class="panel-head"><span class="t">${esc(game.leagueName(club.leagueId))}</span>
+          <span class="r">מחזור ${Math.max(0, game.week - 1)}</span></div>
+        <div class="panel-body tight">
+          ${rows.slice(from, from + 5).map((r, i) => {
+            const c = game.clubs[r.clubId];
+            return `<div class="row ${c.cid === club.cid ? "me" : ""}">
+              <span class="val" style="min-width:18px">${from + i + 1}</span>
+              ${crest(c, 22)}
+              <span class="grow"><span class="nm">${esc(c.name)}</span></span>
+              ${formGuide(c)}
+              <span class="val">${r.points}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+  }
+
+  // --- הודעות ---
+  const news = game.news.slice(-4).reverse();
+  const messages = news.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">הודעות</span>
+        <span class="r">${news.length}</span></div>
+      <div class="panel-body tight">
+        ${news.map(n => {
+          const text = n.replace(/^\[[^\]]+\]\s*/, "");
+          const when = (n.match(/^\[([^\]]+)\]/) || ["", ""])[1];
+          return `<div class="row">
+            ${avatarChip(me, club, 26)}
+            <span class="grow"><span class="nm">${esc(text)}</span>
+              <span class="sub">${esc(when)}</span></span>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>` : "";
 
   return `
   <div class="screen">
-    ${fixture}
-    <div class="card">
-      <div class="eyebrow">המצב שלך</div>
-      ${isPlayer ? `<div class="avatar-row" style="margin-bottom:2px">
-        ${avatar(me, club, 56)}
-        <span class="nm"><strong>${esc(me.name)}</strong><br>
-          <span class="muted">${esc(positionHe(me))} · בן ${me.age}${
-            me.number ? " · מספר " + me.number : ""}</span></span>
-      </div>` : ""}
-      ${status}
-      <div class="muted">בחשבון: ₪${fmt(game.money)}</div>
-    </div>
+    ${nextMatch}
 
     ${offer ? `
-    <div class="card" style="border-color:var(--accent)">
-      <div class="eyebrow">הצעת העברה</div>
-      <div><strong>${esc(game.clubs[offer.club].name)}</strong> — ₪${fmt(offer.wage)} לשבוע</div>
-      <div class="muted">החוזה הנוכחי שלך: ₪${fmt(me.contract.wage)} לשבוע</div>
-      <div class="btn-row">
-        <button class="btn primary" data-act="accept">לחתום</button>
-        <button class="btn" data-act="reject">לדחות</button>
+    <div class="panel" style="border-color:var(--accent)">
+      <div class="panel-head"><span class="t">הצעת העברה</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(game.clubs[offer.club], 30)}
+          <span class="nm"><strong>${esc(game.clubs[offer.club].name)}</strong><br>
+          <span class="muted">₪${fmt(offer.wage)} לשבוע · עכשיו ₪${fmt(me.contract.wage)}</span></span>
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" data-act="accept">לחתום</button>
+          <button class="btn" data-act="reject">לדחות</button>
+        </div>
       </div>
     </div>` : ""}
 
-    <div class="card">
-      <div class="eyebrow">על מה נעבוד השבוע</div>
-      <div class="chips">
-        ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
-          aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
-      </div>
-      ${isPlayer ? `
-      <hr class="rule">
-      <div class="eyebrow">עצימות</div>
-      <div class="chips">
-        ${[[1.0, "רגילה"], [1.3, "גבוהה"], [0.75, "קלה"]].map(([v, l]) =>
-          `<button class="chip" data-int="${v}" aria-pressed="${game.intensity === v}">${l}</button>`).join("")}
-      </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">המצב שלך</span>
+        <span class="r">₪${fmt(game.money)}</span></div>
+      <div class="panel-body">${statusBody}</div>
     </div>
 
-    ${["manager", "coach"].includes(game.stage) ? tacticsCard() : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">תוכנית השבוע</span>
+        <span class="r">${esc((actions.find(a => a[0] === game.trainingFocus) || ["", ""])[1])}</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
+            aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
+        </div>
+        ${isPlayer ? `<hr class="rule">
+        <div class="muted">עצימות</div>
+        <div class="chips">
+          ${[[1.0, "רגילה"], [1.3, "גבוהה"], [0.75, "קלה"]].map(([v, l]) =>
+            `<button class="chip" data-int="${v}" aria-pressed="${game.intensity === v}">${l}</button>`).join("")}
+        </div>` : ""}
+      </div>
+    </div>
+
+    ${tableSnip}
+    ${messages}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
   </div>`;
@@ -5544,7 +5686,7 @@ function screenWeek() {
   }
 
   html += `<button class="btn primary wide" data-act="after-week">המשך</button></div>`;
-  return strip() + html;
+  return appbar() + html;
 }
 
 function youthCard(y) {
@@ -5952,8 +6094,22 @@ function bind() {
     el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
-  app.querySelectorAll("[data-age]").forEach(el =>
-    el.addEventListener("click", () => { viewData.age = +el.dataset.age; render(); }));
+  app.querySelectorAll("[data-role]").forEach(el =>
+    el.addEventListener("click", () => {
+      viewData.role = el.dataset.role;
+      viewData.age = el.dataset.role === "manager" ? 42 : 15;
+      render();
+    }));
+  const ageInput = $("#page");
+  if (ageInput) {
+    ageInput.addEventListener("input", e => {
+      viewData.age = +e.target.value;
+      const head = app.querySelector(".panel-head .r .num");
+      if (head) head.textContent = viewData.age;
+      const blurb = ageInput.closest(".panel-body").querySelector(".muted:last-child");
+      if (blurb) blurb.textContent = ageBlurb(viewData.age, viewData.role);
+    });
+  }
   app.querySelectorAll("[data-league]").forEach(el =>
     el.addEventListener("click", () => go("table", { league: el.dataset.league })));
   app.querySelectorAll("[data-form]").forEach(el =>
@@ -5973,7 +6129,7 @@ function bind() {
 }
 
 function act(what) {
-  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15 }); }
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15, role: "player" }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -5982,8 +6138,9 @@ function act(what) {
     go(game.gameOver ? "end" : "main");
   }
   else if (what === "start") {
-    const name = (viewData.name || "").trim() || "עומר לוי";
-    game = Game.newGame(name, viewData.position, viewData.club, viewData.age);
+    const name = (viewData.name || "").trim() || (viewData.role === "manager" ? "דני מנג'ר" : "עומר לוי");
+    game = Game.newGame(name, viewData.position, viewData.club, viewData.age,
+                        null, viewData.role);
     saveGame();
     go("main");
   }
