@@ -27,6 +27,11 @@
   --pitch-turf: #CBD8C2;
   --pitch-stripe: #C0CFB6;
   --pitch-line: #F4F7F1;
+  --scene-sky: #E4E9DC;
+  --scene-far: #D3DBC9;
+  --scene-mid: #BEC9B3;
+  --scene-near: #A2B199;
+  --scene-line: #71805F;
 }
 
 :root:not([data-theme="light"]) {
@@ -52,6 +57,11 @@
     --pitch-turf: #16301F;
     --pitch-stripe: #1A3724;
     --pitch-line: #3E6B4C;
+    --scene-sky: #0E1712;
+    --scene-far: #14201A;
+    --scene-mid: #1C2E23;
+    --scene-near: #27412F;
+    --scene-line: #4C6B55;
   }
 }
 
@@ -73,6 +83,11 @@
     --pitch-turf: #16301F;
     --pitch-stripe: #1A3724;
     --pitch-line: #3E6B4C;
+    --scene-sky: #0E1712;
+    --scene-far: #14201A;
+    --scene-mid: #1C2E23;
+    --scene-near: #27412F;
+    --scene-line: #4C6B55;
 }
 
 * { box-sizing: border-box; }
@@ -393,7 +408,11 @@ tr.down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
 
 .takeover {
   min-height: 100dvh;
-  background: var(--pitch);
+  background:
+    repeating-linear-gradient(180deg,
+      transparent 0 26px,
+      color-mix(in srgb, var(--ink) 3%, transparent) 26px 52px),
+    var(--pitch);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -580,6 +599,190 @@ td.form-cell { width: 1%; white-space: nowrap; }
   min-width: 18px;
   text-align: center;
 }
+
+
+/* ---------- סצנות מאוירות ---------- */
+
+.scene {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.scene-frame {
+  position: relative;
+  margin-inline: -16px;
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+.screen .scene-frame { margin-inline: -14px; }
+.scene-frame.inset {
+  margin: -14px -14px 2px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+/* מסך שנפתח בסצנה — בלי ריווח מעליה */
+.takeover.flush, .screen.flush { padding-top: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .scene-frame .scene { animation: sceneIn .5s ease-out both; }
+  @keyframes sceneIn { from { opacity: 0; transform: scale(1.06); } }
+}
+
+/* ---------- כרטיס שחקן ---------- */
+
+.pcard {
+  border-radius: 10px;
+  padding: 14px;
+  background: linear-gradient(150deg, var(--card-a) 0%, var(--card-b) 78%);
+  color: var(--card-ink);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.pcard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(200deg, rgba(255,255,255,.14), transparent 55%);
+  pointer-events: none;
+}
+.pcard-top { display: flex; align-items: flex-start; gap: 10px; }
+.pcard-rating { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 62px; }
+.pcard-rating .n {
+  font-family: "Karantina", sans-serif;
+  font-size: 54px;
+  line-height: .82;
+}
+.pcard-rating .pos { font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+.pcard-rating .rule { width: 26px; height: 1.5px; background: currentColor; opacity: .5; margin: 3px 0; }
+.pcard-rating .nat { font-size: 11px; opacity: .85; }
+.pcard-art { flex: 1; display: flex; justify-content: center; }
+.pcard-name {
+  font-family: "Karantina", sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  border-top: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  padding: 5px 0;
+  text-align: center;
+}
+.pcard-attrs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 4px; }
+.pcard-attrs .pa { display: flex; align-items: baseline; justify-content: center; gap: 5px; }
+.pcard-attrs .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pcard-attrs .k { font-size: 11px; opacity: .8; }
+.pcard-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  opacity: .92;
+  border-top: 1px solid currentColor;
+  padding-top: 8px;
+}
+.pcard-foot .spacer { flex: 1; }
+
+/* ---------- לוח תוצאות דרמטי ---------- */
+
+.scoreboard.result { position: relative; overflow: hidden; }
+.scoreboard.result::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent-fill);
+}
+.comp-tag {
+  align-self: flex-start;
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  padding: 2px 9px;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scoreboard.result .side { animation: sideIn .42s cubic-bezier(.2,.7,.3,1) both; }
+  .scoreboard.result .side.away { animation-name: sideInAway; }
+  .scoreboard.result .score { animation: scorePop .5s .2s cubic-bezier(.2,1.4,.4,1) both; }
+  @keyframes sideIn { from { opacity: 0; transform: translateX(18px); } }
+  @keyframes sideInAway { from { opacity: 0; transform: translateX(-18px); } }
+  @keyframes scorePop { from { opacity: 0; transform: scale(.6); } }
+  .timeline { animation: fadeUp .4s .34s ease-out both; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } }
+}
+
+.my-goal-flash {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+  font-weight: 700;
+}
+.my-goal-flash .big {
+  font-family: "Karantina", sans-serif;
+  font-size: 30px;
+  line-height: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .my-goal-flash { animation: flashIn .45s .5s cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes flashIn { from { opacity: 0; transform: scale(.9) translateY(8px); } }
+}
+
+/* ---------- משחק נוער ---------- */
+
+.youth-card { display: flex; flex-direction: column; gap: 10px; }
+.youth-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "Karantina", sans-serif;
+  font-size: 34px;
+  line-height: 1;
+}
+.youth-score .vs { font-family: "Assistant", sans-serif; font-size: 13px; color: var(--ink-soft); }
+
+/* ---------- כותרת עונה ---------- */
+
+.season-hero { position: relative; }
+.season-hero .season-title {
+  position: absolute;
+  inset-inline-start: 16px;
+  bottom: 12px;
+  font-family: "Karantina", sans-serif;
+  font-size: 40px;
+  line-height: .9;
+  color: var(--ink);
+  text-shadow: 0 2px 12px var(--scene-sky);
+}
+
+
+/* רצועת הקשר בדפי ההחלטה */
+.context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.context-strip .cpill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 4px 11px;
+  font-size: 12.5px;
+}
+.context-strip .cpill b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.context-strip .cpill.accent { border-color: var(--accent); color: var(--accent); }
 
 </style>
 <div id="app"></div>
@@ -1289,6 +1492,7 @@ const D = {
   }
  },
  "CAREER_STAGES_HE": {
+  "youth": "כדורגל נוער",
   "academy": "נערי הנוער",
   "player": "שחקן מקצוען",
   "veteran": "שחקן ותיק",
@@ -1312,7 +1516,9 @@ const D = {
   "rest": "מנוחה והתאוששות",
   "badges": "לימודי אימון (תעודות)",
   "media": "סדנת תקשורת",
-  "business": "לימודי ניהול ועסקים"
+  "business": "לימודי ניהול ועסקים",
+  "school": "בית ספר ושיעורי בית",
+  "street": "כדורגל במגרש השכונתי"
  },
  "INJURY_TYPES": [
   [
@@ -1404,6 +1610,9 @@ const D = {
   ]
  },
  "AGE_CURVE": {
+  "13": 2.1,
+  "14": 2.0,
+  "15": 1.85,
   "16": 1.7,
   "17": 1.6,
   "18": 1.5,
@@ -2212,6 +2421,107 @@ const rep = (g, d) => { g.me.reputation = clamp(g.me.reputation + d, 1, 99); };
 const att = (g, a, d) => addGrowth(g.me, a, d);
 
 // ===========================================================================
+// שלב 0 — כדורגל נוער (13-15)
+// ===========================================================================
+
+ev({
+  eid: "first_boots", title: "הנעליים הראשונות", stages: ["youth"], weight: 7.0, once: true,
+  cond: g => g.week >= 2,
+  body: g => `אבא שלך שם על השולחן קופסה.\n` +
+    `נעלי כדורגל אמיתיות — לא של אח גדול, לא מהשוק.\n\n` +
+    `"אני לא מבין בזה," הוא אומר, "אבל אמרו לי שאתה טוב. תוכיח."`,
+  choices: [
+    { label: "לשמור אותן רק למשחקים", hint: "משמעת",
+      apply: g => { att(g, "mental", 1.2); mor(g, 5);
+        return "נעלת אותן רק בימי משחק. באימונים המשכת עם הישנות, עד שנקרעו."; } },
+    { label: "לשחק בהן בכל יום עד שיתפרקו", hint: "כדרור ↑↑",
+      apply: g => { att(g, "dribbling", 1.6); att(g, "physical", 0.4);
+        return "שחקת בהן בבית ספר, ברחוב, בחצר. תוך חודשיים הן נראו כמו סמרטוט — ואתה נראית אחרת."; } },
+  ],
+});
+
+ev({
+  eid: "school_or_football", title: "מבחן ביום משחק", stages: ["youth"], weight: 4.0, once: false,
+  cond: g => g.me.age <= 15,
+  body: g => `מחר גמר מחוזי. מחר גם מבחן במתמטיקה.\n` +
+    `המחנכת אמרה שאם תיעדר שוב — היא מזמינה את ההורים.`,
+  choices: [
+    { label: "לשחק. המבחן יחכה.", hint: "המאמן ↑, בית הספר ↓",
+      apply: g => { tru(g, 8); att(g, "shooting", 0.8); g.setFlag("school_trouble", true);
+        return "כבשת שניים. בבית חיכתה שיחה ארוכה, אבל אף אחד לא הזכיר את זה יותר אחרי הגמר."; } },
+    { label: "מבחן. אני לא זורק את הלימודים.", hint: "ראש ↑",
+      apply: g => { att(g, "mental", 1.4); tru(g, -5);
+        return "עברת את המבחן. הקבוצה הפסידה 1:0 והמאמן הסתכל עליך אחרת שבועיים."; } },
+    { label: "לנסות את שניהם — מבחן בבוקר, משחק בערב",
+      apply: g => { att(g, "mental", 0.6); g.me.fitness = clamp(g.me.fitness - 20, 5, 100);
+        mor(g, -3);
+        return "הגעת למשחק שרוף. שיחקת חצי שעה ולא זכרת ממנה כלום."; } },
+  ],
+});
+
+ev({
+  eid: "growth_spurt", title: "פתאום הכל ארוך", stages: ["youth"], weight: 5.0, once: true,
+  cond: g => g.me.age >= 14,
+  body: g => `גדלת שמונה סנטימטרים בחצי שנה.\n` +
+    `הרגליים לא במקום שהן היו, הכדור לא מגיע לאן שכיוונת,\n` +
+    `וכל מי שהיה נמוך ממך פתאום עוקף אותך בכדרור.`,
+  choices: [
+    { label: "לעבוד על תיאום ושליטה", hint: "כדרור ומסירה ↑",
+      apply: g => { att(g, "dribbling", 1.3); att(g, "passing", 1.0); att(g, "pace", -0.4);
+        return "חודשיים של תרגילי קונוסים משעממים. חזרת לשלוט בגוף החדש שלך."; } },
+    { label: "לנצל את הגובה ולהתחזק", hint: "כוח פיזי ↑↑",
+      apply: g => { att(g, "physical", 2.0); att(g, "dribbling", -0.5);
+        return "הפכת לילד הכי חזק במגרש. גם הכי מגושם, אבל אף אחד לא הזיז אותך מהכדור."; } },
+  ],
+});
+
+ev({
+  eid: "scout_in_stands", title: "האיש עם המחברת", stages: ["youth"], weight: 4.5, once: true,
+  cond: g => g.me.age >= 14 && g.me.season.apps >= 3,
+  body: g => `מאחורי השער עומד גבר עם מעיל ומחברת.\n` +
+    `כולם יודעים מי זה. הקבוצה משחקת אחרת כשהוא שם — כולם רוצים להיראות.`,
+  choices: [
+    { label: "לשחק בדיוק כמו תמיד", hint: "בטוח",
+      apply: g => { att(g, "mental", 1.0); rep(g, 2);
+        return "לא ניסית להרשים. הוא רשם משהו קצר והלך. שבוע אחרי זה שאלו עליך."; } },
+    { label: "לנסות משהו מיוחד", hint: "הימור",
+      apply: g => g.showOff() },
+  ],
+});
+
+ev({
+  eid: "left_out", title: "הרשימה על הדלת", stages: ["youth"], weight: 3.5, once: false,
+  cond: g => g.me.age <= 15 && g.week >= 6,
+  body: g => `רשימת הנוסעים לטורניר תלויה על דלת חדר ההלבשה.\n` +
+    `קראת אותה שלוש פעמים. השם שלך לא שם.`,
+  choices: [
+    { label: "לשאול את המאמן למה", hint: "אמת בפנים",
+      apply: g => g.askWhy() },
+    { label: "להתאמן לבד כל השבוע", hint: "כוח פיזי ↑, מורל ↓",
+      apply: g => { att(g, "physical", 1.4); att(g, "shooting", 0.6); mor(g, -8);
+        return "כל בוקר, מגרש ריק, אתה והכדור. בטורניר הבא לא היה מה לשאול."; } },
+    { label: "לא להגיע לאימונים שבוע", hint: "מסוכן",
+      apply: g => { tru(g, -14); mor(g, 3);
+        return "נעלמת שבוע. כשחזרת, המאמן אמר רק: \"נחמד שהצטרפת.\" זה עלה לך."; } },
+  ],
+});
+
+ev({
+  eid: "academy_offer", title: "מכתב ממועדון גדול", stages: ["youth"], weight: 6.0, once: true,
+  cond: g => g.me.age >= 14 && g.youthAcademySuitor() !== null,
+  body: g => `${g.youthAcademySuitor().name} מזמינים אותך למחלקת הנוער שלהם.\n` +
+    `מתקנים אחרים, מאמנים אחרים, ילדים טובים יותר.\n\n` +
+    `זה גם שעה נסיעה לכל כיוון, וחברים שלא תראה יותר.`,
+  choices: [
+    { label: "לעבור למועדון הגדול", hint: "מתקנים ↑↑, תחרות קשה",
+      apply: g => g.joinBigAcademy() },
+    { label: "להישאר בבית", hint: "דקות משחק, אמון",
+      apply: g => { tru(g, 12); mor(g, 6); g.setFlag("stayed_home", true);
+        return "נשארת. במועדון שלך הפכת לילד שכולם מדברים עליו — וזה בדיוק מה שהיה צריך."; } },
+  ],
+});
+
+// ===========================================================================
 // שלב 1 — נוער ופריצה
 // ===========================================================================
 
@@ -2673,7 +2983,7 @@ class Game {
   constructor() {
     this.seed = 0;
     this.clubs = {}; this.players = {};
-    this.meId = ""; this.stage = "academy";
+    this.meId = ""; this.stage = "youth";
     this.year = 2026; this.week = 1;
     this.fixtures = {}; this.tables = {}; this.cup = {};
     this.money = 0; this.flags = {}; this.honours = []; this.news = [];
@@ -2716,7 +3026,7 @@ class Game {
   // משחק חדש
   // ==================================================================
 
-  static newGame(name, position, clubId, age = 17, seed = null) {
+  static newGame(name, position, clubId, age = 15, seed = null) {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -2728,16 +3038,22 @@ class Game {
       age, quality: Math.round(clamp(club.reputation * 0.55 + 24, 48, 70)) });
     me.name = name;
     me.isHuman = true;
-    me.potential = Math.round(clamp(overall(me) + g.rng.randint(12, 30), 60, 94));
+    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
+    me.potential = Math.round(clamp(
+      overall(me) + g.rng.randint(12, 30) + Math.max(0, 17 - age) * 4, 58, 94));
     me.clubId = clubId;
-    me.contract = { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 };
-    me.morale = 70; me.reputation = 8;
+    // בגילי הנוער אין חוזה מקצועני
+    me.contract = age >= 16
+      ? { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 }
+      : { wage: 0, yearsLeft: 0 };
+    me.morale = 70; me.reputation = age >= 16 ? 8 : 3;
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
     assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
+    g.stage = age <= 15 ? "youth" : "academy";
     club.managerTrust = 45;
 
     g.startSeason();
@@ -2839,6 +3155,10 @@ class Game {
   // ==================================================================
 
   availableActions() {
+    if (this.stage === "youth") {
+      return D.ATTRIBUTES.concat(["street", "school", "rest"])
+        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+    }
     if (["academy", "player", "veteran"].includes(this.stage)) {
       return D.ATTRIBUTES.concat(["rest", "badges", "media", "business"])
         .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
@@ -2869,7 +3189,9 @@ class Game {
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
     report.training = this.doWeeklyAction();
-    this.simulateWeekMatches(report);
+    // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
+    this.simulateWeekMatches(report, this.stage === "youth");
+    if (this.stage === "youth") this.youthWeek(report);
     simulateAiWeek(this.players, this.rng, this.clubs, this.meId);
 
     const event = pickEvent(this, this.rng);
@@ -2892,6 +3214,22 @@ class Game {
     const me = this.me;
     const club = this.myClub();
 
+    if (this.stage === "youth") {
+      if (focus === "school") {
+        me.attributes.mental = Math.round(clamp((me.attributes.mental ?? 50) +
+          (this.rng.random() < 0.35 ? 1 : 0), 10, 97));
+        this.flags.school = (this.flag("school", 0)) + 1;
+        me.fitness = clamp(me.fitness + 14, 0, 100);
+        return [{ icon: "📚", text: "שבוע של בית ספר. ההורים מרוצים, המאמן פחות." }];
+      }
+      if (focus === "street") {
+        const attr = this.rng.choice(["dribbling", "shooting", "pace"]);
+        const lines = weeklyTraining(me, attr, club, this.rng, 1.15);
+        me.morale = clamp(me.morale + 4, 5, 99);
+        return [{ icon: "🧱", text: "שיחקת עד שהחשיך במגרש השכונתי." }].concat(lines);
+      }
+      return weeklyTraining(me, focus, club, this.rng, this.intensity);
+    }
     if (["academy", "player", "veteran"].includes(this.stage))
       return weeklyTraining(me, focus, club, this.rng, this.intensity);
 
@@ -2985,8 +3323,8 @@ class Game {
 
   // -- משחקים -----------------------------------------------------------
 
-  simulateWeekMatches(report) {
-    if (CUP_WEEKS[this.week]) { this.playCupRound(report); return; }
+  simulateWeekMatches(report, spectator = false) {
+    if (CUP_WEEKS[this.week]) { this.playCupRound(report, spectator); return; }
     const myClub = this.myClub();
     for (const league of D.LEAGUES) {
       const lid = league.id;
@@ -2994,16 +3332,64 @@ class Game {
       if (rnd === null) continue;
       for (const [homeId, awayId] of this.fixtures[lid][rnd]) {
         const home = this.clubs[homeId], away = this.clubs[awayId];
-        const isMine = myClub && (myClub.cid === homeId || myClub.cid === awayId);
+        const involvesMe = myClub && (myClub.cid === homeId || myClub.cid === awayId);
+        const isMine = involvesMe && !spectator;
         const result = this.simulateOne(home, away, isMine, "ליגה");
         this.registerResult(lid, result);
         if (isMine) {
           report.match = { result, home, away, competition: "ליגה" };
           this.myMatchLines(result, report);
+        } else if (involvesMe && spectator) {
+          // הקבוצה הבוגרת של המועדון שלך שיחקה — אתה קראת על זה בעיתון
+          report.seniorMatch = { result, home, away };
         }
       }
     }
-    if (myClub && !report.match) this.idleWeek(report);
+    if (myClub && !spectator && !report.match) this.idleWeek(report);
+  }
+
+  /** שבוע בקבוצת הנוער — משחק מול קבוצת נוער אחרת, בלי טבלה ובלי קהל. */
+  youthWeek(report) {
+    const me = this.me;
+    const club = this.myClub();
+    if (this.week % 2 === 0) {
+      report.notes.push({ icon: "🏃", text: "שבוע אימונים בקבוצת הנוער." });
+      weeklyRecovery(me, false, this.rng);
+      return;
+    }
+    if (!isAvailable(me)) {
+      report.personal = { status: "injured", injuryName: me.injuryName, weeks: me.injuryWeeks };
+      return;
+    }
+    const rivalClub = this.rng.choice(Object.values(this.clubs).filter(c => c.cid !== (club && club.cid)));
+    const oppStrength = clamp((club ? club.youthAcademy : 45) * 0.42 + 16 + this.rng.gauss(0, 5), 18, 72);
+    const mine = effective(me);
+    const edge = (mine - oppStrength) / 10;
+
+    const teamGoals = poisson(this.rng, clamp(1.3 + edge * 0.35, 0.15, 6));
+    const oppGoals = poisson(this.rng, clamp(1.4 - edge * 0.30, 0.15, 6));
+    const goals = poisson(this.rng, clamp(
+      0.18 + Math.max(0, edge) * 0.22 + (me.attributes.shooting ?? 40) / 260, 0.02, 3));
+    const assists = poisson(this.rng, clamp(0.12 + (me.attributes.passing ?? 40) / 320, 0.02, 2));
+
+    me.season.goals += goals;
+    me.season.assists += assists;
+    let rating = 6.0 + edge * 0.16 + goals * 1.0 + assists * 0.5 + this.rng.gauss(0, 0.5);
+    rating = Math.round(clamp(rating, 3, 10) * 10) / 10;
+    me.season.apps += 1;
+    me.season.minutes += 70;
+    me.season.ratingSum += rating;
+    me.fitness = clamp(me.fitness - 16, 8, 100);
+    me.morale = clamp(me.morale + (rating - 6.3) * 2, 5, 99);
+    me.form = clamp(me.form * 0.84 + (rating - 6) * 14 + 9, 5, 99);
+
+    report.youth = {
+      rival: rivalClub.name + " נוער",
+      rivalCid: rivalClub.cid,
+      teamGoals, oppGoals, goals, assists, rating,
+      outcome: teamGoals > oppGoals ? "W" : teamGoals === oppGoals ? "D" : "L",
+    };
+    if (club) club.managerTrust = clamp(club.managerTrust + (rating - 6.4) * 0.8, 0, 100);
   }
 
   simulateOne(home, away, isMine, competition, neutral = false) {
@@ -3111,7 +3497,7 @@ class Game {
     }
   }
 
-  playCupRound(report) {
+  playCupRound(report, spectator = false) {
     const teams = this.cup.teams || [];
     const roundName = CUP_WEEKS[this.week];
     if (!teams.length || this.cup.winner) {
@@ -3125,7 +3511,8 @@ class Game {
     const neutral = roundName === "גמר הגביע";
     for (let i = 0; i + 1 < teams.length; i += 2) {
       const home = this.clubs[teams[i]], away = this.clubs[teams[i + 1]];
-      const isMine = myClub && (myClub.cid === home.cid || myClub.cid === away.cid);
+      const involvesMe = myClub && (myClub.cid === home.cid || myClub.cid === away.cid);
+      const isMine = involvesMe && !spectator;
       const result = this.simulateOne(home, away, isMine, roundName, neutral);
       let winner, penalties = null;
       if (result.homeGoals === result.awayGoals) {
@@ -3138,6 +3525,8 @@ class Game {
       if (isMine) {
         report.match = { result, home, away, competition: roundName, penalties };
         this.myMatchLines(result, report);
+      } else if (involvesMe && spectator) {
+        report.seniorMatch = { result, home, away };
       }
     }
     this.cup.teams = winners;
@@ -3147,9 +3536,9 @@ class Game {
       report.notes.push({ icon: "🏆", text: `${champ.name} זוכים בגביע המדינה!` });
       if (myClub && myClub.cid === winners[0]) this.recordHonour("גביע המדינה");
     }
-    if (myClub && !winners.includes(myClub.cid) && !report.match)
+    if (!spectator && myClub && !winners.includes(myClub.cid) && !report.match)
       report.notes.push({ icon: "📅", text: "אין לך משחק גביע השבוע." });
-    if (myClub && !report.match) this.idleWeek(report);
+    if (!spectator && myClub && !report.match) this.idleWeek(report);
   }
 
   idleWeek(report) {
@@ -3159,7 +3548,8 @@ class Game {
 
   weeklyIncome(report) {
     const me = this.me;
-    if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
+    if (this.stage === "youth") { /* בלי שכר — אתה עוד בבית ספר */ }
+    else if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
     else if (["coach", "manager", "director"].includes(this.stage)) {
       const club = this.myClub();
       let base = this.stage === "coach" ? 4000 : 12000;
@@ -3216,6 +3606,54 @@ class Game {
   minutesShare() {
     const weeks = Math.max(1, this.week - 1);
     return clamp(this.me.season.minutes / (weeks * 90), 0, 1);
+  }
+
+  /** מועדון עם מחלקת נוער חזקה שמעוניין בי. */
+  youthAcademySuitor() {
+    const club = this.myClub();
+    if (!club) return null;
+    const pool = Object.values(this.clubs).filter(c =>
+      c.cid !== club.cid && c.youthAcademy > club.youthAcademy + 12 &&
+      c.leagueId !== "euro");
+    if (!pool.length) return null;
+    return pool.reduce((a, b) => (a.youthAcademy >= b.youthAcademy ? a : b));
+  }
+
+  joinBigAcademy() {
+    const target = this.youthAcademySuitor();
+    if (!target) return "ההזדמנות נסגרה.";
+    this.transferMe(target.cid, 0, 0);
+    target.managerTrust = 40;
+    this.me.morale = clamp(this.me.morale - 4, 5, 99);
+    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5), 40, 96));
+    this.setFlag("big_academy", true);
+    return `עברת ל${target.name}. מתקנים שלא הכרת, וילדים שכולם היו הכי טובים במועדון שלהם.`;
+  }
+
+  showOff() {
+    if (this.rng.random() < 0.5) {
+      this.me.reputation = clamp(this.me.reputation + 6, 1, 99);
+      addGrowth(this.me, "dribbling", 1.0);
+      this.setFlag("scouted_wow", true);
+      return "הורדת שניים בתנועה אחת והנחת כדור בזווית. הוא הפסיק לכתוב והסתכל.";
+    }
+    const club = this.myClub();
+    if (club) club.managerTrust = clamp(club.managerTrust - 8, 0, 100);
+    this.me.morale = clamp(this.me.morale - 6, 5, 99);
+    return "ניסית סובב מיותר באמצע המגרש, איבדת כדור, וספגתם. הצופה כבר לא הסתכל.";
+  }
+
+  askWhy() {
+    const club = this.myClub();
+    const trust = club ? club.managerTrust : 50;
+    if (trust >= 45 || this.rng.random() < 0.4) {
+      if (club) club.managerTrust = clamp(club.managerTrust + 6, 0, 100);
+      addGrowth(this.me, "mental", 1.2);
+      return 'הוא ענה בכנות: "אתה טוב עם הכדור וגרוע בלעדיו." ' +
+             'זו הייתה הביקורת הכי שימושית שקיבלת.';
+    }
+    this.me.morale = clamp(this.me.morale - 7, 5, 99);
+    return 'הוא אמר "יש עוד טורנירים" והמשיך לסדר קונוסים. לא קיבלת תשובה.';
   }
 
   loanTargetName() {
@@ -3695,7 +4133,9 @@ class Game {
   seasonAwards(add) {
     const leagueId = this.myLeague() || "top";
     const clubIds = new Set(Object.values(this.clubs).filter(c => c.leagueId === leagueId).map(c => c.cid));
-    const squad = Object.values(this.players).filter(p => clubIds.has(p.clubId) && p.season.apps > 0);
+    const squad = Object.values(this.players).filter(p =>
+      clubIds.has(p.clubId) && p.season.apps > 0 &&
+      !(this.stage === "youth" && p.pid === this.meId));
     if (!squad.length) return;
     const scorer = squad.reduce((a, b) =>
       (a.season.goals > b.season.goals || (a.season.goals === b.season.goals && a.season.assists >= b.season.assists)) ? a : b);
@@ -3709,7 +4149,7 @@ class Game {
 
   personalSummary(add) {
     const me = this.me;
-    if (["academy", "player", "veteran"].includes(this.stage)) {
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
       const s = me.season;
       add("📊", `העונה שלך: ${s.apps} משחקים · ${s.goals} שערים · ${s.assists} בישולים · ציון ${avgRating(s).toFixed(1)}`);
       add("📈", `דירוג ${overall(me)} (פוטנציאל ${me.potential}) · מוניטין ${Math.round(me.reputation)} · שווי ₪${fmt(playerValue(me))}`);
@@ -3847,7 +4287,13 @@ class Game {
     const me = this.me;
     const club = this.myClub();
 
-    if (this.stage === "academy") {
+    if (this.stage === "youth") {
+      if (me.age >= 16) {
+        this.stage = "academy";
+        me.contract = { wage: Math.max(1800, Math.round(wageForOverall(overall(me)) / 3)), yearsLeft: 2 };
+        add("📈", "עלית לקבוצת הנוער הבוגרת — ועם החוזה הראשון שלך.", true);
+      }
+    } else if (this.stage === "academy") {
       if (me.age >= 18 || (club && club.managerTrust >= 55)) {
         this.stage = "player";
         add("📈", "אתה כבר לא נער — אתה שחקן בסגל הבוגרים.", true);
@@ -4328,6 +4774,411 @@ function trophy(size = 16) {
 }
 
 // ---------------------------------------------------------------------------
+// סצנות מאוירות לדפי המעבר. הכל SVG מחולל, בשני מצבי התצוגה.
+// לכל אירוע עלילה יש סצנה משלו: חדר הלבשה, חדר טיפולים, אולם עיתונאים...
+// ---------------------------------------------------------------------------
+
+const SCENE_W = 320, SCENE_H = 132;
+
+function sceneWrap(inner, label) {
+  return `<svg viewBox="0 0 ${SCENE_W} ${SCENE_H}" class="scene" role="img"
+    aria-label="${escAttr(label)}">
+    <rect width="${SCENE_W}" height="${SCENE_H}" fill="var(--scene-sky)"/>
+    ${inner}
+    <rect width="${SCENE_W}" height="${SCENE_H}" fill="url(#sceneVignette)"/>
+  </svg>`;
+}
+
+/** הגדרות משותפות לכל הסצנות — מוזרקות פעם אחת לדף. */
+function sceneDefs() {
+  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <linearGradient id="sceneVignette" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--scene-sky)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--scene-sky)" stop-opacity="0"/>
+      <stop offset="100%" stop-color="var(--scene-sky)" stop-opacity=".55"/>
+    </linearGradient>
+    <linearGradient id="beamGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--accent-fill)" stop-opacity=".26"/>
+      <stop offset="100%" stop-color="var(--accent-fill)" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="tunnelGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="var(--scene-near)"/>
+      <stop offset="100%" stop-color="var(--scene-far)"/>
+    </linearGradient>
+  </defs></svg>`;
+}
+
+// -- עוזרים ---------------------------------------------------------------
+
+function times(count, fn) { return Array.from({ length: count }, (_, i) => fn(i)).join(""); }
+
+/**
+ * דמות אנושית פשוטה. (x,y) = הרצפה שעליה היא עומדת, s = קנה מידה.
+ * תנוחות: stand | sit | kick | lie
+ */
+function figure(x, y, s = 1, opts = {}) {
+  const color = opts.color || "var(--scene-line)";
+  const pose = opts.pose || "stand";
+  const shadow = opts.shadow === false ? "" :
+    `<ellipse cx="0" cy="1.5" rx="9" ry="2.6" fill="var(--scene-line)" opacity=".28"/>`;
+  let body;
+  if (pose === "sit") {
+    body = `<circle cx="0" cy="-31" r="5.4"/>
+      <path d="M-6,-26 h12 l1.5,15 h-15 z"/>
+      <path d="M-5,-11 h16 v5 h-16 z"/>
+      <path d="M9,-6 h5 v6 h-5 z"/>`;
+  } else if (pose === "kick") {
+    body = `<circle cx="0" cy="-33" r="5.4"/>
+      <path d="M-6,-28 h12 l1,16 h-14 z"/>
+      <path d="M-5,-12 l-6,12 h5 l5,-10 z"/>
+      <path d="M2,-12 l9,7 l-3,4 l-8,-7 z"/>
+      <path d="M6,-26 l9,-6 l2,4 l-9,6 z"/>`;
+  } else if (pose === "lie") {
+    body = `<circle cx="-18" cy="-6" r="5"/>
+      <path d="M-13,-10 h20 l2,9 h-22 z"/>
+      <path d="M7,-9 h16 v7 h-16 z"/>`;
+  } else {
+    body = `<circle cx="0" cy="-33" r="5.4"/>
+      <path d="M-6,-28 h12 l1.5,16 h-15 z"/>
+      <rect x="-5.5" y="-12" width="4.5" height="12"/>
+      <rect x="1" y="-12" width="4.5" height="12"/>
+      <path d="M-7,-27 l-4,12 l3,1 l5,-11 z"/>
+      <path d="M7,-27 l4,12 l-3,1 l-5,-11 z"/>`;
+  }
+  return `<g transform="translate(${x},${y}) scale(${s})" fill="${color}">${shadow}${body}</g>`;
+}
+
+function floorAndWall(floorY = 96) {
+  return `<rect y="0" width="${SCENE_W}" height="${floorY}" fill="var(--scene-far)"/>
+    <rect y="${floorY}" width="${SCENE_W}" height="${SCENE_H - floorY}" fill="var(--scene-near)"/>
+    <line x1="0" y1="${floorY}" x2="${SCENE_W}" y2="${floorY}"
+      stroke="var(--scene-line)" stroke-width="1" opacity=".5"/>`;
+}
+
+// -- הסצנות ---------------------------------------------------------------
+
+const SCENES = {
+
+  // חדר הלבשה: תאים, חולצה תלויה, ספסל, נעליים
+  dressing: () => sceneWrap(`
+    ${floorAndWall(100)}
+    ${times(6, i => `
+      <rect x="${8 + i * 52}" y="14" width="46" height="74" rx="2"
+        fill="var(--scene-mid)" stroke="var(--scene-line)" stroke-width="1"/>
+      <rect x="${8 + i * 52}" y="14" width="46" height="9" fill="var(--scene-near)"/>
+      <circle cx="${31 + i * 52}" cy="30" r="1.6" fill="var(--scene-line)"/>`)}
+    <g>
+      <rect x="138" y="30" width="30" height="40" rx="3" fill="var(--accent-fill)"/>
+      <path d="M138,30 L146,26 L160,26 L168,30 L172,40 L166,43 L166,70 L140,70 L140,43 L134,40 Z"
+        fill="var(--accent-fill)"/>
+      <text x="153" y="58" text-anchor="middle" font-size="15" font-weight="700"
+        fill="var(--accent-ink)" font-family="Assistant, sans-serif">10</text>
+    </g>
+    ${figure(64, 100, 1.25, { pose: "sit", color: "var(--scene-near)", shadow: false })}
+    <rect x="20" y="100" width="280" height="7" rx="2" fill="var(--scene-mid)"/>
+    ${times(4, i => `<rect x="${34 + i * 74}" y="107" width="6" height="14" fill="var(--scene-line)"/>`)}
+    ${times(2, i => `
+      <ellipse cx="${212 + i * 46}" cy="126" rx="12" ry="4.5" fill="var(--scene-line)" opacity=".75"/>`)}
+  `, "חדר הלבשה"),
+
+  // חדר טיפולים: מיטה, רגל חבושה, פיזיותרפיסט
+  physio: () => sceneWrap(`
+    ${floorAndWall(104)}
+    <rect x="18" y="22" width="66" height="48" rx="3" fill="var(--scene-mid)"
+      stroke="var(--scene-line)" stroke-width="1"/>
+    ${times(3, i => `<line x1="${28 + i * 20}" y1="22" x2="${28 + i * 20}" y2="70"
+      stroke="var(--scene-line)" stroke-width="1" opacity=".45"/>`)}
+    <rect x="104" y="74" width="164" height="12" rx="4" fill="var(--scene-near)"/>
+    <rect x="112" y="86" width="8" height="18" fill="var(--scene-line)"/>
+    <rect x="252" y="86" width="8" height="18" fill="var(--scene-line)"/>
+    ${figure(146, 74, 1.05, { pose: "lie", color: "var(--scene-mid)", shadow: false })}
+    <g>
+      <path d="M176,66 l30,-2 l4,10 l-30,4 z" fill="var(--scene-mid)"/>
+      <path d="M206,64 l26,10 l-5,10 l-25,-12 z" fill="var(--accent-fill)"/>
+      ${times(4, i => `<line x1="${208 + i * 7}" y1="${64 + i * 2.6}" x2="${204 + i * 7}" y2="${76 + i * 2.6}"
+        stroke="var(--scene-sky)" stroke-width="1.6" opacity=".6"/>`)}
+      <ellipse cx="234" cy="80" rx="6" ry="4.5" fill="var(--accent-fill)"/>
+    </g>
+    ${figure(258, 104, 1.15, { color: "var(--scene-line)" })}
+    <path d="M296,44 L296,100 M290,48 L302,48 M296,100 L290,116 M296,100 L302,116"
+      stroke="var(--scene-line)" stroke-width="3" fill="none" stroke-linecap="round"/>
+  `, "חדר טיפולים"),
+
+  // אולם מסיבות עיתונאים
+  press: () => sceneWrap(`
+    ${floorAndWall(112)}
+    <rect x="0" y="0" width="${SCENE_W}" height="92" fill="var(--scene-mid)"/>
+    ${times(10, i => `<rect x="${(i % 5) * 64 + 8}" y="${Math.floor(i / 5) * 42 + 12}"
+      width="34" height="11" rx="2" fill="var(--scene-near)" opacity=".6"/>`)}
+    ${figure(160, 96, 1.55, { pose: "sit", color: "var(--scene-far)", shadow: false })}
+    <rect x="88" y="90" width="146" height="22" rx="2" fill="var(--scene-near)"/>
+    <rect x="88" y="90" width="146" height="4" fill="var(--accent-fill)" opacity=".8"/>
+    ${times(3, i => `
+      <line x1="${132 + i * 30}" y1="90" x2="${136 + i * 30}" y2="70"
+        stroke="var(--scene-line)" stroke-width="2.4"/>
+      <ellipse cx="${136 + i * 30}" cy="64" rx="6" ry="8"
+        fill="${i === 1 ? "var(--accent-fill)" : "var(--scene-line)"}"/>`)}
+    ${times(9, i => `<circle cx="${14 + i * 36}" cy="${120 + (i % 3) * 5}" r="${2.4 + (i % 3)}"
+      fill="var(--accent-fill)" opacity=".${4 + (i % 5)}"/>`)}
+    ${times(4, i => `<rect x="${28 + i * 78}" y="118" width="18" height="10" rx="2"
+      fill="var(--scene-line)" opacity=".7"/>`)}
+  `, "מסיבת עיתונאים"),
+
+  // אצטדיון לילה
+  stadium: () => sceneWrap(`
+    <rect width="${SCENE_W}" height="70" fill="var(--scene-far)"/>
+    ${[54, 266].map(x => `
+      <path d="M${x},16 L${x + (x < 160 ? 60 : -60)},96 L${x + (x < 160 ? -10 : 10)},96 Z"
+        fill="url(#beamGrad)"/>
+      <rect x="${x - 12}" y="8" width="24" height="8" rx="1.5" fill="var(--scene-line)"/>
+      <rect x="${x - 1.5}" y="16" width="3" height="16" fill="var(--scene-line)"/>
+      ${times(3, i => `<circle cx="${x - 8 + i * 8}" cy="12" r="2.6"
+        fill="var(--accent-fill)"/>`)}`).join("")}
+    <rect y="34" width="${SCENE_W}" height="36" fill="var(--scene-mid)"/>
+    ${times(90, i => `<circle cx="${(i * 37) % 316 + 2}" cy="${38 + (i * 13) % 30}"
+      r="${1 + (i % 3) * 0.5}" fill="var(--scene-line)" opacity=".${3 + (i % 5)}"/>`)}
+    <path d="M0,70 L320,70 L320,132 L0,132 Z" fill="var(--pitch-turf)"/>
+    <path d="M0,70 L320,70 L282,132 L38,132 Z" fill="var(--pitch-stripe)"/>
+    <g fill="none" stroke="var(--pitch-line)" stroke-width="1" opacity=".85">
+      <path d="M38,132 L76,70 L244,70 L282,132"/>
+      <line x1="160" y1="70" x2="160" y2="132"/>
+      <path d="M120,70 L110,100 L210,100 L200,70"/>
+    </g>
+  `, "אצטדיון בלילה"),
+
+  // חדר ישיבות
+  boardroom: () => sceneWrap(`
+    ${floorAndWall(100)}
+    <rect x="176" y="12" width="132" height="72" rx="2" fill="var(--scene-mid)"/>
+    ${times(8, i => `<line x1="176" y1="${16 + i * 9}" x2="308" y2="${16 + i * 9}"
+      stroke="var(--scene-near)" stroke-width="3" opacity=".8"/>`)}
+    <ellipse cx="130" cy="98" rx="112" ry="22" fill="var(--scene-near)"/>
+    <ellipse cx="130" cy="94" rx="112" ry="22" fill="var(--scene-mid)"/>
+    ${times(3, i => figure(46 + i * 62, 92, 1.15, { pose: "sit", color: "var(--scene-near)", shadow: false }))}
+    ${times(3, i => `
+      <rect x="${34 + i * 62}" y="66" width="26" height="20" rx="4" fill="var(--scene-mid)" opacity=".7"/>`)}
+    <rect x="96" y="84" width="34" height="24" rx="2" fill="var(--accent-fill)" opacity=".92"/>
+    ${times(3, i => `<line x1="102" y1="${90 + i * 6}" x2="124" y2="${90 + i * 6}"
+      stroke="var(--accent-ink)" stroke-width="1.4" opacity=".6"/>`)}
+  `, "חדר ישיבות"),
+
+  // מגרש אימונים
+  training: () => sceneWrap(`
+    <rect width="${SCENE_W}" height="44" fill="var(--scene-far)"/>
+    <rect y="44" width="${SCENE_W}" height="88" fill="var(--pitch-turf)"/>
+    ${times(5, i => `<rect y="${44 + i * 18}" width="${SCENE_W}" height="9"
+      fill="var(--pitch-stripe)"/>`)}
+    <g fill="none" stroke="var(--pitch-line)" stroke-width="1.4" opacity=".75">
+      <rect x="206" y="26" width="92" height="32" rx="1"/>
+      ${times(6, i => `<line x1="${212 + i * 14}" y1="26" x2="${212 + i * 14}" y2="58"/>`)}
+      ${times(3, i => `<line x1="206" y1="${34 + i * 9}" x2="298" y2="${34 + i * 9}"/>`)}
+    </g>
+    ${times(5, i => `<path d="M${18 + i * 22},${122 - i * 5} l7,0 l-3.5,-11 z"
+      fill="var(--accent-fill)" opacity=".9"/>`)}
+    ${figure(112, 118, 1.5, { pose: "kick", color: "var(--scene-line)" })}
+    <circle cx="146" cy="116" r="7" fill="var(--scene-sky)"
+      stroke="var(--scene-line)" stroke-width="1.4"/>
+    ${figure(246, 96, 1.15, { color: "var(--scene-near)" })}
+    <rect x="240" y="70" width="12" height="4" rx="2" fill="var(--scene-near)"/>
+  `, "מגרש אימונים"),
+
+  // ארון התארים
+  trophy: () => sceneWrap(`
+    ${floorAndWall(106)}
+    ${[92, 160, 228].map((x, i) => `
+      <path d="M${x - 26},20 L${x + 26},20 L${x + 14},${34 + i * 6} L${x - 14},${34 + i * 6} Z"
+        fill="url(#beamGrad)"/>`).join("")}
+    <rect x="118" y="86" width="84" height="20" rx="2" fill="var(--scene-near)"/>
+    <rect x="128" y="78" width="64" height="10" rx="2" fill="var(--scene-mid)"/>
+    <g>
+      <path d="M138,34 H182 V56 C182,68 172,76 160,76 C148,76 138,68 138,34 Z"
+        fill="var(--accent-fill)"/>
+      <path d="M138,38 H126 V48 C126,57 132,62 140,63" fill="none"
+        stroke="var(--accent-fill)" stroke-width="5"/>
+      <path d="M182,38 H194 V48 C194,57 188,62 180,63" fill="none"
+        stroke="var(--accent-fill)" stroke-width="5"/>
+      <rect x="154" y="76" width="12" height="6" fill="var(--accent-fill)"/>
+    </g>
+    ${times(16, i => `<rect x="${12 + i * 20}" y="${14 + (i * 29) % 80}" width="4" height="7"
+      rx="1" fill="${i % 3 ? "var(--accent-fill)" : "var(--scene-line)"}"
+      opacity=".${4 + (i % 5)}" transform="rotate(${(i * 37) % 90 - 45} ${14 + i * 20} ${18 + (i * 29) % 80})"/>`)}
+  `, "ארון התארים"),
+
+  // שדה תעופה
+  airport: () => sceneWrap(`
+    <rect width="${SCENE_W}" height="82" fill="var(--scene-far)"/>
+    <rect y="82" width="${SCENE_W}" height="50" fill="var(--scene-near)"/>
+    <g opacity=".95">
+      <path d="M150,44 L236,26 L246,32 L196,58 Z" fill="var(--accent-fill)"/>
+      <path d="M188,44 L172,20 L182,18 L206,38 Z" fill="var(--accent-fill)" opacity=".8"/>
+      <path d="M196,58 L214,66 L222,60 L212,54 Z" fill="var(--accent-fill)" opacity=".7"/>
+    </g>
+    ${times(3, i => `<line x1="${60 + i * 18}" y1="${64 + i * 4}" x2="${104 + i * 18}" y2="${56 + i * 4}"
+      stroke="var(--scene-line)" stroke-width="1.5" opacity=".5"/>`)}
+    <rect x="14" y="88" width="46" height="34" rx="4" fill="var(--scene-mid)"
+      stroke="var(--scene-line)" stroke-width="1.5"/>
+    <rect x="30" y="80" width="14" height="8" rx="3" fill="var(--scene-line)"/>
+    <rect x="14" y="100" width="46" height="4" fill="var(--scene-line)" opacity=".6"/>
+    <rect x="230" y="86" width="76" height="30" rx="2" fill="var(--scene-mid)"/>
+    ${times(4, i => `<rect x="236" y="${90 + i * 7}" width="${58 - i * 9}" height="3.4"
+      fill="${i === 0 ? "var(--accent-fill)" : "var(--scene-line)"}" opacity=".8"/>`)}
+    ${times(9, i => `<rect x="${i * 40}" y="126" width="24" height="3" fill="var(--scene-sky)" opacity=".5"/>`)}
+  `, "שדה תעופה"),
+
+  // אולפן טלוויזיה
+  studio: () => sceneWrap(`
+    ${floorAndWall(104)}
+    <rect x="0" y="0" width="${SCENE_W}" height="90" fill="var(--scene-mid)"/>
+    <rect x="20" y="14" width="108" height="60" rx="3" fill="var(--pitch-turf)"
+      stroke="var(--scene-line)" stroke-width="1.5"/>
+    ${times(4, i => `<rect x="20" y="${18 + i * 15}" width="108" height="7"
+      fill="var(--pitch-stripe)"/>`)}
+    <g fill="none" stroke="var(--pitch-line)" stroke-width="1" opacity=".9">
+      <line x1="74" y1="14" x2="74" y2="74"/>
+      <circle cx="74" cy="44" r="12"/>
+    </g>
+    ${times(4, i => `<circle cx="${44 + i * 20}" cy="${34 + (i % 2) * 20}" r="3"
+      fill="var(--accent-fill)"/>`)}
+    ${figure(206, 90, 1.4, { pose: "sit", color: "var(--scene-near)", shadow: false })}
+    <rect x="150" y="88" width="130" height="24" rx="3" fill="var(--scene-near)"/>
+    <rect x="150" y="88" width="130" height="5" fill="var(--accent-fill)" opacity=".9"/>
+    <g>
+      <rect x="262" y="16" width="32" height="21" rx="3" fill="var(--scene-line)"/>
+      <path d="M294,22 L310,14 L310,39 L294,31 Z" fill="var(--scene-line)"/>
+      <circle cx="271" cy="12" r="3.4" fill="var(--loss)"/>
+    </g>
+    ${times(2, i => `<path d="M${140 + i * 130},8 l14,0 l7,14 l-28,0 z"
+      fill="var(--accent-fill)" opacity=".5"/>`)}
+  `, "אולפן טלוויזיה"),
+
+  // מנהרת השחקנים
+  tunnel: () => sceneWrap(`
+    <rect width="${SCENE_W}" height="${SCENE_H}" fill="url(#tunnelGrad)"/>
+    <path d="M0,0 L96,26 L96,110 L0,132 Z" fill="var(--scene-near)"/>
+    <path d="M320,0 L224,26 L224,110 L320,132 Z" fill="var(--scene-near)"/>
+    <path d="M96,26 L224,26 L224,14 L96,14 Z" fill="var(--scene-mid)"/>
+    <rect x="96" y="26" width="128" height="84" fill="var(--scene-sky)" opacity=".16"/>
+    <rect x="112" y="34" width="96" height="70" fill="var(--pitch-turf)"/>
+    ${times(4, i => `<rect x="112" y="${34 + i * 18}" width="96" height="9" fill="var(--pitch-stripe)"/>`)}
+    <path d="M112,34 L208,34 L208,104 L112,104 Z" fill="none"
+      stroke="var(--pitch-line)" stroke-width="1.2" opacity=".7"/>
+    ${times(2, i => `
+      <g fill="var(--scene-line)" opacity=".95">
+        <circle cx="${132 + i * 56}" cy="${58 + i * 4}" r="7"/>
+        <path d="M${125 + i * 56},${66 + i * 4} h14 l3,26 h-20 z"/>
+      </g>`)}
+    <rect x="96" y="104" width="128" height="28" fill="var(--scene-near)"/>
+    ${[104, 216].map(x => `<rect x="${x}" y="14" width="6" height="96"
+      fill="var(--accent-fill)" opacity=".35"/>`).join("")}
+  `, "מנהרת השחקנים"),
+
+  // סלון בבית
+  home: () => sceneWrap(`
+    ${floorAndWall(98)}
+    <rect x="18" y="16" width="86" height="56" rx="3" fill="var(--scene-mid)"
+      stroke="var(--scene-line)" stroke-width="1.5"/>
+    <line x1="61" y1="16" x2="61" y2="72" stroke="var(--scene-line)" stroke-width="1.5"/>
+    <circle cx="86" cy="32" r="9" fill="var(--accent-fill)" opacity=".55"/>
+    ${figure(176, 92, 1.3, { pose: "sit", color: "var(--scene-line)", shadow: false })}
+    <rect x="130" y="76" width="150" height="30" rx="6" fill="var(--scene-near)"/>
+    <rect x="138" y="60" width="134" height="20" rx="6" fill="var(--scene-mid)"/>
+    ${times(3, i => `<rect x="${146 + i * 44}" y="62" width="36" height="16" rx="4"
+      fill="var(--scene-near)" opacity=".8"/>`)}
+    <path d="M292,44 L308,44 L304,64 L296,64 Z" fill="var(--accent-fill)" opacity=".8"/>
+    <rect x="298" y="64" width="4" height="34" fill="var(--scene-line)"/>
+    <rect x="288" y="98" width="24" height="4" rx="2" fill="var(--scene-line)"/>
+    <ellipse cx="300" cy="56" rx="30" ry="22" fill="var(--accent-fill)" opacity=".10"/>
+  `, "בבית"),
+
+  // מגרש שכונתי
+  youthpitch: () => sceneWrap(`
+    <rect width="${SCENE_W}" height="54" fill="var(--scene-far)"/>
+    <rect y="54" width="${SCENE_W}" height="78" fill="var(--pitch-turf)"/>
+    ${times(16, i => `<line x1="${i * 21}" y1="10" x2="${i * 21}" y2="54"
+      stroke="var(--scene-line)" stroke-width="1" opacity=".25"/>`)}
+    ${times(3, i => `<line x1="0" y1="${14 + i * 14}" x2="320" y2="${14 + i * 14}"
+      stroke="var(--scene-line)" stroke-width="1" opacity=".25"/>`)}
+    <rect y="6" width="${SCENE_W}" height="4" fill="var(--scene-line)" opacity=".5"/>
+    <g fill="none" stroke="var(--scene-sky)" stroke-width="2.6" opacity=".92">
+      <path d="M28,54 L28,22 L118,22 L118,54"/>
+      ${times(5, i => `<line x1="${38 + i * 18}" y1="22" x2="${38 + i * 18}" y2="54" stroke-width="1"/>`)}
+      ${times(2, i => `<line x1="28" y1="${32 + i * 12}" x2="118" y2="${32 + i * 12}" stroke-width="1"/>`)}
+    </g>
+    ${times(4, i => `<rect y="${62 + i * 18}" width="${SCENE_W}" height="8"
+      fill="var(--pitch-stripe)"/>`)}
+    ${figure(214, 120, 1.45, { pose: "kick", color: "var(--accent-fill)" })}
+    <circle cx="248" cy="118" r="8" fill="var(--scene-sky)"
+      stroke="var(--scene-line)" stroke-width="1.5"/>
+    <path d="M248,110 l4.5,6.5 l-2,7.5 h-5 l-2,-7.5 z" fill="var(--scene-line)" opacity=".75"/>
+    ${figure(96, 96, 1.0, { color: "var(--scene-near)" })}
+  `, "מגרש שכונתי"),
+
+};
+
+// -- מיפוי אירוע → סצנה ---------------------------------------------------
+
+const EVENT_SCENE = {
+  first_boots: "home", school_or_football: "youthpitch", growth_spurt: "training",
+  scout_in_stands: "youthpitch", left_out: "dressing", academy_offer: "training",
+  first_call_up: "tunnel", youth_mentor: "dressing", loan_offer: "airport",
+  bench_frustration: "dressing", derby_week: "stadium", scandal_night: "press",
+  national_call: "tunnel", big_club_interest: "airport", captain_armband: "dressing",
+  serious_injury: "physio", sponsor_deal: "studio", contract_talks: "boardroom",
+  dressing_room_split: "dressing", youngster_threat: "training",
+  body_signals: "physio", retirement_call: "home", farewell_match: "stadium",
+  next_chapter: "home", first_manager_offer: "boardroom", board_meeting: "boardroom",
+  star_wants_out: "boardroom", wonderkid: "training", sack_race: "press",
+  bigger_job: "boardroom", director_offer: "boardroom", buy_childhood_club: "stadium",
+  hall_of_fame: "trophy", child_debut: "youthpitch",
+};
+
+function sceneFor(eid, stage) {
+  const key = EVENT_SCENE[eid] ||
+    (stage === "youth" ? "youthpitch" : stage === "manager" ? "boardroom" :
+     stage === "pundit" ? "studio" : "dressing");
+  return (SCENES[key] || SCENES.dressing)();
+}
+
+// ---------------------------------------------------------------------------
+// כרטיס שחקן
+// ---------------------------------------------------------------------------
+
+const ATTR_SHORT = {
+  pace: "מהי", shooting: "בעי", passing: "מסי",
+  dribbling: "כדר", defending: "הגנ", physical: "כוח",
+};
+
+function playerCard(player, club, stage) {
+  const [primary, secondary] = club ? kit(club.cid) : FALLBACK_KIT;
+  const ink = inkOn(primary);
+  const ovr = overall(player);
+  return `
+  <div class="pcard" style="--card-a:${primary};--card-b:${shade(primary, -0.35)};--card-ink:${ink}">
+    <div class="pcard-top">
+      <div class="pcard-rating">
+        <span class="n">${ovr}</span>
+        <span class="pos">${escAttr(positionHe(player))}</span>
+        <span class="rule"></span>
+        <span class="nat">${escAttr(player.nationality)}</span>
+      </div>
+      <div class="pcard-art">${shirt(club, player.number || 0, 92)}</div>
+    </div>
+    <div class="pcard-name">${escAttr(player.name)}</div>
+    <div class="pcard-attrs">
+      ${Object.keys(ATTR_SHORT).map(a => `
+        <div class="pa"><span class="v">${player.attributes[a]}</span>
+          <span class="k">${ATTR_SHORT[a]}</span></div>`).join("")}
+    </div>
+    <div class="pcard-foot">
+      ${club ? crest(club, 20) : ""}
+      <span>${club ? escAttr(club.name) : "ללא מועדון"}</span>
+      <span class="spacer"></span>
+      <span>${escAttr(D.CAREER_STAGES_HE[stage] || "")}</span>
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // ממשק המשתמש
 // ---------------------------------------------------------------------------
 
@@ -4371,6 +5222,12 @@ function go(next, data = null) {
 
 function render() {
   const app = $("#app");
+  if (!document.getElementById("scene-defs")) {
+    const holder = document.createElement("div");
+    holder.id = "scene-defs";
+    holder.innerHTML = sceneDefs();
+    document.body.appendChild(holder);
+  }
   let html = "";
   if (view === "menu") html = screenMenu();
   else if (view === "new") html = screenNew();
@@ -4391,9 +5248,9 @@ function render() {
 function screenMenu() {
   const saved = hasSave();
   return `
-  <div class="screen menu">
-    ${stadium()}
-    <div class="hero" style="padding-top:8px">
+  <div class="screen menu flush">
+    <div class="scene-frame">${SCENES.stadium()}</div>
+    <div class="hero" style="padding-top:6px">
       <div class="eyebrow">משחק ניהול כדורגל</div>
       <h1 class="display">קריירה</h1>
       <div class="underline"></div>
@@ -4420,7 +5277,7 @@ function screenMenu() {
 }
 
 function screenNew() {
-  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 17 });
+  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 15 });
   const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
   return `
   <div class="screen">
@@ -4445,10 +5302,12 @@ function screenNew() {
     <div class="card">
       <div class="eyebrow">גיל התחלה</div>
       <div class="chips">
-        ${[16, 17, 18].map(a => `<button class="chip" data-age="${a}"
+        ${[13, 14, 15, 16, 17, 18].map(a => `<button class="chip" data-age="${a}"
           aria-pressed="${state.age === a}">${a}</button>`).join("")}
       </div>
-      <p class="muted">צעיר יותר = יותר זמן להתפתח, אבל דרך ארוכה יותר להרכב.</p>
+      <p class="muted">${state.age <= 15
+        ? "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה גבוהה."
+        : "ישר לקבוצת הנוער הבוגרת, עם חוזה ראשון ופחות זמן להתפתח."}</p>
     </div>
 
     <div class="card">
@@ -4627,8 +5486,8 @@ function screenWeek() {
     const goals = result.events.filter(e => e.kind === "goal")
       .sort((a, b) => a.minute - b.minute);
     html += `
-    <div class="scoreboard">
-      <div class="eyebrow">${esc(competition)}</div>
+    <div class="scoreboard result">
+      <span class="comp-tag">${esc(competition)}</span>
       <div class="scoreline">
         <div class="side">${crest(home, 34)}<span class="nm ${
           club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
@@ -4658,6 +5517,34 @@ function screenWeek() {
     }
   }
 
+  if (report.match) {
+    const mine = report.match.result.events.filter(
+      e => e.kind === "goal" && e.playerId === me.pid);
+    if (mine.length) {
+      html += `<div class="my-goal-flash">
+        <span class="big">${mine.length === 1 ? "גול!" : mine.length + " גולים!"}</span>
+        <span>${mine.map(e => e.minute + "'").join(" · ")} — ${esc(me.name)}</span>
+      </div>`;
+    }
+  }
+
+  if (report.seniorMatch) {
+    const { result, home, away } = report.seniorMatch;
+    const club = game.myClub();
+    const outcome = club ? resultFor(result, club.cid) : "D";
+    const label = { W: "ניצחון", D: "תיקו", L: "הפסד" }[outcome];
+    html += `<div class="card">
+      <div class="eyebrow">הקבוצה הבוגרת</div>
+      <div class="crest-row">
+        ${crest(home, 22)}
+        <span class="nm">${esc(home.name)} ${result.homeGoals} : ${result.awayGoals} ${esc(away.name)}</span>
+        ${crest(away, 22)}
+      </div>
+      <div class="muted">${esc(label)} — קראת על זה בדרך לאימון.</div>
+    </div>`;
+  }
+
+  if (report.youth) html += youthCard(report.youth);
   if (report.personal) html += personalCard(report.personal);
 
   const notes = (report.training || []).concat(report.notes || []);
@@ -4669,6 +5556,34 @@ function screenWeek() {
 
   html += `<button class="btn primary wide" data-act="after-week">המשך</button></div>`;
   return strip() + html;
+}
+
+function youthCard(y) {
+  const club = game.myClub();
+  const rival = game.clubs[y.rivalCid];
+  const label = { W: "ניצחון", D: "תיקו", L: "הפסד" }[y.outcome];
+  const cls = { W: "w", D: "d", L: "l" }[y.outcome];
+  const bits = [];
+  if (y.goals) bits.push(y.goals === 1 ? "שער אחד" : `${y.goals} שערים`);
+  if (y.assists) bits.push(y.assists === 1 ? "בישול אחד" : `${y.assists} בישולים`);
+  const ratingCls = y.rating >= 7.5 ? "good" : y.rating < 5.5 ? "bad" : "";
+  return `<div class="card youth-card">
+    <div class="scene-frame inset">${SCENES.youthpitch()}</div>
+    <span class="comp-tag">ליגת הנוער</span>
+    <div class="youth-score">
+      ${club ? crest(club, 26) : ""}
+      <span>${y.teamGoals} : ${y.oppGoals}</span>
+      ${rival ? crest(rival, 26) : ""}
+      <span class="vs">מול ${esc(y.rival)}</span>
+    </div>
+    <div class="perf">
+      <div class="rating ${ratingCls}">${y.rating.toFixed(1)}</div>
+      <div class="detail">
+        <strong>${label}</strong>
+        <span>${bits.length ? esc(bits.join(" · ")) : "עוד משחק בדרך."}</span>
+      </div>
+    </div>
+  </div>`;
 }
 
 function personalCard(p) {
@@ -4711,11 +5626,13 @@ function screenEvent() {
   const event = game.pendingEvent();
   if (!event) { go("main"); return ""; }
   return `
-  <div class="takeover">
+  <div class="takeover flush">
+    <div class="scene-frame">${sceneFor(event.eid, game.stage)}</div>
     <div class="kicker">${esc(D.CAREER_STAGES_HE[game.stage] || "")} · שבוע ${game.week}</div>
     <h2 class="display">${esc(event.title)}</h2>
     <hr class="rule">
     <div class="body">${esc(game.pendingEventText())}</div>
+    ${contextStrip()}
     <div class="actions" style="margin-top:auto">
       ${event.choices.map((c, i) => `<button class="btn" data-choice="${i}">
         <span class="k">${esc(c.label)}</span>
@@ -4725,9 +5642,31 @@ function screenEvent() {
   </div>`;
 }
 
+/** רצועה קצרה עם המצב שלך — כדי שההחלטה תתקבל עם הנתונים מול העיניים. */
+function contextStrip() {
+  const me = game.me;
+  const club = game.myClub();
+  const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
+  const pills = [];
+  pills.push(`<span class="cpill">גיל <b>${me.age}</b></span>`);
+  if (isPlayer) {
+    pills.push(`<span class="cpill">כללי <b>${overall(me)}</b></span>`);
+    pills.push(`<span class="cpill">מורל <b>${Math.round(me.morale)}</b></span>`);
+    if (club) pills.push(`<span class="cpill">אמון המאמן <b>${Math.round(club.managerTrust)}</b></span>`);
+    if (me.injuryWeeks > 0)
+      pills.push(`<span class="cpill accent">פצוע <b>${me.injuryWeeks}ש</b></span>`);
+  } else {
+    pills.push(`<span class="cpill">ידע אימון <b>${Math.round(me.coaching)}</b></span>`);
+    if (club) pills.push(`<span class="cpill">הנהלה <b>${Math.round(club.boardConfidence)}</b></span>`);
+  }
+  if (game.money > 0) pills.push(`<span class="cpill">₪<b>${fmt(game.money)}</b></span>`);
+  return `<div class="context-strip">${pills.join("")}</div>`;
+}
+
 function screenOutcome() {
   return `
-  <div class="takeover">
+  <div class="takeover${viewData.scene ? " flush" : ""}">
+    ${viewData.scene ? `<div class="scene-frame">${viewData.scene}</div>` : ""}
     <div class="kicker">מה שקרה</div>
     <h2 class="display">${esc(viewData.title)}</h2>
     <hr class="rule">
@@ -4741,10 +5680,10 @@ function screenOutcome() {
 function screenSeason() {
   const s = viewData;
   return `
-  <div class="screen">
-    <div class="hero" style="padding-top:10px">
-      <div class="eyebrow">סוף עונה</div>
-      <h1 class="display" style="font-size:40px">${esc(s.title)}</h1>
+  <div class="screen flush">
+    <div class="scene-frame season-hero">
+      ${SCENES.trophy()}
+      <span class="season-title">${esc(s.title)}</span>
     </div>
     <div class="card"><div class="notes">
       ${s.lines.map(l => `<div class="note ${l.strong ? "strong" : ""}">
@@ -4761,19 +5700,24 @@ function screenProfile() {
   const s = me.season, c = me.career;
   return `
   <div class="screen">
+    ${isPlayer ? playerCard(me, club, game.stage) : `
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
       <div class="kit-row">
-        ${isPlayer ? shirt(club, me.number || 0, 78) : (club ? crest(club, 58) : "")}
+        ${club ? crest(club, 58) : ""}
         <div class="kit-meta">
           <span class="display big">${esc(me.name)}</span>
           <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}</span>
           ${club ? `<span class="muted">${esc(club.name)}</span>` : ""}
         </div>
       </div>
-      ${me.traits.length ? `<div class="chips">${me.traits.map(t =>
-        `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>` : ""}
-    </div>
+    </div>`}
+    ${me.traits.length ? `<div class="card">
+      <div class="eyebrow">אופי</div>
+      <div class="chips">${me.traits.map(t =>
+        `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>
+      <div class="muted">${me.traits.map(t => D.TRAITS[t] ? esc(D.TRAITS[t].desc) : "").join(" ")}</div>
+    </div>` : ""}
 
     ${isPlayer ? `
     <div class="card">
@@ -5038,7 +5982,7 @@ function bind() {
 }
 
 function act(what) {
-  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 17 }); }
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15 }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -5079,10 +6023,12 @@ function afterWeek() {
 }
 
 function resolveChoice(index) {
-  const title = game.pendingEvent().title;
+  const event = game.pendingEvent();
+  const title = event.title;
+  const scene = sceneFor(event.eid, game.stage);
   const text = game.resolveEvent(index);
   saveGame();
-  showOutcome(title, text || "…");
+  go("outcome", { title, text: text || "…", scene });
 }
 
 function showOutcome(title, text) { go("outcome", { title, text }); }

@@ -375,6 +375,51 @@ def test_promotion_and_relegation_change_leagues():
         assert count == 12
 
 
+def test_career_starting_at_thirteen_goes_through_the_youth_stage():
+    """קריירה שמתחילה בגיל 13 — שנות נוער, בלי שכר, ואז חוזה ראשון."""
+    game = GameState.new_game("ילד מהשכונה", "ST", "hapoel_carmel", age=13, seed=77)
+    assert game.stage == "youth"
+    assert game.me.contract.wage == 0
+    start_overall = game.me.overall
+    assert game.me.potential > start_overall + 15
+
+    youth_matches = 0
+    seasons = 0
+    while seasons < 4 and game.stage == "youth":
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.set_action("shooting")
+        report = game.advance_week()
+        youth_matches += sum(1 for line in report.lines if "ליגת הנוער" in line)
+        if report.season_ended:
+            seasons += 1
+
+    assert youth_matches > 10, f"רק {youth_matches} משחקי נוער"
+    assert game.me.age == 16
+    assert game.stage == "academy"
+    assert game.me.contract.wage > 0
+    assert game.me.overall > start_overall
+    assert game.money == 0, "ילד בקבוצת נוער לא מרוויח שכר"
+
+
+def test_the_senior_league_keeps_running_during_the_youth_years():
+    """העולם לא קופא בזמן ששחקן הנוער גדל."""
+    game = GameState.new_game("ילד", "ST", "hapoel_carmel", age=13, seed=42)
+    while True:
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.set_action("shooting")
+        if game.advance_week().season_ended:
+            break
+    champion = game.history[0]
+    assert champion                      # העונה נרשמה
+    top_scorers = [p for p in game.players.values()
+                   if p.pid != game.me_id and p.career.goals > 0]
+    assert len(top_scorers) > 20, "אף שחקן בוגר לא כבש — הליגה לא שוחקה"
+
+
 def test_career_stage_advances_from_academy_to_player():
     game = GameState.new_game("עומר לוי", "ST", "hapoel_carmel", age=17, seed=36)
     while game.stage == "academy":

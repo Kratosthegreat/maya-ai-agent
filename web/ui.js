@@ -42,6 +42,12 @@ function go(next, data = null) {
 
 function render() {
   const app = $("#app");
+  if (!document.getElementById("scene-defs")) {
+    const holder = document.createElement("div");
+    holder.id = "scene-defs";
+    holder.innerHTML = sceneDefs();
+    document.body.appendChild(holder);
+  }
   let html = "";
   if (view === "menu") html = screenMenu();
   else if (view === "new") html = screenNew();
@@ -62,9 +68,9 @@ function render() {
 function screenMenu() {
   const saved = hasSave();
   return `
-  <div class="screen menu">
-    ${stadium()}
-    <div class="hero" style="padding-top:8px">
+  <div class="screen menu flush">
+    <div class="scene-frame">${SCENES.stadium()}</div>
+    <div class="hero" style="padding-top:6px">
       <div class="eyebrow">משחק ניהול כדורגל</div>
       <h1 class="display">קריירה</h1>
       <div class="underline"></div>
@@ -91,7 +97,7 @@ function screenMenu() {
 }
 
 function screenNew() {
-  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 17 });
+  const state = viewData || (viewData = { name: "", position: "ST", club: "hapoel_carmel", age: 15 });
   const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
   return `
   <div class="screen">
@@ -116,10 +122,12 @@ function screenNew() {
     <div class="card">
       <div class="eyebrow">גיל התחלה</div>
       <div class="chips">
-        ${[16, 17, 18].map(a => `<button class="chip" data-age="${a}"
+        ${[13, 14, 15, 16, 17, 18].map(a => `<button class="chip" data-age="${a}"
           aria-pressed="${state.age === a}">${a}</button>`).join("")}
       </div>
-      <p class="muted">צעיר יותר = יותר זמן להתפתח, אבל דרך ארוכה יותר להרכב.</p>
+      <p class="muted">${state.age <= 15
+        ? "מתחילים בקבוצת הנוער: בית ספר, מגרש שכונתי, ומאמן שעוד לא יודע איך קוראים לך. הדרך ארוכה — והתקרה גבוהה."
+        : "ישר לקבוצת הנוער הבוגרת, עם חוזה ראשון ופחות זמן להתפתח."}</p>
     </div>
 
     <div class="card">
@@ -298,8 +306,8 @@ function screenWeek() {
     const goals = result.events.filter(e => e.kind === "goal")
       .sort((a, b) => a.minute - b.minute);
     html += `
-    <div class="scoreboard">
-      <div class="eyebrow">${esc(competition)}</div>
+    <div class="scoreboard result">
+      <span class="comp-tag">${esc(competition)}</span>
       <div class="scoreline">
         <div class="side">${crest(home, 34)}<span class="nm ${
           club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
@@ -329,6 +337,34 @@ function screenWeek() {
     }
   }
 
+  if (report.match) {
+    const mine = report.match.result.events.filter(
+      e => e.kind === "goal" && e.playerId === me.pid);
+    if (mine.length) {
+      html += `<div class="my-goal-flash">
+        <span class="big">${mine.length === 1 ? "גול!" : mine.length + " גולים!"}</span>
+        <span>${mine.map(e => e.minute + "'").join(" · ")} — ${esc(me.name)}</span>
+      </div>`;
+    }
+  }
+
+  if (report.seniorMatch) {
+    const { result, home, away } = report.seniorMatch;
+    const club = game.myClub();
+    const outcome = club ? resultFor(result, club.cid) : "D";
+    const label = { W: "ניצחון", D: "תיקו", L: "הפסד" }[outcome];
+    html += `<div class="card">
+      <div class="eyebrow">הקבוצה הבוגרת</div>
+      <div class="crest-row">
+        ${crest(home, 22)}
+        <span class="nm">${esc(home.name)} ${result.homeGoals} : ${result.awayGoals} ${esc(away.name)}</span>
+        ${crest(away, 22)}
+      </div>
+      <div class="muted">${esc(label)} — קראת על זה בדרך לאימון.</div>
+    </div>`;
+  }
+
+  if (report.youth) html += youthCard(report.youth);
   if (report.personal) html += personalCard(report.personal);
 
   const notes = (report.training || []).concat(report.notes || []);
@@ -340,6 +376,34 @@ function screenWeek() {
 
   html += `<button class="btn primary wide" data-act="after-week">המשך</button></div>`;
   return strip() + html;
+}
+
+function youthCard(y) {
+  const club = game.myClub();
+  const rival = game.clubs[y.rivalCid];
+  const label = { W: "ניצחון", D: "תיקו", L: "הפסד" }[y.outcome];
+  const cls = { W: "w", D: "d", L: "l" }[y.outcome];
+  const bits = [];
+  if (y.goals) bits.push(y.goals === 1 ? "שער אחד" : `${y.goals} שערים`);
+  if (y.assists) bits.push(y.assists === 1 ? "בישול אחד" : `${y.assists} בישולים`);
+  const ratingCls = y.rating >= 7.5 ? "good" : y.rating < 5.5 ? "bad" : "";
+  return `<div class="card youth-card">
+    <div class="scene-frame inset">${SCENES.youthpitch()}</div>
+    <span class="comp-tag">ליגת הנוער</span>
+    <div class="youth-score">
+      ${club ? crest(club, 26) : ""}
+      <span>${y.teamGoals} : ${y.oppGoals}</span>
+      ${rival ? crest(rival, 26) : ""}
+      <span class="vs">מול ${esc(y.rival)}</span>
+    </div>
+    <div class="perf">
+      <div class="rating ${ratingCls}">${y.rating.toFixed(1)}</div>
+      <div class="detail">
+        <strong>${label}</strong>
+        <span>${bits.length ? esc(bits.join(" · ")) : "עוד משחק בדרך."}</span>
+      </div>
+    </div>
+  </div>`;
 }
 
 function personalCard(p) {
@@ -382,11 +446,13 @@ function screenEvent() {
   const event = game.pendingEvent();
   if (!event) { go("main"); return ""; }
   return `
-  <div class="takeover">
+  <div class="takeover flush">
+    <div class="scene-frame">${sceneFor(event.eid, game.stage)}</div>
     <div class="kicker">${esc(D.CAREER_STAGES_HE[game.stage] || "")} · שבוע ${game.week}</div>
     <h2 class="display">${esc(event.title)}</h2>
     <hr class="rule">
     <div class="body">${esc(game.pendingEventText())}</div>
+    ${contextStrip()}
     <div class="actions" style="margin-top:auto">
       ${event.choices.map((c, i) => `<button class="btn" data-choice="${i}">
         <span class="k">${esc(c.label)}</span>
@@ -396,9 +462,31 @@ function screenEvent() {
   </div>`;
 }
 
+/** רצועה קצרה עם המצב שלך — כדי שההחלטה תתקבל עם הנתונים מול העיניים. */
+function contextStrip() {
+  const me = game.me;
+  const club = game.myClub();
+  const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
+  const pills = [];
+  pills.push(`<span class="cpill">גיל <b>${me.age}</b></span>`);
+  if (isPlayer) {
+    pills.push(`<span class="cpill">כללי <b>${overall(me)}</b></span>`);
+    pills.push(`<span class="cpill">מורל <b>${Math.round(me.morale)}</b></span>`);
+    if (club) pills.push(`<span class="cpill">אמון המאמן <b>${Math.round(club.managerTrust)}</b></span>`);
+    if (me.injuryWeeks > 0)
+      pills.push(`<span class="cpill accent">פצוע <b>${me.injuryWeeks}ש</b></span>`);
+  } else {
+    pills.push(`<span class="cpill">ידע אימון <b>${Math.round(me.coaching)}</b></span>`);
+    if (club) pills.push(`<span class="cpill">הנהלה <b>${Math.round(club.boardConfidence)}</b></span>`);
+  }
+  if (game.money > 0) pills.push(`<span class="cpill">₪<b>${fmt(game.money)}</b></span>`);
+  return `<div class="context-strip">${pills.join("")}</div>`;
+}
+
 function screenOutcome() {
   return `
-  <div class="takeover">
+  <div class="takeover${viewData.scene ? " flush" : ""}">
+    ${viewData.scene ? `<div class="scene-frame">${viewData.scene}</div>` : ""}
     <div class="kicker">מה שקרה</div>
     <h2 class="display">${esc(viewData.title)}</h2>
     <hr class="rule">
@@ -412,10 +500,10 @@ function screenOutcome() {
 function screenSeason() {
   const s = viewData;
   return `
-  <div class="screen">
-    <div class="hero" style="padding-top:10px">
-      <div class="eyebrow">סוף עונה</div>
-      <h1 class="display" style="font-size:40px">${esc(s.title)}</h1>
+  <div class="screen flush">
+    <div class="scene-frame season-hero">
+      ${SCENES.trophy()}
+      <span class="season-title">${esc(s.title)}</span>
     </div>
     <div class="card"><div class="notes">
       ${s.lines.map(l => `<div class="note ${l.strong ? "strong" : ""}">
@@ -432,19 +520,24 @@ function screenProfile() {
   const s = me.season, c = me.career;
   return `
   <div class="screen">
+    ${isPlayer ? playerCard(me, club, game.stage) : `
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
       <div class="kit-row">
-        ${isPlayer ? shirt(club, me.number || 0, 78) : (club ? crest(club, 58) : "")}
+        ${club ? crest(club, 58) : ""}
         <div class="kit-meta">
           <span class="display big">${esc(me.name)}</span>
           <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}</span>
           ${club ? `<span class="muted">${esc(club.name)}</span>` : ""}
         </div>
       </div>
-      ${me.traits.length ? `<div class="chips">${me.traits.map(t =>
-        `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>` : ""}
-    </div>
+    </div>`}
+    ${me.traits.length ? `<div class="card">
+      <div class="eyebrow">אופי</div>
+      <div class="chips">${me.traits.map(t =>
+        `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>
+      <div class="muted">${me.traits.map(t => D.TRAITS[t] ? esc(D.TRAITS[t].desc) : "").join(" ")}</div>
+    </div>` : ""}
 
     ${isPlayer ? `
     <div class="card">
@@ -709,7 +802,7 @@ function bind() {
 }
 
 function act(what) {
-  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 17 }); }
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15 }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -750,10 +843,12 @@ function afterWeek() {
 }
 
 function resolveChoice(index) {
-  const title = game.pendingEvent().title;
+  const event = game.pendingEvent();
+  const title = event.title;
+  const scene = sceneFor(event.eid, game.stage);
   const text = game.resolveEvent(index);
   saveGame();
-  showOutcome(title, text || "…");
+  go("outcome", { title, text: text || "…", scene });
 }
 
 function showOutcome(title, text) { go("outcome", { title, text }); }

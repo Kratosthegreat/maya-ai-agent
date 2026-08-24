@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import data as D
 from . import story as ST
-from .engine import (MENTALITIES, MatchEvent, MatchResult, build_commentary,
-                     simulate_match)
+from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
+                     build_commentary, simulate_match)
 from .models import (Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from .progression import (end_of_season_development, retirement_pressure,
@@ -168,8 +168,8 @@ class GameState:
 
     @classmethod
     def new_game(cls, name: str, position: str, club_id: str,
-                 age: int = 17, seed: Optional[int] = None,
-                 stage: str = "academy") -> "GameState":
+                 age: int = 15, seed: Optional[int] = None,
+                 stage: Optional[str] = None) -> "GameState":
         """פותח קריירה חדשה של שחקן צעיר."""
         state = cls()
         state.seed = seed if seed is not None else random.randrange(1, 10 ** 8)
@@ -181,18 +181,24 @@ class GameState:
                              quality=int(clamp(club.reputation * 0.55 + 24, 48, 70)))
         me.name = name
         me.is_human = True
-        me.potential = int(clamp(me.overall + state.rng.randint(12, 30), 60, 94))
+        # מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
+        me.potential = int(clamp(me.overall + state.rng.randint(12, 30)
+                                 + max(0, 17 - age) * 4, 58, 94))
         me.club_id = club_id
-        me.contract = Contract(wage=max(2500, wage_for_overall(me.overall) // 2), years_left=3)
+        if age >= 16:
+            me.contract = Contract(wage=max(2500, wage_for_overall(me.overall) // 2),
+                                   years_left=3)
+        else:
+            me.contract = Contract(wage=0, years_left=0)   # בגיל הנוער אין חוזה
         me.morale = 70.0
-        me.reputation = 8.0
+        me.reputation = 8.0 if age >= 16 else 3.0
         me.traits = [state.rng.choice(list(D.TRAITS.keys()))]
         state.players[me.pid] = me
         club.squad.append(me.pid)
         state.me_id = me.pid
         state.first_club_id = club_id
         state.last_club_id = club_id
-        state.stage = stage
+        state.stage = stage or ("youth" if age <= 15 else "academy")
         club.manager_trust = 45.0
 
         state.start_season(first=True)
@@ -281,6 +287,9 @@ class GameState:
 
     def available_actions(self) -> List[Tuple[str, str]]:
         """פעולות אפשריות לשבוע, לפי שלב הקריירה."""
+        if self.stage == "youth":
+            keys = list(D.ATTRIBUTES) + ["street", "school", "rest"]
+            return [(k, D.TRAINING_FOCUS_HE[k]) for k in keys]
         if self.stage in ("academy", "player", "veteran"):
             keys = list(D.ATTRIBUTES) + ["rest", "badges", "media", "business"]
             return [(k, D.TRAINING_FOCUS_HE[k]) for k in keys]
@@ -319,8 +328,10 @@ class GameState:
         # 1. פעולת השבוע
         report.lines.extend(self._do_weekly_action())
 
-        # 2. משחקים
-        self._simulate_week_matches(report)
+        # 2. משחקים — הליגה הבוגרת רצה גם כשאתה עוד בקבוצת הנוער
+        self._simulate_week_matches(report, spectator=self.stage == "youth")
+        if self.stage == "youth":
+            self._youth_week(report)
 
         # 3. שחקני מחשב
         simulate_ai_week(self.players, self.rng, self.clubs, skip=self.me_id)
@@ -345,6 +356,21 @@ class GameState:
         focus = self.training_focus
         me = self.me
         club = self.my_club
+
+        if self.stage == "youth":
+            if focus == "school":
+                if self.rng.random() < 0.35:
+                    me.attributes["mental"] = int(clamp(
+                        me.attributes.get("mental", 50) + 1, 10, 97))
+                self.flags["school"] = self.flag("school", 0) + 1
+                me.fitness = clamp(me.fitness + 14, 0, 100)
+                return ["📚 שבוע של בית ספר. ההורים מרוצים, המאמן פחות."]
+            if focus == "street":
+                attr = self.rng.choice(["dribbling", "shooting", "pace"])
+                lines = weekly_training(me, attr, club, self.rng, 1.15)
+                me.morale = clamp(me.morale + 4, 5, 99)
+                return ["🧱 שיחקת עד שהחשיך במגרש השכונתי."] + lines
+            return weekly_training(me, focus, club, self.rng, self.intensity)
 
         if self.stage in ("academy", "player", "veteran"):
             return weekly_training(me, focus, club, self.rng, self.intensity)
@@ -443,10 +469,59 @@ class GameState:
 
     # -- משחקים -----------------------------------------------------------
 
-    def _simulate_week_matches(self, report: WeekReport) -> None:
-        """מדמה את כל המשחקים של השבוע."""
+    def _youth_week(self, report: WeekReport) -> None:
+        """שבוע בקבוצת הנוער — משחק מול קבוצת נוער אחרת, בלי טבלה ובלי קהל."""
+        me = self.me
+        club = self.my_club
+        if self.week % 2 == 0:
+            report.add("🏃 שבוע אימונים בקבוצת הנוער.")
+            weekly_recovery(me, played=False, rng=self.rng)
+            return
+        if not me.available:
+            report.add(f"🚑 פצוע — {me.injury_name} ({me.injury_weeks} שבועות).")
+            return
+
+        rivals = [c for c in self.clubs.values() if not club or c.cid != club.cid]
+        rival = self.rng.choice(rivals)
+        opp = clamp((club.youth_academy if club else 45) * 0.42 + 16
+                    + self.rng.gauss(0, 5), 18, 72)
+        edge = (me.effective - opp) / 10.0
+
+        team_goals = _poisson(self.rng, clamp(1.3 + edge * 0.35, 0.15, 6))
+        opp_goals = _poisson(self.rng, clamp(1.4 - edge * 0.30, 0.15, 6))
+        goals = _poisson(self.rng, clamp(
+            0.18 + max(0.0, edge) * 0.22 + me.attributes.get("shooting", 40) / 260.0, 0.02, 3))
+        assists = _poisson(self.rng, clamp(
+            0.12 + me.attributes.get("passing", 40) / 320.0, 0.02, 2))
+
+        me.season.goals += goals
+        me.season.assists += assists
+        rating = round(clamp(6.0 + edge * 0.16 + goals * 1.0 + assists * 0.5
+                             + self.rng.gauss(0, 0.5), 3, 10), 1)
+        me.season.add_match(rating, 70)
+        me.fitness = clamp(me.fitness - 16, 8, 100)
+        me.morale = clamp(me.morale + (rating - 6.3) * 2, 5, 99)
+        me.form = clamp(me.form * 0.84 + (rating - 6) * 14 + 9, 5, 99)
+        if club:
+            club.manager_trust = clamp(club.manager_trust + (rating - 6.4) * 0.8, 0, 100)
+
+        outcome = "ניצחון" if team_goals > opp_goals else \
+                  "תיקו" if team_goals == opp_goals else "הפסד"
+        report.add(f"⚽ ליגת הנוער: {team_goals}:{opp_goals} מול {rival.name} נוער — {outcome}")
+        detail = f"הציון שלך: {rating}"
+        if goals:
+            detail += f" | {goals} שערים"
+        if assists:
+            detail += f" | {assists} בישולים"
+        report.add(f"👤 {detail}")
+
+    def _simulate_week_matches(self, report: WeekReport, spectator: bool = False) -> None:
+        """מדמה את כל המשחקים של השבוע.
+
+        spectator=True: העולם ממשיך לרוץ, אבל אתה לא משחק במשחקים האלה.
+        """
         if self.week in CUP_WEEKS:
-            self._play_cup_round(report)
+            self._play_cup_round(report, spectator)
             return
 
         my_club = self.my_club
@@ -457,12 +532,15 @@ class GameState:
                 continue
             for home_id, away_id in self.fixtures[lid][rnd]:
                 home, away = self.clubs[home_id], self.clubs[away_id]
-                is_mine = my_club is not None and my_club.cid in (home_id, away_id)
+                involves_me = my_club is not None and my_club.cid in (home_id, away_id)
+                is_mine = involves_me and not spectator
                 result = self._simulate_one(home, away, is_mine, "ליגה")
                 self._register_result(lid, result)
                 if is_mine:
                     report.match = result
                     report.lines.extend(self._my_match_lines(result))
+                elif involves_me and spectator:
+                    report.add(f"📰 הקבוצה הבוגרת: {home.name} {result.score} {away.name}")
 
     def _simulate_one(self, home: Club, away: Club, is_mine: bool,
                       competition: str, neutral: bool = False) -> MatchResult:
@@ -576,7 +654,7 @@ class GameState:
         table[result.home_id].register(result.home_goals, result.away_goals)
         table[result.away_id].register(result.away_goals, result.home_goals)
 
-    def _play_cup_round(self, report: WeekReport) -> None:
+    def _play_cup_round(self, report: WeekReport, spectator: bool = False) -> None:
         """מחזור גביע נוקאאוט."""
         teams = self.cup.get("teams", [])
         if not teams or self.cup.get("winner"):
@@ -590,7 +668,8 @@ class GameState:
         neutral = round_name == "גמר הגביע"
         for i in range(0, len(teams) - 1, 2):
             home, away = self.clubs[teams[i]], self.clubs[teams[i + 1]]
-            is_mine = my_club is not None and my_club.cid in (home.cid, away.cid)
+            involves_me = my_club is not None and my_club.cid in (home.cid, away.cid)
+            is_mine = involves_me and not spectator
             result = self._simulate_one(home, away, is_mine, round_name, neutral)
             if result.home_goals == result.away_goals:
                 # פנדלים
@@ -608,6 +687,8 @@ class GameState:
                 report.match = result
                 report.add(f"🏆 {round_name}")
                 report.lines.extend(self._my_match_lines(result))
+            elif involves_me and spectator:
+                report.add(f"📰 הקבוצה הבוגרת בגביע: {home.name} {result.score} {away.name}")
         self.cup["teams"] = winners
         if len(winners) == 1:
             self.cup["winner"] = winners[0]
@@ -615,7 +696,7 @@ class GameState:
             report.add(f"🏆 {champ.name} זוכים בגביע המדינה!")
             if my_club and my_club.cid == winners[0]:
                 self.record_honour("גביע המדינה")
-        if my_club and my_club.cid not in winners:
+        if not spectator and my_club and my_club.cid not in winners:
             self._idle_week(report)
 
     def _idle_week(self, report: WeekReport) -> None:
@@ -626,7 +707,9 @@ class GameState:
     def _weekly_income(self, report: WeekReport) -> None:
         """שכר שבועי לפי שלב הקריירה."""
         me = self.me
-        if self.stage in ("academy", "player", "veteran"):
+        if self.stage == "youth":
+            pass                      # בגיל הזה עוד לא משלמים לך
+        elif self.stage in ("academy", "player", "veteran"):
             self.earn_money(me.contract.wage)
         elif self.stage in ("coach", "manager", "director"):
             club = self.my_club
@@ -713,6 +796,54 @@ class GameState:
         rows = list(self.tables.get(league_id, {}).values())
         rows.sort(key=lambda r: (-r.points, -r.gd, -r.gf))
         return rows
+
+    def youth_academy_suitor(self) -> Optional[Club]:
+        """מועדון עם מחלקת נוער חזקה שמעוניין בי."""
+        club = self.my_club
+        if not club:
+            return None
+        pool = [c for c in self.clubs.values()
+                if c.cid != club.cid and c.youth_academy > club.youth_academy + 12
+                and c.league_id != "euro"]
+        if not pool:
+            return None
+        return max(pool, key=lambda c: c.youth_academy)
+
+    def join_big_academy(self) -> str:
+        target = self.youth_academy_suitor()
+        if not target:
+            return "ההזדמנות נסגרה."
+        self.transfer_me(target.cid, wage=0, years=0)
+        target.manager_trust = 40.0
+        self.me.morale = clamp(self.me.morale - 4, 5, 99)
+        self.me.potential = int(clamp(self.me.potential + self.rng.randint(1, 5), 40, 96))
+        self.set_flag("big_academy", True)
+        return (f"עברת ל{target.name}. מתקנים שלא הכרת, "
+                f"וילדים שכולם היו הכי טובים במועדון שלהם.")
+
+    def show_off(self) -> str:
+        if self.rng.random() < 0.5:
+            self.me.reputation = clamp(self.me.reputation + 6, 1, 99)
+            self.me.growth["dribbling"] = self.me.growth.get("dribbling", 0.0) + 1.0
+            self.set_flag("scouted_wow", True)
+            return "הורדת שניים בתנועה אחת והנחת כדור בזווית. הוא הפסיק לכתוב והסתכל."
+        club = self.my_club
+        if club:
+            club.manager_trust = clamp(club.manager_trust - 8, 0, 100)
+        self.me.morale = clamp(self.me.morale - 6, 5, 99)
+        return "ניסית סובב מיותר באמצע המגרש, איבדת כדור, וספגתם. הצופה כבר לא הסתכל."
+
+    def ask_why(self) -> str:
+        club = self.my_club
+        trust = club.manager_trust if club else 50.0
+        if trust >= 45 or self.rng.random() < 0.4:
+            if club:
+                club.manager_trust = clamp(club.manager_trust + 6, 0, 100)
+            self.me.growth["mental"] = self.me.growth.get("mental", 0.0) + 1.2
+            return ('הוא ענה בכנות: "אתה טוב עם הכדור וגרוע בלעדיו." '
+                    'זו הייתה הביקורת הכי שימושית שקיבלת.')
+        self.me.morale = clamp(self.me.morale - 7, 5, 99)
+        return 'הוא אמר "יש עוד טורנירים" והמשיך לסדר קונוסים. לא קיבלת תשובה.'
 
     def loan_target_name(self) -> str:
         options = [c for c in self.clubs.values() if c.league_id == "national"]
@@ -1231,7 +1362,8 @@ class GameState:
         league_id = self.my_league or "top"
         club_ids = {c.cid for c in self.clubs.values() if c.league_id == league_id}
         squad = [p for p in self.players.values()
-                 if p.club_id in club_ids and p.season.apps > 0]
+                 if p.club_id in club_ids and p.season.apps > 0
+                 and not (self.stage == "youth" and p.pid == self.me_id)]
         if not squad:
             return lines
         scorer = max(squad, key=lambda p: (p.season.goals, p.season.assists))
@@ -1247,7 +1379,7 @@ class GameState:
     def _personal_summary(self) -> List[str]:
         me = self.me
         lines = ["", "— העונה שלך —"]
-        if self.stage in ("academy", "player", "veteran"):
+        if self.stage in ("youth", "academy", "player", "veteran"):
             season = me.season
             lines.append(f"משחקים: {season.apps} | שערים: {season.goals} | "
                          f"בישולים: {season.assists} | ציון ממוצע: {season.avg_rating}")
@@ -1401,7 +1533,13 @@ class GameState:
         me = self.me
         club = self.my_club
 
-        if self.stage == "academy":
+        if self.stage == "youth":
+            if me.age >= 16:
+                self.stage = "academy"
+                me.contract = Contract(
+                    wage=max(1800, wage_for_overall(me.overall) // 3), years_left=2)
+                lines.append("📈 עלית לקבוצת הנוער הבוגרת — ועם החוזה הראשון שלך.")
+        elif self.stage == "academy":
             if me.age >= 18 or (club and club.manager_trust >= 55):
                 self.stage = "player"
                 lines.append("📈 אתה כבר לא נער — אתה שחקן בסגל הבוגרים.")

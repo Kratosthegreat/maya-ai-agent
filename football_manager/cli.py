@@ -390,9 +390,15 @@ def new_game_wizard() -> GameState:
     club_idx = choose("באיזה מועדון אתה מתחיל?", labels, default=len(labels) // 2)
     club_id = starters[club_idx][0]
 
-    age = 16 + choose("בן כמה אתה מתחיל?", ["16 — נער בקבוצת הנוער",
-                                            "17 — על סף הבוגרים",
-                                            "18 — כבר בסגל"], default=1)
+    ages = [
+        ("13 — ילד בקבוצת הנוער", 13),
+        ("14 — עוד שנה בנוער", 14),
+        ("15 — השנה האחרונה בנוער", 15),
+        ("16 — נערי הנוער הבוגרת", 16),
+        ("17 — על סף הבוגרים", 17),
+        ("18 — כבר בסגל", 18),
+    ]
+    age = ages[choose("בן כמה אתה מתחיל?", [label for label, _ in ages], default=2)][1]
     game = GameState.new_game(name, position, club_id, age=age)
     header("הסיפור מתחיל")
     out(f"{game.me.name}, בן {game.me.age}, {game.me.position_he} של "

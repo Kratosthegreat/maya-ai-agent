@@ -81,6 +81,160 @@ def _attr(game, attr: str, delta: float) -> None:
 
 
 # ===========================================================================
+# שלב 0 — כדורגל נוער (13-15)
+# ===========================================================================
+
+register(StoryEvent(
+    eid="first_boots",
+    title="הנעליים הראשונות",
+    stages=("youth",),
+    weight=7.0,
+    condition=lambda g: g.week >= 2,
+    body=lambda g: (
+        "אבא שלך שם על השולחן קופסה.\n"
+        "נעלי כדורגל אמיתיות — לא של אח גדול, לא מהשוק.\n\n"
+        "\"אני לא מבין בזה,\" הוא אומר, \"אבל אמרו לי שאתה טוב. תוכיח.\""
+    ),
+    choices=[
+        Choice("לשמור אותן רק למשחקים",
+               lambda g: (_attr(g, "mental", 1.2), _morale(g, 5),
+                          "נעלת אותן רק בימי משחק. באימונים המשכת עם הישנות, עד שנקרעו.")[-1],
+               hint="משמעת"),
+        Choice("לשחק בהן בכל יום עד שיתפרקו",
+               lambda g: (_attr(g, "dribbling", 1.6), _attr(g, "physical", 0.4),
+                          "שחקת בהן בבית ספר, ברחוב, בחצר. "
+                          "תוך חודשיים הן נראו כמו סמרטוט — ואתה נראית אחרת.")[-1],
+               hint="כדרור ↑↑"),
+    ],
+))
+
+register(StoryEvent(
+    eid="school_or_football",
+    title="מבחן ביום משחק",
+    stages=("youth",),
+    weight=4.0,
+    once=False,
+    condition=lambda g: g.me.age <= 15,
+    body=lambda g: (
+        "מחר גמר מחוזי. מחר גם מבחן במתמטיקה.\n"
+        "המחנכת אמרה שאם תיעדר שוב — היא מזמינה את ההורים."
+    ),
+    choices=[
+        Choice("לשחק. המבחן יחכה.",
+               lambda g: (_trust(g, 8), _attr(g, "shooting", 0.8),
+                          g.set_flag("school_trouble", True),
+                          "כבשת שניים. בבית חיכתה שיחה ארוכה, "
+                          "אבל אף אחד לא הזכיר את זה יותר אחרי הגמר.")[-1],
+               hint="המאמן ↑, בית הספר ↓"),
+        Choice("מבחן. אני לא זורק את הלימודים.",
+               lambda g: (_attr(g, "mental", 1.4), _trust(g, -5),
+                          "עברת את המבחן. הקבוצה הפסידה 1:0 "
+                          "והמאמן הסתכל עליך אחרת שבועיים.")[-1],
+               hint="ראש ↑"),
+        Choice("לנסות את שניהם — מבחן בבוקר, משחק בערב",
+               lambda g: (_attr(g, "mental", 0.6), _morale(g, -3),
+                          g.me.__setattr__("fitness", clamp(g.me.fitness - 20, 5, 100)),
+                          "הגעת למשחק שרוף. שיחקת חצי שעה ולא זכרת ממנה כלום.")[-1]),
+    ],
+))
+
+register(StoryEvent(
+    eid="growth_spurt",
+    title="פתאום הכל ארוך",
+    stages=("youth",),
+    weight=5.0,
+    condition=lambda g: g.me.age >= 14,
+    body=lambda g: (
+        "גדלת שמונה סנטימטרים בחצי שנה.\n"
+        "הרגליים לא במקום שהן היו, הכדור לא מגיע לאן שכיוונת,\n"
+        "וכל מי שהיה נמוך ממך פתאום עוקף אותך בכדרור."
+    ),
+    choices=[
+        Choice("לעבוד על תיאום ושליטה",
+               lambda g: (_attr(g, "dribbling", 1.3), _attr(g, "passing", 1.0),
+                          _attr(g, "pace", -0.4),
+                          "חודשיים של תרגילי קונוסים משעממים. "
+                          "חזרת לשלוט בגוף החדש שלך.")[-1],
+               hint="כדרור ומסירה ↑"),
+        Choice("לנצל את הגובה ולהתחזק",
+               lambda g: (_attr(g, "physical", 2.0), _attr(g, "dribbling", -0.5),
+                          "הפכת לילד הכי חזק במגרש. גם הכי מגושם, "
+                          "אבל אף אחד לא הזיז אותך מהכדור.")[-1],
+               hint="כוח פיזי ↑↑"),
+    ],
+))
+
+register(StoryEvent(
+    eid="scout_in_stands",
+    title="האיש עם המחברת",
+    stages=("youth",),
+    weight=4.5,
+    condition=lambda g: g.me.age >= 14 and g.me.season.apps >= 3,
+    body=lambda g: (
+        "מאחורי השער עומד גבר עם מעיל ומחברת.\n"
+        "כולם יודעים מי זה. הקבוצה משחקת אחרת כשהוא שם — כולם רוצים להיראות."
+    ),
+    choices=[
+        Choice("לשחק בדיוק כמו תמיד",
+               lambda g: (_attr(g, "mental", 1.0), _rep(g, 2),
+                          "לא ניסית להרשים. הוא רשם משהו קצר והלך. "
+                          "שבוע אחרי זה שאלו עליך.")[-1],
+               hint="בטוח"),
+        Choice("לנסות משהו מיוחד", lambda g: g.show_off(), hint="הימור"),
+    ],
+))
+
+register(StoryEvent(
+    eid="left_out",
+    title="הרשימה על הדלת",
+    stages=("youth",),
+    weight=3.5,
+    once=False,
+    condition=lambda g: g.me.age <= 15 and g.week >= 6,
+    body=lambda g: (
+        "רשימת הנוסעים לטורניר תלויה על דלת חדר ההלבשה.\n"
+        "קראת אותה שלוש פעמים. השם שלך לא שם."
+    ),
+    choices=[
+        Choice("לשאול את המאמן למה", lambda g: g.ask_why(), hint="אמת בפנים"),
+        Choice("להתאמן לבד כל השבוע",
+               lambda g: (_attr(g, "physical", 1.4), _attr(g, "shooting", 0.6),
+                          _morale(g, -8),
+                          "כל בוקר, מגרש ריק, אתה והכדור. "
+                          "בטורניר הבא לא היה מה לשאול.")[-1],
+               hint="כוח פיזי ↑, מורל ↓"),
+        Choice("לא להגיע לאימונים שבוע",
+               lambda g: (_trust(g, -14), _morale(g, 3),
+                          "נעלמת שבוע. כשחזרת, המאמן אמר רק: "
+                          "\"נחמד שהצטרפת.\" זה עלה לך.")[-1],
+               hint="מסוכן"),
+    ],
+))
+
+register(StoryEvent(
+    eid="academy_offer",
+    title="מכתב ממועדון גדול",
+    stages=("youth",),
+    weight=6.0,
+    condition=lambda g: g.me.age >= 14 and g.youth_academy_suitor() is not None,
+    body=lambda g: (
+        f"{g.youth_academy_suitor().name} מזמינים אותך למחלקת הנוער שלהם.\n"
+        f"מתקנים אחרים, מאמנים אחרים, ילדים טובים יותר.\n\n"
+        f"זה גם שעה נסיעה לכל כיוון, וחברים שלא תראה יותר."
+    ),
+    choices=[
+        Choice("לעבור למועדון הגדול", lambda g: g.join_big_academy(),
+               hint="מתקנים ↑↑, תחרות קשה"),
+        Choice("להישאר בבית",
+               lambda g: (_trust(g, 12), _morale(g, 6), g.set_flag("stayed_home", True),
+                          "נשארת. במועדון שלך הפכת לילד שכולם מדברים עליו — "
+                          "וזה בדיוק מה שהיה צריך.")[-1],
+               hint="דקות משחק, אמון"),
+    ],
+))
+
+
+# ===========================================================================
 # שלב 1 — נוער ופריצה
 # ===========================================================================
 

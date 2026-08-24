@@ -8,12 +8,13 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "engine.js", "story.js", "game.js"];
+const PARTS = ["data.js", "engine.js", "story.js", "game.js", "graphics.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
 const ctx = vm.createContext({ console, Math, JSON, Date });
 vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, generatePlayer, " +
   "simulateMatch, pickLineup, teamStrength, roundRobin, overall, playerValue, " +
-  "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt };", ctx);
+  "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
+  "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -230,6 +231,43 @@ test("אירוע ממתין עוצר את השבוע עד להחלטה", () => {
   assert(g.pendingEventId === null, "האירוע לא נסגר");
 });
 
+console.log("\nגרפיקה");
+
+test("כל הסצנות מייצרות SVG תקין", () => {
+  const names = Object.keys(A.SCENES);
+  assert(names.length >= 10, `רק ${names.length} סצנות`);
+  for (const name of names) {
+    const svg = A.SCENES[name]();
+    assert(svg.startsWith("<svg") && svg.trim().endsWith("</svg>"), `${name}: לא SVG`);
+    assert(!svg.includes("undefined") && !svg.includes("NaN"), `${name}: ערך חסר`);
+    assert((svg.match(/</g) || []).length === (svg.match(/>/g) || []).length,
+      `${name}: תגיות לא מאוזנות`);
+  }
+});
+
+test("לכל אירוע עלילה יש סצנה", () => {
+  for (const event of A.STORY) {
+    const svg = A.sceneFor(event.eid, event.stages[0] || "player");
+    assert(svg.startsWith("<svg"), `${event.eid}: אין סצנה`);
+  }
+});
+
+test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 17, 55);
+  for (const club of Object.values(g.clubs)) {
+    const c = A.crest(club, 28);
+    assert(c.includes("<svg") && !c.includes("undefined"), `סמל ${club.name}`);
+    const [primary] = A.kit(club.cid);
+    assert(/^#[0-9A-Fa-f]{6}$/.test(primary), `צבע לא תקין ל-${club.name}`);
+  }
+  const card = A.playerCard(g.me, g.myClub(), g.stage);
+  assert(card.includes("pcard") && !card.includes("undefined"), "כרטיס שחקן");
+  const club = g.myClub();
+  const lineup = A.pickLineup(club, g.players, club.formation);
+  const svg = A.pitch(lineup, club.formation, g.players, g.meId, club);
+  assert(svg.includes("<svg") && !svg.includes("NaN"), "מגרש");
+});
+
 console.log("\nמצב המשחק");
 
 test("משחק חדש מציב את השחקן בסגל", () => {
@@ -238,6 +276,49 @@ test("משחק חדש מציב את השחקן בסגל", () => {
   assert(g.myClub().squad.includes(g.meId), "לא בסגל");
   assert(g.stage === "academy", "שלב פתיחה");
   assert(A.overall(g.me) < g.me.potential, "אין לאן להתפתח");
+});
+
+test("קריירה שמתחילה בגיל 13 עוברת דרך שלב הנוער", () => {
+  const g = A.Game.newGame("ילד מהשכונה", "ST", "hapoel_carmel", 13, 77);
+  assert(g.stage === "youth", `שלב פתיחה ${g.stage}`);
+  assert(g.me.contract.wage === 0, "ילד בן 13 לא מקבל שכר");
+  const startOverall = A.overall(g.me);
+  assert(g.me.potential > startOverall + 15, "אין מספיק לאן לגדול");
+
+  let youthMatches = 0, seasons = 0;
+  while (seasons < 4) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.setAction(g.availableActions()[0][0]);
+    const r = g.advanceWeek();
+    if (r.youth) {
+      youthMatches++;
+      assert(r.youth.rival && r.youth.rating >= 3, "משחק נוער לא תקין");
+    }
+    if (r.seasonEnded) seasons++;
+    if (g.stage !== "youth") break;
+  }
+  assert(youthMatches > 10, `רק ${youthMatches} משחקי נוער`);
+  assert(g.me.age === 16, `הגיל בזמן המעבר: ${g.me.age}`);
+  assert(g.stage === "academy", `השלב אחרי הנוער: ${g.stage}`);
+  assert(g.me.contract.wage > 0, "אין חוזה ראשון");
+  assert(A.overall(g.me) > startOverall, "לא התפתח בשנות הנוער");
+});
+
+test("הליגה הבוגרת ממשיכה לרוץ בזמן שנות הנוער", () => {
+  const g = A.Game.newGame("ילד", "ST", "hapoel_carmel", 13, 42);
+  let summary = null;
+  while (!summary) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.setAction("shooting");
+    const r = g.advanceWeek();
+    if (r.seasonEnded) summary = r.seasonSummary;
+  }
+  const champion = summary.lines.find(l => l.text.includes("אלוף ליגת העל"));
+  assert(champion, "אין אלוף");
+  const points = parseInt(champion.text.match(/\((\d+) נק/)[1], 10);
+  assert(points > 30, `האלוף סיים עם ${points} נקודות — הליגה לא שוחקה`);
+  const scorer = summary.lines.find(l => l.text.includes("מלך השערים"));
+  assert(scorer && !scorer.text.includes("ילד"), "ילד בן 13 לא אמור להיות מלך השערים של ליגת העל");
 });
 
 test("טבלת הליגה מסתדרת חשבונית", () => {

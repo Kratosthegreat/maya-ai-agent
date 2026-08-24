@@ -8,7 +8,7 @@ class Game {
   constructor() {
     this.seed = 0;
     this.clubs = {}; this.players = {};
-    this.meId = ""; this.stage = "academy";
+    this.meId = ""; this.stage = "youth";
     this.year = 2026; this.week = 1;
     this.fixtures = {}; this.tables = {}; this.cup = {};
     this.money = 0; this.flags = {}; this.honours = []; this.news = [];
@@ -51,7 +51,7 @@ class Game {
   // משחק חדש
   // ==================================================================
 
-  static newGame(name, position, clubId, age = 17, seed = null) {
+  static newGame(name, position, clubId, age = 15, seed = null) {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -63,16 +63,22 @@ class Game {
       age, quality: Math.round(clamp(club.reputation * 0.55 + 24, 48, 70)) });
     me.name = name;
     me.isHuman = true;
-    me.potential = Math.round(clamp(overall(me) + g.rng.randint(12, 30), 60, 94));
+    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
+    me.potential = Math.round(clamp(
+      overall(me) + g.rng.randint(12, 30) + Math.max(0, 17 - age) * 4, 58, 94));
     me.clubId = clubId;
-    me.contract = { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 };
-    me.morale = 70; me.reputation = 8;
+    // בגילי הנוער אין חוזה מקצועני
+    me.contract = age >= 16
+      ? { wage: Math.max(2500, Math.round(wageForOverall(overall(me)) / 2)), yearsLeft: 3 }
+      : { wage: 0, yearsLeft: 0 };
+    me.morale = 70; me.reputation = age >= 16 ? 8 : 3;
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
     assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
+    g.stage = age <= 15 ? "youth" : "academy";
     club.managerTrust = 45;
 
     g.startSeason();
@@ -174,6 +180,10 @@ class Game {
   // ==================================================================
 
   availableActions() {
+    if (this.stage === "youth") {
+      return D.ATTRIBUTES.concat(["street", "school", "rest"])
+        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+    }
     if (["academy", "player", "veteran"].includes(this.stage)) {
       return D.ATTRIBUTES.concat(["rest", "badges", "media", "business"])
         .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
@@ -204,7 +214,9 @@ class Game {
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
     report.training = this.doWeeklyAction();
-    this.simulateWeekMatches(report);
+    // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
+    this.simulateWeekMatches(report, this.stage === "youth");
+    if (this.stage === "youth") this.youthWeek(report);
     simulateAiWeek(this.players, this.rng, this.clubs, this.meId);
 
     const event = pickEvent(this, this.rng);
@@ -227,6 +239,22 @@ class Game {
     const me = this.me;
     const club = this.myClub();
 
+    if (this.stage === "youth") {
+      if (focus === "school") {
+        me.attributes.mental = Math.round(clamp((me.attributes.mental ?? 50) +
+          (this.rng.random() < 0.35 ? 1 : 0), 10, 97));
+        this.flags.school = (this.flag("school", 0)) + 1;
+        me.fitness = clamp(me.fitness + 14, 0, 100);
+        return [{ icon: "📚", text: "שבוע של בית ספר. ההורים מרוצים, המאמן פחות." }];
+      }
+      if (focus === "street") {
+        const attr = this.rng.choice(["dribbling", "shooting", "pace"]);
+        const lines = weeklyTraining(me, attr, club, this.rng, 1.15);
+        me.morale = clamp(me.morale + 4, 5, 99);
+        return [{ icon: "🧱", text: "שיחקת עד שהחשיך במגרש השכונתי." }].concat(lines);
+      }
+      return weeklyTraining(me, focus, club, this.rng, this.intensity);
+    }
     if (["academy", "player", "veteran"].includes(this.stage))
       return weeklyTraining(me, focus, club, this.rng, this.intensity);
 
@@ -320,8 +348,8 @@ class Game {
 
   // -- משחקים -----------------------------------------------------------
 
-  simulateWeekMatches(report) {
-    if (CUP_WEEKS[this.week]) { this.playCupRound(report); return; }
+  simulateWeekMatches(report, spectator = false) {
+    if (CUP_WEEKS[this.week]) { this.playCupRound(report, spectator); return; }
     const myClub = this.myClub();
     for (const league of D.LEAGUES) {
       const lid = league.id;
@@ -329,16 +357,64 @@ class Game {
       if (rnd === null) continue;
       for (const [homeId, awayId] of this.fixtures[lid][rnd]) {
         const home = this.clubs[homeId], away = this.clubs[awayId];
-        const isMine = myClub && (myClub.cid === homeId || myClub.cid === awayId);
+        const involvesMe = myClub && (myClub.cid === homeId || myClub.cid === awayId);
+        const isMine = involvesMe && !spectator;
         const result = this.simulateOne(home, away, isMine, "ליגה");
         this.registerResult(lid, result);
         if (isMine) {
           report.match = { result, home, away, competition: "ליגה" };
           this.myMatchLines(result, report);
+        } else if (involvesMe && spectator) {
+          // הקבוצה הבוגרת של המועדון שלך שיחקה — אתה קראת על זה בעיתון
+          report.seniorMatch = { result, home, away };
         }
       }
     }
-    if (myClub && !report.match) this.idleWeek(report);
+    if (myClub && !spectator && !report.match) this.idleWeek(report);
+  }
+
+  /** שבוע בקבוצת הנוער — משחק מול קבוצת נוער אחרת, בלי טבלה ובלי קהל. */
+  youthWeek(report) {
+    const me = this.me;
+    const club = this.myClub();
+    if (this.week % 2 === 0) {
+      report.notes.push({ icon: "🏃", text: "שבוע אימונים בקבוצת הנוער." });
+      weeklyRecovery(me, false, this.rng);
+      return;
+    }
+    if (!isAvailable(me)) {
+      report.personal = { status: "injured", injuryName: me.injuryName, weeks: me.injuryWeeks };
+      return;
+    }
+    const rivalClub = this.rng.choice(Object.values(this.clubs).filter(c => c.cid !== (club && club.cid)));
+    const oppStrength = clamp((club ? club.youthAcademy : 45) * 0.42 + 16 + this.rng.gauss(0, 5), 18, 72);
+    const mine = effective(me);
+    const edge = (mine - oppStrength) / 10;
+
+    const teamGoals = poisson(this.rng, clamp(1.3 + edge * 0.35, 0.15, 6));
+    const oppGoals = poisson(this.rng, clamp(1.4 - edge * 0.30, 0.15, 6));
+    const goals = poisson(this.rng, clamp(
+      0.18 + Math.max(0, edge) * 0.22 + (me.attributes.shooting ?? 40) / 260, 0.02, 3));
+    const assists = poisson(this.rng, clamp(0.12 + (me.attributes.passing ?? 40) / 320, 0.02, 2));
+
+    me.season.goals += goals;
+    me.season.assists += assists;
+    let rating = 6.0 + edge * 0.16 + goals * 1.0 + assists * 0.5 + this.rng.gauss(0, 0.5);
+    rating = Math.round(clamp(rating, 3, 10) * 10) / 10;
+    me.season.apps += 1;
+    me.season.minutes += 70;
+    me.season.ratingSum += rating;
+    me.fitness = clamp(me.fitness - 16, 8, 100);
+    me.morale = clamp(me.morale + (rating - 6.3) * 2, 5, 99);
+    me.form = clamp(me.form * 0.84 + (rating - 6) * 14 + 9, 5, 99);
+
+    report.youth = {
+      rival: rivalClub.name + " נוער",
+      rivalCid: rivalClub.cid,
+      teamGoals, oppGoals, goals, assists, rating,
+      outcome: teamGoals > oppGoals ? "W" : teamGoals === oppGoals ? "D" : "L",
+    };
+    if (club) club.managerTrust = clamp(club.managerTrust + (rating - 6.4) * 0.8, 0, 100);
   }
 
   simulateOne(home, away, isMine, competition, neutral = false) {
@@ -446,7 +522,7 @@ class Game {
     }
   }
 
-  playCupRound(report) {
+  playCupRound(report, spectator = false) {
     const teams = this.cup.teams || [];
     const roundName = CUP_WEEKS[this.week];
     if (!teams.length || this.cup.winner) {
@@ -460,7 +536,8 @@ class Game {
     const neutral = roundName === "גמר הגביע";
     for (let i = 0; i + 1 < teams.length; i += 2) {
       const home = this.clubs[teams[i]], away = this.clubs[teams[i + 1]];
-      const isMine = myClub && (myClub.cid === home.cid || myClub.cid === away.cid);
+      const involvesMe = myClub && (myClub.cid === home.cid || myClub.cid === away.cid);
+      const isMine = involvesMe && !spectator;
       const result = this.simulateOne(home, away, isMine, roundName, neutral);
       let winner, penalties = null;
       if (result.homeGoals === result.awayGoals) {
@@ -473,6 +550,8 @@ class Game {
       if (isMine) {
         report.match = { result, home, away, competition: roundName, penalties };
         this.myMatchLines(result, report);
+      } else if (involvesMe && spectator) {
+        report.seniorMatch = { result, home, away };
       }
     }
     this.cup.teams = winners;
@@ -482,9 +561,9 @@ class Game {
       report.notes.push({ icon: "🏆", text: `${champ.name} זוכים בגביע המדינה!` });
       if (myClub && myClub.cid === winners[0]) this.recordHonour("גביע המדינה");
     }
-    if (myClub && !winners.includes(myClub.cid) && !report.match)
+    if (!spectator && myClub && !winners.includes(myClub.cid) && !report.match)
       report.notes.push({ icon: "📅", text: "אין לך משחק גביע השבוע." });
-    if (myClub && !report.match) this.idleWeek(report);
+    if (!spectator && myClub && !report.match) this.idleWeek(report);
   }
 
   idleWeek(report) {
@@ -494,7 +573,8 @@ class Game {
 
   weeklyIncome(report) {
     const me = this.me;
-    if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
+    if (this.stage === "youth") { /* בלי שכר — אתה עוד בבית ספר */ }
+    else if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
     else if (["coach", "manager", "director"].includes(this.stage)) {
       const club = this.myClub();
       let base = this.stage === "coach" ? 4000 : 12000;
@@ -551,6 +631,54 @@ class Game {
   minutesShare() {
     const weeks = Math.max(1, this.week - 1);
     return clamp(this.me.season.minutes / (weeks * 90), 0, 1);
+  }
+
+  /** מועדון עם מחלקת נוער חזקה שמעוניין בי. */
+  youthAcademySuitor() {
+    const club = this.myClub();
+    if (!club) return null;
+    const pool = Object.values(this.clubs).filter(c =>
+      c.cid !== club.cid && c.youthAcademy > club.youthAcademy + 12 &&
+      c.leagueId !== "euro");
+    if (!pool.length) return null;
+    return pool.reduce((a, b) => (a.youthAcademy >= b.youthAcademy ? a : b));
+  }
+
+  joinBigAcademy() {
+    const target = this.youthAcademySuitor();
+    if (!target) return "ההזדמנות נסגרה.";
+    this.transferMe(target.cid, 0, 0);
+    target.managerTrust = 40;
+    this.me.morale = clamp(this.me.morale - 4, 5, 99);
+    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5), 40, 96));
+    this.setFlag("big_academy", true);
+    return `עברת ל${target.name}. מתקנים שלא הכרת, וילדים שכולם היו הכי טובים במועדון שלהם.`;
+  }
+
+  showOff() {
+    if (this.rng.random() < 0.5) {
+      this.me.reputation = clamp(this.me.reputation + 6, 1, 99);
+      addGrowth(this.me, "dribbling", 1.0);
+      this.setFlag("scouted_wow", true);
+      return "הורדת שניים בתנועה אחת והנחת כדור בזווית. הוא הפסיק לכתוב והסתכל.";
+    }
+    const club = this.myClub();
+    if (club) club.managerTrust = clamp(club.managerTrust - 8, 0, 100);
+    this.me.morale = clamp(this.me.morale - 6, 5, 99);
+    return "ניסית סובב מיותר באמצע המגרש, איבדת כדור, וספגתם. הצופה כבר לא הסתכל.";
+  }
+
+  askWhy() {
+    const club = this.myClub();
+    const trust = club ? club.managerTrust : 50;
+    if (trust >= 45 || this.rng.random() < 0.4) {
+      if (club) club.managerTrust = clamp(club.managerTrust + 6, 0, 100);
+      addGrowth(this.me, "mental", 1.2);
+      return 'הוא ענה בכנות: "אתה טוב עם הכדור וגרוע בלעדיו." ' +
+             'זו הייתה הביקורת הכי שימושית שקיבלת.';
+    }
+    this.me.morale = clamp(this.me.morale - 7, 5, 99);
+    return 'הוא אמר "יש עוד טורנירים" והמשיך לסדר קונוסים. לא קיבלת תשובה.';
   }
 
   loanTargetName() {
@@ -1030,7 +1158,9 @@ class Game {
   seasonAwards(add) {
     const leagueId = this.myLeague() || "top";
     const clubIds = new Set(Object.values(this.clubs).filter(c => c.leagueId === leagueId).map(c => c.cid));
-    const squad = Object.values(this.players).filter(p => clubIds.has(p.clubId) && p.season.apps > 0);
+    const squad = Object.values(this.players).filter(p =>
+      clubIds.has(p.clubId) && p.season.apps > 0 &&
+      !(this.stage === "youth" && p.pid === this.meId));
     if (!squad.length) return;
     const scorer = squad.reduce((a, b) =>
       (a.season.goals > b.season.goals || (a.season.goals === b.season.goals && a.season.assists >= b.season.assists)) ? a : b);
@@ -1044,7 +1174,7 @@ class Game {
 
   personalSummary(add) {
     const me = this.me;
-    if (["academy", "player", "veteran"].includes(this.stage)) {
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
       const s = me.season;
       add("📊", `העונה שלך: ${s.apps} משחקים · ${s.goals} שערים · ${s.assists} בישולים · ציון ${avgRating(s).toFixed(1)}`);
       add("📈", `דירוג ${overall(me)} (פוטנציאל ${me.potential}) · מוניטין ${Math.round(me.reputation)} · שווי ₪${fmt(playerValue(me))}`);
@@ -1182,7 +1312,13 @@ class Game {
     const me = this.me;
     const club = this.myClub();
 
-    if (this.stage === "academy") {
+    if (this.stage === "youth") {
+      if (me.age >= 16) {
+        this.stage = "academy";
+        me.contract = { wage: Math.max(1800, Math.round(wageForOverall(overall(me)) / 3)), yearsLeft: 2 };
+        add("📈", "עלית לקבוצת הנוער הבוגרת — ועם החוזה הראשון שלך.", true);
+      }
+    } else if (this.stage === "academy") {
       if (me.age >= 18 || (club && club.managerTrust >= 55)) {
         this.stage = "player";
         add("📈", "אתה כבר לא נער — אתה שחקן בסגל הבוגרים.", true);

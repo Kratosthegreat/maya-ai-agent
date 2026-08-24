@@ -6,9 +6,11 @@
     python3 web/build.py            # יוצר web/index.html
 """
 import os
+import subprocess
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-JS_PARTS = ["data.js", "engine.js", "story.js", "game.js", "graphics.js", "ui.js"]
+JS_PARTS = ["data.js", "engine.js", "story.js", "game.js", "graphics.js", "scenes.js", "ui.js"]
 
 HEAD = """<title>קריירה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,7 +37,26 @@ def build() -> str:
     return HEAD % {"css": css, "js": js}
 
 
+def check_bundle() -> None:
+    """מוודא שכל קבצי ה-JS יחד מתפרשים — קובץ תקין לבדו עדיין יכול להתנגש בשכן."""
+    js = "\n".join(read(part) for part in JS_PARTS)
+    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False,
+                                     encoding="utf-8") as fh:
+        fh.write(js)
+        path = fh.name
+    try:
+        result = subprocess.run(["node", "--check", path],
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            raise SystemExit("החבילה לא מתפרשת:\n" + result.stderr.strip())
+    except FileNotFoundError:
+        pass          # אין node בסביבה — מדלגים על הבדיקה
+    finally:
+        os.unlink(path)
+
+
 def main() -> None:
+    check_bundle()
     out = os.path.join(HERE, "index.html")
     html = build()
     with open(out, "w", encoding="utf-8") as fh:
