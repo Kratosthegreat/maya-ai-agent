@@ -182,13 +182,27 @@ function screenMain() {
 function screenHub() {
   const me = game.me;
   const club = game.myClub();
-  const isPlayer = ["academy", "player", "veteran"].includes(game.stage);
+  const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
   const actions = game.availableActions();
   const offer = game.flag("pending_offer");
 
-  let fixture = "";
   const fx = game.myFixture();
-  if (fx) {
+  let fixture = "";
+  if (game.stage === "youth") {
+    const isMatchWeek = game.week % 2 === 1;
+    fixture = `
+      <div class="scoreboard">
+        <span class="comp-tag">${isMatchWeek ? "ליגת הנוער" : "שבוע אימונים"}</span>
+        <div class="avatar-row">
+          ${avatar(me, club, 46)}
+          <span class="nm">${isMatchWeek
+            ? "משחק נוער השבוע. המאמן מסתכל."
+            : "בלי משחק השבוע — רק אימונים."}</span>
+        </div>
+        ${fx ? `<div class="muted">הקבוצה הבוגרת: ${
+          esc(game.clubs[fx[0]].name)} נגד ${esc(game.clubs[fx[1]].name)}</div>` : ""}
+      </div>`;
+  } else if (fx) {
     const [homeId, awayId] = fx;
     const home = game.clubs[homeId], away = game.clubs[awayId];
     const comp = CUP_WEEKS[game.week] || "ליגה";
@@ -239,6 +253,12 @@ function screenHub() {
     ${fixture}
     <div class="card">
       <div class="eyebrow">המצב שלך</div>
+      ${isPlayer ? `<div class="avatar-row" style="margin-bottom:2px">
+        ${avatar(me, club, 56)}
+        <span class="nm"><strong>${esc(me.name)}</strong><br>
+          <span class="muted">${esc(positionHe(me))} · בן ${me.age}${
+            me.number ? " · מספר " + me.number : ""}</span></span>
+      </div>` : ""}
       ${status}
       <div class="muted">בחשבון: ₪${fmt(game.money)}</div>
     </div>
@@ -433,6 +453,7 @@ function personalCard(p) {
   return `<div class="card">
     <div class="eyebrow">${p.status === "sub" ? "נכנסת מהספסל" : "ההופעה שלך"}</div>
     <div class="perf">
+      ${avatar(game.me, game.myClub(), 54)}
       <div class="rating ${cls}">${p.rating.toFixed(1)}</div>
       <div class="detail">
         <strong>${p.status === "sub" ? p.minutes + " דקות" : "90 דקות"}</strong>
@@ -516,7 +537,7 @@ function screenSeason() {
 function screenProfile() {
   const me = game.me;
   const club = game.myClub();
-  const isPlayer = ["academy", "player", "veteran"].includes(game.stage);
+  const isPlayer = ["youth", "academy", "player", "veteran"].includes(game.stage);
   const s = me.season, c = me.career;
   return `
   <div class="screen">
@@ -626,7 +647,7 @@ function seasonGoalsData() {
     previous = h.goals;
   }
   const current = game.me.season.goals;
-  if (["academy", "player", "veteran"].includes(game.stage))
+  if (["youth", "academy", "player", "veteran"].includes(game.stage))
     rows.push({ label: String(game.year).slice(2), value: current });
   return rows.slice(-8);
 }
@@ -696,7 +717,8 @@ function screenSquad() {
       ${formGuide(club) ? `<div>${formGuide(club)}</div>` : ""}
       <hr class="rule">
       ${squad.map(p => `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
-        <span><span class="num">${p.number || ""}</span> ${esc(p.name)}${
+        <span class="avatar-row">${avatarChip(p, club, 30)}
+          <span class="num">${p.number || ""}</span> <span class="nm">${esc(p.name)}</span>${
           p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
         <span class="pos">${esc(positionHe(p))} · ${p.age}</span>
         <span class="ovr">${overall(p)}</span>

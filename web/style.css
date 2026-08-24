@@ -4,18 +4,18 @@
 
 :root {
   /* בהיר — נייר של תוכניית משחק */
-  --bg: #F1F3ED;
+  --bg: #EFF2EA;
   --surface: #FFFFFF;
-  --surface-2: #E6EAE0;
-  --ink: #12211A;
-  --ink-soft: #56675D;
-  --line: #D3D9CD;
-  --accent: #A66F05;
-  --accent-fill: #F0B429;
-  --accent-ink: #241803;
-  --win: #1E7A4E;
-  --draw: #6B7A71;
-  --loss: #B3392F;
+  --surface-2: #E3E8DB;
+  --ink: #0E1C15;
+  --ink-soft: #4F6157;
+  --line: #CED6C6;
+  --accent: #8A5A00;
+  --accent-fill: #FFC42E;
+  --accent-ink: #201603;
+  --win: #12734A;
+  --draw: #63736A;
+  --loss: #B32B20;
   --shadow: 0 1px 2px rgba(18, 33, 26, .08), 0 8px 24px rgba(18, 33, 26, .06);
   --radius: 4px;
   --pitch: #DDE4D6;
@@ -35,18 +35,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0B120E;
-    --surface: #131E17;
-    --surface-2: #1B291F;
-    --ink: #E9EFE6;
-    --ink-soft: #93A398;
-    --line: #26382C;
-    --accent: #F0B429;
-    --accent-fill: #F0B429;
-    --accent-ink: #1A1206;
-    --win: #4CAF7D;
-    --draw: #8A9A90;
-    --loss: #E06B60;
+    --bg: #070D0A;
+    --surface: #0E1813;
+    --surface-2: #16241B;
+    --ink: #EEF4EA;
+    --ink-soft: #90A497;
+    --line: #24382B;
+    --accent: #FFC42E;
+    --accent-fill: #FFC42E;
+    --accent-ink: #1A1204;
+    --win: #35D07F;
+    --draw: #7E9089;
+    --loss: #FF5A4E;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
     --pitch: #16241B;
     --pitch-turf: #16301F;
@@ -90,7 +90,11 @@
 body {
   direction: rtl;
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(120% 60% at 50% 0%,
+      color-mix(in srgb, var(--accent-fill) 5%, transparent) 0%, transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: "Assistant", "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 16px;
@@ -447,7 +451,7 @@ tr.down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
   margin: 10px 0 4px;
   margin-inline-end: auto;
 }
-.screen.menu { justify-content: center; }
+.screen.menu { justify-content: flex-start; }
 .hero .sub { color: var(--ink-soft); font-size: 15px; max-width: 40ch; }
 .hero .accent { color: var(--accent); }
 
@@ -596,12 +600,31 @@ td.form-cell { width: 1%; white-space: nowrap; }
 }
 
 
-/* ---------- סצנות מאוירות ---------- */
+/* ---------- סצנות ---------- */
 
 .scene {
   display: block;
+  margin: 0;
+  position: relative;
   width: 100%;
-  height: auto;
+  aspect-ratio: 900 / 372;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.scene img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scene .scene-tint {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--bg) 10%, transparent) 0%,
+    transparent 30%,
+    color-mix(in srgb, var(--bg) 28%, transparent) 88%,
+    color-mix(in srgb, var(--bg) 55%, transparent) 100%);
 }
 .scene-frame {
   position: relative;
@@ -614,12 +637,16 @@ td.form-cell { width: 1%; white-space: nowrap; }
   margin: -14px -14px 2px;
   border-radius: var(--radius) var(--radius) 0 0;
 }
-/* מסך שנפתח בסצנה — בלי ריווח מעליה */
 .takeover.flush, .screen.flush { padding-top: 0; }
 @media (prefers-reduced-motion: no-preference) {
-  .scene-frame .scene { animation: sceneIn .5s ease-out both; }
-  @keyframes sceneIn { from { opacity: 0; transform: scale(1.06); } }
+  .scene-frame .scene img { animation: sceneIn .7s ease-out both; }
+  @keyframes sceneIn { from { opacity: 0; transform: scale(1.05); } }
 }
+
+/* ---------- דיוקנים ---------- */
+
+.avatar { display: block; flex: none; border-radius: 50%; }
+.avatar-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 /* ---------- כרטיס שחקן ---------- */
 
@@ -653,6 +680,11 @@ td.form-cell { width: 1%; white-space: nowrap; }
 .pcard-rating .rule { width: 26px; height: 1.5px; background: currentColor; opacity: .5; margin: 3px 0; }
 .pcard-rating .nat { font-size: 11px; opacity: .85; }
 .pcard-art { flex: 1; display: flex; justify-content: center; }
+.pcard-art .avatar {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  border: 2px solid rgba(255, 255, 255, .18);
+}
+.pcard-kit { align-self: flex-end; opacity: .95; }
 .pcard-name {
   font-family: "Karantina", sans-serif;
   font-size: 34px;

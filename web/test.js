@@ -8,13 +8,15 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "engine.js", "story.js", "game.js", "graphics.js", "scenes.js"];
+const PARTS = ["data.js", "art.js", "engine.js", "story.js", "game.js", "graphics.js",
+               "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
 const ctx = vm.createContext({ console, Math, JSON, Date });
 vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, generatePlayer, " +
   "simulateMatch, pickLineup, teamStrength, roundRobin, overall, playerValue, " +
   "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
-  "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide };", ctx);
+  "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide, " +
+  "ART, avatar, faceTraits, SCENE_LABELS };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -233,23 +235,49 @@ test("אירוע ממתין עוצר את השבוע עד להחלטה", () => {
 
 console.log("\nגרפיקה");
 
-test("כל הסצנות מייצרות SVG תקין", () => {
+test("לכל סצנה יש תמונה מוטבעת", () => {
   const names = Object.keys(A.SCENES);
   assert(names.length >= 10, `רק ${names.length} סצנות`);
   for (const name of names) {
-    const svg = A.SCENES[name]();
-    assert(svg.startsWith("<svg") && svg.trim().endsWith("</svg>"), `${name}: לא SVG`);
-    assert(!svg.includes("undefined") && !svg.includes("NaN"), `${name}: ערך חסר`);
-    assert((svg.match(/</g) || []).length === (svg.match(/>/g) || []).length,
-      `${name}: תגיות לא מאוזנות`);
+    const html = A.SCENES[name]();
+    assert(html.includes("<img src=\"data:image/jpeg;base64,"), `${name}: אין תמונה מוטבעת`);
+    assert(!html.includes("undefined"), `${name}: ערך חסר`);
+    const art = A.ART[name];
+    assert(art && art.length > 8000, `${name}: התמונה קטנה מדי (${art ? art.length : 0})`);
+  }
+});
+
+test("כל תמונות הרקע קיימות ותקינות", () => {
+  for (const key of Object.keys(A.SCENE_LABELS)) {
+    const data = A.ART[key];
+    assert(typeof data === "string", `${key}: חסרה תמונה`);
+    assert(data.startsWith("data:image/jpeg;base64,"), `${key}: פורמט שגוי`);
   }
 });
 
 test("לכל אירוע עלילה יש סצנה", () => {
   for (const event of A.STORY) {
-    const svg = A.sceneFor(event.eid, event.stages[0] || "player");
-    assert(svg.startsWith("<svg"), `${event.eid}: אין סצנה`);
+    const html = A.sceneFor(event.eid, event.stages[0] || "player");
+    assert(html.includes("data:image/jpeg"), `${event.eid}: אין סצנה`);
   }
+});
+
+test("לכל שחקן יש דיוקן קבוע ותקין", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 17, 61);
+  const club = g.myClub();
+  const sample = club.squad.slice(0, 12).map(pid => g.players[pid]);
+  const faces = new Set();
+  for (const p of sample) {
+    const svg = A.avatar(p, club, 80);
+    assert(svg.startsWith("<svg") && svg.trim().endsWith("</svg>"), `${p.name}: לא SVG`);
+    assert(!svg.includes("undefined") && !svg.includes("NaN"), `${p.name}: ערך חסר`);
+    const t = A.faceTraits(p);
+    assert(t.skin && t.hairColor && t.eye, "מאפייני פנים חסרים");
+    faces.add([t.skin[0], t.hairColor, t.hairStyle, t.facial].join("|"));
+    // אותו שחקן — אותן פנים, תמיד
+    assert(JSON.stringify(A.faceTraits(p)) === JSON.stringify(t), "הפנים משתנות בין קריאות");
+  }
+  assert(faces.size >= 6, `רק ${faces.size} פרצופים שונים מתוך ${sample.length}`);
 });
 
 test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", () => {
@@ -262,6 +290,7 @@ test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", ()
   }
   const card = A.playerCard(g.me, g.myClub(), g.stage);
   assert(card.includes("pcard") && !card.includes("undefined"), "כרטיס שחקן");
+  assert(card.includes("avatar"), "אין דיוקן בכרטיס");
   const club = g.myClub();
   const lineup = A.pickLineup(club, g.players, club.formation);
   const svg = A.pitch(lineup, club.formation, g.players, g.meId, club);
