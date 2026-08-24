@@ -16,6 +16,7 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "simulateMatch, pickLineup, teamStrength, roundRobin, overall, playerValue, " +
   "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
   "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide, " +
+  "SEASON_WEEKS, leagueWeeks, " +
   "ART, avatar, faceTraits, SCENE_LABELS };", ctx);
 const A = ctx.API;
 
@@ -154,18 +155,28 @@ test("הקבוצה החזקה מנצחת את רוב המשחקים", () => {
 });
 
 test("לוח המשחקים מכסה כל צמד פעמיים", () => {
-  const teams = Array.from({ length: 12 }, (_, i) => "t" + i);
+  const teams = Array.from({ length: 20 }, (_, i) => "t" + i);
   const rounds = A.roundRobin(teams, new A.Rng(1));
-  assert(rounds.length === 22, `${rounds.length} מחזורים`);
+  assert(rounds.length === 38, `${rounds.length} מחזורים`);
   const seen = {};
   for (const rnd of rounds) {
-    assert(rnd.length === 6, "משחקים במחזור");
+    assert(rnd.length === 10, "משחקים במחזור");
     const inRound = new Set(rnd.flat());
-    assert(inRound.size === 12, "כל קבוצה פעם אחת במחזור");
+    assert(inRound.size === 20, "כל קבוצה פעם אחת במחזור");
     for (const [h, a] of rnd) seen[h + ">" + a] = (seen[h + ">" + a] || 0) + 1;
   }
-  assert(Object.keys(seen).length === 132, "כל הצמדים");
+  assert(Object.keys(seen).length === 380, "כל הצמדים");
   assert(Object.values(seen).every(v => v === 1), "בלי כפילויות");
+});
+
+test("לוח השנה מכיל בדיוק את כל המחזורים", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_sharon", 24, 3);
+  assert(A.SEASON_WEEKS === 43, `אורך עונה ${A.SEASON_WEEKS}`);
+  assert(A.leagueWeeks().length === 38, "שבועות ליגה");
+  assert(g.fixtures.top.length === 38, "מחזורי ליגת העל");
+  assert(g.cup.teams.length === 32, "קבוצות בגביע");
+  assert(g.standings("top").length === 20 && g.standings("national").length === 20,
+    "גודל הליגות");
 });
 
 console.log("\nהתפתחות");
@@ -408,7 +419,7 @@ test("עונה מתגלגלת ומאפסת טבלאות", () => {
   assert(g.week === 1, "השבוע לא אופס");
   assert(g.history.length === 1, "אין רישום עונה");
   assert(g.standings("top").every(r => r.played === 0), "הטבלה לא אופסה");
-  assert(Object.values(g.clubs).filter(c => c.leagueId === "top").length === 12, "12 בליגת העל");
+  assert(Object.values(g.clubs).filter(c => c.leagueId === "top").length === 20, "20 בליגת העל");
 });
 
 test("שמירה וטעינה משחזרות את המצב ואת ההגרלה", () => {

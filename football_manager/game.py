@@ -26,8 +26,9 @@ from .progression import (end_of_season_development, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
                           weekly_training)
 
-SEASON_WEEKS = 26
-CUP_WEEKS = {5: "שמינית הגמר", 11: "רבע הגמר", 17: "חצי הגמר", 23: "גמר הגביע"}
+SEASON_WEEKS = 43
+CUP_WEEKS = {6: "שלב 32 האחרונות", 13: "שמינית הגמר", 21: "רבע הגמר",
+             29: "חצי הגמר", 37: "גמר הגביע"}
 SAVE_DIR = os.path.join(os.path.expanduser("~"), ".football_manager_saves")
 
 
@@ -293,13 +294,13 @@ class GameState:
             club.season_expectation = self._expectation(club)
 
     def _build_cup(self) -> None:
-        """גביע המדינה: 12 קבוצות ליגת העל + 4 מהלאומית."""
+        """גביע המדינה: כל ליגת העל + 12 מהלאומית — 32 קבוצות בנוקאאוט."""
         top = [c.cid for c in self.clubs.values() if c.league_id == "top"]
         national = sorted([c for c in self.clubs.values() if c.league_id == "national"],
-                          key=lambda c: -c.reputation)[:4]
+                          key=lambda c: -c.reputation)[:12]
         teams = top + [c.cid for c in national]
         self.rng.shuffle(teams)
-        self.cup = {"teams": teams[:16], "round": "שמינית הגמר",
+        self.cup = {"teams": teams[:32], "round": "שלב 32 האחרונות",
                     "winner": None, "log": []}
 
     def _expectation(self, club: Club) -> str:
@@ -1476,8 +1477,8 @@ class GameState:
         nat_table = self.standings("national")
         if len(top_table) < 4 or len(nat_table) < 4:
             return []
-        relegated = [row.club_id for row in top_table[-2:]]
-        promoted = [row.club_id for row in nat_table[:2]]
+        relegated = [row.club_id for row in top_table[-3:]]
+        promoted = [row.club_id for row in nat_table[:3]]
         for cid in relegated:
             self.clubs[cid].league_id = "national"
             self.clubs[cid].reputation = int(clamp(self.clubs[cid].reputation - 6, 5, 99))
@@ -1517,7 +1518,7 @@ class GameState:
                     club.squad.remove(player.pid)
                 player.club_id = None
         for club in self.clubs.values():
-            while len(club.squad) < 18:
+            while len(club.squad) < 20:
                 kid = generate_player(self.rng, club, self.rng.choice(D.POSITIONS),
                                       age=self.rng.randint(16, 19))
                 kid.potential = int(clamp(kid.overall + self.rng.randint(6, 28), 45, 94))

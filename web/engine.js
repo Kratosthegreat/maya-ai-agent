@@ -2,8 +2,9 @@
 // מנוע המשחק — פורט מ-football_manager (פייתון). ללא תלות ב-DOM.
 // ---------------------------------------------------------------------------
 
-const SEASON_WEEKS = 26;
-const CUP_WEEKS = { 5: "שמינית הגמר", 11: "רבע הגמר", 17: "חצי הגמר", 23: "גמר הגביע" };
+const SEASON_WEEKS = 43;
+const CUP_WEEKS = { 6: "שלב 32 האחרונות", 13: "שמינית הגמר", 21: "רבע הגמר",
+                    29: "חצי הגמר", 37: "גמר הגביע" };
 const SQUAD_MIN = 16;
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -345,7 +346,7 @@ function simulateMatch(home, away, players, rng, opts = {}) {
 
   const expected = (attack, defence, control, talk) => {
     const edge = (attack - defence) / 11;
-    let base = 1.38 * Math.exp(edge * 0.38);
+    let base = 1.26 * Math.exp(edge * 0.34);
     base *= 0.55 + 0.9 * control;
     base *= 0.9 + talk * 0.2;
     return clamp(base, 0.12, 4.6);

@@ -374,8 +374,9 @@ def wage_for_overall(overall: int) -> int:
     return int(clamp(8000 * (max(20, overall) / 50.0) ** 6.85, 700, 1_200_000))
 
 
-SQUAD_TEMPLATE = ["GK", "GK", "CB", "CB", "CB", "LB", "RB", "DM", "DM",
-                  "CM", "CM", "AM", "LW", "RW", "ST", "ST", "CM", "CB"]
+SQUAD_TEMPLATE = ["GK", "GK", "GK", "CB", "CB", "CB", "CB", "LB", "LB", "RB", "RB",
+                  "DM", "DM", "CM", "CM", "CM", "AM", "AM", "LW", "LW", "RW", "RW",
+                  "ST", "ST", "ST"]
 
 
 def generate_world(seed: int = 0):

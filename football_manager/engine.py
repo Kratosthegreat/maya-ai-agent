@@ -249,7 +249,7 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
     def expected_goals(attack: float, defence: float, control: float,
                        team_talk: float) -> float:
         edge = (attack - defence) / 11.0
-        base = 1.42 * math.exp(edge * 0.40)
+        base = 1.30 * math.exp(edge * 0.36)
         base *= 0.55 + 0.9 * control
         base *= 0.9 + team_talk * 0.2
         return clamp(base, 0.12, 4.6)

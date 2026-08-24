@@ -189,15 +189,16 @@ function screenNew() {
   </div>`;
 }
 
-const MONTHS_HE = ["אוג", "אוג", "ספט", "ספט", "ספט", "אוק", "אוק", "אוק", "נוב", "נוב",
-                   "נוב", "דצמ", "דצמ", "ינו", "ינו", "פבר", "פבר", "מרץ", "מרץ", "אפר",
-                   "אפר", "מאי", "מאי", "מאי", "יונ", "יונ"];
+const SEASON_MONTHS = ["אוג", "ספט", "אוק", "נוב", "דצמ", "ינו", "פבר", "מרץ", "אפר", "מאי"];
 
 /** התאריך המשוער של השבוע — נותן תחושה של לוח שנה אמיתי. */
 function weekDate() {
-  const w = Math.min(SEASON_WEEKS, game.week);
-  const day = 1 + ((w * 7) % 28);
-  const month = MONTHS_HE[w - 1] || "יונ";
+  const w = Math.min(SEASON_WEEKS, Math.max(1, game.week));
+  const perMonth = SEASON_WEEKS / SEASON_MONTHS.length;
+  const month = SEASON_MONTHS[Math.min(SEASON_MONTHS.length - 1,
+    Math.floor((w - 1) / perMonth))];
+  const inMonth = ((w - 1) % perMonth) / perMonth;
+  const day = 1 + Math.floor(inMonth * 28);
   return { d: `${day} ${month}`, w: `שבוע ${w}/${SEASON_WEEKS}` };
 }
 
@@ -231,7 +232,7 @@ function appbar() {
 
 function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
-                 ["profile", "פרופיל"], ["news", "יומן"]];
+                 ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
@@ -252,6 +253,7 @@ function screenMain() {
   if (view === "squad") return appbar() + screenSquad();
   if (view === "news") return appbar() + screenNews();
   if (view === "tactics") return appbar() + screenTactics();
+  if (view === "editor") return appbar() + screenEditor();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -915,6 +917,69 @@ function screenSquad() {
   </div>`;
 }
 
+/**
+ * עורך מסד הנתונים — שינוי שמות מועדונים ושחקנים, ייצוא וייבוא.
+ * מה שנשמר כאן נשמר רק בדפדפן שלך.
+ */
+function screenEditor() {
+  const club = game.myClub();
+  const leagues = D.LEAGUES.map(l => l.id);
+  const editingLeague = (viewData && viewData.editLeague) || (club ? club.leagueId : "top");
+  const clubs = Object.values(game.clubs)
+    .filter(c => c.leagueId === editingLeague)
+    .sort((a, b) => b.reputation - a.reputation);
+  const squad = club ? club.squad.map(p => game.players[p]).filter(Boolean)
+    .sort((a, b) => overall(b) - overall(a)) : [];
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">עורך מסד הנתונים</span></div>
+      <div class="panel-body">
+        <div class="muted">כאן אפשר לתת לכל מועדון ולכל שחקן את השם שאתה רוצה.
+        השינויים נשמרים בדפדפן הזה בלבד, יחד עם הקריירה שלך.</div>
+        <div class="btn-row">
+          <button class="btn" data-act="export-db">ייצוא לקובץ</button>
+          <button class="btn" data-act="import-db">ייבוא מקובץ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מועדונים</span>
+        <span class="r">${clubs.length}</span></div>
+      <div class="panel-body">
+        <div class="chips">
+          ${leagues.map(id => `<button class="chip" data-editleague="${id}"
+            aria-pressed="${editingLeague === id}">${esc(game.leagueName(id))}</button>`).join("")}
+        </div>
+      </div>
+      <div class="panel-body tight">
+        ${clubs.map(c => `<div class="row">
+          ${crest(c, 26)}
+          <input type="text" class="edit-in" data-club="${c.cid}" value="${esc(c.name)}"
+            maxlength="26" aria-label="שם המועדון">
+          <span class="val">${c.reputation}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+
+    ${squad.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">הסגל שלך</span>
+        <span class="r">${esc(club.name)}</span></div>
+      <div class="panel-body tight">
+        ${squad.map(p => `<div class="row ${p.pid === game.meId ? "me" : ""}">
+          ${avatarChip(p, club, 26)}
+          <input type="text" class="edit-in" data-player="${p.pid}" value="${esc(p.name)}"
+            maxlength="26" aria-label="שם השחקן">
+          <span class="val">${overall(p)}</span>
+        </div>`).join("")}
+      </div>
+    </div>` : ""}
+  </div>`;
+}
+
 function screenNews() {
   return `
   <div class="screen">
@@ -1007,6 +1072,18 @@ function bind() {
       if (blurb) blurb.textContent = ageBlurb(viewData.age, viewData.role);
     });
   }
+  app.querySelectorAll("[data-editleague]").forEach(el =>
+    el.addEventListener("click", () => go("editor", { editLeague: el.dataset.editleague })));
+  app.querySelectorAll("input.edit-in").forEach(el => {
+    el.addEventListener("change", () => {
+      const value = el.value.trim();
+      if (!value) { el.value = el.dataset.club
+        ? game.clubs[el.dataset.club].name : game.players[el.dataset.player].name; return; }
+      if (el.dataset.club) game.clubs[el.dataset.club].name = value;
+      else if (el.dataset.player) game.players[el.dataset.player].name = value;
+      saveGame();
+    });
+  });
   app.querySelectorAll("[data-league]").forEach(el =>
     el.addEventListener("click", () => go("table", { league: el.dataset.league })));
   app.querySelectorAll("[data-form]").forEach(el =>
@@ -1048,9 +1125,49 @@ function act(what) {
   else if (what === "accept") { showOutcome("הצעת העברה", game.acceptOffer()); }
   else if (what === "reject") { showOutcome("הצעת העברה", game.rejectOffer()); }
   else if (what === "restart") { clearSave(); game = null; go("menu"); }
+  else if (what === "export-db") exportDatabase();
+  else if (what === "import-db") importDatabase();
 }
 
 let pendingSeason = null;
+
+/** מוריד את השמות שערכת כקובץ, כדי שאפשר יהיה לשמור ולשתף אותם. */
+function exportDatabase() {
+  const data = {
+    v: 1,
+    clubs: Object.fromEntries(Object.values(game.clubs).map(c => [c.cid, c.name])),
+    players: Object.fromEntries(Object.values(game.players)
+      .filter(p => p.clubId || p.pid === game.meId).map(p => [p.pid, p.name])),
+  };
+  const text = JSON.stringify(data, null, 1);
+  navigator.clipboard && navigator.clipboard.writeText(text).then(
+    () => alert("מסד הנתונים הועתק ללוח. אפשר להדביק אותו לקובץ ולשמור."),
+    () => window.prompt("העתק את מסד הנתונים:", text));
+  if (!navigator.clipboard) window.prompt("העתק את מסד הנתונים:", text);
+}
+
+/** מדביק בחזרה מסד נתונים שערכת. */
+function importDatabase() {
+  const text = window.prompt("הדבק כאן מסד נתונים שייצאת:");
+  if (!text) return;
+  let data;
+  try { data = JSON.parse(text); } catch (err) {
+    alert("הקובץ לא תקין — צריך להדביק בדיוק את מה שיוצא בייצוא.");
+    return;
+  }
+  let changed = 0;
+  for (const [cid, name] of Object.entries(data.clubs || {}))
+    if (game.clubs[cid] && typeof name === "string" && name.trim()) {
+      game.clubs[cid].name = name.trim().slice(0, 26); changed++;
+    }
+  for (const [pid, name] of Object.entries(data.players || {}))
+    if (game.players[pid] && typeof name === "string" && name.trim()) {
+      game.players[pid].name = name.trim().slice(0, 26); changed++;
+    }
+  saveGame();
+  alert(changed ? `עודכנו ${changed} שמות.` : "לא נמצא מה לעדכן.");
+  render();
+}
 
 function playWeek() {
   const report = game.advanceWeek();

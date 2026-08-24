@@ -11,7 +11,7 @@ from football_manager import data as D
 from football_manager import story as ST
 from football_manager.engine import (pick_lineup, position_fit, simulate_match,
                                      team_strength)
-from football_manager.game import SEASON_WEEKS, GameState, round_robin
+from football_manager.game import CUP_WEEKS, SEASON_WEEKS, GameState, round_robin
 from football_manager.models import (generate_player, generate_world,
                                      wage_for_overall)
 from football_manager.progression import (age_factor, end_of_season_development,
@@ -341,6 +341,17 @@ def test_league_table_totals_add_up():
             assert row.points == row.won * 3 + row.drawn
 
 
+def test_the_calendar_fits_the_fixture_list():
+    """38 מחזורי ליגה, חמישה מחזורי גביע, ועונה שבדיוק מכילה אותם."""
+    from football_manager.game import league_weeks
+    assert len(CUP_WEEKS) == 5
+    assert len(league_weeks()) == 38
+    game = GameState.new_game("בודק", "ST", "maccabi_sharon", age=24, seed=3)
+    for league_id in ("top", "national"):
+        assert len(game.fixtures[league_id]) == 38
+    assert len(game.cup["teams"]) == 32
+
+
 def test_season_rolls_over_and_history_is_recorded():
     game = GameState.new_game("עומר לוי", "ST", "hapoel_carmel", age=17, seed=34)
     year = game.year
@@ -369,10 +380,10 @@ def test_promotion_and_relegation_change_leagues():
         if game.advance_week().season_ended:
             break
     moved = [cid for cid, lid in before.items() if game.clubs[cid].league_id != lid]
-    assert len(moved) == 4                    # שתיים עולות, שתיים יורדות
+    assert len(moved) == 6                    # שלוש עולות, שלוש יורדות
     for league_id in ("top", "national"):
         count = sum(1 for c in game.clubs.values() if c.league_id == league_id)
-        assert count == 12
+        assert count == 20
 
 
 def test_career_can_start_at_any_age():

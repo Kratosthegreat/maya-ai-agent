@@ -178,9 +178,9 @@ class Game {
   buildCup() {
     const top = Object.values(this.clubs).filter(c => c.leagueId === "top").map(c => c.cid);
     const national = Object.values(this.clubs).filter(c => c.leagueId === "national")
-      .sort((a, b) => b.reputation - a.reputation).slice(0, 4).map(c => c.cid);
-    const teams = this.rng.shuffle(top.concat(national)).slice(0, 16);
-    this.cup = { teams, round: "שמינית הגמר", winner: null, log: [] };
+      .sort((a, b) => b.reputation - a.reputation).slice(0, 12).map(c => c.cid);
+    const teams = this.rng.shuffle(top.concat(national)).slice(0, 32);
+    this.cup = { teams, round: "שלב 32 האחרונות", winner: null, log: [] };
   }
 
   expectation(club) {
@@ -1260,8 +1260,8 @@ class Game {
     const topTable = this.standings("top");
     const natTable = this.standings("national");
     if (topTable.length < 4 || natTable.length < 4) return;
-    const relegated = topTable.slice(-2).map(r => r.clubId);
-    const promoted = natTable.slice(0, 2).map(r => r.clubId);
+    const relegated = topTable.slice(-3).map(r => r.clubId);
+    const promoted = natTable.slice(0, 3).map(r => r.clubId);
     for (const cid of relegated) {
       this.clubs[cid].leagueId = "national";
       this.clubs[cid].reputation = Math.round(clamp(this.clubs[cid].reputation - 6, 5, 99));
@@ -1302,7 +1302,7 @@ class Game {
       }
     }
     for (const club of Object.values(this.clubs)) {
-      while (club.squad.length < 18) {
+      while (club.squad.length < 20) {
         const kid = generatePlayer(this.rng, club, this.rng.choice(D.POSITIONS),
           { age: this.rng.randint(16, 19) });
         kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(6, 28), 45, 94));

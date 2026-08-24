@@ -696,3 +696,18 @@ tr.down td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
 .note { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; }
 .note .ico { flex: none; width: 20px; text-align: center; }
 .note.strong { font-weight: 700; }
+
+
+/* ---------- עורך מסד הנתונים ---------- */
+
+input.edit-in {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 13.5px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+}
+input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
