@@ -59,7 +59,8 @@ class Game {
     return "veteran";
   }
 
-  static newGame(name, position, clubId, age = 15, seed = null, role = "player") {
+  static newGame(name, position, clubId, age = 15, seed = null, role = "player",
+                 face = null) {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -67,7 +68,7 @@ class Game {
     g.clubs = world.clubs; g.players = world.players;
     const club = g.clubs[clubId];
 
-    if (role === "manager") return g.startAsManager(name, club, age);
+    if (role === "manager") return g.startAsManager(name, club, age, face);
 
     // ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
     const quality = age <= 17
@@ -76,6 +77,7 @@ class Game {
     const me = generatePlayer(g.rng, club, position, { age, quality });
     me.name = name;
     me.isHuman = true;
+    if (face) me.face = face;
     // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
     me.potential = Math.round(clamp(
       overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
@@ -119,10 +121,11 @@ class Game {
   }
 
   /** קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל. */
-  startAsManager(name, club, age) {
+  startAsManager(name, club, age, face) {
     const me = generatePlayer(this.rng, club, "CM", { age: Math.min(age, 40), quality: 55 });
     me.name = name;
     me.isHuman = true;
+    if (face) me.face = face;
     me.age = age;
     me.retired = true;
     me.clubId = null;

@@ -17,7 +17,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
   "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide, " +
   "SEASON_WEEKS, leagueWeeks, " +
-  "ART, avatar, faceTraits, SCENE_LABELS };", ctx);
+  "ART, avatar, faceTraits, SCENE_LABELS, randomFace, faceFromId, " +
+  "SKIN, HAIR_COLORS, EYES };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -271,6 +272,41 @@ test("לכל אירוע עלילה יש סצנה", () => {
     const html = A.sceneFor(event.eid, event.stages[0] || "player");
     assert(html.includes("data:image/jpeg"), `${event.eid}: אין סצנה`);
   }
+});
+
+test("אפשר לבחור דמות, והיא נשמרת עם הקריירה", () => {
+  const chosen = { skin: 4, hairStyle: 3, hairColor: 5, eye: 2, facial: 2, brow: 0, jaw: 1 };
+  const g = A.Game.newGame("עומר לוי", "ST", "hapoel_carmel", 24, 8, "player", chosen);
+  assert(g.me.face, "הדמות לא נשמרה על השחקן");
+  for (const [k, v] of Object.entries(chosen))
+    assert(g.me.face[k] === v, `${k}: ${g.me.face[k]} במקום ${v}`);
+
+  const t = A.faceTraits(g.me);
+  assert(t.skin === A.SKIN[4], "גוון העור שנבחר לא הוחל");
+  assert(t.hairStyle === 3, "התסרוקת שנבחרה לא הוחלה");
+  assert(t.hairColor === A.HAIR_COLORS[5], "צבע השיער שנבחר לא הוחל");
+  assert(t.facial === 2, "הזקן שנבחר לא הוחל");
+
+  // שמירה וטעינה
+  const copy = A.Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  assert(JSON.stringify(copy.me.face) === JSON.stringify(g.me.face),
+    "הדמות לא שרדה שמירה וטעינה");
+
+  // דמות אקראית תמיד חוקית
+  for (let i = 0; i < 60; i++) {
+    const f = A.randomFace();
+    assert(f.skin >= 0 && f.skin < A.SKIN.length, "גוון עור מחוץ לטווח");
+    assert(f.hairStyle >= 0 && f.hairStyle < 8, "תסרוקת מחוץ לטווח");
+    assert(f.hairColor >= 0 && f.hairColor < A.HAIR_COLORS.length, "צבע שיער מחוץ לטווח");
+    assert(f.eye >= 0 && f.eye < A.EYES.length, "עיניים מחוץ לטווח");
+    assert(f.facial >= 0 && f.facial < 4, "זקן מחוץ לטווח");
+  }
+
+  // שחקן שלא נבחרה לו דמות — עדיין מקבל פנים יציבות
+  const other = g.players[g.myClub().squad.find(p => p !== g.meId)];
+  assert(!other.face, "לשחקן מחשב לא אמורה להישמר דמות");
+  assert(JSON.stringify(A.faceTraits(other)) === JSON.stringify(A.faceTraits(other)),
+    "הפנים של שחקן המחשב משתנות");
 });
 
 test("לכל שחקן יש דיוקן קבוע ותקין", () => {

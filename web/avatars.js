@@ -23,23 +23,62 @@ function hashOf(str) {
   return Math.abs(h);
 }
 
-/** מאפייני הדמות — קבועים לכל שחקן לפי המזהה שלו. */
-function faceTraits(player) {
+const FACE_FIELDS = {
+  skin: SKIN.length,
+  hairStyle: 8,
+  hairColor: HAIR_COLORS.length,
+  eye: EYES.length,
+  facial: 4,
+  brow: 3,
+  jaw: 3,
+};
+
+/** דמות אקראית — משמשת גם ככפתור "הגרל" בבורר. */
+function randomFace(rand) {
+  const r = rand || Math.random;
+  const face = {};
+  for (const [key, count] of Object.entries(FACE_FIELDS))
+    face[key] = Math.floor(r() * count);
+  return face;
+}
+
+/** דמות שנגזרת מהמזהה — לשחקני המחשב, שתמיד ייראו אותו דבר. */
+function faceFromId(player) {
   const h = hashOf(player.pid + player.name);
-  const pick = (arr, shift) => arr[Math.floor(h / Math.pow(7, shift)) % arr.length];
-  const bit = (shift, mod) => Math.floor(h / Math.pow(3, shift)) % mod;
+  const pickIndex = (count, shift) => Math.floor(h / Math.pow(7, shift)) % count;
   return {
-    skin: pick(SKIN, 1),
-    hairColor: player.age >= 34 && bit(9, 3) === 0 ? "#9A9A96" : pick(HAIR_COLORS, 2),
-    hairStyle: bit(3, 8),
-    eye: pick(EYES, 4),
-    brow: bit(5, 3),
-    facial: player.age >= 20 ? bit(6, 4) : 0,
-    jaw: bit(7, 3),
-    mouth: bit(8, 3),
-    ear: bit(11, 2),
+    skin: pickIndex(SKIN.length, 1),
+    hairColor: player.age >= 34 && Math.floor(h / 19683) % 3 === 0
+      ? HAIR_COLORS.length - 1
+      : pickIndex(HAIR_COLORS.length, 2),
+    hairStyle: pickIndex(8, 3),
+    eye: pickIndex(EYES.length, 4),
+    brow: pickIndex(3, 5),
+    facial: player.age >= 20 ? pickIndex(4, 6) : 0,
+    jaw: pickIndex(3, 7),
   };
 }
+
+/** מאפייני הדמות: מה שהשחקן בחר, ואם לא בחר — לפי המזהה. */
+function faceTraits(player) {
+  const chosen = player.face || null;
+  const base = chosen ? Object.assign(faceFromId(player), chosen) : faceFromId(player);
+  const clampIndex = (v, count) => Math.max(0, Math.min(count - 1, v | 0));
+  return {
+    skin: SKIN[clampIndex(base.skin, SKIN.length)],
+    hairColor: HAIR_COLORS[clampIndex(base.hairColor, HAIR_COLORS.length)],
+    hairStyle: clampIndex(base.hairStyle, 8),
+    eye: EYES[clampIndex(base.eye, EYES.length)],
+    brow: clampIndex(base.brow, 3),
+    facial: clampIndex(base.facial, 4),
+    jaw: clampIndex(base.jaw, 3),
+    ear: 1,
+  };
+}
+
+// שמות התצוגה של האפשרויות בבורר הדמות
+const HAIR_STYLE_NAMES = ["קצר", "מכונה", "מתולתל", "אפרו", "ארוך", "קוקו", "קרחת", "בלורית"];
+const FACIAL_NAMES = ["מגולח", "זיפים", "זקן", "שפם"];
 
 /**
  * שיער בשתי שכבות: מסה מאחורי הראש, ובלורית מעליו.

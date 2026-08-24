@@ -717,6 +717,60 @@ input.edit-in {
 }
 input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 
+
+/* ---------- בורר הדמות ---------- */
+
+.face-preview { display: flex; justify-content: center; padding: 4px 0 8px; }
+.face-preview .avatar {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+  border: 3px solid var(--line);
+}
+.face-group { display: flex; flex-direction: column; gap: 6px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+.swatch {
+  appearance: none;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--sw);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+}
+.swatch[aria-pressed="true"] {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 32%, transparent);
+}
+.face-thumbs { display: flex; flex-wrap: wrap; gap: 7px; }
+.thumb {
+  appearance: none;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 5px 5px 4px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  font-size: 10.5px; color: var(--ink-soft);
+  min-width: 62px;
+}
+.thumb[aria-pressed="true"] {
+  border-color: var(--accent-2);
+  background: var(--panel-3);
+  color: var(--ink);
+  font-weight: 700;
+}
+.mini-btn {
+  appearance: none;
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  padding: 3px 11px;
+  cursor: pointer;
+}
+.mini-btn:hover { border-color: var(--accent); color: var(--ink); }
+
 </style>
 <div id="app"></div>
 <script>
@@ -3187,7 +3241,8 @@ class Game {
     return "veteran";
   }
 
-  static newGame(name, position, clubId, age = 15, seed = null, role = "player") {
+  static newGame(name, position, clubId, age = 15, seed = null, role = "player",
+                 face = null) {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -3195,7 +3250,7 @@ class Game {
     g.clubs = world.clubs; g.players = world.players;
     const club = g.clubs[clubId];
 
-    if (role === "manager") return g.startAsManager(name, club, age);
+    if (role === "manager") return g.startAsManager(name, club, age, face);
 
     // ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
     const quality = age <= 17
@@ -3204,6 +3259,7 @@ class Game {
     const me = generatePlayer(g.rng, club, position, { age, quality });
     me.name = name;
     me.isHuman = true;
+    if (face) me.face = face;
     // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
     me.potential = Math.round(clamp(
       overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
@@ -3247,10 +3303,11 @@ class Game {
   }
 
   /** קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל. */
-  startAsManager(name, club, age) {
+  startAsManager(name, club, age, face) {
     const me = generatePlayer(this.rng, club, "CM", { age: Math.min(age, 40), quality: 55 });
     me.name = name;
     me.isHuman = true;
+    if (face) me.face = face;
     me.age = age;
     me.retired = true;
     me.clubId = null;
@@ -5019,23 +5076,62 @@ function hashOf(str) {
   return Math.abs(h);
 }
 
-/** מאפייני הדמות — קבועים לכל שחקן לפי המזהה שלו. */
-function faceTraits(player) {
+const FACE_FIELDS = {
+  skin: SKIN.length,
+  hairStyle: 8,
+  hairColor: HAIR_COLORS.length,
+  eye: EYES.length,
+  facial: 4,
+  brow: 3,
+  jaw: 3,
+};
+
+/** דמות אקראית — משמשת גם ככפתור "הגרל" בבורר. */
+function randomFace(rand) {
+  const r = rand || Math.random;
+  const face = {};
+  for (const [key, count] of Object.entries(FACE_FIELDS))
+    face[key] = Math.floor(r() * count);
+  return face;
+}
+
+/** דמות שנגזרת מהמזהה — לשחקני המחשב, שתמיד ייראו אותו דבר. */
+function faceFromId(player) {
   const h = hashOf(player.pid + player.name);
-  const pick = (arr, shift) => arr[Math.floor(h / Math.pow(7, shift)) % arr.length];
-  const bit = (shift, mod) => Math.floor(h / Math.pow(3, shift)) % mod;
+  const pickIndex = (count, shift) => Math.floor(h / Math.pow(7, shift)) % count;
   return {
-    skin: pick(SKIN, 1),
-    hairColor: player.age >= 34 && bit(9, 3) === 0 ? "#9A9A96" : pick(HAIR_COLORS, 2),
-    hairStyle: bit(3, 8),
-    eye: pick(EYES, 4),
-    brow: bit(5, 3),
-    facial: player.age >= 20 ? bit(6, 4) : 0,
-    jaw: bit(7, 3),
-    mouth: bit(8, 3),
-    ear: bit(11, 2),
+    skin: pickIndex(SKIN.length, 1),
+    hairColor: player.age >= 34 && Math.floor(h / 19683) % 3 === 0
+      ? HAIR_COLORS.length - 1
+      : pickIndex(HAIR_COLORS.length, 2),
+    hairStyle: pickIndex(8, 3),
+    eye: pickIndex(EYES.length, 4),
+    brow: pickIndex(3, 5),
+    facial: player.age >= 20 ? pickIndex(4, 6) : 0,
+    jaw: pickIndex(3, 7),
   };
 }
+
+/** מאפייני הדמות: מה שהשחקן בחר, ואם לא בחר — לפי המזהה. */
+function faceTraits(player) {
+  const chosen = player.face || null;
+  const base = chosen ? Object.assign(faceFromId(player), chosen) : faceFromId(player);
+  const clampIndex = (v, count) => Math.max(0, Math.min(count - 1, v | 0));
+  return {
+    skin: SKIN[clampIndex(base.skin, SKIN.length)],
+    hairColor: HAIR_COLORS[clampIndex(base.hairColor, HAIR_COLORS.length)],
+    hairStyle: clampIndex(base.hairStyle, 8),
+    eye: EYES[clampIndex(base.eye, EYES.length)],
+    brow: clampIndex(base.brow, 3),
+    facial: clampIndex(base.facial, 4),
+    jaw: clampIndex(base.jaw, 3),
+    ear: 1,
+  };
+}
+
+// שמות התצוגה של האפשרויות בבורר הדמות
+const HAIR_STYLE_NAMES = ["קצר", "מכונה", "מתולתל", "אפרו", "ארוך", "קוקו", "קרחת", "בלורית"];
+const FACIAL_NAMES = ["מגולח", "זיפים", "זקן", "שפם"];
 
 /**
  * שיער בשתי שכבות: מסה מאחורי הראש, ובלורית מעליו.
@@ -5430,6 +5526,95 @@ function ageBlurb(age, role) {
   return "בסוף הדרך. עוד עונה או שתיים, ואז ההחלטה הגדולה.";
 }
 
+/** שחקן דמה לתצוגה מקדימה בבורר הדמות. */
+function facePreviewPlayer(face, overrides) {
+  return {
+    pid: "preview", name: "preview", age: 25, number: 9,
+    face: Object.assign({}, face, overrides || {}),
+  };
+}
+
+const PREVIEW_CLUB = { cid: "__preview__" };
+
+/** בורר הדמות: תצוגה מקדימה גדולה, ובחירה לכל מאפיין. */
+function facePicker(face, club) {
+  const previewClub = club || PREVIEW_CLUB;
+  const swatch = (field, index, color, label) => `
+    <button class="swatch" data-face="${field}" data-idx="${index}"
+      aria-pressed="${face[field] === index}" title="${escAttr(label)}"
+      style="--sw:${color}"><span></span></button>`;
+
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">הדמות שלך</span>
+      <span class="r"><button class="mini-btn" data-act="random-face">הגרל</button></span></div>
+    <div class="panel-body">
+      <div class="face-preview">${avatar(facePreviewPlayer(face), previewClub, 132)}</div>
+
+      <div class="face-group">
+        <div class="muted">גוון עור</div>
+        <div class="swatches">
+          ${SKIN.map((tones, i) => swatch("skin", i, tones[0], "גוון " + (i + 1))).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">תסרוקת</div>
+        <div class="face-thumbs">
+          ${HAIR_STYLE_NAMES.map((name, i) => `
+            <button class="thumb" data-face="hairStyle" data-idx="${i}"
+              aria-pressed="${face.hairStyle === i}">
+              ${avatar(facePreviewPlayer(face, { hairStyle: i }), previewClub, 52)}
+              <span>${esc(name)}</span>
+            </button>`).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">צבע שיער</div>
+        <div class="swatches">
+          ${HAIR_COLORS.map((c, i) => swatch("hairColor", i, c, "צבע " + (i + 1))).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">זקן</div>
+        <div class="face-thumbs">
+          ${FACIAL_NAMES.map((name, i) => `
+            <button class="thumb" data-face="facial" data-idx="${i}"
+              aria-pressed="${face.facial === i}">
+              ${avatar(facePreviewPlayer(face, { facial: i }), previewClub, 52)}
+              <span>${esc(name)}</span>
+            </button>`).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">עיניים</div>
+        <div class="swatches">
+          ${EYES.map((c, i) => swatch("eye", i, c, "עיניים " + (i + 1))).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">מבנה פנים</div>
+        <div class="chips">
+          ${["צר", "רחב", "מוארך"].map((name, i) => `<button class="chip"
+            data-face="jaw" data-idx="${i}" aria-pressed="${face.jaw === i}">${name}</button>`).join("")}
+        </div>
+      </div>
+
+      <div class="face-group">
+        <div class="muted">גבות</div>
+        <div class="chips">
+          ${["דקות", "רגילות", "עבות"].map((name, i) => `<button class="chip"
+            data-face="brow" data-idx="${i}" aria-pressed="${face.brow === i}">${name}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function screenNew() {
   const state = viewData || (viewData = { name: "", position: "ST",
     club: "hapoel_carmel", age: 15, role: "player" });
@@ -5465,6 +5650,8 @@ function screenNew() {
         <input type="text" id="pname" maxlength="24" placeholder="עומר לוי" value="${esc(state.name)}">
       </div>
     </div>
+
+    ${facePicker(state.face, { cid: state.club })}
 
     ${isManager ? "" : `
     <div class="panel">
@@ -6242,6 +6429,12 @@ function screenSquad() {
  * עורך מסד הנתונים — שינוי שמות מועדונים ושחקנים, ייצוא וייבוא.
  * מה שנשמר כאן נשמר רק בדפדפן שלך.
  */
+/** המאפיינים הנוכחיים של הדמות כאינדקסים, לעריכה בבורר. */
+function faceTraitsIndices(player) {
+  if (player.face) return Object.assign(faceFromId(player), player.face);
+  return faceFromId(player);
+}
+
 function screenEditor() {
   const club = game.myClub();
   const leagues = D.LEAGUES.map(l => l.id);
@@ -6284,6 +6477,8 @@ function screenEditor() {
         </div>`).join("")}
       </div>
     </div>
+
+    ${facePicker(faceTraitsIndices(game.me), club)}
 
     ${squad.length ? `
     <div class="panel">
@@ -6377,6 +6572,18 @@ function bind() {
     el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
+  app.querySelectorAll("[data-face]").forEach(el =>
+    el.addEventListener("click", () => {
+      const field = el.dataset.face;
+      const index = +el.dataset.idx;
+      if (view === "editor") {
+        game.me.face = Object.assign({}, faceTraitsIndices(game.me), { [field]: index });
+        saveGame();
+      } else {
+        viewData.face = Object.assign({}, viewData.face, { [field]: index });
+      }
+      render();
+    }));
   app.querySelectorAll("[data-role]").forEach(el =>
     el.addEventListener("click", () => {
       viewData.role = el.dataset.role;
@@ -6424,7 +6631,8 @@ function bind() {
 }
 
 function act(what) {
-  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15, role: "player" }); }
+  if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15,
+      role: "player", face: randomFace() }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -6435,7 +6643,7 @@ function act(what) {
   else if (what === "start") {
     const name = (viewData.name || "").trim() || (viewData.role === "manager" ? "דני מנג'ר" : "עומר לוי");
     game = Game.newGame(name, viewData.position, viewData.club, viewData.age,
-                        null, viewData.role);
+                        null, viewData.role, viewData.face);
     saveGame();
     go("main");
   }
@@ -6446,6 +6654,11 @@ function act(what) {
   else if (what === "accept") { showOutcome("הצעת העברה", game.acceptOffer()); }
   else if (what === "reject") { showOutcome("הצעת העברה", game.rejectOffer()); }
   else if (what === "restart") { clearSave(); game = null; go("menu"); }
+  else if (what === "random-face") {
+    if (view === "editor") { game.me.face = randomFace(); saveGame(); }
+    else viewData.face = randomFace();
+    render();
+  }
   else if (what === "export-db") exportDatabase();
   else if (what === "import-db") importDatabase();
 }
