@@ -63,7 +63,8 @@ function screenMenu() {
   const saved = hasSave();
   return `
   <div class="screen menu">
-    <div class="hero">
+    ${stadium()}
+    <div class="hero" style="padding-top:8px">
       <div class="eyebrow">משחק ניהול כדורגל</div>
       <h1 class="display">קריירה</h1>
       <div class="underline"></div>
@@ -189,9 +190,16 @@ function screenHub() {
       <div class="scoreboard">
         <div class="eyebrow">${esc(comp)} · ${where}</div>
         <div class="scoreline">
-          <div class="side"><span class="${club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
+          <div class="side">${crest(home, 30)}<span class="nm ${
+            club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
           <div class="versus">נגד</div>
-          <div class="side away"><span class="${club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+          <div class="side away">${crest(away, 30)}<span class="nm ${
+            club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+        </div>
+        <div class="scoreline" style="font-size:12px">
+          <div class="side">${formGuide(home)}</div>
+          <div></div>
+          <div class="side away">${formGuide(away)}</div>
         </div>
         <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}</div>
       </div>`;
@@ -293,12 +301,15 @@ function screenWeek() {
     <div class="scoreboard">
       <div class="eyebrow">${esc(competition)}</div>
       <div class="scoreline">
-        <div class="side"><span class="${club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
+        <div class="side">${crest(home, 34)}<span class="nm ${
+          club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
         <div class="score">${result.homeGoals} : ${result.awayGoals}</div>
-        <div class="side away"><span class="${club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
+        <div class="side away">${crest(away, 34)}<span class="nm ${
+          club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
       </div>
       ${penalties ? `<div class="muted center">הוכרע בפנדלים — ${esc(penalties)}</div>` : ""}
-      ${goals.length ? `<hr class="rule"><div class="goals">${goals.map((e, i) => `
+      ${goals.length ? goalTimeline(result, home, away, me.pid) : ""}
+      ${goals.length ? `<div class="goals">${goals.map((e, i) => `
         <div class="goal-row ${e.playerId === me.pid ? "mine" : ""}" style="animation-delay:${i * 60}ms">
           <span class="min">${e.minute}'</span>
           <span>${esc(game.players[e.playerId] ? game.players[e.playerId].name : "")}</span>
@@ -306,6 +317,16 @@ function screenWeek() {
         </div>`).join("")}</div>` : ""}
       <div class="muted">${esc(result.commentary[0] || "")}</div>
     </div>`;
+
+    // ההרכב על המגרש — רק כשהייתי בו
+    const myLineup = club && club.cid === home.cid ? result.homeLineup : result.awayLineup;
+    if (club && myLineup.includes(me.pid)) {
+      const formation = club.formation;
+      html += `<div class="card">
+        <div class="eyebrow">ההרכב · ${esc(formation)}</div>
+        ${pitch(myLineup, formation, game.players, me.pid, club)}
+      </div>`;
+    }
   }
 
   if (report.personal) html += personalCard(report.personal);
@@ -334,7 +355,8 @@ function personalCard(p) {
   if (p.status === "bench")
     return `<div class="card"><div class="eyebrow">אתה</div>
       <div class="note"><span class="ico">🪑</span><span>ישבת 90 דקות על הספסל.</span></div>
-      <div class="muted">${game.noStartStreak} משחקים ברצף בלי להתחיל.</div></div>`;
+      <div class="muted">${game.noStartStreak === 1 ? "משחק אחד" :
+        game.noStartStreak + " משחקים"} ברצף בלי להתחיל.</div></div>`;
   if (p.status === "injured")
     return `<div class="card"><div class="eyebrow">אתה</div>
       <div class="note"><span class="ico">🚑</span><span>${esc(p.injuryName)} — עוד ${p.weeks} שבועות.</span></div></div>`;
@@ -412,9 +434,14 @@ function screenProfile() {
   <div class="screen">
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
-      <h2 class="display" style="font-size:34px">${esc(me.name)}</h2>
-      <div class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}
-        ${club ? "· " + esc(club.name) : ""}</div>
+      <div class="kit-row">
+        ${isPlayer ? shirt(club, me.number || 0, 78) : (club ? crest(club, 58) : "")}
+        <div class="kit-meta">
+          <span class="display big">${esc(me.name)}</span>
+          <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}</span>
+          ${club ? `<span class="muted">${esc(club.name)}</span>` : ""}
+        </div>
+      </div>
       ${me.traits.length ? `<div class="chips">${me.traits.map(t =>
         `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>` : ""}
     </div>
@@ -450,6 +477,12 @@ function screenProfile() {
         <div class="stat"><div class="n">${c.assists}</div><div class="l">בישולים</div></div>
       </div>
     </div>
+
+    ${game.history.length ? `
+    <div class="card">
+      <div class="eyebrow">שערים לפי עונה</div>
+      ${columns(seasonGoalsData(), { alt: "שערים בכל עונה" })}
+    </div>` : ""}
 
     <div class="card">
       <div class="eyebrow">חוזה</div>
@@ -492,6 +525,19 @@ function screenProfile() {
   </div>`;
 }
 
+function seasonGoalsData() {
+  const rows = [];
+  let previous = 0;
+  for (const h of game.history) {
+    rows.push({ label: String(h.year).slice(2), value: Math.max(0, h.goals - previous) });
+    previous = h.goals;
+  }
+  const current = game.me.season.goals;
+  if (["academy", "player", "veteran"].includes(game.stage))
+    rows.push({ label: String(game.year).slice(2), value: current });
+  return rows.slice(-8);
+}
+
 function screenTable() {
   const club = game.myClub();
   const leagueId = (viewData && viewData.league) || game.myLeague() || "top";
@@ -507,7 +553,7 @@ function screenTable() {
       <div class="table-wrap">
         <table>
           <thead><tr><th>#</th><th style="text-align:right">קבוצה</th><th>מש</th>
-            <th>נצ</th><th>תק</th><th>הפ</th><th>הפרש</th><th>נק</th></tr></thead>
+            <th>הפרש</th><th>נק</th><th>טופס</th></tr></thead>
           <tbody>
             ${rows.map((r, i) => {
               const c = game.clubs[r.clubId];
@@ -515,9 +561,12 @@ function screenTable() {
               const cls = [mine ? "me" : "",
                 isDomestic && leagueId === "national" && i < 2 ? "up" : "",
                 isDomestic && leagueId === "top" && i >= rows.length - 2 ? "down" : ""].join(" ");
-              return `<tr class="${cls}"><td>${i + 1}</td><td class="club">${esc(c.name)}</td>
-                <td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>
-                <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td><td class="pts">${r.points}</td></tr>`;
+              return `<tr class="${cls}"><td>${i + 1}</td>
+                <td class="club"><span class="crest-row">${crest(c, 20)}<span class="nm">${esc(c.name)}</span></span></td>
+                <td>${r.played}</td>
+                <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td>
+                <td class="pts">${r.points}</td>
+                <td class="form-cell">${formGuide(c)}</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -525,6 +574,11 @@ function screenTable() {
       ${leagueId === "top" ? `<div class="muted">שתי האחרונות יורדות לליגה הלאומית.</div>` : ""}
       ${leagueId === "national" ? `<div class="muted">שתי הראשונות עולות לליגת העל.</div>` : ""}
     </div>
+    ${club && club.leagueId === leagueId && game.positionLog.length > 2 ? `
+    <div class="card">
+      <div class="eyebrow">המיקום שלך לאורך העונה</div>
+      ${positionLine(game.positionLog, rows.length, { alt: "מיקום בטבלה לפי מחזור" })}
+    </div>` : ""}
     ${game.cup && game.cup.teams ? `<div class="card">
       <div class="eyebrow">גביע המדינה</div>
       <div class="muted">${game.cup.winner
@@ -542,12 +596,15 @@ function screenSquad() {
   return `
   <div class="screen">
     <div class="card">
-      <div class="eyebrow">${esc(club.name)} · ${esc(club.nickname)}</div>
+      <div class="crest-row">${crest(club, 38)}<span class="nm">
+        <strong>${esc(club.name)}</strong><br><span class="muted">${esc(club.nickname)}</span></span></div>
       <div class="muted">מאמן: ${esc(club.managerName)} · מערך: ${esc(club.formation)}
         · מתקנים ${club.trainingFacilities}</div>
+      ${formGuide(club) ? `<div>${formGuide(club)}</div>` : ""}
       <hr class="rule">
       ${squad.map(p => `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
-        <span>${esc(p.name)}${p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
+        <span><span class="num">${p.number || ""}</span> ${esc(p.name)}${
+          p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
         <span class="pos">${esc(positionHe(p))} · ${p.age}</span>
         <span class="ovr">${overall(p)}</span>
       </div>`).join("")}
@@ -562,7 +619,7 @@ function screenNews() {
       <div class="eyebrow">הישגים</div>
       ${game.honours.slice().reverse().map(h => {
         const [yr, ...rest] = h.split(": ");
-        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>${trophy()} ${esc(rest.join(": "))}</span></div>`;
       }).join("")}
     </div>` : ""}
     ${game.history.length ? `<div class="card">
@@ -609,7 +666,7 @@ function screenEnd() {
     ${game.honours.length ? `<div class="card"><div class="eyebrow">ארון התארים</div>
       ${game.honours.map(h => {
         const [yr, ...rest] = h.split(": ");
-        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>${trophy()} ${esc(rest.join(": "))}</span></div>`;
       }).join("")}</div>` : ""}
     <button class="btn primary wide" data-act="restart">קריירה חדשה</button>
   </div>`;

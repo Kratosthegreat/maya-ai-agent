@@ -24,6 +24,9 @@
   --shadow: 0 1px 2px rgba(18, 33, 26, .08), 0 8px 24px rgba(18, 33, 26, .06);
   --radius: 4px;
   --pitch: #DDE4D6;
+  --pitch-turf: #CBD8C2;
+  --pitch-stripe: #C0CFB6;
+  --pitch-line: #F4F7F1;
 }
 
 :root:not([data-theme="light"]) {
@@ -46,6 +49,9 @@
     --loss: #E06B60;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
     --pitch: #16241B;
+    --pitch-turf: #16301F;
+    --pitch-stripe: #1A3724;
+    --pitch-line: #3E6B4C;
   }
 }
 
@@ -64,6 +70,9 @@
   --loss: #E06B60;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px rgba(0, 0, 0, .35);
   --pitch: #16241B;
+    --pitch-turf: #16301F;
+    --pitch-stripe: #1A3724;
+    --pitch-line: #3E6B4C;
 }
 
 * { box-sizing: border-box; }
@@ -422,6 +431,7 @@ tr.down td:first-child { box-shadow: inset 3px 0 0 var(--loss); }
   height: 5px;
   background: var(--accent-fill);
   margin: 10px 0 4px;
+  margin-inline-end: auto;
 }
 .screen.menu { justify-content: center; }
 .hero .sub { color: var(--ink-soft); font-size: 15px; max-width: 40ch; }
@@ -502,6 +512,74 @@ input[type="text"], select {
   text-align: center;
 }
 .squad-row.me { color: var(--accent); font-weight: 700; }
+
+
+/* ---------- גרפיקה ---------- */
+
+.crest { flex: none; display: block; }
+
+.crest-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.crest-row .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.scoreline .side { display: flex; align-items: center; gap: 9px; }
+.scoreline .side.away { flex-direction: row-reverse; }
+.scoreline .side .nm { font-weight: 700; font-size: 15px; line-height: 1.15; }
+
+.pitch {
+  width: 100%;
+  max-width: 240px;
+  margin: 0 auto;
+  display: block;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+}
+.timeline { width: 100%; display: block; }
+
+.form { display: inline-flex; gap: 3px; vertical-align: middle; }
+.form .f {
+  width: 17px; height: 17px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.form .f-w { background: var(--win); }
+.form .f-d { background: var(--draw); }
+.form .f-l { background: var(--loss); }
+
+.chart { width: 100%; display: block; overflow: visible; }
+
+.stadium {
+  width: 100%;
+  display: block;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  margin-bottom: 4px;
+}
+
+.trophy { flex: none; vertical-align: -3px; }
+
+.kit-row { display: flex; align-items: center; gap: 16px; }
+.kit-row .kit-meta { display: flex; flex-direction: column; gap: 2px; }
+.kit-row .kit-meta .big {
+  font-family: "Karantina", sans-serif;
+  font-size: 30px;
+  line-height: 1;
+}
+
+td.club .crest-row { gap: 6px; }
+td.form-cell { width: 1%; white-space: nowrap; }
+.squad-row .crest-row { gap: 7px; }
+.squad-row .num {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  font-size: 12px;
+  min-width: 18px;
+  text-align: center;
+}
 
 </style>
 <div id="app"></div>
@@ -1552,6 +1630,29 @@ function generatePlayer(rng, club, position, opts = {}) {
   return p;
 }
 
+// מספרי חולצה — לכל עמדה יש את המספרים המסורתיים שלה
+const NUMBER_PREF = {
+  GK: [1, 12, 23], CB: [4, 5, 2, 3, 6], LB: [3, 15], RB: [2, 14],
+  DM: [6, 16, 4], CM: [8, 18, 20], AM: [10, 7, 21],
+  LW: [11, 17], RW: [7, 17, 22], ST: [9, 19, 29],
+};
+
+/** נותן לשחקן מספר חולצה פנוי במועדון, בעדיפות למספר המסורתי של העמדה. */
+function assignNumber(club, players, player) {
+  const taken = new Set(club.squad
+    .map(pid => players[pid])
+    .filter(p => p && p !== player && p.number)
+    .map(p => p.number));
+  for (const n of (NUMBER_PREF[player.position] || [])) {
+    if (!taken.has(n)) { player.number = n; return n; }
+  }
+  for (let n = 2; n <= 45; n++) {
+    if (!taken.has(n)) { player.number = n; return n; }
+  }
+  player.number = 0;
+  return 0;
+}
+
 function generateWorld(seed) {
   const rng = new Rng(seed);
   const clubs = {}, players = {}, usedNames = new Set();
@@ -1574,6 +1675,7 @@ function generateWorld(seed) {
       const p = generatePlayer(rng, club, position, { usedNames });
       players[p.pid] = p;
       club.squad.push(p.pid);
+      assignNumber(club, players, p);
     }
     clubs[cid] = club;
   }
@@ -1600,27 +1702,37 @@ function pickLineup(club, players, formation, forced) {
   formation = formation || club.formation;
   const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
   const available = club.squad.map(pid => players[pid]).filter(p => p && isAvailable(p));
-  const lineup = [];
-  const forcedLeft = (forced || []).slice();
+  const lineup = new Array(slots.length).fill(null);
+  const used = new Set();
+  const claim = (idx, p) => { lineup[idx] = p.pid; used.add(p.pid); };
 
-  for (const slot of slots) {
-    let pick = null;
-    for (let i = 0; i < forcedLeft.length; i++) {
-      const p = players[forcedLeft[i]];
-      if (p && isAvailable(p) && !lineup.includes(p.pid) && available.includes(p)) {
-        pick = p; forcedLeft.splice(i, 1); break;
-      }
-    }
-    if (!pick) {
-      const candidates = available.filter(p => !lineup.includes(p.pid));
-      if (!candidates.length) break;
-      pick = candidates.reduce((best, p) =>
-        effective(p) * positionFit(p.position, slot) >
-        effective(best) * positionFit(best.position, slot) ? p : best);
-    }
-    lineup.push(pick.pid);
+  // מי שנכפה להרכב תופס ראשון את המשבצת הכי מתאימה לו
+  for (const pid of (forced || [])) {
+    const p = players[pid];
+    if (!p || used.has(pid) || !available.includes(p)) continue;
+    let bestIdx = -1, bestFit = 0;
+    slots.forEach((slot, idx) => {
+      if (lineup[idx]) return;
+      const fit = positionFit(p.position, slot);
+      if (fit > bestFit) { bestFit = fit; bestIdx = idx; }
+    });
+    if (bestIdx >= 0) claim(bestIdx, p);
   }
-  return lineup;
+
+  // מעבר ראשון: רק שחקנים בעמדתם הטבעית. מעבר שני: מי שנשאר.
+  for (const minFit of [0.9, 0]) {
+    for (let idx = 0; idx < slots.length; idx++) {
+      if (lineup[idx]) continue;
+      const slot = slots[idx];
+      const candidates = available.filter(p =>
+        !used.has(p.pid) && positionFit(p.position, slot) >= minFit);
+      if (!candidates.length) continue;
+      claim(idx, candidates.reduce((a, b) =>
+        effective(a) * positionFit(a.position, slot) >=
+        effective(b) * positionFit(b.position, slot) ? a : b));
+    }
+  }
+  return lineup.filter(Boolean);
 }
 
 function teamStrength(lineup, players, formation) {
@@ -1694,7 +1806,7 @@ function simulateMatch(home, away, players, rng, opts = {}) {
 
   const expected = (attack, defence, control, talk) => {
     const edge = (attack - defence) / 11;
-    let base = 1.48 * Math.exp(edge * 0.38);
+    let base = 1.38 * Math.exp(edge * 0.38);
     base *= 0.55 + 0.9 * control;
     base *= 0.9 + talk * 0.2;
     return clamp(base, 0.12, 4.6);
@@ -2572,6 +2684,7 @@ class Game {
     this.firstClubId = null; this.lastClubId = null;
     this.history = []; this.caps = 0; this.intlGoals = 0;
     this.noStartStreak = 0; this.gameOver = false;
+    this.positionLog = [];
     this.rng = new Rng(1);
   }
 
@@ -2622,6 +2735,7 @@ class Game {
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
+    assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
     club.managerTrust = 45;
@@ -2637,6 +2751,8 @@ class Game {
 
   startSeason() {
     this.week = 1;
+    this.positionLog = [];
+    for (const club of Object.values(this.clubs)) club.formLog = [];
     this.fixtures = {}; this.tables = {};
     for (const league of D.LEAGUES) {
       const lid = league.id;
@@ -2760,6 +2876,8 @@ class Game {
     if (event && this.armEvent(event)) report.eventId = event.eid;
 
     this.weeklyIncome(report);
+
+    if (this.myClub()) this.positionLog.push(this.leaguePosition());
 
     this.week += 1;
     if (this.week > SEASON_WEEKS) {
@@ -2986,6 +3104,11 @@ class Game {
     };
     reg(table[result.homeId], result.homeGoals, result.awayGoals);
     reg(table[result.awayId], result.awayGoals, result.homeGoals);
+    for (const cid of [result.homeId, result.awayId]) {
+      const club = this.clubs[cid];
+      if (!club) continue;
+      club.formLog = (club.formLog || []).concat(resultFor(result, cid)).slice(-5);
+    }
   }
 
   playCupRound(report) {
@@ -3424,6 +3547,7 @@ class Game {
       .reduce((a, b) => (a.reputation >= b.reputation ? a : b));
     buyer.squad.push(star.pid);
     star.clubId = buyer.cid;
+    assignNumber(buyer, this.players, star);
     club.boardConfidence = clamp(club.boardConfidence + 5, 0, 100);
     club.fanSupport = clamp(club.fanSupport - 12, 0, 100);
     return `מכרת את ${star.name} ל${buyer.name} תמורת ₪${fmt(fee)}. האוהדים בטראומה.`;
@@ -3456,6 +3580,7 @@ class Game {
     kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(10, 32), 60, 93));
     this.players[kid.pid] = kid;
     club.squad.push(kid.pid);
+    assignNumber(club, this.players, kid);
     this.setFlag("wonderkid", kid.pid);
     return `העלית את ${kid.name} (${kid.age}) לסגל. פוטנציאל מוערך: ${kid.potential}. עכשיו תתפלל.`;
   }
@@ -3516,6 +3641,7 @@ class Game {
     const next = this.clubs[clubId];
     next.squad.push(me.pid);
     me.clubId = clubId;
+    assignNumber(next, this.players, me);
     me.contract = { wage, yearsLeft: years };
     next.managerTrust = loan ? 65 : 55;
     this.lastClubId = clubId;
@@ -3649,6 +3775,7 @@ class Game {
         kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(6, 28), 45, 94));
         this.players[kid.pid] = kid;
         club.squad.push(kid.pid);
+        assignNumber(club, this.players, kid);
       }
     }
   }
@@ -3665,6 +3792,7 @@ class Game {
           old.squad = old.squad.filter(x => x !== p.pid);
           target.squad.push(p.pid);
           p.clubId = target.cid;
+          assignNumber(target, this.players, p);
         }
       }
       p.contract.yearsLeft = this.rng.randint(1, 4);
@@ -3778,6 +3906,7 @@ class Game {
       firstClubId: this.firstClubId, lastClubId: this.lastClubId,
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
+      positionLog: this.positionLog,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
   }
@@ -3795,11 +3924,407 @@ class Game {
       firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
+      positionLog: raw.positionLog || [],
     });
     g.rng = Rng.fromState(raw.rngState);
     PID_COUNTER = Math.max(PID_COUNTER, raw.pidCounter || 0);
     return g;
   }
+}
+
+// ---------------------------------------------------------------------------
+// גרפיקה — הכל SVG מחולל, בלי תמונות חיצוניות.
+// סמלי מועדונים, צבעי מדים, מגרש עם ההרכב, ציר שערים, חולצה, וגרפים.
+// ---------------------------------------------------------------------------
+
+// צבעי המדים נגזרים מהכינוי של כל מועדון (הצהובים, הירוקים, הנחשים...)
+const KITS = {
+  hapoel_yam:      ["#123A6B", "#FFFFFF", "hoops"],
+  maccabi_harel:   ["#F2C230", "#16264A", "solid"],
+  bnei_negev:      ["#C87A2E", "#3B2412", "sash"],
+  hapoel_carmel:   ["#B4231F", "#FFFFFF", "solid"],
+  maccabi_sharon:  ["#1E7A46", "#FFFFFF", "halves"],
+  ironi_galil:     ["#1B6F6A", "#EDE8D8", "stripes"],
+  beitar_zion:     ["#1A1A1A", "#F2C230", "stripes"],
+  hapoel_ayalon:   ["#C0392B", "#F5F5F5", "sash"],
+  maccabi_yarden:  ["#1F5FA8", "#2E8B57", "halves"],
+  shimshon_ashdod: ["#1FA3A3", "#FFFFFF", "hoops"],
+  hakoah_arava:    ["#E2701A", "#1A1A1A", "sash"],
+  ironi_kinneret:  ["#5AA9E6", "#FFFFFF", "solid"],
+
+  maccabi_tavor:   ["#6B3FA0", "#FFFFFF", "stripes"],
+  hapoel_lachish:  ["#3E7A2E", "#E8C25A", "hoops"],
+  ironi_modiin:    ["#20509E", "#FFFFFF", "sash"],
+  bnei_hasharon:   ["#E8791E", "#FFFFFF", "halves"],
+  maccabi_arad:    ["#7A4B2A", "#E2A03F", "stripes"],
+  hapoel_ramla:    ["#7B2233", "#F0E6D2", "solid"],
+  shimshon_dan:    ["#16264A", "#C0392B", "halves"],
+  ironi_besor:     ["#177C6E", "#FFFFFF", "sash"],
+  maccabi_negba:   ["#5E6A70", "#C0392B", "hoops"],
+  hapoel_ofakim:   ["#4FA3D1", "#E8791E", "stripes"],
+  bnei_zvulun:     ["#14304F", "#D9B44A", "sash"],
+  ironi_shomron:   ["#6E7B3A", "#FFFFFF", "solid"],
+
+  real_castilla:   ["#F5F5F0", "#C8A24A", "solid"],
+  olympia_munchen: ["#C8102E", "#FFFFFF", "hoops"],
+  thames_united:   ["#B4231F", "#1A1A1A", "halves"],
+  inter_lazio:     ["#1B2A6B", "#1A1A1A", "stripes"],
+  paris_luxe:      ["#16264A", "#C0392B", "sash"],
+  ajax_noord:      ["#F5F5F0", "#C8102E", "sash"],
+  porto_atlantico: ["#1F63B8", "#FFFFFF", "stripes"],
+  galata_bosphorus:["#E8B21E", "#B4231F", "halves"],
+};
+
+const FALLBACK_KIT = ["#4A5A50", "#FFFFFF", "solid"];
+
+function kit(cid) { return KITS[cid] || FALLBACK_KIT; }
+
+/** שחור או לבן — מה שקריא יותר מעל הצבע הנתון. */
+function inkOn(hex) {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.slice(0, 2), 16) / 255;
+  const g = parseInt(c.slice(2, 4), 16) / 255;
+  const b = parseInt(c.slice(4, 6), 16) / 255;
+  const lin = v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+  const L = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return L > 0.42 ? "#14201A" : "#F4F7F2";
+}
+
+function shade(hex, amount) {
+  const c = hex.replace("#", "");
+  const parts = [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16));
+  const out = parts.map(v => Math.max(0, Math.min(255,
+    Math.round(amount < 0 ? v * (1 + amount) : v + (255 - v) * amount))));
+  return "#" + out.map(v => v.toString(16).padStart(2, "0")).join("");
+}
+
+/** ראשי התיבות של שם המועדון — שתי אותיות. */
+function initials(name) {
+  const words = name.replace(/["']/g, "").split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 2);
+  return words[0][0] + words[1][0];
+}
+
+// ---------------------------------------------------------------------------
+// סמל המועדון
+// ---------------------------------------------------------------------------
+
+const SHIELD = "M6,6 H94 V64 C94,90 74,106 50,116 C26,106 6,90 6,64 Z";
+let crestSeq = 0;
+
+function crest(club, size = 28) {
+  const [primary, secondary, pattern] = kit(club.cid);
+  const id = "cr" + (++crestSeq);
+  const ink = inkOn(primary);
+  const bandInk = inkOn(secondary);
+
+  let motif = "";
+  if (pattern === "stripes") {
+    motif = [18, 42, 66].map(x =>
+      `<rect x="${x}" y="0" width="14" height="120" fill="${secondary}"/>`).join("");
+  } else if (pattern === "hoops") {
+    motif = [22, 52, 82].map(y =>
+      `<rect x="0" y="${y}" width="100" height="14" fill="${secondary}"/>`).join("");
+  } else if (pattern === "halves") {
+    motif = `<rect x="50" y="0" width="50" height="120" fill="${secondary}"/>`;
+  } else if (pattern === "sash") {
+    motif = `<path d="M0,26 L100,86 L100,108 L0,48 Z" fill="${secondary}"/>`;
+  }
+
+  return `<svg class="crest" width="${size}" height="${size * 1.16}" viewBox="0 0 100 120"
+    role="img" aria-label="סמל ${escAttr(club.name)}">
+    <defs><clipPath id="${id}"><path d="${SHIELD}"/></clipPath></defs>
+    <path d="${SHIELD}" fill="${primary}"/>
+    <g clip-path="url(#${id})">${motif}
+      <rect x="0" y="52" width="100" height="26" fill="${secondary}" opacity=".92"/>
+      <text x="50" y="71" text-anchor="middle" font-size="20" font-weight="700"
+        fill="${bandInk}" font-family="Assistant, sans-serif">${escAttr(initials(club.name))}</text>
+    </g>
+    <path d="${SHIELD}" fill="none" stroke="${shade(primary, -0.45)}" stroke-width="5"/>
+  </svg>`;
+}
+
+function escAttr(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ---------------------------------------------------------------------------
+// חולצה עם מספר
+// ---------------------------------------------------------------------------
+
+function shirt(club, number, size = 74) {
+  const [primary, secondary, pattern] = club ? kit(club.cid) : FALLBACK_KIT;
+  const id = "sh" + (++crestSeq);
+  const ink = inkOn(primary);
+  const body = "M22,16 L38,8 C42,16 58,16 62,8 L78,16 L86,34 L72,42 L72,92 L28,92 L28,42 L14,34 Z";
+  let motif = "";
+  if (pattern === "stripes")
+    motif = [30, 46, 62].map(x => `<rect x="${x}" y="0" width="9" height="100" fill="${secondary}"/>`).join("");
+  else if (pattern === "hoops")
+    motif = [30, 52, 74].map(y => `<rect x="0" y="${y}" width="100" height="10" fill="${secondary}"/>`).join("");
+  else if (pattern === "halves")
+    motif = `<rect x="50" y="0" width="50" height="100" fill="${secondary}"/>`;
+  else if (pattern === "sash")
+    motif = `<path d="M8,24 L92,66 L92,80 L8,38 Z" fill="${secondary}"/>`;
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" role="img"
+    aria-label="חולצה מספר ${number}">
+    <defs><clipPath id="${id}"><path d="${body}"/></clipPath></defs>
+    <path d="${body}" fill="${primary}"/>
+    <g clip-path="url(#${id})">${motif}</g>
+    <path d="${body}" fill="none" stroke="${shade(primary, -0.4)}" stroke-width="3"/>
+    <text x="50" y="76" text-anchor="middle" font-size="38" font-weight="700"
+      fill="${ink}" font-family="Assistant, sans-serif">${number}</text>
+  </svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// המגרש וההרכב
+// ---------------------------------------------------------------------------
+
+const ROW_OF = { GK: 0, CB: 1, LB: 1, RB: 1, DM: 2, CM: 2, AM: 3, LW: 3, RW: 3, ST: 4 };
+const LATERAL = { LB: -2, LW: -2, RB: 2, RW: 2, CB: 0, DM: 0, CM: 0, AM: 0, ST: 0, GK: 0 };
+const ROW_Y = [150, 122, 92, 62, 32];
+
+/** מצייר את ההרכב על מגרש. השחקן האנושי מסומן. */
+function pitch(lineup, formation, players, meId, club) {
+  const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
+  const [primary] = club ? kit(club.cid) : FALLBACK_KIT;
+  const dotInk = inkOn(primary);
+
+  const rows = [[], [], [], [], []];
+  lineup.forEach((pid, idx) => {
+    const slot = idx < slots.length ? slots[idx] : (players[pid] || {}).position || "CM";
+    rows[ROW_OF[slot] ?? 2].push({ pid, slot });
+  });
+
+  let dots = "";
+  rows.forEach((row, r) => {
+    if (!row.length) return;
+    row.sort((a, b) => LATERAL[a.slot] - LATERAL[b.slot]);
+    const step = 100 / (row.length + 1);
+    row.forEach((entry, i) => {
+      const x = step * (i + 1);
+      const y = ROW_Y[r];
+      const p = players[entry.pid];
+      const isMe = entry.pid === meId;
+      dots += `
+        <g>
+          <circle cx="${x}" cy="${y}" r="${isMe ? 7 : 5.4}"
+            fill="${isMe ? "var(--accent-fill)" : primary}"
+            stroke="${isMe ? "var(--accent-fill)" : shade(primary, -0.4)}" stroke-width="1.4"/>
+          <text x="${x}" y="${y + 2.6}" text-anchor="middle" font-size="6.4" font-weight="700"
+            fill="${isMe ? "#241803" : dotInk}"
+            font-family="Assistant, sans-serif">${p && p.number ? p.number : ""}</text>
+          ${isMe ? `<text x="${x}" y="${y - 10}" text-anchor="middle" font-size="7"
+            font-weight="700" fill="var(--accent)"
+            font-family="Assistant, sans-serif">${escAttr(shortName(p.name))}</text>` : ""}
+        </g>`;
+    });
+  });
+
+  return `<svg viewBox="0 0 100 170" class="pitch" role="img" aria-label="ההרכב על המגרש">
+    <rect x="0" y="0" width="100" height="170" fill="var(--pitch-turf)"/>
+    ${[0, 1, 2, 3, 4, 5].map(i =>
+      `<rect x="0" y="${i * 28.4}" width="100" height="14.2" fill="var(--pitch-stripe)"/>`).join("")}
+    <g fill="none" stroke="var(--pitch-line)" stroke-width="0.8">
+      <rect x="4" y="4" width="92" height="162"/>
+      <line x1="4" y1="85" x2="96" y2="85"/>
+      <circle cx="50" cy="85" r="14"/>
+      <rect x="28" y="4" width="44" height="20"/>
+      <rect x="28" y="146" width="44" height="20"/>
+      <rect x="40" y="4" width="20" height="8"/>
+      <rect x="40" y="158" width="20" height="8"/>
+    </g>
+    ${dots}
+  </svg>`;
+}
+
+function shortName(name) {
+  const parts = String(name).split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : name;
+}
+
+// ---------------------------------------------------------------------------
+// ציר השערים של המשחק
+// ---------------------------------------------------------------------------
+
+function goalTimeline(result, homeClub, awayClub, meId) {
+  const goals = result.events.filter(e => e.kind === "goal");
+  const reds = result.events.filter(e => e.kind === "red");
+  const homeColor = kit(homeClub.cid)[0];
+  const awayColor = kit(awayClub.cid)[0];
+  const W = 300, H = 46, PAD = 14, BASE = 23;
+  const x = m => PAD + (Math.min(m, 93) / 93) * (W - PAD * 2);
+
+  const marks = goals.map(g => {
+    const home = g.clubId === homeClub.cid;
+    const y = home ? 11 : 35;
+    const me = g.playerId === meId;
+    return `<g>
+      <line x1="${x(g.minute)}" y1="${BASE}" x2="${x(g.minute)}" y2="${y}"
+        stroke="var(--line)" stroke-width="1"/>
+      <circle cx="${x(g.minute)}" cy="${y}" r="${me ? 5.5 : 4.5}"
+        fill="${home ? homeColor : awayColor}"
+        stroke="${me ? "var(--accent-fill)" : "var(--surface)"}" stroke-width="2">
+        <title>${g.minute}' ${escAttr(homeClub.name && "")}</title>
+      </circle>
+    </g>`;
+  }).join("");
+
+  const cards = reds.map(c =>
+    `<rect x="${x(c.minute) - 1.6}" y="${BASE - 4}" width="3.2" height="8" rx="0.8"
+      fill="var(--loss)"/>`).join("");
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="timeline" role="img"
+    aria-label="ציר הזמן של השערים במשחק">
+    <line x1="${PAD}" y1="${BASE}" x2="${W - PAD}" y2="${BASE}"
+      stroke="var(--line)" stroke-width="1.4"/>
+    ${[15, 30, 60, 75].map(m =>
+      `<line x1="${x(m)}" y1="${BASE - 3}" x2="${x(m)}" y2="${BASE + 3}"
+        stroke="var(--line)" stroke-width="1"/>`).join("")}
+    <line x1="${x(45)}" y1="${BASE - 6}" x2="${x(45)}" y2="${BASE + 6}"
+      stroke="var(--ink-soft)" stroke-width="1"/>
+    ${marks}${cards}
+  </svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// חמישה משחקים אחרונים — צבע ואות יחד, אף פעם לא צבע לבד
+// ---------------------------------------------------------------------------
+
+const OUTCOME_HE = { W: "נ", D: "ת", L: "ה" };
+const OUTCOME_LABEL = { W: "ניצחון", D: "תיקו", L: "הפסד" };
+
+function formGuide(club) {
+  const log = (club.formLog || []).slice(-5);
+  if (!log.length) return "";
+  return `<span class="form" role="img" aria-label="חמישה משחקים אחרונים: ${
+    log.map(o => OUTCOME_LABEL[o]).join(", ")}">${
+    log.map(o => `<span class="f f-${o.toLowerCase()}">${OUTCOME_HE[o]}</span>`).join("")}</span>`;
+}
+
+// ---------------------------------------------------------------------------
+// גרפים — סדרה אחת, סימנים דקים, רשת דקיקה
+// ---------------------------------------------------------------------------
+
+/** עמודות: ערך אחד לעונה. מסמן ישירות רק את השיא. */
+function columns(data, opts = {}) {
+  if (!data.length) return "";
+  const w = 300, h = 96, padB = 16, padT = 12;
+  const max = Math.max(1, ...data.map(d => d.value));
+  const band = w / data.length;
+  const barW = Math.min(24, band * 0.56);
+  const peak = data.reduce((a, b) => (b.value > a.value ? b : a), data[0]);
+
+  const bars = data.map((d, i) => {
+    const x = band * i + (band - barW) / 2;
+    const barH = (d.value / max) * (h - padB - padT);
+    const y = h - padB - barH;
+    const isPeak = d === peak && d.value > 0;
+    return `<g>
+      <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(barH, 0.6)}"
+        rx="4" fill="var(--accent-fill)" opacity="${isPeak ? 1 : 0.62}">
+        <title>${escAttr(d.label)}: ${d.value}</title></rect>
+      ${isPeak ? `<text x="${x + barW / 2}" y="${y - 4}" text-anchor="middle" font-size="11"
+        font-weight="700" fill="var(--ink)" font-family="Assistant, sans-serif">${d.value}</text>` : ""}
+      <text x="${x + barW / 2}" y="${h - 4}" text-anchor="middle" font-size="9"
+        fill="var(--ink-soft)" font-family="Assistant, sans-serif">${escAttr(d.label)}</text>
+    </g>`;
+  }).join("");
+
+  return `<svg viewBox="0 0 ${w} ${h}" class="chart" role="img"
+    aria-label="${escAttr(opts.alt || "")}">
+    <line x1="0" y1="${h - padB}" x2="${w}" y2="${h - padB}"
+      stroke="var(--line)" stroke-width="1"/>
+    ${bars}
+  </svg>`;
+}
+
+/** קו: המיקום בטבלה לאורך העונה (ציר הפוך — המקום הראשון למעלה). */
+function positionLine(points, teams, opts = {}) {
+  if (points.length < 2) return "";
+  const W = 300, H = 108, padT = 16, padB = 22, padL = 26, padR = 16;
+  const stepX = (W - padL - padR) / Math.max(1, points.length - 1);
+  const y = pos => padT + ((pos - 1) / Math.max(1, teams - 1)) * (H - padT - padB);
+  const path = points.map((p, i) => `${i ? "L" : "M"}${padL + i * stepX},${y(p)}`).join(" ");
+  const last = points[points.length - 1];
+  const lastX = padL + (points.length - 1) * stepX;
+  const ticks = [...new Set([1, Math.ceil(teams / 2), teams])];
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="chart" role="img"
+    aria-label="${escAttr(opts.alt || "")}">
+    ${ticks.map(p => `
+      <line x1="${padL}" y1="${y(p)}" x2="${W - padR}" y2="${y(p)}"
+        stroke="var(--line)" stroke-width="1"/>
+      <text x="${padL - 6}" y="${y(p) + 3.4}" font-size="10" text-anchor="end"
+        fill="var(--ink-soft)" font-family="Assistant, sans-serif">${p}</text>`).join("")}
+    <path d="${path}" fill="none" stroke="var(--accent-fill)" stroke-width="2"
+      stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${lastX}" cy="${y(last)}" r="4.5" fill="var(--accent-fill)"
+      stroke="var(--surface)" stroke-width="2"/>
+    <text x="${lastX - 7}" y="${y(last) - 7}" font-size="11" font-weight="700"
+      text-anchor="middle" fill="var(--ink)"
+      font-family="Assistant, sans-serif">${last}</text>
+    <text x="${padL}" y="${H - 5}" font-size="9.5" fill="var(--ink-soft)"
+      font-family="Assistant, sans-serif">מחזור 1</text>
+    <text x="${W - padR}" y="${H - 5}" font-size="9.5" text-anchor="end"
+      fill="var(--ink-soft)" font-family="Assistant, sans-serif">מחזור ${points.length}</text>
+  </svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// אצטדיון לילה — כותרת מסך הפתיחה
+// ---------------------------------------------------------------------------
+
+function stadium() {
+  const crowd = [];
+  for (let i = 0; i < 150; i++) {
+    const x = 4 + Math.random() * 292;
+    const y = 30 + Math.random() * 26;
+    const r = 0.9 + Math.random() * 1.1;
+    crowd.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}"
+      fill="var(--ink-soft)" opacity="${(0.18 + Math.random() * 0.3).toFixed(2)}"/>`);
+  }
+  const beam = (x, dir) => `
+    <path d="M${x},18 L${x + dir * 52},74 L${x - dir * 6},74 Z"
+      fill="var(--accent-fill)" opacity=".07"/>
+    <rect x="${x - 9}" y="10" width="18" height="7" rx="1.4" fill="var(--ink-soft)" opacity=".55"/>
+    <rect x="${x - 1.2}" y="17" width="2.4" height="12" fill="var(--ink-soft)" opacity=".4"/>
+    ${[-6, 0, 6].map(o => `<circle cx="${x + o}" cy="13.5" r="2.2"
+      fill="var(--accent-fill)" opacity=".85"/>`).join("")}`;
+
+  return `<svg viewBox="0 0 300 90" class="stadium" role="img" aria-label="אצטדיון בלילה" aria-hidden="true">
+    <rect x="0" y="0" width="300" height="90" fill="none"/>
+    ${beam(52, 1)}${beam(248, -1)}
+    <path d="M0,58 L300,58 L300,90 L0,90 Z" fill="var(--pitch-turf)"/>
+    <path d="M0,58 L300,58 L262,90 L38,90 Z" fill="var(--pitch-stripe)"/>
+    <g fill="none" stroke="var(--pitch-line)" stroke-width="0.8" opacity=".8">
+      <path d="M38,90 L76,58 L224,58 L262,90"/>
+      <line x1="150" y1="58" x2="150" y2="90"/>
+      <path d="M112,58 L104,74 L196,74 L188,58"/>
+    </g>
+    <path d="M0,28 L300,28 L300,58 L0,58 Z" fill="var(--surface-2)" opacity=".65"/>
+    ${crowd.join("")}
+  </svg>`;
+}
+
+// ---------------------------------------------------------------------------
+// גביע — לרשימת ההישגים
+// ---------------------------------------------------------------------------
+
+function trophy(size = 16) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="trophy"
+    role="img" aria-label="תואר">
+    <path d="M7,3 H17 V9 C17,12.3 14.8,14.6 12,14.6 C9.2,14.6 7,12.3 7,9 Z"
+      fill="var(--accent-fill)"/>
+    <path d="M7,4 H4.4 V6.4 C4.4,8.6 5.7,10 7.4,10.2" fill="none"
+      stroke="var(--accent-fill)" stroke-width="1.5"/>
+    <path d="M17,4 H19.6 V6.4 C19.6,8.6 18.3,10 16.6,10.2" fill="none"
+      stroke="var(--accent-fill)" stroke-width="1.5"/>
+    <rect x="10.6" y="14.2" width="2.8" height="4" fill="var(--accent-fill)"/>
+    <rect x="7.6" y="18" width="8.8" height="2.6" rx="0.8" fill="var(--accent-fill)"/>
+  </svg>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -3867,7 +4392,8 @@ function screenMenu() {
   const saved = hasSave();
   return `
   <div class="screen menu">
-    <div class="hero">
+    ${stadium()}
+    <div class="hero" style="padding-top:8px">
       <div class="eyebrow">משחק ניהול כדורגל</div>
       <h1 class="display">קריירה</h1>
       <div class="underline"></div>
@@ -3993,9 +4519,16 @@ function screenHub() {
       <div class="scoreboard">
         <div class="eyebrow">${esc(comp)} · ${where}</div>
         <div class="scoreline">
-          <div class="side"><span class="${club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
+          <div class="side">${crest(home, 30)}<span class="nm ${
+            club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
           <div class="versus">נגד</div>
-          <div class="side away"><span class="${club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+          <div class="side away">${crest(away, 30)}<span class="nm ${
+            club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
+        </div>
+        <div class="scoreline" style="font-size:12px">
+          <div class="side">${formGuide(home)}</div>
+          <div></div>
+          <div class="side away">${formGuide(away)}</div>
         </div>
         <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}</div>
       </div>`;
@@ -4097,12 +4630,15 @@ function screenWeek() {
     <div class="scoreboard">
       <div class="eyebrow">${esc(competition)}</div>
       <div class="scoreline">
-        <div class="side"><span class="${club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
+        <div class="side">${crest(home, 34)}<span class="nm ${
+          club && club.cid === home.cid ? "mine" : ""}">${esc(home.name)}</span></div>
         <div class="score">${result.homeGoals} : ${result.awayGoals}</div>
-        <div class="side away"><span class="${club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
+        <div class="side away">${crest(away, 34)}<span class="nm ${
+          club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
       </div>
       ${penalties ? `<div class="muted center">הוכרע בפנדלים — ${esc(penalties)}</div>` : ""}
-      ${goals.length ? `<hr class="rule"><div class="goals">${goals.map((e, i) => `
+      ${goals.length ? goalTimeline(result, home, away, me.pid) : ""}
+      ${goals.length ? `<div class="goals">${goals.map((e, i) => `
         <div class="goal-row ${e.playerId === me.pid ? "mine" : ""}" style="animation-delay:${i * 60}ms">
           <span class="min">${e.minute}'</span>
           <span>${esc(game.players[e.playerId] ? game.players[e.playerId].name : "")}</span>
@@ -4110,6 +4646,16 @@ function screenWeek() {
         </div>`).join("")}</div>` : ""}
       <div class="muted">${esc(result.commentary[0] || "")}</div>
     </div>`;
+
+    // ההרכב על המגרש — רק כשהייתי בו
+    const myLineup = club && club.cid === home.cid ? result.homeLineup : result.awayLineup;
+    if (club && myLineup.includes(me.pid)) {
+      const formation = club.formation;
+      html += `<div class="card">
+        <div class="eyebrow">ההרכב · ${esc(formation)}</div>
+        ${pitch(myLineup, formation, game.players, me.pid, club)}
+      </div>`;
+    }
   }
 
   if (report.personal) html += personalCard(report.personal);
@@ -4138,7 +4684,8 @@ function personalCard(p) {
   if (p.status === "bench")
     return `<div class="card"><div class="eyebrow">אתה</div>
       <div class="note"><span class="ico">🪑</span><span>ישבת 90 דקות על הספסל.</span></div>
-      <div class="muted">${game.noStartStreak} משחקים ברצף בלי להתחיל.</div></div>`;
+      <div class="muted">${game.noStartStreak === 1 ? "משחק אחד" :
+        game.noStartStreak + " משחקים"} ברצף בלי להתחיל.</div></div>`;
   if (p.status === "injured")
     return `<div class="card"><div class="eyebrow">אתה</div>
       <div class="note"><span class="ico">🚑</span><span>${esc(p.injuryName)} — עוד ${p.weeks} שבועות.</span></div></div>`;
@@ -4216,9 +4763,14 @@ function screenProfile() {
   <div class="screen">
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
-      <h2 class="display" style="font-size:34px">${esc(me.name)}</h2>
-      <div class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}
-        ${club ? "· " + esc(club.name) : ""}</div>
+      <div class="kit-row">
+        ${isPlayer ? shirt(club, me.number || 0, 78) : (club ? crest(club, 58) : "")}
+        <div class="kit-meta">
+          <span class="display big">${esc(me.name)}</span>
+          <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}</span>
+          ${club ? `<span class="muted">${esc(club.name)}</span>` : ""}
+        </div>
+      </div>
       ${me.traits.length ? `<div class="chips">${me.traits.map(t =>
         `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>` : ""}
     </div>
@@ -4254,6 +4806,12 @@ function screenProfile() {
         <div class="stat"><div class="n">${c.assists}</div><div class="l">בישולים</div></div>
       </div>
     </div>
+
+    ${game.history.length ? `
+    <div class="card">
+      <div class="eyebrow">שערים לפי עונה</div>
+      ${columns(seasonGoalsData(), { alt: "שערים בכל עונה" })}
+    </div>` : ""}
 
     <div class="card">
       <div class="eyebrow">חוזה</div>
@@ -4296,6 +4854,19 @@ function screenProfile() {
   </div>`;
 }
 
+function seasonGoalsData() {
+  const rows = [];
+  let previous = 0;
+  for (const h of game.history) {
+    rows.push({ label: String(h.year).slice(2), value: Math.max(0, h.goals - previous) });
+    previous = h.goals;
+  }
+  const current = game.me.season.goals;
+  if (["academy", "player", "veteran"].includes(game.stage))
+    rows.push({ label: String(game.year).slice(2), value: current });
+  return rows.slice(-8);
+}
+
 function screenTable() {
   const club = game.myClub();
   const leagueId = (viewData && viewData.league) || game.myLeague() || "top";
@@ -4311,7 +4882,7 @@ function screenTable() {
       <div class="table-wrap">
         <table>
           <thead><tr><th>#</th><th style="text-align:right">קבוצה</th><th>מש</th>
-            <th>נצ</th><th>תק</th><th>הפ</th><th>הפרש</th><th>נק</th></tr></thead>
+            <th>הפרש</th><th>נק</th><th>טופס</th></tr></thead>
           <tbody>
             ${rows.map((r, i) => {
               const c = game.clubs[r.clubId];
@@ -4319,9 +4890,12 @@ function screenTable() {
               const cls = [mine ? "me" : "",
                 isDomestic && leagueId === "national" && i < 2 ? "up" : "",
                 isDomestic && leagueId === "top" && i >= rows.length - 2 ? "down" : ""].join(" ");
-              return `<tr class="${cls}"><td>${i + 1}</td><td class="club">${esc(c.name)}</td>
-                <td>${r.played}</td><td>${r.won}</td><td>${r.drawn}</td><td>${r.lost}</td>
-                <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td><td class="pts">${r.points}</td></tr>`;
+              return `<tr class="${cls}"><td>${i + 1}</td>
+                <td class="club"><span class="crest-row">${crest(c, 20)}<span class="nm">${esc(c.name)}</span></span></td>
+                <td>${r.played}</td>
+                <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td>
+                <td class="pts">${r.points}</td>
+                <td class="form-cell">${formGuide(c)}</td></tr>`;
             }).join("")}
           </tbody>
         </table>
@@ -4329,6 +4903,11 @@ function screenTable() {
       ${leagueId === "top" ? `<div class="muted">שתי האחרונות יורדות לליגה הלאומית.</div>` : ""}
       ${leagueId === "national" ? `<div class="muted">שתי הראשונות עולות לליגת העל.</div>` : ""}
     </div>
+    ${club && club.leagueId === leagueId && game.positionLog.length > 2 ? `
+    <div class="card">
+      <div class="eyebrow">המיקום שלך לאורך העונה</div>
+      ${positionLine(game.positionLog, rows.length, { alt: "מיקום בטבלה לפי מחזור" })}
+    </div>` : ""}
     ${game.cup && game.cup.teams ? `<div class="card">
       <div class="eyebrow">גביע המדינה</div>
       <div class="muted">${game.cup.winner
@@ -4346,12 +4925,15 @@ function screenSquad() {
   return `
   <div class="screen">
     <div class="card">
-      <div class="eyebrow">${esc(club.name)} · ${esc(club.nickname)}</div>
+      <div class="crest-row">${crest(club, 38)}<span class="nm">
+        <strong>${esc(club.name)}</strong><br><span class="muted">${esc(club.nickname)}</span></span></div>
       <div class="muted">מאמן: ${esc(club.managerName)} · מערך: ${esc(club.formation)}
         · מתקנים ${club.trainingFacilities}</div>
+      ${formGuide(club) ? `<div>${formGuide(club)}</div>` : ""}
       <hr class="rule">
       ${squad.map(p => `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
-        <span>${esc(p.name)}${p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
+        <span><span class="num">${p.number || ""}</span> ${esc(p.name)}${
+          p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
         <span class="pos">${esc(positionHe(p))} · ${p.age}</span>
         <span class="ovr">${overall(p)}</span>
       </div>`).join("")}
@@ -4366,7 +4948,7 @@ function screenNews() {
       <div class="eyebrow">הישגים</div>
       ${game.honours.slice().reverse().map(h => {
         const [yr, ...rest] = h.split(": ");
-        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>${trophy()} ${esc(rest.join(": "))}</span></div>`;
       }).join("")}
     </div>` : ""}
     ${game.history.length ? `<div class="card">
@@ -4413,7 +4995,7 @@ function screenEnd() {
     ${game.honours.length ? `<div class="card"><div class="eyebrow">ארון התארים</div>
       ${game.honours.map(h => {
         const [yr, ...rest] = h.split(": ");
-        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>🏆 ${esc(rest.join(": "))}</span></div>`;
+        return `<div class="honour"><span class="yr">${esc(yr)}</span><span>${trophy()} ${esc(rest.join(": "))}</span></div>`;
       }).join("")}</div>` : ""}
     <button class="btn primary wide" data-act="restart">קריירה חדשה</button>
   </div>`;

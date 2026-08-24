@@ -19,6 +19,7 @@ class Game {
     this.firstClubId = null; this.lastClubId = null;
     this.history = []; this.caps = 0; this.intlGoals = 0;
     this.noStartStreak = 0; this.gameOver = false;
+    this.positionLog = [];
     this.rng = new Rng(1);
   }
 
@@ -69,6 +70,7 @@ class Game {
     me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
+    assignNumber(club, g.players, me);
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
     club.managerTrust = 45;
@@ -84,6 +86,8 @@ class Game {
 
   startSeason() {
     this.week = 1;
+    this.positionLog = [];
+    for (const club of Object.values(this.clubs)) club.formLog = [];
     this.fixtures = {}; this.tables = {};
     for (const league of D.LEAGUES) {
       const lid = league.id;
@@ -207,6 +211,8 @@ class Game {
     if (event && this.armEvent(event)) report.eventId = event.eid;
 
     this.weeklyIncome(report);
+
+    if (this.myClub()) this.positionLog.push(this.leaguePosition());
 
     this.week += 1;
     if (this.week > SEASON_WEEKS) {
@@ -433,6 +439,11 @@ class Game {
     };
     reg(table[result.homeId], result.homeGoals, result.awayGoals);
     reg(table[result.awayId], result.awayGoals, result.homeGoals);
+    for (const cid of [result.homeId, result.awayId]) {
+      const club = this.clubs[cid];
+      if (!club) continue;
+      club.formLog = (club.formLog || []).concat(resultFor(result, cid)).slice(-5);
+    }
   }
 
   playCupRound(report) {
@@ -871,6 +882,7 @@ class Game {
       .reduce((a, b) => (a.reputation >= b.reputation ? a : b));
     buyer.squad.push(star.pid);
     star.clubId = buyer.cid;
+    assignNumber(buyer, this.players, star);
     club.boardConfidence = clamp(club.boardConfidence + 5, 0, 100);
     club.fanSupport = clamp(club.fanSupport - 12, 0, 100);
     return `מכרת את ${star.name} ל${buyer.name} תמורת ₪${fmt(fee)}. האוהדים בטראומה.`;
@@ -903,6 +915,7 @@ class Game {
     kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(10, 32), 60, 93));
     this.players[kid.pid] = kid;
     club.squad.push(kid.pid);
+    assignNumber(club, this.players, kid);
     this.setFlag("wonderkid", kid.pid);
     return `העלית את ${kid.name} (${kid.age}) לסגל. פוטנציאל מוערך: ${kid.potential}. עכשיו תתפלל.`;
   }
@@ -963,6 +976,7 @@ class Game {
     const next = this.clubs[clubId];
     next.squad.push(me.pid);
     me.clubId = clubId;
+    assignNumber(next, this.players, me);
     me.contract = { wage, yearsLeft: years };
     next.managerTrust = loan ? 65 : 55;
     this.lastClubId = clubId;
@@ -1096,6 +1110,7 @@ class Game {
         kid.potential = Math.round(clamp(overall(kid) + this.rng.randint(6, 28), 45, 94));
         this.players[kid.pid] = kid;
         club.squad.push(kid.pid);
+        assignNumber(club, this.players, kid);
       }
     }
   }
@@ -1112,6 +1127,7 @@ class Game {
           old.squad = old.squad.filter(x => x !== p.pid);
           target.squad.push(p.pid);
           p.clubId = target.cid;
+          assignNumber(target, this.players, p);
         }
       }
       p.contract.yearsLeft = this.rng.randint(1, 4);
@@ -1225,6 +1241,7 @@ class Game {
       firstClubId: this.firstClubId, lastClubId: this.lastClubId,
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
+      positionLog: this.positionLog,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
   }
@@ -1242,6 +1259,7 @@ class Game {
       firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
+      positionLog: raw.positionLog || [],
     });
     g.rng = Rng.fromState(raw.rngState);
     PID_COUNTER = Math.max(PID_COUNTER, raw.pidCounter || 0);

@@ -113,32 +113,51 @@ def position_fit(player_pos: str, slot: str) -> float:
 def pick_lineup(club: Club, players: Dict[str, Player],
                 formation: Optional[str] = None,
                 forced: Optional[List[str]] = None) -> List[str]:
-    """בוחר את ההרכב הפותח: המתאימים והטובים ביותר לכל משבצת."""
+    """בוחר את ההרכב הפותח.
+
+    קודם מוצבים שחקנים שנכפו על ידי המנג'ר, כל אחד במשבצת הכי מתאימה לו.
+    אחר כך ממלאים משבצות בשחקנים בעמדתם הטבעית בלבד, ורק בסוף — במי שנשאר.
+    שני המעברים מונעים מצב שבו הקשר הכי טוב תופס את מקום המגן הימני
+    ומשאיר את משבצת הקישור למישהו גרוע יותר.
+    """
     formation = formation or club.formation
     slots = D.FORMATIONS.get(formation, D.FORMATIONS["4-3-3"])
     available = [players[pid] for pid in club.squad
                  if pid in players and players[pid].available]
-    lineup: List[str] = []
-    forced = list(forced or [])
+    lineup: List[Optional[str]] = [None] * len(slots)
+    used: set = set()
 
-    for slot in slots:
-        pick = None
-        # קודם כל שחקנים שנכפו על ידי המנג'ר
-        for pid in forced:
-            p = players.get(pid)
-            if p and p.available and pid not in lineup and p in available:
-                if position_fit(p.position, slot) >= 0.9 or slot == slots[-1]:
-                    pick = p
-                    forced.remove(pid)
-                    break
-        if pick is None:
-            candidates = [p for p in available if p.pid not in lineup]
+    def claim(index: int, player: Player) -> None:
+        lineup[index] = player.pid
+        used.add(player.pid)
+
+    for pid in (forced or []):
+        player = players.get(pid)
+        if not player or pid in used or player not in available:
+            continue
+        best_index, best_fit = -1, 0.0
+        for index, slot in enumerate(slots):
+            if lineup[index]:
+                continue
+            fit = position_fit(player.position, slot)
+            if fit > best_fit:
+                best_index, best_fit = index, fit
+        if best_index >= 0:
+            claim(best_index, player)
+
+    for min_fit in (0.9, 0.0):
+        for index, slot in enumerate(slots):
+            if lineup[index]:
+                continue
+            candidates = [p for p in available
+                          if p.pid not in used
+                          and position_fit(p.position, slot) >= min_fit]
             if not candidates:
-                break
-            pick = max(candidates,
-                       key=lambda p: p.effective * position_fit(p.position, slot))
-        lineup.append(pick.pid)
-    return lineup
+                continue
+            claim(index, max(candidates,
+                             key=lambda p: p.effective * position_fit(p.position, slot)))
+
+    return [pid for pid in lineup if pid]
 
 
 def team_strength(lineup: List[str], players: Dict[str, Player],
@@ -230,7 +249,7 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
     def expected_goals(attack: float, defence: float, control: float,
                        team_talk: float) -> float:
         edge = (attack - defence) / 11.0
-        base = 1.60 * math.exp(edge * 0.40)
+        base = 1.42 * math.exp(edge * 0.40)
         base *= 0.55 + 0.9 * control
         base *= 0.9 + team_talk * 0.2
         return clamp(base, 0.12, 4.6)

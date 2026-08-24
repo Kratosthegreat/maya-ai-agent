@@ -70,6 +70,24 @@ test("הרכב תקין: 11 שחקנים בלי כפילויות", () => {
   assert(new Set(lineup).size === 11, "כפילות בהרכב");
 });
 
+test("שחקן שנכפה להרכב מוצב במשבצת מתאימה לעמדתו", () => {
+  const { clubs, players } = A.generateWorld(31);
+  const club = clubs.ironi_shomron;
+  for (const pos of ["ST", "CB", "CM", "LW", "GK"]) {
+    const me = club.squad.map(p => players[p]).find(p => p.position === pos)
+      || players[club.squad[0]];
+    me.position = pos;
+    for (const formation of Object.keys(A.D.FORMATIONS)) {
+      const lineup = A.pickLineup(club, players, formation, [me.pid]);
+      const idx = lineup.indexOf(me.pid);
+      assert(idx >= 0, `${pos} לא נכנס להרכב ב-${formation}`);
+      const slot = A.D.FORMATIONS[formation][idx];
+      assert(A.positionFit(pos, slot) >= 0.9,
+        `${pos} הוצב כ-${slot} במערך ${formation}`);
+    }
+  }
+});
+
 test("התאמת עמדה מעדיפה את העמדה הטבעית", () => {
   assert(A.positionFit("ST", "ST") === 1, "עמדה טבעית");
   assert(A.positionFit("GK", "ST") < 0.5, "שוער בהתקפה");

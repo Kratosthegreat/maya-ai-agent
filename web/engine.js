@@ -169,6 +169,29 @@ function generatePlayer(rng, club, position, opts = {}) {
   return p;
 }
 
+// מספרי חולצה — לכל עמדה יש את המספרים המסורתיים שלה
+const NUMBER_PREF = {
+  GK: [1, 12, 23], CB: [4, 5, 2, 3, 6], LB: [3, 15], RB: [2, 14],
+  DM: [6, 16, 4], CM: [8, 18, 20], AM: [10, 7, 21],
+  LW: [11, 17], RW: [7, 17, 22], ST: [9, 19, 29],
+};
+
+/** נותן לשחקן מספר חולצה פנוי במועדון, בעדיפות למספר המסורתי של העמדה. */
+function assignNumber(club, players, player) {
+  const taken = new Set(club.squad
+    .map(pid => players[pid])
+    .filter(p => p && p !== player && p.number)
+    .map(p => p.number));
+  for (const n of (NUMBER_PREF[player.position] || [])) {
+    if (!taken.has(n)) { player.number = n; return n; }
+  }
+  for (let n = 2; n <= 45; n++) {
+    if (!taken.has(n)) { player.number = n; return n; }
+  }
+  player.number = 0;
+  return 0;
+}
+
 function generateWorld(seed) {
   const rng = new Rng(seed);
   const clubs = {}, players = {}, usedNames = new Set();
@@ -191,6 +214,7 @@ function generateWorld(seed) {
       const p = generatePlayer(rng, club, position, { usedNames });
       players[p.pid] = p;
       club.squad.push(p.pid);
+      assignNumber(club, players, p);
     }
     clubs[cid] = club;
   }
@@ -217,27 +241,37 @@ function pickLineup(club, players, formation, forced) {
   formation = formation || club.formation;
   const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
   const available = club.squad.map(pid => players[pid]).filter(p => p && isAvailable(p));
-  const lineup = [];
-  const forcedLeft = (forced || []).slice();
+  const lineup = new Array(slots.length).fill(null);
+  const used = new Set();
+  const claim = (idx, p) => { lineup[idx] = p.pid; used.add(p.pid); };
 
-  for (const slot of slots) {
-    let pick = null;
-    for (let i = 0; i < forcedLeft.length; i++) {
-      const p = players[forcedLeft[i]];
-      if (p && isAvailable(p) && !lineup.includes(p.pid) && available.includes(p)) {
-        pick = p; forcedLeft.splice(i, 1); break;
-      }
-    }
-    if (!pick) {
-      const candidates = available.filter(p => !lineup.includes(p.pid));
-      if (!candidates.length) break;
-      pick = candidates.reduce((best, p) =>
-        effective(p) * positionFit(p.position, slot) >
-        effective(best) * positionFit(best.position, slot) ? p : best);
-    }
-    lineup.push(pick.pid);
+  // מי שנכפה להרכב תופס ראשון את המשבצת הכי מתאימה לו
+  for (const pid of (forced || [])) {
+    const p = players[pid];
+    if (!p || used.has(pid) || !available.includes(p)) continue;
+    let bestIdx = -1, bestFit = 0;
+    slots.forEach((slot, idx) => {
+      if (lineup[idx]) return;
+      const fit = positionFit(p.position, slot);
+      if (fit > bestFit) { bestFit = fit; bestIdx = idx; }
+    });
+    if (bestIdx >= 0) claim(bestIdx, p);
   }
-  return lineup;
+
+  // מעבר ראשון: רק שחקנים בעמדתם הטבעית. מעבר שני: מי שנשאר.
+  for (const minFit of [0.9, 0]) {
+    for (let idx = 0; idx < slots.length; idx++) {
+      if (lineup[idx]) continue;
+      const slot = slots[idx];
+      const candidates = available.filter(p =>
+        !used.has(p.pid) && positionFit(p.position, slot) >= minFit);
+      if (!candidates.length) continue;
+      claim(idx, candidates.reduce((a, b) =>
+        effective(a) * positionFit(a.position, slot) >=
+        effective(b) * positionFit(b.position, slot) ? a : b));
+    }
+  }
+  return lineup.filter(Boolean);
 }
 
 function teamStrength(lineup, players, formation) {
@@ -311,7 +345,7 @@ function simulateMatch(home, away, players, rng, opts = {}) {
 
   const expected = (attack, defence, control, talk) => {
     const edge = (attack - defence) / 11;
-    let base = 1.48 * Math.exp(edge * 0.38);
+    let base = 1.38 * Math.exp(edge * 0.38);
     base *= 0.55 + 0.9 * control;
     base *= 0.9 + talk * 0.2;
     return clamp(base, 0.12, 4.6);

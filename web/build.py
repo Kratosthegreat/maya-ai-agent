@@ -8,7 +8,7 @@
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-JS_PARTS = ["data.js", "engine.js", "story.js", "game.js", "ui.js"]
+JS_PARTS = ["data.js", "engine.js", "story.js", "game.js", "graphics.js", "ui.js"]
 
 HEAD = """<title>קריירה</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">

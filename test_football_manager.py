@@ -87,6 +87,33 @@ def test_lineup_has_eleven_players_and_no_duplicates():
     assert all(players[pid].available for pid in lineup)
 
 
+def test_forced_player_starts_in_a_slot_that_fits_his_position():
+    """שחקן שהמאמן מציב בהרכב לא אמור למצוא את עצמו בשער."""
+    clubs, players = generate_world(seed=31)
+    club = clubs["ironi_shomron"]
+    for position in ("ST", "CB", "CM", "LW", "GK"):
+        player = next((players[p] for p in club.squad
+                       if players[p].position == position), players[club.squad[0]])
+        player.position = position
+        for formation, slots in D.FORMATIONS.items():
+            lineup = pick_lineup(club, players, formation, forced=[player.pid])
+            assert player.pid in lineup, f"{position} לא נכנס להרכב ב-{formation}"
+            slot = slots[lineup.index(player.pid)]
+            assert position_fit(position, slot) >= 0.9, \
+                f"{position} הוצב כ-{slot} במערך {formation}"
+
+
+def test_best_players_are_not_played_out_of_position():
+    """המעבר הראשון שומר את המשבצות לשחקנים בעמדתם הטבעית."""
+    clubs, players = generate_world(seed=17)
+    club = clubs["maccabi_harel"]
+    for formation, slots in D.FORMATIONS.items():
+        lineup = pick_lineup(club, players, formation)
+        misplaced = sum(1 for pid, slot in zip(lineup, slots)
+                        if position_fit(players[pid].position, slot) < 0.9)
+        assert misplaced <= 1, f"{misplaced} שחקנים מחוץ לעמדה ב-{formation}"
+
+
 def test_position_fit_prefers_natural_position():
     assert position_fit("ST", "ST") == 1.0
     assert position_fit("ST", "CB") < position_fit("CB", "CB")
