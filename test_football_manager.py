@@ -13,8 +13,8 @@ from football_manager import story as ST
 from football_manager.engine import (pick_lineup, position_fit, simulate_match,
                                      team_strength)
 from football_manager.game import CUP_WEEKS, SEASON_WEEKS, GameState, round_robin
-from football_manager.models import (generate_player, generate_world,
-                                     wage_for_overall)
+from football_manager.models import (available_numbers, generate_player,
+                                     generate_world, wage_for_overall)
 from football_manager import commercial as CM
 from football_manager import manager as MG
 from football_manager.engine import medical_care
@@ -1059,3 +1059,32 @@ def test_repeat_events_respect_their_cooldown():
             continue
         game.advance_week()
     assert len(seen) > 5
+
+
+def test_shirt_numbers_are_unique_and_choosable():
+    clubs, players = generate_world(seed=4)
+    club = clubs["hapoel_carmel"]
+    numbers = [players[pid].number for pid in club.squad]
+    assert all(1 <= n <= 45 for n in numbers)
+    assert len(set(numbers)) == len(numbers)
+
+    free = available_numbers(club, players)
+    assert free and not set(free) & set(numbers)
+
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=5,
+                              wanted_number=free[0])
+    squad = [game.players[pid].number for pid in game.my_club.squad]
+    assert len(set(squad)) == len(squad)
+
+
+def test_a_taken_number_is_not_stolen():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=5)
+    club = game.my_club
+    other = next(game.players[pid] for pid in club.squad
+                 if pid != game.me_id and game.players[pid].number)
+    before = game.me.number
+    from football_manager.models import assign_number
+    assign_number(club, game.players, game.me, other.number)
+    assert game.me.number != other.number or before == other.number
+    squad = [game.players[pid].number for pid in club.squad]
+    assert len(set(squad)) == len(squad)

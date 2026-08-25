@@ -188,16 +188,37 @@ const NUMBER_PREF = {
   LW: [11, 17], RW: [7, 17, 22], ST: [9, 19, 29],
 };
 
+const SQUAD_NUMBER_MAX = 45;
+
+/** המספרים שתפוסים בסגל כרגע. */
+function takenNumbers(club, players, exceptPid = null) {
+  const out = new Set();
+  for (const pid of club.squad) {
+    const p = players[pid];
+    if (p && p.pid !== exceptPid && p.number) out.add(p.number);
+  }
+  return out;
+}
+
+/** כל המספרים הפנויים במועדון, 1 עד 45. */
+function availableNumbers(club, players, exceptPid = null) {
+  const taken = takenNumbers(club, players, exceptPid);
+  const out = [];
+  for (let n = 1; n <= SQUAD_NUMBER_MAX; n++) if (!taken.has(n)) out.push(n);
+  return out;
+}
+
 /** נותן לשחקן מספר חולצה פנוי במועדון, בעדיפות למספר המסורתי של העמדה. */
-function assignNumber(club, players, player) {
-  const taken = new Set(club.squad
-    .map(pid => players[pid])
-    .filter(p => p && p !== player && p.number)
-    .map(p => p.number));
+function assignNumber(club, players, player, wanted = null) {
+  const taken = takenNumbers(club, players, player.pid);
+  if (wanted && !taken.has(wanted) && wanted >= 1 && wanted <= SQUAD_NUMBER_MAX) {
+    player.number = wanted;
+    return wanted;
+  }
   for (const n of (NUMBER_PREF[player.position] || [])) {
     if (!taken.has(n)) { player.number = n; return n; }
   }
-  for (let n = 2; n <= 45; n++) {
+  for (let n = 2; n <= SQUAD_NUMBER_MAX; n++) {
     if (!taken.has(n)) { player.number = n; return n; }
   }
   player.number = 0;

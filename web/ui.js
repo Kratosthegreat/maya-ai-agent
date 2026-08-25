@@ -390,18 +390,35 @@ function ageBlurb(age, role) {
 
 const PREVIEW_CLUB = { cid: "__preview__" };
 
+/**
+ * רשת מספרי חולצה. מסמנת את המסורתיים לעמדה, ואת התפוסים היא לא מציעה.
+ * field מגדיר איזה data-attribute ייצא, כדי שאותה רשת תשמש גם בפתיחה
+ * וגם בהחלפת מספר באמצע הקריירה.
+ */
+const ALL_NUMBERS = Array.from({ length: SQUAD_NUMBER_MAX }, (unused, i) => i + 1);
+
+function numberGrid(free, current, position, attr) {
+  const preferred = new Set(NUMBER_PREF[position] || []);
+  return `<div class="numbers">${free.map(n => `
+    <button class="num-pick ${preferred.has(n) ? "pref" : ""}"
+      ${attr}="${n}" aria-pressed="${current === n}">${n}</button>`).join("")}</div>`;
+}
+
 /** שחקן דמה לתצוגה מקדימה בכרטיס הזהות. */
 function identityPreviewPlayer(identity) {
-  return { pid: "preview", name: "preview", age: 25, number: 9, foot: identity.foot };
+  return { pid: "preview", name: "preview", age: 25,
+           number: identity.number || 9, foot: identity.foot };
 }
+
 
 /**
  * כרטיס הזהות: רגל חזקה ותכונת אופי.
  * שתיהן משפיעות על המשחק עצמו — הן לא קישוט.
  */
-function identityPicker(identity, club) {
+function identityPicker(identity, club, position) {
   const previewClub = club || PREVIEW_CLUB;
   const preview = identityPreviewPlayer(identity);
+
 
   return `
   <div class="panel">
@@ -417,6 +434,14 @@ function identityPicker(identity, club) {
           ${FOOT_KEYS.map(k => `<button class="chip" data-ident="foot" data-val="${k}"
             aria-pressed="${identity.foot === k}">${FOOT_NAMES[k]}</button>`).join("")}
         </div>
+      </div>
+
+      <div class="ident-group">
+        <div class="muted">מספר חולצה מבוקש${identity.number
+          ? "" : " — אם לא תבחר, תקבל את המסורתי של העמדה"}</div>
+        ${numberGrid(ALL_NUMBERS, identity.number, position, "data-shirt")}
+        <div class="muted small">אם המספר תפוס בסגל, תקבל אחר — ותוכל להחליף
+        אותו בכל רגע מהפרופיל, מתוך מה שבאמת פנוי.</div>
       </div>
 
       <div class="ident-group">
@@ -472,7 +497,7 @@ function screenNew() {
       </div>
     </div>
 
-    ${identityPicker(state.identity, { cid: state.club })}
+    ${identityPicker(state.identity, { cid: state.club }, state.position)}
 
     ${isManager ? "" : `
     <div class="panel">
@@ -601,7 +626,8 @@ const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בש�
 
 /** תעודת זהות מלאה של שחקן — מה שחסר כשרואים רק גיל ורגל. */
 function screenPlayer() {
-  const pid = (viewData && viewData.pid) || game.meId;
+  if (!viewData) viewData = {};
+  const pid = viewData.pid || game.meId;
   const p = game.players[pid];
   if (!p) return `<div class="screen"><div class="card">שחקן לא נמצא.</div></div>`;
   const club = p.clubId ? game.clubs[p.clubId] : null;
@@ -626,7 +652,14 @@ function screenPlayer() {
         <div class="row"><span class="nm">לאום</span>
           <span class="val">${esc(p.nationality)}</span></div>
         <div class="row"><span class="nm">מספר חולצה</span>
-          <span class="val num">${p.number || "—"}</span></div>
+          <span class="val num">${p.number || "—"}</span>
+          ${mine && game.myClub() ? `<button class="mini-btn" data-act="pick-number">${
+            viewData.pickNumber ? "סגור" : "להחליף"}</button>` : ""}</div>
+        ${mine && viewData.pickNumber && game.myClub() ? `
+          <div class="number-picker">
+            ${numberGrid(game.freeNumbers(), p.number, p.position, "data-newshirt")}
+            <div class="muted small">רק מספרים שאף אחד בסגל לא לובש.</div>
+          </div>` : ""}
         ${club ? `<div class="row"><span class="nm">מועדון</span>
           <span class="val"><button class="link-btn" data-club="${club.cid}">${esc(club.name)}</button></span></div>` : ""}
       </div>
@@ -1683,7 +1716,8 @@ function screenEditor() {
       </div>
     </div>
 
-    ${identityPicker({ foot: playerFoot(game.me), trait: game.me.traits[0] }, club)}
+    ${identityPicker({ foot: playerFoot(game.me), trait: game.me.traits[0],
+                       number: game.me.number }, club, game.me.position)}
 
     ${squad.length ? `
     <div class="panel">
@@ -1777,6 +1811,20 @@ function bind() {
     el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
+  app.querySelectorAll("[data-shirt]").forEach(el =>
+    el.addEventListener("click", () => {
+      const wanted = +el.dataset.shirt;
+      viewData.identity = Object.assign({}, viewData.identity,
+        { number: viewData.identity && viewData.identity.number === wanted ? null : wanted });
+      render();
+    }));
+  app.querySelectorAll("[data-newshirt]").forEach(el =>
+    el.addEventListener("click", () => {
+      toast(game.chooseNumber(+el.dataset.newshirt));
+      viewData.pickNumber = false;
+      saveGame();
+      render();
+    }));
   app.querySelectorAll("[data-ident]").forEach(el =>
     el.addEventListener("click", () => {
       const field = el.dataset.ident;
@@ -1909,6 +1957,7 @@ function act(what) {
     render();
   }
   else if (what === "back") goBack();
+  else if (what === "pick-number") { viewData.pickNumber = !viewData.pickNumber; render(); }
   else if (what === "club-squad") { viewData.full = !viewData.full; render(); }
   else if (what === "backup") backupCareer(false);
   else if (what === "backup-as") backupCareer(true);

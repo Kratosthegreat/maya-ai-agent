@@ -20,7 +20,7 @@ from . import data as D
 from . import story as ST
 from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
                      build_commentary, simulate_match)
-from .models import (gain_reputation, Club, Contract, Player, TableRow, clamp,
+from .models import (assign_number, available_numbers, gain_reputation, Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from . import club_ops as CO
 from . import manager as MG
@@ -192,7 +192,8 @@ class GameState:
     def new_game(cls, name: str, position: str, club_id: str,
                  age: int = 15, seed: Optional[int] = None,
                  stage: Optional[str] = None,
-                 role: str = "player") -> "GameState":
+                 role: str = "player",
+                 wanted_number: Optional[int] = None) -> "GameState":
         """פותח קריירה חדשה של שחקן צעיר."""
         state = cls()
         state.seed = seed if seed is not None else random.randrange(1, 10 ** 8)
@@ -243,6 +244,15 @@ class GameState:
         me.traits = [state.rng.choice(list(D.TRAITS.keys()))]
         state.players[me.pid] = me
         club.squad.append(me.pid)
+        assign_number(club, state.players, me, wanted_number)
+        if wanted_number and me.number != wanted_number:
+            owner = next((state.players[p] for p in club.squad
+                          if p in state.players and p != me.pid
+                          and state.players[p].number == wanted_number), None)
+            state.log(f"מספר {wanted_number} תפוס אצל {owner.name}. "
+                      f"קיבלת את {me.number}."
+                      if owner else
+                      f"מספר {wanted_number} לא היה פנוי. קיבלת את {me.number}.")
         state.me_id = me.pid
         state.first_club_id = club_id
         state.last_club_id = club_id
@@ -1450,6 +1460,7 @@ class GameState:
         buyer = max([c for c in self.clubs.values() if c.cid != club.cid],
                     key=lambda c: c.reputation)
         buyer.squad.append(star.pid)
+        assign_number(buyer, self.players, star)
         star.club_id = buyer.cid
         club.board_confidence = clamp(club.board_confidence + 5, 0, 100)
         club.fan_support = clamp(club.fan_support - 12, 0, 100)
@@ -1487,6 +1498,7 @@ class GameState:
         kid.potential = int(clamp(kid.overall + self.rng.randint(10, 32), 60, 93))
         self.players[kid.pid] = kid
         club.squad.append(kid.pid)
+        assign_number(club, self.players, kid)
         self.set_flag("wonderkid", kid.pid)
         return (f"העלית את {kid.name} ({kid.age}) לסגל. "
                 f"פוטנציאל מוערך: {kid.potential}. עכשיו תתפלל.")
@@ -1552,6 +1564,7 @@ class GameState:
             old.squad.remove(me.pid)
         new = self.clubs[club_id]
         new.squad.append(me.pid)
+        assign_number(new, self.players, me)
         me.club_id = club_id
         me.contract = Contract(wage=wage, years_left=years)
         new.manager_trust = 55.0 if not loan else 65.0
@@ -1717,6 +1730,7 @@ class GameState:
                 kid.potential = int(clamp(kid.overall + self.rng.randint(6, 28), 45, 94))
                 self.players[kid.pid] = kid
                 club.squad.append(kid.pid)
+                assign_number(club, self.players, kid)
 
     def _transfer_window(self) -> List[str]:
         """חלון העברות: הצעות אליי, ומעברים בין קבוצות מחשב."""
@@ -1734,6 +1748,7 @@ class GameState:
                 if old and player.pid in old.squad and len(old.squad) > 16:
                     old.squad.remove(player.pid)
                     target.squad.append(player.pid)
+                    assign_number(target, self.players, player)
                     player.club_id = target.cid
             player.contract.years_left = self.rng.randint(1, 4)
 

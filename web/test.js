@@ -26,7 +26,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, injuryRisk, marketability, sponsorOffer, " +
-  "managerStyle, postMatchLine, selectionNote, weeklyDirective, STORY };", ctx);
+  "managerStyle, postMatchLine, selectionNote, weeklyDirective, STORY, " +
+  "availableNumbers, assignNumber };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -775,6 +776,43 @@ test("אירוע חוזר לא קופץ שוב בשבוע הבא", () => {
     g.advanceWeek();
   }
   assert(Object.keys(seen).length > 5, "כמעט לא נורו אירועים");
+});
+
+test("מספרי חולצה ייחודיים, וניתן לבחור אותם", () => {
+  const { clubs, players } = A.generateWorld(4);
+  const club = clubs.hapoel_carmel;
+  const numbers = club.squad.map(pid => players[pid].number);
+  assert(numbers.every(n => n >= 1 && n <= 45), "מספר מחוץ לטווח");
+  assert(new Set(numbers).size === numbers.length, "יש כפילות במספרים");
+
+  const free = A.availableNumbers(club, players);
+  assert(free.length > 0, "אין מספרים פנויים");
+  assert(free.every(n => !numbers.includes(n)), "מספר תפוס הוצע כפנוי");
+
+  // מספר מבוקש שפנוי — מתקבל
+  const wanted = free[0];
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 5, "player",
+                           { foot: "right", trait: "leader", number: wanted });
+  assert(g.me.number === wanted, `ביקשתי ${wanted} וקיבלתי ${g.me.number}`);
+  const squadNumbers = g.myClub().squad.map(pid => g.players[pid].number);
+  assert(new Set(squadNumbers).size === squadNumbers.length, "כפילות אחרי הצטרפות");
+});
+
+test("מספר תפוס לא נגנב, ומוסבר למי הוא שייך", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 5);
+  const club = g.myClub();
+  const other = club.squad.map(pid => g.players[pid])
+    .find(p => p && p.pid !== g.meId && p.number);
+  const before = g.me.number;
+  const message = g.chooseNumber(other.number);
+  assert(message.includes(other.name), `הודעה: ${message}`);
+  assert(g.me.number === before, "המספר הוחלף למרות שהיה תפוס");
+
+  const free = g.freeNumbers().find(n => n !== before);
+  assert(g.chooseNumber(free).includes(String(free)), "החלפה למספר פנוי נכשלה");
+  assert(g.me.number === free, "המספר לא התעדכן");
+  const squadNumbers = club.squad.map(pid => g.players[pid].number);
+  assert(new Set(squadNumbers).size === squadNumbers.length, "כפילות אחרי החלפה");
 });
 
 console.log("\nמצב המשחק");

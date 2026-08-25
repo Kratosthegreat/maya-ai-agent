@@ -133,6 +133,7 @@ class Player:
 
     traits: List[str] = field(default_factory=list)
     foot: str = "right"
+    number: int = 0             # מספר חולצה במועדון הנוכחי
     height: int = 178            # ס"מ
     weight: int = 74             # ק"ג
     resilience: float = 50.0     # 0-100, עמידות לפציעות
@@ -481,6 +482,52 @@ def grown_height(adult_height: int, age: int) -> int:
     return int(round(adult_height * share.get(age, 1.0)))
 
 
+# המספרים המסורתיים של כל עמדה
+NUMBER_PREF = {
+    "GK": [1, 12, 23], "CB": [4, 5, 2, 3, 6], "LB": [3, 15], "RB": [2, 14],
+    "DM": [6, 16, 4], "CM": [8, 18, 20], "AM": [10, 7, 21],
+    "LW": [11, 17], "RW": [7, 17, 22], "ST": [9, 19, 29],
+}
+SQUAD_NUMBER_MAX = 45
+
+
+def taken_numbers(club: Club, players: Dict[str, Player],
+                  except_pid: Optional[str] = None) -> set:
+    """המספרים שתפוסים בסגל כרגע."""
+    out = set()
+    for pid in club.squad:
+        player = players.get(pid)
+        if player and player.pid != except_pid and player.number:
+            out.add(player.number)
+    return out
+
+
+def available_numbers(club: Club, players: Dict[str, Player],
+                      except_pid: Optional[str] = None) -> List[int]:
+    """כל המספרים הפנויים במועדון, 1 עד 45."""
+    taken = taken_numbers(club, players, except_pid)
+    return [n for n in range(1, SQUAD_NUMBER_MAX + 1) if n not in taken]
+
+
+def assign_number(club: Club, players: Dict[str, Player], player: Player,
+                  wanted: Optional[int] = None) -> int:
+    """נותן מספר חולצה. wanted מנסה מספר מבוקש; אחרת לפי מסורת העמדה."""
+    taken = taken_numbers(club, players, player.pid)
+    if wanted and wanted not in taken and 1 <= wanted <= SQUAD_NUMBER_MAX:
+        player.number = wanted
+        return wanted
+    for number in NUMBER_PREF.get(player.position, []):
+        if number not in taken:
+            player.number = number
+            return number
+    for number in range(2, SQUAD_NUMBER_MAX + 1):
+        if number not in taken:
+            player.number = number
+            return number
+    player.number = 0
+    return 0
+
+
 def stadium_name_for(cid: str, nickname: str, rng: random.Random) -> str:
     """שם אצטדיון קבוע למועדון."""
     word = rng.choice(D.STADIUM_WORDS)
@@ -539,6 +586,7 @@ def generate_world(seed: int = 0):
             player = generate_player(rng, club, position, used_names=used_names)
             players[player.pid] = player
             club.squad.append(player.pid)
+            assign_number(club, players, player)
         clubs[cid] = club
 
     return clubs, players

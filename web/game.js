@@ -117,7 +117,15 @@ class Game {
       ? identity.trait : g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
-    assignNumber(club, g.players, me);
+    const wantedNumber = identity && identity.number;
+    assignNumber(club, g.players, me, wantedNumber);
+    if (wantedNumber && me.number !== wantedNumber) {
+      const owner = club.squad.map(pid => g.players[pid])
+        .find(p => p && p.pid !== me.pid && p.number === wantedNumber);
+      g.log(owner
+        ? `מספר ${wantedNumber} תפוס אצל ${owner.name}. קיבלת את ${me.number}.`
+        : `מספר ${wantedNumber} לא היה פנוי. קיבלת את ${me.number}.`);
+    }
     g.meId = me.pid;
     g.firstClubId = clubId; g.lastClubId = clubId;
     g.stage = Game.stageForAge(age);
@@ -737,6 +745,28 @@ class Game {
   // ==================================================================
   // ניהול המועדון: מתקנים, אצטדיון וצוות
   // ==================================================================
+
+  /** המספרים שאפשר לבחור מהם במועדון הנוכחי. */
+  freeNumbers() {
+    const club = this.myClub();
+    return club ? availableNumbers(club, this.players, this.meId) : [];
+  }
+
+  /** מחליף מספר חולצה. מחזיר הודעה למשתמש. */
+  chooseNumber(number) {
+    const club = this.myClub();
+    if (!club) return "אתה לא משויך לסגל כרגע.";
+    const taken = takenNumbers(club, this.players, this.meId);
+    if (taken.has(number)) {
+      const owner = club.squad.map(p => this.players[p])
+        .find(p => p && p.pid !== this.meId && p.number === number);
+      return owner ? `${owner.name} לובש את ${number}.` : "המספר תפוס.";
+    }
+    if (number < 1 || number > SQUAD_NUMBER_MAX) return "מספר לא חוקי.";
+    this.me.number = number;
+    this.log(`קיבלת את חולצה מספר ${number}.`);
+    return `מעכשיו אתה מספר ${number}.`;
+  }
 
   /** האם אני בעמדה שמאפשרת להוציא כסף של המועדון. */
   controlsClub() {
