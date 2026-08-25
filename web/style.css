@@ -774,6 +774,13 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 }
 .candidate .fee { grid-column: 1 / -1; }
 
+.panel.warn { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.panel.warn .panel-head { background: color-mix(in srgb, var(--warn) 13%, transparent); }
+.panel.warn .panel-head .t { color: var(--warn); }
+.btn.wide { width: 100%; }
+.btn-row { display: flex; gap: 8px; }
+.btn-row .btn { flex: 1; }
+
 .toast {
   position: fixed; inset-inline: 12px; bottom: 16px; z-index: 90;
   max-width: 560px; margin: 0 auto;

@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-JS_PARTS = ["data.js", "art.js", "engine.js", "clubops.js", "story.js", "game.js", "graphics.js",
+JS_PARTS = ["data.js", "art.js", "save.js", "engine.js", "clubops.js", "story.js", "game.js", "graphics.js",
             "avatars.js", "scenes.js", "ui.js"]
 
 HEAD = """<title>קריירה</title>

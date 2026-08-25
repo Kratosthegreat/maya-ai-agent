@@ -12,24 +12,138 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 
 // -- שמירה --------------------------------------------------------------
 
+/**
+ * מצב השמירה האחרונה. כשהדפדפן מסרב לשמור — ואצל חלק מהדפדפנים
+ * בטלפון זה קורה — עדיף שתדע מיד ולא שתגלה כשהקריירה נעלמת.
+ */
+let saveState = { ok: true, at: 0, error: "" };
+
 function saveGame() {
   if (!game) return false;
+  let payload;
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(game.toJSON()));
+    payload = packSave(game.toJSON());
+  } catch (err) {
+    saveState = { ok: false, at: saveState.at, error: "הכנת השמורה נכשלה." };
+    return false;
+  }
+  try {
+    localStorage.setItem(SAVE_KEY, payload);
+    saveState = { ok: true, at: Date.now(), error: "" };
     return true;
-  } catch (err) { return false; }
+  } catch (err) {
+    const full = err && (err.name === "QuotaExceededError"
+      || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
+    saveState = {
+      ok: false, at: saveState.at,
+      error: full
+        ? "אין מספיק מקום פנוי בדפדפן כדי לשמור את הקריירה."
+        : "הדפדפן חוסם שמירה מקומית בעמוד הזה.",
+    };
+    return false;
+  }
 }
+
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return Game.fromJSON(JSON.parse(raw));
+    return Game.fromJSON(unpackSave(raw));
   } catch (err) { return null; }
 }
+
 function hasSave() {
   try { return !!localStorage.getItem(SAVE_KEY); } catch (err) { return false; }
 }
-function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (err) {} }
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+  saveState = { ok: true, at: 0, error: "" };
+}
+
+/**
+ * גיבוי הקריירה לקובץ. זו הדרך היחידה שעוברת בין מכשירים,
+ * ושורדת גם ניקוי של הדפדפן וגם גרסה חדשה של המשחק.
+ */
+async function backupCareer() {
+  if (!game) return;
+  let payload;
+  try { payload = packSave(game.toJSON()); }
+  catch (err) { toast("לא הצלחתי להכין את הגיבוי."); return; }
+
+  // שם קובץ באנגלית: חלק מהמארחים מסננים שמות עם תווים לא-לטיניים
+  const filename = `fm-career-${game.year}-w${game.week}.txt`;
+  try {
+    const downloads = window.claude && await window.claude.use("downloads");
+    if (downloads) {
+      await downloads.save({ filename, data: payload });
+      toast("הקריירה נשמרה לקובץ.");
+      return;
+    }
+  } catch (err) {
+    if (err && err.code === "declined") return;
+    // נופלים לדרך הרגילה
+  }
+
+  const blob = new Blob([payload], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast("הקריירה יורדת כקובץ גיבוי.");
+}
+
+/** שחזור קריירה מקובץ גיבוי. */
+function restoreCareer() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".txt,text/plain,application/json";
+  input.addEventListener("change", () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => toast("לא הצלחתי לקרוא את הקובץ.");
+    reader.onload = () => {
+      let restored;
+      try { restored = Game.fromJSON(unpackSave(String(reader.result).trim())); }
+      catch (err) { toast("הקובץ הזה לא נראה כמו גיבוי של קריירה."); return; }
+      game = restored;
+      saveGame();
+      toast(`הקריירה של ${game.me.name} שוחזרה.`);
+      go(game.gameOver ? "end" : "main");
+    };
+    reader.readAsText(file);
+  });
+  input.click();
+}
+
+/** התראה כשהשמירה האוטומטית לא עובדת — עם דרך מוצא. */
+function saveWarning() {
+  if (saveState.ok) return "";
+  return `
+  <div class="panel warn">
+    <div class="panel-head"><span class="t">השמירה האוטומטית לא עובדת</span></div>
+    <div class="panel-body">
+      <div class="muted">${esc(saveState.error)}
+        הקריירה תמשיך לרוץ, אבל היא לא תחכה לך אחרי שתסגור את הדף.</div>
+      <button class="btn wide" data-act="backup">להוריד קובץ גיבוי</button>
+    </div>
+  </div>`;
+}
+
+/** "לפני רגע" / "לפני 4 דק'" — כדי שיהיה ברור שהשמירה באמת קורית. */
+function savedAgo() {
+  if (!saveState.at) return "";
+  const seconds = Math.round((Date.now() - saveState.at) / 1000);
+  if (seconds < 45) return "נשמר עכשיו";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `נשמר לפני ${minutes} דק'`;
+  return `נשמר לפני ${Math.round(minutes / 60)} שע'`;
+}
 
 // -- ניווט --------------------------------------------------------------
 
@@ -101,6 +215,10 @@ function screenMenu() {
         <span class="k">${saved ? "קריירה חדשה" : "להתחיל קריירה"}</span>
         ${saved ? `<span class="hint">מוחק את השמורה</span>` : ""}
       </button>
+      <button class="btn ghost" data-act="restore">
+        <span class="k">לשחזר מקובץ גיבוי</span>
+        <span class="hint">להעביר קריירה ממכשיר אחר</span>
+      </button>
     </div>
     <div class="card">
       <div class="eyebrow">מה יש כאן</div>
@@ -110,7 +228,8 @@ function screenMenu() {
         <div class="note"><span class="ico">🎓</span><span>מה שתלמד בזמן הקריירה יקבע מה תעשה אחריה.</span></div>
       </div>
     </div>
-    <p class="muted center">המשחק נשמר בדפדפן הזה אוטומטית.</p>
+    <p class="muted center">המשחק נשמר בדפדפן הזה אוטומטית. כדי להעביר קריירה
+    למכשיר אחר — או לשמור אותה לפני ניקוי הדפדפן — יש כפתור גיבוי בתוך המשחק.</p>
   </div>`;
 }
 
@@ -644,6 +763,7 @@ function screenHub() {
 
   return `
   <div class="screen">
+    ${saveWarning()}
     ${nextMatch}
 
     ${offer ? `
@@ -687,6 +807,19 @@ function screenHub() {
     ${clubSnip()}
     ${tableSnip}
     ${messages}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">השמורה</span>
+        <span class="r">${saveState.ok ? esc(savedAgo()) : "לא נשמר"}</span></div>
+      <div class="panel-body">
+        <div class="muted">הקריירה נשמרת בדפדפן הזה אחרי כל שבוע. קובץ גיבוי
+        מאפשר להעביר אותה למכשיר אחר, ולשחזר אותה אם הדפדפן ינוקה.</div>
+        <div class="btn-row">
+          <button class="btn" data-act="backup">קובץ גיבוי</button>
+          <button class="btn" data-act="restore">לשחזר</button>
+        </div>
+      </div>
+    </div>
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
   </div>`;
@@ -1424,6 +1557,8 @@ function act(what) {
     } else viewData.identity = next;
     render();
   }
+  else if (what === "backup") backupCareer();
+  else if (what === "restore") restoreCareer();
   else if (what === "export-db") exportDatabase();
   else if (what === "import-db") importDatabase();
 }
@@ -1510,6 +1645,12 @@ function boot() {
     const loaded = loadGame();
     if (loaded) { game = loaded; }
   }
+  // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע
+  const saveNow = () => { if (game) saveGame(); };
+  window.addEventListener("pagehide", saveNow);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveNow();
+  });
   go("menu");
 }
 

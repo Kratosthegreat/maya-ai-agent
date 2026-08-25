@@ -8,10 +8,12 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "art.js", "engine.js", "clubops.js", "story.js", "game.js",
+const PARTS = ["data.js", "art.js", "save.js", "engine.js", "clubops.js", "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
-const ctx = vm.createContext({ console, Math, JSON, Date });
+const ctx = vm.createContext({ console, Math, JSON, Date,
+                              TextEncoder, TextDecoder, btoa, atob,
+                              Uint8Array, Int32Array });
 vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, generatePlayer, " +
   "simulateMatch, pickLineup, teamStrength, roundRobin, overall, playerValue, " +
   "wageForOverall, positionFit, avgRating, weeklyTraining, weeklyRecovery, " +
@@ -21,7 +23,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "ART, avatar, avatarChip, SCENE_LABELS, randomIdentity, playerFoot, " +
   "buildOf, FOOT_KEYS, FOOT_NAMES, attendanceFor, matchdayIncome, " +
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
-  "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice };", ctx);
+  "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
+  "packSave, unpackSave };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -589,6 +592,57 @@ test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", ()
   const lineup = A.pickLineup(club, g.players, club.formation);
   const svg = A.pitch(lineup, club.formation, g.players, g.meId, club);
   assert(svg.includes("<svg") && !svg.includes("NaN"), "מגרש");
+});
+
+console.log("\nשמירה");
+
+test("שמורה נדחסת בלי לאבד ולו סיבית", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 15, 7);
+  for (let i = 0; i < 20; i++) { if (g.pendingEventId) g.resolveEvent(0); g.advanceWeek(); }
+  const state = JSON.parse(JSON.stringify(g.toJSON()));
+  const packed = A.packSave(state);
+  assert(packed.startsWith("fm2:"), "אין תג פורמט");
+  assert(packed.length < JSON.stringify(state).length / 2,
+    `הדחיסה חלשה מדי: ${packed.length} מול ${JSON.stringify(state).length}`);
+  assert(JSON.stringify(A.unpackSave(packed)) === JSON.stringify(state), "השמורה לא זהה");
+});
+
+test("קריירה שנטענה ממשיכה בדיוק לאותו עתיד", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 15, 7);
+  for (let i = 0; i < 15; i++) { if (g.pendingEventId) g.resolveEvent(0); g.advanceWeek(); }
+  const copy = A.Game.fromJSON(A.unpackSave(A.packSave(g.toJSON())));
+
+  const walk = state => {
+    const out = [];
+    for (let i = 0; i < 12; i++) {
+      if (state.pendingEventId) state.resolveEvent(0);
+      const r = state.advanceWeek();
+      out.push([r.week, r.attendance, r.finances && r.finances.net,
+                r.match ? r.match.result.homeGoals + ":" + r.match.result.awayGoals : ""].join("|"));
+    }
+    return out.join(";");
+  };
+  assert(walk(g) === walk(copy), "העתיד השתנה אחרי טעינה");
+});
+
+test("שמורות בפורמט הישן עדיין נטענות", () => {
+  const g = A.Game.newGame("ותיק", "CM", "hapoel_carmel", 22, 3);
+  g.advanceWeek();
+  const legacy = JSON.stringify(g.toJSON());       // כך זה נשמר לפני הדחיסה
+  const restored = A.Game.fromJSON(A.unpackSave(legacy));
+  assert(restored.me.name === "ותיק", "שם לא שוחזר");
+  assert(restored.week === g.week, "שבוע לא שוחזר");
+});
+
+test("דחיסה עומדת בטקסט עברי, אימוג'י ותווים חריגים", () => {
+  const cases = ["", "a", "שלום עולם", "🏟️⚽🎓", "\u0000\u001f\uffff",
+                 JSON.stringify({ a: [1.5, -2.25e-7, null, true], ב: "מכבי \"הראל\"" }),
+                 "ab".repeat(50000)];
+  for (const text of cases) {
+    const value = { text };
+    assert(JSON.stringify(A.unpackSave(A.packSave(value))) === JSON.stringify(value),
+      `נשבר על: ${text.slice(0, 24)}`);
+  }
 });
 
 console.log("\nמצב המשחק");
