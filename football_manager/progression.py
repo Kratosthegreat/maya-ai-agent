@@ -12,6 +12,7 @@ import random
 from typing import Dict, List, Optional
 
 from . import data as D
+from .engine import medical_care
 from .models import Club, Player, clamp
 
 # מקדם התפתחות לפי גיל — צעירים גדלים מהר, ותיקים דועכים
@@ -50,14 +51,17 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     """מבצע שבוע אימונים אחד ומחזיר הודעות למשתמש."""
     messages: List[str] = []
     facilities = club.training_facilities if club else 45
+    assistant = club.staff_quality("assistant") if club else 0
+    fitness_coach = club.staff_quality("fitness") if club else 0
+    care = medical_care(club)
 
     # מנוחה
     if focus == "rest":
-        player.fitness = clamp(player.fitness + 26, 0, 100)
+        player.fitness = clamp(player.fitness + 26 + fitness_coach / 14.0, 0, 100)
         player.morale = clamp(player.morale + 1.5, 0, 100)
         if player.injury_weeks > 0:
             player.injury_weeks = max(0, player.injury_weeks - 1)
-            if rng.random() < 0.3:
+            if rng.random() < 0.20 + care * 0.34:
                 player.injury_weeks = max(0, player.injury_weeks - 1)
                 messages.append("🏥 השיקום מתקדם מהר מהצפוי.")
         return messages
@@ -96,6 +100,7 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     curve = age_factor(player.age)
     base = 0.30 * intensity
     base *= 0.55 + facilities / 110.0
+    base *= 1.0 + assistant / 420.0          # עוזר מאמן — עד 23% יותר
     base *= max(0.15, curve)
     base *= 1.0 + clamp(gap, -10, 25) * 0.05
     if player.has_trait("workhorse"):
@@ -123,7 +128,8 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
                         f"(עכשיו {player.attributes[focus]}).")
 
     # אימון אינטנסיבי מסוכן
-    if intensity > 1.15 and rng.random() < 0.035 * intensity:
+    injury_risk = 0.035 * intensity * (1.0 - fitness_coach / 260.0)
+    if intensity > 1.15 and rng.random() < injury_risk:
         weeks = rng.randint(1, 3)
         player.injury_weeks = weeks
         player.injury_name = "עומס יתר באימון"
@@ -131,15 +137,20 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     return messages
 
 
-def weekly_recovery(player: Player, played: bool, rng: random.Random) -> None:
-    """התאוששות טבעית בסוף שבוע."""
+def weekly_recovery(player: Player, played: bool, rng: random.Random,
+                    club: Optional[Club] = None) -> None:
+    """התאוששות טבעית בסוף שבוע. מרכז רפואי וצוות מקצרים שיקום."""
+    care = medical_care(club)
     if player.injury_weeks > 0:
         player.injury_weeks -= 1
+        if player.injury_weeks > 0 and rng.random() < (care - 0.45) * 0.55:
+            player.injury_weeks -= 1        # טיפול טוב חוסך עוד שבוע
         if player.injury_weeks == 0:
             player.injury_name = ""
             player.fitness = clamp(player.fitness + 15, 0, 100)
     if not played:
-        player.fitness = clamp(player.fitness + 9, 0, 100)
+        fitness_coach = club.staff_quality("fitness") if club else 0
+        player.fitness = clamp(player.fitness + 9 + fitness_coach / 22.0, 0, 100)
     player.form = clamp(player.form + (0 if played else rng.uniform(-1.5, 1.5)), 5, 99)
 
 

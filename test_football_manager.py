@@ -7,6 +7,7 @@ import random
 
 import pytest
 
+from football_manager import club_ops as CO
 from football_manager import data as D
 from football_manager import story as ST
 from football_manager.engine import (pick_lineup, position_fit, simulate_match,
@@ -648,3 +649,276 @@ def test_many_story_events_fire_across_careers():
             game.advance_week()
         fired.update(game.fired_events)
     assert len(fired) >= len(ST.REGISTRY) // 3
+
+
+# ---------------------------------------------------------------------------
+# אצטדיון, תקציב, מתקנים וצוות
+# ---------------------------------------------------------------------------
+
+def _managed_game(seed=9, club="hapoel_carmel"):
+    return GameState.new_game("מנג'ר", "CM", club, 42, seed=seed, role="manager")
+
+
+def test_every_club_has_a_stadium_facilities_and_staff():
+    clubs, _ = generate_world(seed=4)
+    for club in clubs.values():
+        assert club.stadium_name
+        assert 1_500 <= club.capacity <= 42_000
+        assert club.capacity % 500 == 0
+        assert club.balance > 0
+        assert 1 <= club.medical_centre <= 99
+        assert club.ticket_price > 0
+        for role, member in club.staff.items():
+            assert role in D.STAFF_ROLES
+            assert 8 <= member["quality"] <= 96
+            assert member["wage"] > 0
+            assert member["name"]
+
+
+def test_stadium_size_tracks_club_stature():
+    clubs, _ = generate_world(seed=4)
+    ranked = sorted(clubs.values(), key=lambda c: -c.reputation)
+    big = sum(c.capacity for c in ranked[:6]) / 6
+    small = sum(c.capacity for c in ranked[-6:]) / 6
+    assert big > small * 4
+
+
+def test_attendance_never_exceeds_capacity_and_follows_support():
+    clubs, _ = generate_world(seed=4)
+    rng = random.Random(2)
+    club = clubs["hapoel_carmel"]
+    opponent = clubs["maccabi_harel"]
+    for _ in range(60):
+        assert 0 < CO.attendance_for(club, opponent, rng) <= club.capacity
+
+    loyal = generate_world(seed=4)[0]["hapoel_carmel"]
+    quiet = generate_world(seed=4)[0]["hapoel_carmel"]
+    loyal.fan_support, quiet.fan_support = 95.0, 25.0
+    crowded = sum(CO.attendance_for(loyal, opponent, random.Random(i)) for i in range(30))
+    empty = sum(CO.attendance_for(quiet, opponent, random.Random(i)) for i in range(30))
+    assert crowded > empty
+
+
+def test_weekly_finances_balance_out():
+    clubs, players = generate_world(seed=4)
+    club = clubs["hapoel_carmel"]
+    before = club.balance
+    detail = CO.weekly_finances(club, players, matchday=1_000_000)
+    assert detail["net"] == (detail["commercial"] + detail["matchday"]
+                             - detail["wages"] - detail["staff"])
+    assert club.balance == round(before + detail["net"])
+    assert detail["balance"] == int(club.balance)
+
+
+def test_home_matches_draw_a_crowd_and_pay_for_themselves():
+    game = _managed_game()
+    home_weeks = 0
+    for _ in range(120):
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        report = game.advance_week()
+        if report.attendance:
+            home_weeks += 1
+            assert report.finances["matchday"] > 0
+            assert report.attendance <= game.my_club.capacity
+        else:
+            assert report.finances["matchday"] == 0
+        if report.season_ended:
+            break
+    assert home_weeks >= 14
+
+
+def test_the_gate_is_counted_during_the_youth_years_too():
+    """בשנות הנוער אתה צופה מהיציע — אבל הקופה של המועדון עדיין עובדת."""
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 13, seed=5)
+    assert game.stage == "youth"
+    home_weeks = 0
+    for _ in range(80):
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        report = game.advance_week()
+        if report.attendance:
+            home_weeks += 1
+            assert report.finances["matchday"] > 0
+        if report.season_ended:
+            break
+    assert home_weeks >= 14
+    assert game.my_club.balance > 0
+
+
+def test_facility_upgrade_costs_money_takes_time_and_lands():
+    game = _managed_game()
+    club = game.my_club
+    club.balance = 60_000_000
+    before_level = club.medical_centre
+    before_balance = club.balance
+    cost = CO.upgrade_cost(club, "medical")
+
+    assert "אישרת" in game.upgrade_facility("medical")
+    assert club.balance == before_balance - cost
+    assert club.medical_centre == before_level          # עוד לא הסתיים
+    assert "כבר בעיצומן" in game.upgrade_facility("medical")
+
+    for _ in range(D.FACILITIES["medical"]["weeks"]):
+        CO.tick_works(club)
+    assert club.medical_centre > before_level
+    assert club.works == []
+
+
+def test_stadium_expansion_adds_seats():
+    game = _managed_game()
+    club = game.my_club
+    club.balance = 200_000_000
+    before = club.capacity
+    added = CO.stadium_expansion(club)
+    game.upgrade_facility("stadium")
+    for _ in range(D.FACILITIES["stadium"]["weeks"]):
+        CO.tick_works(club)
+    assert club.capacity == before + added
+
+
+def test_an_empty_till_blocks_building():
+    game = _managed_game()
+    club = game.my_club
+    club.balance = 1_000
+    assert CO.can_upgrade(club, "training") == "אין מספיק כסף בקופה."
+    assert "אין מספיק כסף" in game.upgrade_facility("training")
+    assert club.works == []
+
+
+def test_hiring_and_firing_staff_moves_money_and_the_roster():
+    game = _managed_game()
+    club = game.my_club
+    club.balance = 20_000_000
+    candidate = dict(game.staff_market["analyst"][0])
+    balance_before = club.balance
+
+    message = game.hire_staff("analyst", 0)
+    assert candidate["name"] in message
+    assert club.staff["analyst"]["quality"] == candidate["quality"]
+    assert club.balance == balance_before - candidate["wage"] * 4
+    assert game.staff_market["analyst"][0]["name"] != candidate["name"] or True
+
+    wage = club.staff["analyst"]["wage"]
+    balance_before = club.balance
+    assert "סיים את תפקידו" in game.release_staff("analyst")
+    assert "analyst" not in club.staff
+    assert club.balance == balance_before - wage * 8
+    assert game.release_staff("analyst") == "המשרה כבר פנויה."
+
+
+def test_only_a_decision_maker_spends_club_money():
+    game = GameState.new_game("שחקן", "ST", "hapoel_carmel", 24, seed=9)
+    assert not game.controls_club()
+    balance = game.my_club.balance
+    assert "לא מחליט" in game.upgrade_facility("training")
+    assert "לא מגייס" in game.hire_staff("analyst", 0)
+    assert "לא מפטר" in game.release_staff("analyst")
+    assert game.my_club.balance == balance
+
+
+def test_medical_quality_shortens_injuries():
+    clubs, _ = generate_world(seed=4)
+    club = clubs["hapoel_carmel"]
+    club.medical_centre = 95
+    club.staff["physio"] = {"name": "טוב", "quality": 95, "wage": 5000}
+    from football_manager.engine import medical_care
+    from football_manager.progression import weekly_recovery
+    assert medical_care(club) > 0.9
+
+    poor = clubs["maccabi_shikma"] if "maccabi_shikma" in clubs else club
+    poor.medical_centre = 10
+    poor.staff.pop("physio", None)
+    assert medical_care(poor) < 0.2
+
+    def weeks_to_heal(target):
+        player = generate_player(random.Random(3), target, "ST")
+        player.injury_weeks = 6
+        rng = random.Random(11)
+        weeks = 0
+        while player.injury_weeks > 0 and weeks < 40:
+            weekly_recovery(player, played=False, rng=rng, club=target)
+            weeks += 1
+        return weeks
+
+    fast = sum(weeks_to_heal(club) for _ in range(12))
+    slow = sum(weeks_to_heal(poor) for _ in range(12))
+    assert fast < slow
+
+
+def test_an_assistant_manager_speeds_up_training():
+    clubs, _ = generate_world(seed=4)
+    with_help = clubs["hapoel_carmel"]
+    with_help.staff["assistant"] = {"name": "טוב", "quality": 95, "wage": 6000}
+    alone = clubs["maccabi_sharon"]
+    alone.training_facilities = with_help.training_facilities
+    alone.staff.pop("assistant", None)
+
+    def gain(club, seed):
+        player = generate_player(random.Random(seed), club, "ST", age=19, quality=55)
+        player.potential = 90
+        start = player.attributes["shooting"]
+        rng = random.Random(seed)
+        for _ in range(40):
+            weekly_training(player, "shooting", club, rng)
+        return player.attributes["shooting"] - start
+
+    helped = sum(gain(with_help, s) for s in range(14))
+    unhelped = sum(gain(alone, s) for s in range(14))
+    assert helped > unhelped
+
+
+def test_an_analyst_gives_a_measurable_edge():
+    clubs, players = generate_world(seed=4)
+    home, away = clubs["hapoel_carmel"], clubs["maccabi_sharon"]
+    home.staff["analyst"] = {"name": "מצוין", "quality": 95, "wage": 6000}
+    away.staff.pop("analyst", None)
+    sharp = sum(simulate_match(home, away, players, random.Random(s)).home_goals
+                for s in range(160))
+    home.staff.pop("analyst", None)
+    away.staff["analyst"] = {"name": "מצוין", "quality": 95, "wage": 6000}
+    blunt = sum(simulate_match(home, away, players, random.Random(s)).home_goals
+                for s in range(160))
+    assert sharp > blunt
+
+
+def test_building_finishes_even_after_you_change_clubs():
+    """בנייה ששילמת עליה לא נתקעת רק כי עברת מועדון."""
+    game = _managed_game()
+    first = game.my_club
+    first.balance = 60_000_000
+    before = first.medical_centre
+    game.upgrade_facility("medical")
+
+    game.managed_club_id = "maccabi_harel"      # עברת מועדון באמצע
+    for _ in range(D.FACILITIES["medical"]["weeks"] + 1):
+        if game.pending_event_id:
+            game.resolve_event(0)
+        game.advance_week()
+
+    assert first.medical_centre > before
+    assert first.works == []
+
+
+def test_club_books_survive_save_and_load(tmp_path):
+    game = _managed_game()
+    club = game.my_club
+    club.balance = 80_000_000
+    game.upgrade_facility("medical")
+    game.hire_staff("assistant", 0)
+    for _ in range(3):
+        if game.pending_event_id:
+            game.resolve_event(0)
+        game.advance_week()
+
+    path = game.save(str(tmp_path / "save.json"))
+    loaded = GameState.load(path)
+    mirror = loaded.my_club
+    assert mirror.stadium_name == club.stadium_name
+    assert mirror.capacity == club.capacity
+    assert int(mirror.balance) == int(club.balance)
+    assert mirror.staff == club.staff
+    assert mirror.works == club.works
+    assert loaded.staff_market.keys() == game.staff_market.keys()

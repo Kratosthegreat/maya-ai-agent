@@ -8,17 +8,20 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "art.js", "engine.js", "story.js", "game.js", "graphics.js",
-               "avatars.js", "scenes.js"];
+const PARTS = ["data.js", "art.js", "engine.js", "clubops.js", "story.js", "game.js",
+               "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
 const ctx = vm.createContext({ console, Math, JSON, Date });
 vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, generatePlayer, " +
   "simulateMatch, pickLineup, teamStrength, roundRobin, overall, playerValue, " +
-  "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
+  "wageForOverall, positionFit, avgRating, weeklyTraining, weeklyRecovery, " +
+  "endOfSeasonDevelopment, fmt, " +
   "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide, " +
   "SEASON_WEEKS, leagueWeeks, " +
   "ART, avatar, avatarChip, SCENE_LABELS, randomIdentity, playerFoot, " +
-  "buildOf, FOOT_KEYS, FOOT_NAMES };", ctx);
+  "buildOf, FOOT_KEYS, FOOT_NAMES, attendanceFor, matchdayIncome, " +
+  "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
+  "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -314,6 +317,261 @@ test("לכל שחקן יש דיוקן במדי המועדון, בלי פנים �
     shapes.add([b.frame, b.crop, b.shoulder].join("|"));
   }
   assert(shapes.size >= 5, `רק ${shapes.size} צלליות שונות מתוך ${sample.length}`);
+});
+
+console.log("\nמועדון: אצטדיון, תקציב, מתקנים וצוות");
+
+function managedGame(seed = 9, club = "hapoel_carmel") {
+  return A.Game.newGame("מנג'ר", "CM", club, 42, seed, "manager");
+}
+
+test("לכל מועדון יש אצטדיון, מתקנים וצוות", () => {
+  const { clubs } = A.generateWorld(4);
+  for (const club of Object.values(clubs)) {
+    assert(club.stadiumName, `${club.name}: אין שם אצטדיון`);
+    assert(club.capacity >= 1500 && club.capacity <= 42000, `${club.name}: קיבולת ${club.capacity}`);
+    assert(club.capacity % 500 === 0, "קיבולת לא מעוגלת");
+    assert(club.balance > 0, "אין קופה");
+    assert(club.medicalCentre >= 1 && club.medicalCentre <= 99, "מרכז רפואי מחוץ לטווח");
+    assert(A.ticketPrice(club) > 0, "מחיר כרטיס לא תקין");
+    for (const [role, m] of Object.entries(club.staff)) {
+      assert(A.D.STAFF_ROLES[role], `תפקיד לא מוכר: ${role}`);
+      assert(m.quality >= 8 && m.quality <= 96, `איכות ${m.quality}`);
+      assert(m.wage > 0 && Number.isFinite(m.wage), `שכר ${m.wage}`);
+      assert(m.name, "אין שם");
+    }
+  }
+});
+
+test("גודל האצטדיון הולך אחרי גודל המועדון", () => {
+  const { clubs } = A.generateWorld(4);
+  const ranked = Object.values(clubs).sort((a, b) => b.reputation - a.reputation);
+  const big = ranked.slice(0, 6).reduce((s, c) => s + c.capacity, 0) / 6;
+  const small = ranked.slice(-6).reduce((s, c) => s + c.capacity, 0) / 6;
+  assert(big > small * 4, `${Math.round(big)} מול ${Math.round(small)}`);
+});
+
+test("הקהל אף פעם לא עולה על הקיבולת, וגדל עם האהדה", () => {
+  const { clubs } = A.generateWorld(4);
+  const club = clubs.hapoel_carmel, opponent = clubs.maccabi_harel;
+  const rng = new A.Rng(2);
+  for (let i = 0; i < 60; i++) {
+    const att = A.attendanceFor(club, opponent, rng);
+    assert(att > 0 && att <= club.capacity, `קהל ${att} מול קיבולת ${club.capacity}`);
+  }
+  const loyal = Object.assign({}, club, { fanSupport: 95 });
+  const quiet = Object.assign({}, club, { fanSupport: 25 });
+  let crowded = 0, empty = 0;
+  for (let i = 0; i < 30; i++) {
+    crowded += A.attendanceFor(loyal, opponent, new A.Rng(i + 1));
+    empty += A.attendanceFor(quiet, opponent, new A.Rng(i + 1));
+  }
+  assert(crowded > empty, "אהדה לא משפיעה על הקהל");
+});
+
+test("המאזן השבועי מסתדר חשבונית", () => {
+  const { clubs, players } = A.generateWorld(4);
+  const club = clubs.hapoel_carmel;
+  const before = club.balance;
+  const d = A.weeklyFinances(club, players, 1000000);
+  assert(d.net === d.commercial + d.matchday - d.wages - d.staff, "הנטו לא מסתדר");
+  assert(club.balance === Math.round(before + d.net), "הקופה לא עודכנה");
+});
+
+test("משחקי בית מכניסים כסף לקופה", () => {
+  const g = managedGame();
+  let homeWeeks = 0;
+  for (let i = 0; i < 120; i++) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    const r = g.advanceWeek();
+    if (r.attendance) {
+      homeWeeks++;
+      assert(r.finances.matchday > 0, "משחק בית בלי הכנסה");
+      assert(r.attendance <= g.myClub().capacity, "קהל מעל הקיבולת");
+    } else {
+      assert(r.finances.matchday === 0, "הכנסת יום משחק בלי משחק בית");
+    }
+    if (r.seasonEnded) break;
+  }
+  assert(homeWeeks >= 14, `רק ${homeWeeks} משחקי בית בעונה`);
+});
+
+test("הקופה עובדת גם בשנות הנוער", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 13, 5);
+  assert(g.stage === "youth", `שלב ${g.stage}`);
+  let homeWeeks = 0;
+  for (let i = 0; i < 80; i++) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    const r = g.advanceWeek();
+    if (r.attendance) { homeWeeks++; assert(r.finances.matchday > 0, "אין הכנסה ממשחק בית"); }
+    if (r.seasonEnded) break;
+  }
+  assert(homeWeeks >= 14, `רק ${homeWeeks} משחקי בית נספרו`);
+  assert(g.myClub().balance > 0, "הקופה ירדה למינוס בשנות הנוער");
+});
+
+test("שדרוג מתקן עולה כסף, לוקח זמן ונוחת", () => {
+  const g = managedGame();
+  const club = g.myClub();
+  club.balance = 60000000;
+  const beforeLevel = club.medicalCentre;
+  const beforeBalance = club.balance;
+  const cost = A.upgradeCost(club, "medical");
+
+  assert(g.upgradeFacility("medical").includes("אישרת"), "השדרוג לא אושר");
+  assert(club.balance === beforeBalance - cost, "הכסף לא ירד");
+  assert(club.medicalCentre === beforeLevel, "המתקן השתדרג לפני הזמן");
+  assert(g.upgradeFacility("medical").includes("כבר בעיצומן"), "אפשר לשדרג פעמיים במקביל");
+
+  for (let i = 0; i < A.D.FACILITIES.medical.weeks; i++) A.tickWorks(club);
+  assert(club.medicalCentre > beforeLevel, "המתקן לא שודרג");
+  assert(club.works.length === 0, "העבודות לא הסתיימו");
+});
+
+test("הרחבת אצטדיון מוסיפה מקומות", () => {
+  const g = managedGame();
+  const club = g.myClub();
+  club.balance = 200000000;
+  const before = club.capacity;
+  const added = A.stadiumExpansion(club);
+  g.upgradeFacility("stadium");
+  for (let i = 0; i < A.D.FACILITIES.stadium.weeks; i++) A.tickWorks(club);
+  assert(club.capacity === before + added, `${before} + ${added} ≠ ${club.capacity}`);
+});
+
+test("קופה ריקה חוסמת בנייה", () => {
+  const g = managedGame();
+  const club = g.myClub();
+  club.balance = 1000;
+  assert(A.canUpgrade(club, "training") === "אין מספיק כסף בקופה.", "לא נחסם");
+  assert(g.upgradeFacility("training").includes("אין מספיק כסף"), "השדרוג עבר");
+  assert(club.works.length === 0, "נפתחה עבודה בלי כסף");
+});
+
+test("גיוס ופיטורי צוות מזיזים כסף ואת הסגל המקצועי", () => {
+  const g = managedGame();
+  const club = g.myClub();
+  club.balance = 20000000;
+  const candidate = Object.assign({}, g.staffMarket.analyst[0]);
+  let before = club.balance;
+
+  const message = g.hireStaff("analyst", 0);
+  assert(message.includes(candidate.name), `הודעה: ${message}`);
+  assert(club.staff.analyst.quality === candidate.quality, "האנליסט לא נכנס");
+  assert(club.balance === before - candidate.wage * 4, "דמי החתימה לא ירדו");
+
+  const wage = club.staff.analyst.wage;
+  before = club.balance;
+  assert(g.releaseStaff("analyst").includes("סיים את תפקידו"), "לא פוטר");
+  assert(!club.staff.analyst, "עדיין בתפקיד");
+  assert(club.balance === before - wage * 8, "הפיצויים לא שולמו");
+  assert(g.releaseStaff("analyst") === "המשרה כבר פנויה.", "פיטר משרה ריקה");
+});
+
+test("רק מי שמחליט מוציא כסף של המועדון", () => {
+  const g = A.Game.newGame("שחקן", "ST", "hapoel_carmel", 24, 9);
+  assert(!g.controlsClub(), "שחקן שולט בתקציב");
+  const balance = g.myClub().balance;
+  assert(g.upgradeFacility("training").includes("לא מחליט"), "שחקן שדרג מתקן");
+  assert(g.hireStaff("analyst", 0).includes("לא מגייס"), "שחקן גייס צוות");
+  assert(g.releaseStaff("analyst").includes("לא מפטר"), "שחקן פיטר צוות");
+  assert(g.myClub().balance === balance, "הקופה השתנתה");
+});
+
+test("טיפול רפואי טוב מקצר פציעות", () => {
+  const { clubs } = A.generateWorld(4);
+  const good = clubs.hapoel_carmel;
+  good.medicalCentre = 95;
+  good.staff.physio = { name: "טוב", quality: 95, wage: 5000 };
+  const poor = clubs.maccabi_sharon;
+  poor.medicalCentre = 10;
+  delete poor.staff.physio;
+  assert(A.medicalCare(good) > 0.9, "טיפול טוב לא נמדד");
+  assert(A.medicalCare(poor) < 0.2, "טיפול גרוע לא נמדד");
+
+  const weeksToHeal = (club, seed) => {
+    const p = A.generatePlayer(new A.Rng(seed), club, "ST");
+    p.injuryWeeks = 6;
+    const rng = new A.Rng(seed + 100);
+    let weeks = 0;
+    while (p.injuryWeeks > 0 && weeks < 40) { A.weeklyRecovery(p, false, rng, club); weeks++; }
+    return weeks;
+  };
+  let fast = 0, slow = 0;
+  for (let i = 0; i < 14; i++) { fast += weeksToHeal(good, i); slow += weeksToHeal(poor, i); }
+  assert(fast < slow, `${fast} מול ${slow}`);
+});
+
+test("עוזר מאמן מאיץ את האימון", () => {
+  const { clubs } = A.generateWorld(4);
+  const helped = clubs.hapoel_carmel;
+  helped.staff.assistant = { name: "טוב", quality: 95, wage: 6000 };
+  const alone = clubs.maccabi_sharon;
+  alone.trainingFacilities = helped.trainingFacilities;
+  delete alone.staff.assistant;
+
+  const gain = (club, seed) => {
+    const p = A.generatePlayer(new A.Rng(seed), club, "ST", { age: 19, quality: 55 });
+    p.potential = 90;
+    const start = p.attributes.shooting;
+    const rng = new A.Rng(seed);
+    for (let i = 0; i < 40; i++) A.weeklyTraining(p, "shooting", club, rng);
+    return p.attributes.shooting - start;
+  };
+  let withHelp = 0, without = 0;
+  for (let s = 0; s < 14; s++) { withHelp += gain(helped, s); without += gain(alone, s); }
+  assert(withHelp > without, `${withHelp} מול ${without}`);
+});
+
+test("אנליסט נותן יתרון מדיד", () => {
+  const { clubs, players } = A.generateWorld(4);
+  const home = clubs.hapoel_carmel, away = clubs.maccabi_sharon;
+  home.staff.analyst = { name: "מצוין", quality: 95, wage: 6000 };
+  delete away.staff.analyst;
+  let sharp = 0;
+  for (let s = 0; s < 160; s++)
+    sharp += A.simulateMatch(home, away, players, new A.Rng(s + 1)).homeGoals;
+  delete home.staff.analyst;
+  away.staff.analyst = { name: "מצוין", quality: 95, wage: 6000 };
+  let blunt = 0;
+  for (let s = 0; s < 160; s++)
+    blunt += A.simulateMatch(home, away, players, new A.Rng(s + 1)).homeGoals;
+  assert(sharp > blunt, `${sharp} מול ${blunt}`);
+});
+
+test("בנייה מסתיימת גם אחרי שעברת מועדון", () => {
+  const g = managedGame();
+  const first = g.myClub();
+  first.balance = 60000000;
+  const before = first.medicalCentre;
+  g.upgradeFacility("medical");
+
+  g.managedClubId = "maccabi_harel";      // עברת מועדון באמצע
+  for (let i = 0; i < A.D.FACILITIES.medical.weeks + 1; i++) {
+    if (g.pendingEventId) g.resolveEvent(0);
+    g.advanceWeek();
+  }
+  assert(first.medicalCentre > before, `${before} -> ${first.medicalCentre}`);
+  assert(first.works.length === 0, "העבודות נתקעו");
+});
+
+test("ספרי המועדון שורדים שמירה וטעינה", () => {
+  const g = managedGame();
+  const club = g.myClub();
+  club.balance = 80000000;
+  g.upgradeFacility("medical");
+  g.hireStaff("assistant", 0);
+  for (let i = 0; i < 3; i++) { if (g.pendingEventId) g.resolveEvent(0); g.advanceWeek(); }
+
+  const copy = A.Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  const mirror = copy.myClub();
+  assert(mirror.stadiumName === club.stadiumName, "שם האצטדיון לא נשמר");
+  assert(mirror.capacity === club.capacity, "הקיבולת לא נשמרה");
+  assert(Math.round(mirror.balance) === Math.round(club.balance), "הקופה לא נשמרה");
+  assert(JSON.stringify(mirror.staff) === JSON.stringify(club.staff), "הצוות לא נשמר");
+  assert(JSON.stringify(mirror.works) === JSON.stringify(club.works), "העבודות לא נשמרו");
+  assert(Object.keys(copy.staffMarket).length === Object.keys(g.staffMarket).length,
+    "שוק הצוות לא נשמר");
 });
 
 test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", () => {

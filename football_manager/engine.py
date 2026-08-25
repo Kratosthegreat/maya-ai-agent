@@ -192,6 +192,13 @@ def team_strength(lineup: List[str], players: Dict[str, Player],
     return out[0], out[1], out[2]
 
 
+def medical_care(club: Optional[Club]) -> float:
+    """איכות הטיפול הרפואי במועדון, 0..1 — מרכז רפואי ופיזיותרפיסט."""
+    if club is None:
+        return 0.45
+    return clamp((club.medical_centre + club.staff_quality("physio")) / 200.0, 0.0, 1.0)
+
+
 def _poisson(rng: random.Random, lam: float) -> int:
     """הגרלת מספר שערים מהתפלגות פואסון."""
     lam = max(0.02, lam)
@@ -234,6 +241,12 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
     hd *= h_ment[2] * (1 + h_press[2])
     aa *= a_ment[1] * (1 + a_press[1])
     ad *= a_ment[2] * (1 + a_press[2])
+
+    # אנליסט: קריאת היריבה מתורגמת ליתרון קטן בשני הקווים (עד 4%)
+    h_edge = 1.0 + home.staff_quality("analyst") / 2400.0
+    a_edge = 1.0 + away.staff_quality("analyst") / 2400.0
+    ha *= h_edge; hd *= h_edge; hm *= h_edge
+    aa *= a_edge; ad *= a_edge; am *= a_edge
 
     # יתרון ביתיות
     if not neutral:
@@ -287,8 +300,8 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
 
     _apply_discipline(result, home_lineup, home.cid, players, rng, h_press[3])
     _apply_discipline(result, away_lineup, away.cid, players, rng, a_press[3])
-    _apply_injuries(result, home_lineup, home.cid, players, rng)
-    _apply_injuries(result, away_lineup, away.cid, players, rng)
+    _apply_injuries(result, home_lineup, home.cid, players, rng, home)
+    _apply_injuries(result, away_lineup, away.cid, players, rng, away)
 
     _rate_players(result, home_lineup, home.cid, players, rng)
     _rate_players(result, away_lineup, away.cid, players, rng)
@@ -385,8 +398,10 @@ def _apply_discipline(result: MatchResult, lineup: List[str], club_id: str,
 
 
 def _apply_injuries(result: MatchResult, lineup: List[str], club_id: str,
-                    players: Dict[str, Player], rng: random.Random) -> None:
-    """פציעות במהלך המשחק."""
+                    players: Dict[str, Player], rng: random.Random,
+                    club: Optional[Club] = None) -> None:
+    """פציעות במהלך המשחק. מרכז רפואי וצוות טוב מקצרים את השיקום."""
+    care = medical_care(club)
     for pid in lineup:
         p = players.get(pid)
         if not p:
@@ -399,6 +414,8 @@ def _apply_injuries(result: MatchResult, lineup: List[str], club_id: str,
         if rng.random() < chance:
             name, low, high = rng.choice(INJURY_TYPES)
             weeks = rng.randint(low, high)
+            if care > 0.5 and weeks > 1 and rng.random() < (care - 0.5) * 1.6:
+                weeks -= 1                      # טיפול טוב חוסך שבוע
             p.injury_weeks = weeks
             p.injury_name = name
             p.fitness = min(p.fitness, 55.0)

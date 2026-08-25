@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from . import data as D
 
@@ -239,6 +239,13 @@ class Club:
     wage_budget: int = 200_000      # תקציב שכר שבועי
     training_facilities: int = 50   # 1-100, משפיע על קצב התפתחות
     youth_academy: int = 50         # 1-100, איכות הנוער
+    medical_centre: int = 50        # 1-100, מקצר משך פציעות
+    stadium_name: str = ""
+    capacity: int = 12_000          # מקומות ישיבה
+    balance: float = 0.0            # מזומן בקופת המועדון (₪)
+    last_attendance: int = 0        # קהל במשחק הבית האחרון
+    staff: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    works: List[Dict[str, Any]] = field(default_factory=list)  # פרויקטי בנייה בתהליך
     manager_name: str = ""
     manager_trust: float = 50.0     # אמון המאמן בשחקן האנושי
     board_confidence: float = 60.0  # אמון ההנהלה במאמן האנושי
@@ -247,6 +254,26 @@ class Club:
     squad: List[str] = field(default_factory=list)  # מזהי שחקנים
     season_expectation: str = "אמצע טבלה"
     trophies: List[str] = field(default_factory=list)
+
+    # -- כלכלה ומתקנים -------------------------------------------------
+
+    def facility(self, kind: str) -> float:
+        """הערך הנוכחי של מתקן, לפי המפתח ב-D.FACILITIES."""
+        return float(getattr(self, D.FACILITIES[kind]["field"]))
+
+    def staff_quality(self, role: str) -> int:
+        """איכות בעל התפקיד, או 0 אם המשרה פנויה."""
+        member = self.staff.get(role)
+        return int(member["quality"]) if member else 0
+
+    @property
+    def staff_wage_bill(self) -> int:
+        return sum(int(m["wage"]) for m in self.staff.values())
+
+    @property
+    def ticket_price(self) -> int:
+        tier = next((l["tier"] for l in D.LEAGUES if l["id"] == self.league_id), 2)
+        return int(D.TICKET_BASE.get(tier, 40) * (0.55 + self.reputation / 90.0))
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -381,6 +408,37 @@ SQUAD_TEMPLATE = ["GK", "GK", "GK", "CB", "CB", "CB", "CB", "LB", "LB", "RB", "R
                   "ST", "ST", "ST"]
 
 
+def stadium_name_for(cid: str, nickname: str, rng: random.Random) -> str:
+    """שם אצטדיון קבוע למועדון."""
+    word = rng.choice(D.STADIUM_WORDS)
+    if rng.random() < 0.45:
+        return f"{word} {rng.choice(D.STADIUM_SUFFIX)}"
+    return f"{word} {nickname}"
+
+
+def capacity_for(reputation: int, rng: random.Random) -> int:
+    """קיבולת שמתאימה לגודל המועדון, מעוגלת ל-500 הקרובים."""
+    base = 900 + (reputation / 10.0) ** 3.05 * 55
+    raw = base * rng.uniform(0.84, 1.16)
+    return int(round(clamp(raw, 1_500, 42_000) / 500) * 500)
+
+
+def staff_member(rng: random.Random, role: str, quality: int) -> Dict[str, Any]:
+    quality = int(clamp(quality, 8, 96))
+    wage = int(quality * D.STAFF_ROLES[role]["wage_per_point"] * rng.uniform(0.85, 1.2))
+    return {"name": rng.choice(D.STAFF_NAMES), "quality": quality, "wage": wage}
+
+
+def generate_staff(rng: random.Random, reputation: int) -> Dict[str, Dict[str, Any]]:
+    """צוות מקצועי שמתאים לגודל המועדון. מועדונים קטנים משאירים משרות פנויות."""
+    staff: Dict[str, Dict[str, Any]] = {}
+    for role in D.STAFF_ROLES:
+        if reputation < 35 and rng.random() < 0.45:
+            continue                      # אין תקציב לתפקיד הזה
+        staff[role] = staff_member(rng, role, int(reputation + rng.gauss(0, 11)))
+    return staff
+
+
 def generate_world(seed: int = 0):
     """מייצר את כל המועדונים והשחקנים במשחק."""
     rng = random.Random(seed)
@@ -395,10 +453,15 @@ def generate_world(seed: int = 0):
             wage_budget=int(budget * 1_000_000 / 10),
             training_facilities=int(clamp(rep + rng.gauss(0, 8), 15, 99)),
             youth_academy=int(clamp(rep + rng.gauss(0, 12), 15, 99)),
+            medical_centre=int(clamp(rep + rng.gauss(0, 10), 15, 99)),
             manager_name=rng.choice(D.MANAGER_NAMES),
             fan_support=clamp(rep + rng.gauss(0, 10), 20, 99),
             formation=rng.choice(list(D.FORMATIONS.keys())),
         )
+        club.stadium_name = stadium_name_for(cid, nickname, rng)
+        club.capacity = capacity_for(rep, rng)
+        club.balance = round(budget * 1_000_000 * rng.uniform(0.18, 0.42))
+        club.staff = generate_staff(rng, rep)
         for position in SQUAD_TEMPLATE:
             player = generate_player(rng, club, position, used_names=used_names)
             players[player.pid] = player

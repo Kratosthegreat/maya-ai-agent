@@ -33,6 +33,24 @@ function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
 
 // -- ניווט --------------------------------------------------------------
 
+/** הודעה קצרה שנעלמת מעצמה — משוב על פעולה שבוצעה. */
+let toastTimer = null;
+function toast(message) {
+  if (!message) return;
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.className = "toast";
+    el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("on"), 3600);
+}
+
 function go(next, data = null) {
   view = next;
   viewData = data;
@@ -283,6 +301,7 @@ function appbar() {
 function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
+  if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
@@ -303,8 +322,145 @@ function screenMain() {
   if (view === "squad") return appbar() + screenSquad();
   if (view === "news") return appbar() + screenNews();
   if (view === "tactics") return appbar() + screenTactics();
+  if (view === "club") return appbar() + screenClub();
   if (view === "editor") return appbar() + screenEditor();
   return appbar() + screenHub() + dock(true);
+}
+
+/** שורת כסף: תווית, סכום וסימן. */
+function moneyRow(label, amount, kind) {
+  const sign = amount > 0 ? "+" : amount < 0 ? "−" : "";
+  if (!amount) kind = "";
+  return `<div class="row money ${kind || ""}">
+    <span class="nm">${esc(label)}</span>
+    <span class="val num">${sign}₪${fmt(Math.abs(amount))}</span>
+  </div>`;
+}
+
+/**
+ * מסך המועדון: אצטדיון, קופה, מתקנים וצוות מקצועי.
+ * כשאתה שחקן אתה רואה הכל אבל לא נוגע; כמנג'ר, מנהל או בעלים — אתה מחליט.
+ */
+function screenClub() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אתה לא משויך למועדון כרגע.</div></div>`;
+  const money = game.clubFinanceSummary();
+  const boss = game.controlsClub();
+  const last = money.lastWeek;
+  if (!viewData) viewData = {};
+  const openRole = viewData.staffRole;
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.name)}</span>
+        <span class="r">${esc(D.LEAGUES.find(l => l.id === club.leagueId).name)}</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(club, 46)}
+          <div class="kit-meta">
+            <span class="nm">🏟️ ${esc(club.stadiumName)}</span>
+            <span class="muted">${fmt(club.capacity)} מקומות · כרטיס ₪${fmt(money.ticket)}</span>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${fmt(money.attendance)}</div><div class="l">קהל אחרון</div></div>
+          <div class="stat"><div class="n">${money.attendance
+            ? Math.round(money.attendance / club.capacity * 100) + "%" : "—"}</div>
+            <div class="l">תפוסה</div></div>
+          <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">אהדה</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הקופה</span>
+        <span class="r num ${money.balance < 0 ? "bad" : ""}">₪${fmt(money.balance)}</span></div>
+      <div class="panel-body tight">
+        ${last ? `
+          ${moneyRow("שידורים וחסויות", last.commercial, "in")}
+          ${moneyRow("יום משחק", last.matchday, "in")}
+          ${moneyRow("שכר שחקנים", -last.wages, "out")}
+          ${moneyRow("שכר צוות", -last.staff, "out")}
+          <hr class="rule">
+          ${moneyRow("מאזן השבוע", last.net, last.net >= 0 ? "in" : "out")}
+        ` : `<div class="muted">המאזן הראשון יופיע אחרי השבוע הבא.</div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מתקנים</span>
+        <span class="r">${boss ? "אתה מחליט" : "החלטה של ההנהלה"}</span></div>
+      <div class="panel-body">
+        ${game.facilityOptions().map(f => `
+          <div class="facility">
+            <div class="facility-top">
+              <span class="nm">${esc(f.name)}</span>
+              <span class="val num">${f.kind === "stadium" ? fmt(f.level) : f.level}</span>
+            </div>
+            ${f.kind === "stadium" ? "" :
+              `<span class="bar"><i style="width:${f.level}%"></i></span>`}
+            <div class="muted">${esc(f.effect)}</div>
+            ${f.building
+              ? `<div class="build">🏗️ בבנייה — עוד ${f.building} שבועות</div>`
+              : boss
+                ? `<button class="mini-btn wide" data-upgrade="${f.kind}"
+                     ${f.blocked ? "disabled" : ""}>
+                     ${f.kind === "stadium"
+                       ? `<span class="num">+${fmt(f.added)}</span> מקומות`
+                       : `<span class="num">+${D.FACILITIES[f.kind].unit}</span>`}
+                     · <span class="num">₪${fmt(f.cost)}</span>
+                     · <span class="num">${f.weeks}</span> שב'
+                   </button>
+                   ${f.blocked ? `<div class="blocked">${esc(f.blocked)}${
+                     f.blocked === "אין מספיק כסף בקופה."
+                       ? ` חסר ₪${fmt(f.cost - money.balance)}.` : ""}</div>` : ""}`
+                : `<div class="muted">שדרוג: ₪${fmt(f.cost)} · ${f.weeks} שבועות</div>`}
+          </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הצוות המקצועי</span>
+        <span class="r num">₪${fmt(money.staffWages)}/שבוע</span></div>
+      <div class="panel-body">
+        ${Object.entries(D.STAFF_ROLES).map(([role, spec]) => {
+          const member = club.staff[role];
+          const open = openRole === role;
+          const candidates = (game.staffMarket && game.staffMarket[role]) || [];
+          return `
+          <div class="staff">
+            <div class="staff-top">
+              <span class="nm">${esc(spec.name)}</span>
+              ${member
+                ? `<span class="val num">${member.quality}</span>`
+                : `<span class="val muted">פנוי</span>`}
+            </div>
+            <div class="muted">${member
+              ? `${esc(member.name)} · ₪${fmt(member.wage)}/שבוע`
+              : "אין מי שממלא את התפקיד."}</div>
+            <div class="muted small">${esc(spec.effect)}</div>
+            ${boss ? `
+              <div class="staff-actions">
+                <button class="mini-btn" data-staffrole="${role}">
+                  ${open ? "סגור" : member ? "להחליף" : "לגייס"}</button>
+                ${member ? `<button class="mini-btn danger" data-fire="${role}">לפטר</button>` : ""}
+              </div>
+              ${open ? `<div class="candidates">
+                ${candidates.length ? candidates.map((c, i) => `
+                  <button class="candidate" data-hire="${role}" data-idx="${i}">
+                    <span class="nm">${esc(c.name)}</span>
+                    <span class="q num">${c.quality}</span>
+                    <span class="w num">₪${fmt(c.wage)}/שב'</span>
+                    <span class="fee">חתימה ₪${fmt(c.wage * 4)}</span>
+                  </button>`).join("")
+                  : `<div class="muted">אין מועמדים כרגע.</div>`}
+              </div>` : ""}
+            ` : ""}
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>`;
 }
 
 /** מסך טקטיקה — מגרש עם ההרכב ובחירות המנג'ר. */
@@ -528,10 +684,44 @@ function screenHub() {
       </div>
     </div>
 
+    ${clubSnip()}
     ${tableSnip}
     ${messages}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
+  </div>`;
+}
+
+/** תקציר המועדון בסקירה: קופה, קהל ובנייה בתהליך. */
+function clubSnip() {
+  const club = game.myClub();
+  if (!club) return "";
+  const money = game.clubFinanceSummary();
+  const works = club.works || [];
+  const last = money.lastWeek;
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">המועדון</span>
+      <span class="r"><button class="mini-btn" data-go="club">לפרטים</button></span></div>
+    <div class="panel-body tight">
+      <div class="row">
+        <span class="nm">🏟️ ${esc(club.stadiumName)}</span>
+        <span class="val num">${fmt(club.capacity)}</span>
+      </div>
+      <div class="row">
+        <span class="nm">קופת המועדון</span>
+        <span class="val num ${money.balance < 0 ? "bad" : ""}">₪${fmt(money.balance)}</span>
+      </div>
+      ${last ? `<div class="row">
+        <span class="nm">מאזן השבוע</span>
+        <span class="val num ${last.net < 0 ? "bad" : "good"}">${
+          last.net < 0 ? "−" : "+"}₪${fmt(Math.abs(last.net))}</span>
+      </div>` : ""}
+      ${works.length ? works.map(w => `<div class="row">
+        <span class="nm">🏗️ ${esc(D.FACILITIES[w.kind].name)}</span>
+        <span class="val num">${w.weeksLeft} שב'</span>
+      </div>`).join("") : ""}
+    </div>
   </div>`;
 }
 
@@ -576,6 +766,9 @@ function screenWeek() {
           club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
       </div>
       ${penalties ? `<div class="muted center">הוכרע בפנדלים — ${esc(penalties)}</div>` : ""}
+      ${report.attendance ? `<div class="muted center">🏟️ <span class="num">${
+        fmt(report.attendance)}</span> צופים · הכנסות <span class="num">₪${
+        fmt(report.finances ? report.finances.matchday : 0)}</span></div>` : ""}
       ${goals.length ? goalTimeline(result, home, away, me.pid) : ""}
       ${goals.length ? `<div class="goals">${goals.map((e, i) => `
         <div class="goal-row ${e.playerId === me.pid ? "mine" : ""}" style="animation-delay:${i * 60}ms">
@@ -1159,6 +1352,34 @@ function bind() {
     el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
   app.querySelectorAll("[data-press]").forEach(el =>
     el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+  app.querySelectorAll("[data-upgrade]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.upgradeFacility(el.dataset.upgrade);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-staffrole]").forEach(el =>
+    el.addEventListener("click", () => {
+      viewData.staffRole = viewData.staffRole === el.dataset.staffrole
+        ? null : el.dataset.staffrole;
+      render();
+    }));
+  app.querySelectorAll("[data-hire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.hireStaff(el.dataset.hire, +el.dataset.idx);
+      viewData.staffRole = null;
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-fire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.releaseStaff(el.dataset.fire);
+      saveGame();
+      toast(message);
+      render();
+    }));
 
   const nameInput = $("#pname");
   if (nameInput) nameInput.addEventListener("input", e => { viewData.name = e.target.value; });

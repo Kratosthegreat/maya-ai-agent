@@ -22,6 +22,7 @@ from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
                      build_commentary, simulate_match)
 from .models import (Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
+from . import club_ops as CO
 from .progression import (end_of_season_development, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
                           weekly_training)
@@ -74,6 +75,8 @@ class WeekReport:
     match: Optional[MatchResult] = None
     event_id: Optional[str] = None
     season_ended: bool = False
+    attendance: int = 0
+    finances: Optional[Dict[str, int]] = None
 
     def add(self, text: str) -> None:
         if text:
@@ -116,6 +119,9 @@ class GameState:
         self.caps: int = 0
         self.intl_goals: int = 0
         self.no_start_streak: int = 0
+        self.staff_market: Dict[str, List[Dict[str, Any]]] = {}
+        self._week_attendance: int = 0    # קהל במשחק הבית של השבוע הנוכחי
+        self.finances: Dict[str, int] = {}   # פירוט המאזן של השבוע האחרון
         self.game_over: bool = False
         self.rng = random.Random(0)
 
@@ -280,6 +286,7 @@ class GameState:
     # ==================================================================
 
     def start_season(self, first: bool = False) -> None:
+        self.refresh_staff_market()
         """בונה לוח משחקים, טבלאות וגביע לעונה חדשה."""
         self.week = 1
         self.fixtures = {}
@@ -387,6 +394,7 @@ class GameState:
     def advance_week(self) -> WeekReport:
         """מריץ שבוע שלם ומחזיר דוח."""
         report = WeekReport(week=self.week)
+        self._week_attendance = 0
         if self.game_over:
             report.add("הקריירה הסתיימה.")
             return report
@@ -628,9 +636,30 @@ class GameState:
                 away_tac = mine
         result = simulate_match(home, away, self.players, self.rng,
                                 home_tac, away_tac, competition, neutral)
+        # הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
+        # כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
+        my_club = self.my_club
+        if not neutral and my_club and my_club.cid == home.cid:
+            self._register_attendance(home, away)
         if self.stage in ("manager", "coach"):
             self.tactics["talk_boost"] = 0.0
         return result
+
+    def _register_attendance(self, home: Club, away: Club) -> int:
+        """כמה קהל הגיע למשחק הבית, לפי מיקום בטבלה, יריבה וכושר."""
+        table = self.tables.get(home.league_id, {})
+        order = sorted(table.values(), key=lambda r: (-r.points, -r.gd, -r.gf))
+        position = next((i + 1 for i, row in enumerate(order)
+                         if row.club_id == home.cid), max(1, len(order) // 2))
+        row = table.get(home.cid)
+        form = 0.5
+        if row and row.played:
+            form = clamp((row.won * 3 + row.drawn) / (row.played * 3.0), 0.0, 1.0)
+        attendance = CO.attendance_for(home, away, self.rng, position,
+                                       max(2, len(order)), form)
+        home.last_attendance = attendance
+        self._week_attendance = attendance
+        return attendance
 
     def _selected(self) -> bool:
         """האם המאמן מציב אותי בהרכב הפותח."""
@@ -717,6 +746,106 @@ class GameState:
         lines.append(f"🔁 נכנסת בדקה {90 - minutes} — {minutes} דקות, ציון {rating}.")
         return lines
 
+    # ==================================================================
+    # ניהול המועדון: מתקנים, אצטדיון וצוות
+    # ==================================================================
+
+    def controls_club(self) -> bool:
+        """האם אני בעמדה שמאפשרת להוציא כסף של המועדון."""
+        return self.stage in ("manager", "director", "owner") and self.my_club is not None
+
+    def refresh_staff_market(self, role: Optional[str] = None) -> None:
+        """מרענן את רשימת המועמדים. נקרא בתחילת עונה ואחרי כל גיוס."""
+        club = self.my_club
+        if not club:
+            self.staff_market = {}
+            return
+        roles = [role] if role else list(D.STAFF_ROLES)
+        for key in roles:
+            self.staff_market[key] = CO.staff_candidates(self.rng, club, key)
+
+    def facility_options(self) -> List[Dict[str, Any]]:
+        """מצב כל מתקן: רמה נוכחית, מחיר השדרוג ומה חוסם אותו."""
+        club = self.my_club
+        if not club:
+            return []
+        out = []
+        for kind, spec in D.FACILITIES.items():
+            work = CO.work_in_progress(club, kind)
+            out.append({
+                "kind": kind,
+                "name": spec["name"],
+                "effect": spec["effect"],
+                "level": int(club.capacity if kind == "stadium" else club.facility(kind)),
+                "cost": CO.upgrade_cost(club, kind),
+                "weeks": int(spec["weeks"]),
+                "added": CO.stadium_expansion(club) if kind == "stadium" else 0,
+                "building": int(work["weeks_left"]) if work else 0,
+                "blocked": CO.can_upgrade(club, kind),
+            })
+        return out
+
+    def upgrade_facility(self, kind: str) -> str:
+        """מאשר שדרוג מתקן מכספי המועדון."""
+        if kind not in D.FACILITIES:
+            return "אין מתקן כזה."
+        if not self.controls_club():
+            return "בתפקיד הנוכחי אתה לא מחליט על תקציב המועדון."
+        club = self.my_club
+        message = CO.start_upgrade(club, kind)
+        if not CO.work_in_progress(club, kind):
+            return message                       # נחסם — לא לרשום ביומן
+        self.log(message)
+        return message
+
+    def hire_staff(self, role: str, index: int) -> str:
+        """מגייס מועמד מהרשימה לתפקיד."""
+        if role not in D.STAFF_ROLES:
+            return "אין תפקיד כזה."
+        if not self.controls_club():
+            return "בתפקיד הנוכחי אתה לא מגייס צוות."
+        candidates = self.staff_market.get(role) or []
+        if not 0 <= index < len(candidates):
+            return "המועמד כבר לא זמין."
+        message = CO.hire_staff(self.my_club, role, candidates[index])
+        if "אין מספיק כסף" in message:
+            return message
+        self.refresh_staff_market(role)
+        self.log(message)
+        return message
+
+    def release_staff(self, role: str) -> str:
+        """מפטר בעל תפקיד ומשלם פיצויים."""
+        if not self.controls_club():
+            return "בתפקיד הנוכחי אתה לא מפטר צוות."
+        message = CO.fire_staff(self.my_club, role)
+        if message != "המשרה כבר פנויה.":
+            self.refresh_staff_market(role)
+            self.log(message)
+        return message
+
+    def club_finance_summary(self) -> Dict[str, Any]:
+        """תמונת המצב הכספית של המועדון שלי."""
+        club = self.my_club
+        if not club:
+            return {}
+        return {
+            "balance": int(club.balance),
+            "commercial": CO.commercial_income(club),
+            "wages": CO.wage_bill(club, self.players),
+            "staff_wages": club.staff_wage_bill,
+            "capacity": int(club.capacity),
+            "stadium": club.stadium_name,
+            "attendance": int(club.last_attendance),
+            "ticket": club.ticket_price,
+            "last_week": dict(self.finances),
+        }
+
+    def matchday_attendance(self) -> int:
+        """הקהל במשחק הבית האחרון של המועדון שלי."""
+        club = self.my_club
+        return int(club.last_attendance) if club else 0
+
     def _register_result(self, league_id: str, result: MatchResult) -> None:
         table = self.tables.get(league_id)
         if not table:
@@ -775,7 +904,7 @@ class GameState:
         weekly_recovery(me, played=False, rng=self.rng)
 
     def _weekly_income(self, report: WeekReport) -> None:
-        """שכר שבועי לפי שלב הקריירה."""
+        """שכר אישי, מאזן המועדון והתקדמות עבודות הבנייה."""
         me = self.me
         if self.stage == "youth":
             pass                      # בגיל הזה עוד לא משלמים לך
@@ -787,8 +916,38 @@ class GameState:
             if club:
                 base += int(club.reputation * (60 if self.stage == "coach" else 260))
             self.earn_money(base)
+
+        club = self.my_club
+        if club:
+            report.attendance = self._week_attendance
+            gate = (CO.matchday_income(club, report.attendance)
+                    if report.attendance else 0)
+            self.finances = CO.weekly_finances(club, self.players, gate)
+            report.finances = self.finances
+            self._board_finance_pressure(report, club)
+
+        # בנייה שהתחלת ממשיכה גם אם עברת מועדון — פשוט לא תיהנה ממנה
+        for other in self.clubs.values():
+            if not other.works:
+                continue
+            for line in CO.tick_works(other):
+                if club and other.cid == club.cid:
+                    report.add(line)
+                    self.log(line)
+
         weekly_recovery(me, played=me.pid in (report.match.ratings if report.match else {}),
-                        rng=self.rng)
+                        rng=self.rng, club=club)
+
+    def _board_finance_pressure(self, report: WeekReport, club: Club) -> None:
+        """קופה בגירעון שוחקת את אמון ההנהלה במאמן."""
+        if self.stage not in ("manager", "director", "owner"):
+            return
+        if club.balance < 0:
+            club.board_confidence = clamp(club.board_confidence - 0.8, 0, 100)
+            if self.week % 4 == 0:
+                report.add(f"💸 הקופה במינוס ₪{abs(int(club.balance)):,}. ההנהלה לא אוהבת את זה.")
+        elif club.balance > CO.commercial_income(club) * 26:
+            club.board_confidence = clamp(club.board_confidence + 0.2, 0, 100)
 
     # ==================================================================
     # אירועי עלילה
@@ -1673,6 +1832,7 @@ class GameState:
             "first_club_id": self.first_club_id, "last_club_id": self.last_club_id,
             "history": self.history, "caps": self.caps, "intl_goals": self.intl_goals,
             "no_start_streak": self.no_start_streak, "game_over": self.game_over,
+            "staff_market": self.staff_market, "finances": self.finances,
             "rng_state": _encode_rng(self.rng),
         }
 
@@ -1708,6 +1868,8 @@ class GameState:
         state.caps = raw["caps"]
         state.intl_goals = raw["intl_goals"]
         state.no_start_streak = raw["no_start_streak"]
+        state.staff_market = raw.get("staff_market", {})
+        state.finances = raw.get("finances", {})
         state.game_over = raw["game_over"]
         state.rng = _decode_rng(raw["rng_state"])
         return state

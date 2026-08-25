@@ -166,6 +166,7 @@ class Game {
   startSeason() {
     this.week = 1;
     this.positionLog = [];
+    this.refreshStaffMarket();
     for (const club of Object.values(this.clubs)) club.formLog = [];
     this.fixtures = {}; this.tables = {};
     for (const league of D.LEAGUES) {
@@ -282,7 +283,9 @@ class Game {
 
   advanceWeek() {
     const report = { week: this.week, training: [], notes: [], match: null,
-                     personal: null, eventId: null, seasonEnded: false, seasonSummary: null };
+                     personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
+                     attendance: 0, finances: null };
+    this.weekAttendance = 0;
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
@@ -501,8 +504,29 @@ class Game {
     }
     const result = simulateMatch(home, away, this.players, this.rng,
       { homeTactics: homeTac, awayTactics: awayTac, competition, neutral });
+    // הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
+    // כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
+    const myHomeClub = this.myClub();
+    if (!neutral && myHomeClub && myHomeClub.cid === home.cid)
+      this.registerAttendance(home, away);
     if (["manager", "coach"].includes(this.stage)) this.tactics.talkBoost = 0;
     return result;
+  }
+
+  /** כמה קהל הגיע למשחק הבית, לפי מיקום בטבלה, יריבה וכושר. */
+  registerAttendance(home, away) {
+    const order = this.standings(home.leagueId);
+    const table = this.tables[home.leagueId] || {};
+    const idx = order.findIndex(row => row.clubId === home.cid);
+    const position = idx >= 0 ? idx + 1 : Math.max(1, Math.round(order.length / 2));
+    const row = table[home.cid];
+    const form = row && row.played
+      ? clamp((row.won * 3 + row.drawn) / (row.played * 3), 0, 1) : 0.5;
+    const attendance = attendanceFor(home, away, this.rng, position,
+                                     Math.max(2, order.length), form);
+    home.lastAttendance = attendance;
+    this.weekAttendance = attendance;
+    return attendance;
   }
 
   selected() {
@@ -654,8 +678,127 @@ class Game {
       if (club) base += Math.round(club.reputation * (this.stage === "coach" ? 60 : 260));
       this.earn(base);
     }
+
+    const club = this.myClub();
+    if (club) {
+      report.attendance = this.weekAttendance || 0;
+      const gate = report.attendance ? matchdayIncome(club, report.attendance) : 0;
+      this.finances = weeklyFinances(club, this.players, gate);
+      report.finances = this.finances;
+      this.boardFinancePressure(report, club);
+    }
+
+    // בנייה שהתחלת ממשיכה גם אם עברת מועדון — פשוט לא תיהנה ממנה
+    for (const other of Object.values(this.clubs)) {
+      if (!other.works || !other.works.length) continue;
+      for (const line of tickWorks(other)) {
+        if (club && other.cid === club.cid) {
+          report.notes.push({ icon: "🏗️", text: line });
+          this.log(line);
+        }
+      }
+    }
+
     const played = !!(report.match && me.pid in report.match.result.ratings);
-    weeklyRecovery(me, played, this.rng);
+    weeklyRecovery(me, played, this.rng, club);
+  }
+
+  // ==================================================================
+  // ניהול המועדון: מתקנים, אצטדיון וצוות
+  // ==================================================================
+
+  /** האם אני בעמדה שמאפשרת להוציא כסף של המועדון. */
+  controlsClub() {
+    return ["manager", "director", "owner"].includes(this.stage) && !!this.myClub();
+  }
+
+  /** מרענן את רשימת המועמדים. נקרא בתחילת עונה ואחרי כל גיוס. */
+  refreshStaffMarket(role = null) {
+    const club = this.myClub();
+    if (!club) { this.staffMarket = {}; return; }
+    if (!this.staffMarket) this.staffMarket = {};
+    for (const key of role ? [role] : Object.keys(D.STAFF_ROLES))
+      this.staffMarket[key] = staffCandidates(this.rng, club, key);
+  }
+
+  /** מצב כל מתקן: רמה נוכחית, מחיר השדרוג ומה חוסם אותו. */
+  facilityOptions() {
+    const club = this.myClub();
+    if (!club) return [];
+    return Object.entries(D.FACILITIES).map(([kind, spec]) => {
+      const work = workInProgress(club, kind);
+      return {
+        kind, name: spec.name, effect: spec.effect,
+        level: Math.round(kind === "stadium" ? club.capacity : facilityLevel(club, kind)),
+        cost: upgradeCost(club, kind),
+        weeks: spec.weeks,
+        added: kind === "stadium" ? stadiumExpansion(club) : 0,
+        building: work ? work.weeksLeft : 0,
+        blocked: canUpgrade(club, kind),
+      };
+    });
+  }
+
+  upgradeFacility(kind) {
+    if (!D.FACILITIES[kind]) return "אין מתקן כזה.";
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מחליט על תקציב המועדון.";
+    const club = this.myClub();
+    const message = startUpgrade(club, kind);
+    if (!workInProgress(club, kind)) return message;
+    this.log(message);
+    return message;
+  }
+
+  hireStaff(role, index) {
+    if (!D.STAFF_ROLES[role]) return "אין תפקיד כזה.";
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מגייס צוות.";
+    const candidates = (this.staffMarket && this.staffMarket[role]) || [];
+    if (index < 0 || index >= candidates.length) return "המועמד כבר לא זמין.";
+    const message = hireStaffMember(this.myClub(), role, candidates[index]);
+    if (message.includes("אין מספיק כסף")) return message;
+    this.refreshStaffMarket(role);
+    this.log(message);
+    return message;
+  }
+
+  releaseStaff(role) {
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מפטר צוות.";
+    const message = fireStaffMember(this.myClub(), role);
+    if (message !== "המשרה כבר פנויה.") {
+      this.refreshStaffMarket(role);
+      this.log(message);
+    }
+    return message;
+  }
+
+  /** תמונת המצב הכספית של המועדון שלי. */
+  clubFinanceSummary() {
+    const club = this.myClub();
+    if (!club) return null;
+    return {
+      balance: Math.round(club.balance),
+      commercial: commercialIncome(club),
+      wages: wageBill(club, this.players),
+      staffWages: staffWageBill(club),
+      capacity: club.capacity,
+      stadium: club.stadiumName,
+      attendance: club.lastAttendance,
+      ticket: ticketPrice(club),
+      lastWeek: this.finances || null,
+    };
+  }
+
+  /** קופה בגירעון שוחקת את אמון ההנהלה במאמן. */
+  boardFinancePressure(report, club) {
+    if (!["manager", "director", "owner"].includes(this.stage)) return;
+    if (club.balance < 0) {
+      club.boardConfidence = clamp(club.boardConfidence - 0.8, 0, 100);
+      if (this.week % 4 === 0)
+        report.notes.push({ icon: "💸",
+          text: `הקופה במינוס ₪${fmt(Math.abs(club.balance))}. ההנהלה לא אוהבת את זה.` });
+    } else if (club.balance > commercialIncome(club) * 26) {
+      club.boardConfidence = clamp(club.boardConfidence + 0.2, 0, 100);
+    }
   }
 
   // ==================================================================
@@ -1451,6 +1594,7 @@ class Game {
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
       positionLog: this.positionLog,
+      staffMarket: this.staffMarket, finances: this.finances,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
   }
@@ -1469,6 +1613,7 @@ class Game {
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
       positionLog: raw.positionLog || [],
+      staffMarket: raw.staffMarket || {}, finances: raw.finances || null,
     });
     g.rng = Rng.fromState(raw.rngState);
     PID_COUNTER = Math.max(PID_COUNTER, raw.pidCounter || 0);

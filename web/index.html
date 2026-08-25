@@ -726,6 +726,73 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   border: 3px solid var(--line);
 }
 .ident-group { display: flex; flex-direction: column; gap: 6px; }
+/* ---------- מסך המועדון: קופה, מתקנים וצוות ---------- */
+
+.row.money .val { font-variant-numeric: tabular-nums; }
+.row.money.in .val { color: var(--good); }
+.row.money.out .val { color: var(--ink-2); }
+.panel-head .r.num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.panel-head .r.bad { color: var(--bad); }
+
+.facility, .staff {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.facility:last-child, .staff:last-child { border-bottom: 0; padding-bottom: 2px; }
+.facility-top, .staff-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.facility-top .nm, .staff-top .nm { font-weight: 700; font-size: 14px; }
+.facility-top .val, .staff-top .val {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px;
+}
+.facility .bar { height: 6px; }
+.facility .build {
+  font-size: 12px; color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border-radius: var(--radius); padding: 5px 8px;
+}
+.muted.small { font-size: 11px; }
+.facility .blocked { font-size: 11px; color: var(--ink-soft); text-align: center; }
+.row .val.good { color: var(--good); }
+.row .val.bad { color: var(--bad); }
+
+.mini-btn.wide { width: 100%; justify-content: center; padding: 7px 10px; }
+.mini-btn.wide[disabled] { opacity: .5; cursor: not-allowed; }
+.mini-btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
+
+.staff-actions { display: flex; gap: 6px; }
+.candidates { display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.candidate {
+  appearance: none; cursor: pointer; text-align: right;
+  display: grid; grid-template-columns: 1fr auto auto; gap: 3px 10px;
+  align-items: baseline;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 7px 9px; color: var(--ink);
+}
+.candidate:hover { border-color: var(--accent-2); background: var(--panel-3); }
+.candidate .nm { font-weight: 700; font-size: 13px; }
+.candidate .q { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
+.candidate .w, .candidate .fee {
+  font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums;
+}
+.candidate .fee { grid-column: 1 / -1; }
+
+.toast {
+  position: fixed; inset-inline: 12px; bottom: 16px; z-index: 90;
+  max-width: 560px; margin: 0 auto;
+  background: var(--panel-3); color: var(--ink);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 11px 14px; font-size: 13.5px; line-height: 1.4;
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+.toast.on { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
 .trait-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .trait-opt {
   appearance: none; text-align: right;
@@ -759,6 +826,7 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 <div id="app"></div>
 <script>
 // נוצר אוטומטית מ-football_manager/data.py — אין לערוך ידנית.
+// מריצים מחדש: python3 web/gen_data.py
 const D = {
  "POSITIONS": [
   "GK",
@@ -1686,6 +1754,116 @@ const D = {
   "school": "בית ספר ושיעורי בית",
   "street": "כדורגל במגרש השכונתי"
  },
+ "STADIUM_WORDS": [
+  "האצטדיון העירוני",
+  "היכל",
+  "אצטדיון",
+  "פארק",
+  "הזירה"
+ ],
+ "STADIUM_SUFFIX": [
+  "הצפון",
+  "הדרום",
+  "העמק",
+  "החוף",
+  "הגבעה",
+  "המושבה",
+  "הנמל",
+  "הכרמל",
+  "השפלה",
+  "המדבר",
+  "הבירה",
+  "הגליל"
+ ],
+ "TICKET_BASE": {
+  "0": 140,
+  "1": 78,
+  "2": 46,
+  "3": 28
+ },
+ "FACILITIES": {
+  "training": {
+   "field": "trainingFacilities",
+   "name": "מתקני אימון",
+   "effect": "קצב ההתפתחות של כל שחקני הסגל, כולל שלך.",
+   "unit": 9.0,
+   "weeks": 6,
+   "cost": 7000000
+  },
+  "youth": {
+   "field": "youthAcademy",
+   "name": "מחלקת נוער",
+   "effect": "איכות השחקנים שעולים מהנוער ורמת היריבים בשנות הנוער.",
+   "unit": 8.0,
+   "weeks": 8,
+   "cost": 5500000
+  },
+  "medical": {
+   "field": "medicalCentre",
+   "name": "מרכז רפואי",
+   "effect": "משך הפציעות בסגל — מרכז טוב מקצר שיקום.",
+   "unit": 10.0,
+   "weeks": 5,
+   "cost": 4500000
+  },
+  "stadium": {
+   "field": "capacity",
+   "name": "הרחבת האצטדיון",
+   "effect": "כמה כרטיסים אפשר למכור במשחק בית.",
+   "unit": 0.18,
+   "weeks": 20,
+   "cost": 7500000
+  }
+ },
+ "STAFF_ROLES": {
+  "assistant": {
+   "name": "עוזר מאמן",
+   "effect": "מוסיף לקצב האימון של כל הסגל.",
+   "wagePerPoint": 62
+  },
+  "fitness": {
+   "name": "מאמן כושר",
+   "effect": "התאוששות מהירה יותר, ופחות פציעות מעומס אימון.",
+   "wagePerPoint": 48
+  },
+  "physio": {
+   "name": "פיזיותרפיסט",
+   "effect": "מקצר את משך הפציעות.",
+   "wagePerPoint": 44
+  },
+  "scout": {
+   "name": "ראש סקאוטינג",
+   "effect": "משפר את איכות השחקנים שעולים מהנוער.",
+   "wagePerPoint": 40
+  },
+  "analyst": {
+   "name": "אנליסט",
+   "effect": "יתרון טקטי קטן בכל משחק.",
+   "wagePerPoint": 52
+  }
+ },
+ "STAFF_NAMES": [
+  "רון אלקיים",
+  "ז'אן פוליה",
+  "דניאל אשכנזי",
+  "מירי שגב",
+  "אנדראס קלוזה",
+  "יוסי דהן",
+  "לורה בנקס",
+  "פבלו אורטגה",
+  "נועם ברזילי",
+  "טל אבידן",
+  "סרחיו מולינה",
+  "אורית כהן",
+  "מרקו יאנסן",
+  "עדי פרץ",
+  "חנא סרוג'י",
+  "דין מקנזי",
+  "רותם לביא",
+  "אלכס דוברוב",
+  "שרון מזרחי",
+  "פייר לובלן"
+ ],
  "INJURY_TYPES": [
   [
    "מתיחה בשריר הירך",
@@ -2054,6 +2232,48 @@ function assignNumber(club, players, player) {
   return 0;
 }
 
+function stadiumNameFor(nickname, rng) {
+  const word = rng.choice(D.STADIUM_WORDS);
+  if (rng.random() < 0.45) return `${word} ${rng.choice(D.STADIUM_SUFFIX)}`;
+  return `${word} ${nickname}`;
+}
+
+function capacityFor(reputation, rng) {
+  const base = 900 + Math.pow(reputation / 10, 3.05) * 55;
+  const raw = base * rng.uniform(0.84, 1.16);
+  return Math.round(clamp(raw, 1500, 42000) / 500) * 500;
+}
+
+function staffMember(rng, role, quality) {
+  const q = Math.round(clamp(quality, 8, 96));
+  return {
+    name: rng.choice(D.STAFF_NAMES),
+    quality: q,
+    wage: Math.round(q * D.STAFF_ROLES[role].wagePerPoint * rng.uniform(0.85, 1.2)),
+  };
+}
+
+/** מועדון קטן לא תמיד מאייש את כל התפקידים. */
+function generateStaff(rng, reputation) {
+  const staff = {};
+  for (const role of Object.keys(D.STAFF_ROLES)) {
+    if (reputation < 35 && rng.random() < 0.45) continue;
+    staff[role] = staffMember(rng, role, Math.round(reputation + rng.gauss(0, 11)));
+  }
+  return staff;
+}
+
+function staffQuality(club, role) {
+  const member = club && club.staff ? club.staff[role] : null;
+  return member ? member.quality : 0;
+}
+
+/** איכות הטיפול הרפואי במועדון, 0..1 — מרכז רפואי ופיזיותרפיסט. */
+function medicalCare(club) {
+  if (!club) return 0.45;
+  return clamp(((club.medicalCentre || 45) + staffQuality(club, "physio")) / 200, 0, 1);
+}
+
 function generateWorld(seed) {
   const rng = new Rng(seed);
   const clubs = {}, players = {}, usedNames = new Set();
@@ -2063,6 +2283,7 @@ function generateWorld(seed) {
       wageBudget: Math.round(budget * 1000000 / 10),
       trainingFacilities: Math.round(clamp(rep + rng.gauss(0, 8), 15, 99)),
       youthAcademy: Math.round(clamp(rep + rng.gauss(0, 12), 15, 99)),
+      medicalCentre: Math.round(clamp(rep + rng.gauss(0, 10), 15, 99)),
       managerName: rng.choice(D.MANAGER_NAMES),
       managerTrust: 50,
       boardConfidence: 60,
@@ -2071,7 +2292,17 @@ function generateWorld(seed) {
       squad: [],
       seasonExpectation: "אמצע טבלה",
       trophies: [],
+      stadiumName: "",
+      capacity: 12000,
+      balance: 0,
+      lastAttendance: 0,
+      staff: {},
+      works: [],
     };
+    club.stadiumName = stadiumNameFor(nickname, rng);
+    club.capacity = capacityFor(rep, rng);
+    club.balance = Math.round(budget * 1000000 * rng.uniform(0.18, 0.42));
+    club.staff = generateStaff(rng, rep);
     for (const position of D.SQUAD_TEMPLATE) {
       const p = generatePlayer(rng, club, position, { usedNames });
       players[p.pid] = p;
@@ -2193,7 +2424,13 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   let hm = hs.mid;
   let aa = as.att * aMent[1] * (1 + aPress[1]);
   let ad = as.def * aMent[2] * (1 + aPress[2]);
-  const am = as.mid;
+  let am = as.mid;
+
+  // אנליסט: קריאת היריבה מתורגמת ליתרון קטן בכל הקווים (עד 4%)
+  const hEdge = 1 + staffQuality(home, "analyst") / 2400;
+  const aEdge = 1 + staffQuality(away, "analyst") / 2400;
+  ha *= hEdge; hd *= hEdge; hm *= hEdge;
+  aa *= aEdge; ad *= aEdge; am *= aEdge;
 
   if (!neutral) {
     ha *= 1 + home.fanSupport / 640;
@@ -2253,8 +2490,8 @@ function simulateMatch(home, away, players, rng, opts = {}) {
 
   applyDiscipline(result, homeLineup, home.cid, players, rng, hPress[3]);
   applyDiscipline(result, awayLineup, away.cid, players, rng, aPress[3]);
-  applyInjuries(result, homeLineup, home.cid, players, rng);
-  applyInjuries(result, awayLineup, away.cid, players, rng);
+  applyInjuries(result, homeLineup, home.cid, players, rng, home);
+  applyInjuries(result, awayLineup, away.cid, players, rng, away);
   ratePlayers(result, homeLineup, home.cid, players, rng);
   ratePlayers(result, awayLineup, away.cid, players, rng);
 
@@ -2327,7 +2564,8 @@ function applyDiscipline(result, lineup, clubId, players, rng, pressFactor) {
   }
 }
 
-function applyInjuries(result, lineup, clubId, players, rng) {
+function applyInjuries(result, lineup, clubId, players, rng, club = null) {
+  const care = medicalCare(club);
   for (const pid of lineup) {
     const p = players[pid];
     if (!p) continue;
@@ -2337,7 +2575,8 @@ function applyInjuries(result, lineup, clubId, players, rng) {
     if (hasTrait(p, "glass")) chance *= 2.2;
     if (rng.random() < chance) {
       const [name, low, high] = rng.choice(D.INJURY_TYPES);
-      const weeks = rng.randint(low, high);
+      let weeks = rng.randint(low, high);
+      if (care > 0.5 && weeks > 1 && rng.random() < (care - 0.5) * 1.6) weeks -= 1;
       p.injuryWeeks = weeks;
       p.injuryName = name;
       p.fitness = Math.min(p.fitness, 55);
@@ -2421,13 +2660,16 @@ function addGrowth(p, attr, delta) {
 function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const messages = [];
   const facilities = club ? club.trainingFacilities : 45;
+  const assistant = club ? staffQuality(club, "assistant") : 0;
+  const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
+  const care = medicalCare(club);
 
   if (focus === "rest") {
-    p.fitness = clamp(p.fitness + 26, 0, 100);
+    p.fitness = clamp(p.fitness + 26 + fitnessCoach / 14, 0, 100);
     p.morale = clamp(p.morale + 1.5, 0, 100);
     if (p.injuryWeeks > 0) {
       p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
-      if (rng.random() < 0.3) {
+      if (rng.random() < 0.20 + care * 0.34) {
         p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
         messages.push({ icon: "🏥", text: "השיקום מתקדם מהר מהצפוי." });
       }
@@ -2471,6 +2713,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const curve = ageFactor(p.age);
   let base = 0.30 * intensity;
   base *= 0.55 + facilities / 110;
+  base *= 1 + assistant / 420;          // עוזר מאמן — עד 23% יותר
   base *= Math.max(0.15, curve);
   base *= 1 + clamp(gap, -10, 25) * 0.05;
   if (hasTrait(p, "workhorse")) base *= 1.30;
@@ -2493,7 +2736,8 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
     messages.push({ icon: "📈", text:
       `${D.ATTRIBUTE_NAMES_HE[focus]} עלתה ב-${gained} (עכשיו ${p.attributes[focus]}).` });
   }
-  if (intensity > 1.15 && rng.random() < 0.035 * intensity) {
+  const injuryRisk = 0.035 * intensity * (1 - fitnessCoach / 260);
+  if (intensity > 1.15 && rng.random() < injuryRisk) {
     const weeks = rng.randint(1, 3);
     p.injuryWeeks = weeks;
     p.injuryName = "עומס יתר באימון";
@@ -2502,12 +2746,17 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   return messages;
 }
 
-function weeklyRecovery(p, played, rng) {
+function weeklyRecovery(p, played, rng, club = null) {
+  const care = medicalCare(club);
   if (p.injuryWeeks > 0) {
     p.injuryWeeks -= 1;
+    if (p.injuryWeeks > 0 && rng.random() < (care - 0.45) * 0.55) p.injuryWeeks -= 1;
     if (p.injuryWeeks === 0) { p.injuryName = ""; p.fitness = clamp(p.fitness + 15, 0, 100); }
   }
-  if (!played) p.fitness = clamp(p.fitness + 9, 0, 100);
+  if (!played) {
+    const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
+    p.fitness = clamp(p.fitness + 9 + fitnessCoach / 22, 0, 100);
+  }
   p.form = clamp(p.form + (played ? 0 : rng.uniform(-1.5, 1.5)), 5, 99);
 }
 
@@ -2596,6 +2845,175 @@ function leagueWeeks() {
   const out = [];
   for (let w = 1; w <= SEASON_WEEKS; w++) if (!CUP_WEEKS[w]) out.push(w);
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// כלכלת מועדון — פורט מ-football_manager/club_ops.py.
+// קהל מייצר הכנסה, ההכנסה מממנת מתקנים וצוות, והם משפיעים בחזרה על המגרש.
+// ---------------------------------------------------------------------------
+
+const COMMERCIAL_POWER = 3.1;
+const TIER_COMMERCIAL = { 0: 3.0, 1: 2.18, 2: 1.5, 3: 1.0 };
+
+function leagueTier(leagueId) {
+  const league = D.LEAGUES.find(l => l.id === leagueId);
+  return league ? league.tier : 2;
+}
+
+function ticketPrice(club) {
+  const base = D.TICKET_BASE[leagueTier(club.leagueId)] ?? 40;
+  return Math.round(base * (0.55 + club.reputation / 90));
+}
+
+function staffWageBill(club) {
+  return Object.values(club.staff || {}).reduce((sum, m) => sum + Math.round(m.wage), 0);
+}
+
+/** תפוסה נגזרת מאהדה, מיקום בטבלה, היריבה והכושר. */
+function attendanceFor(club, opponent, rng, position = 10, size = 20, form = 0.5) {
+  const standing = 1 - (position - 1) / Math.max(1, size - 1);
+  let occupancy = 0.24
+    + club.fanSupport / 100 * 0.34
+    + standing * 0.17
+    + opponent.reputation / 100 * 0.14
+    + (form - 0.5) * 0.16;
+  occupancy *= rng.uniform(0.93, 1.07);
+  occupancy = clamp(occupancy, 0.22, 1.0);
+  return Math.round(club.capacity * occupancy);
+}
+
+/** כרטיסים ועוד 24% מזון, חנות וחניה. */
+function matchdayIncome(club, attendance) {
+  return Math.round(attendance * ticketPrice(club) * 1.24);
+}
+
+function wageBill(club, players) {
+  let total = 0;
+  for (const pid of club.squad) {
+    const player = players[pid];
+    if (player && !player.retired) total += Math.round(player.contract.wage);
+  }
+  return total;
+}
+
+/** שידורים, חסויות ומרצ'נדייז — הכנסה קבועה בכל שבוע. */
+function commercialIncome(club) {
+  const mult = TIER_COMMERCIAL[leagueTier(club.leagueId)] ?? 1.2;
+  return Math.round(Math.pow(club.reputation, COMMERCIAL_POWER) * mult);
+}
+
+function weeklyFinances(club, players, matchday = 0) {
+  const wages = wageBill(club, players);
+  const staff = staffWageBill(club);
+  const commercial = commercialIncome(club);
+  const net = commercial + matchday - wages - staff;
+  club.balance = Math.round(club.balance + net);
+  return { commercial, matchday, wages, staff, net, balance: Math.round(club.balance) };
+}
+
+// ---------------------------------------------------------------------------
+// שדרוג מתקנים
+// ---------------------------------------------------------------------------
+
+function facilityLevel(club, kind) {
+  return club[D.FACILITIES[kind].field];
+}
+
+/** כמה מקומות נוספים בהרחבה הבאה, מעוגל ל-500. */
+function stadiumExpansion(club) {
+  const added = club.capacity * D.FACILITIES.stadium.unit;
+  return Math.round(Math.max(1000, Math.min(added, 9000)) / 500) * 500;
+}
+
+function upgradeCost(club, kind) {
+  const spec = D.FACILITIES[kind];
+  if (kind === "stadium") return Math.round(spec.cost * stadiumExpansion(club) / 1000);
+  const level = facilityLevel(club, kind);
+  return Math.round(spec.cost * (0.55 + Math.pow(level / 100, 1.7) * 2.6));
+}
+
+function workInProgress(club, kind) {
+  return (club.works || []).find(w => w.kind === kind) || null;
+}
+
+/** מחזיר סיבה למה אי אפשר לשדרג, או null אם אפשר. */
+function canUpgrade(club, kind) {
+  if (workInProgress(club, kind)) return "העבודות כבר בעיצומן.";
+  if (kind !== "stadium" && facilityLevel(club, kind) >= 95)
+    return "המתקן כבר ברמה הגבוהה ביותר.";
+  if (kind === "stadium" && club.capacity >= 75000) return "אין לאן להרחיב יותר.";
+  if (club.balance < upgradeCost(club, kind)) return "אין מספיק כסף בקופה.";
+  return null;
+}
+
+function startUpgrade(club, kind) {
+  const blocked = canUpgrade(club, kind);
+  if (blocked) return blocked;
+  const spec = D.FACILITIES[kind];
+  const cost = upgradeCost(club, kind);
+  club.balance = Math.round(club.balance - cost);
+  const added = kind === "stadium" ? stadiumExpansion(club) : 0;
+  club.works.push({ kind, weeksLeft: spec.weeks, cost, added });
+  if (kind === "stadium")
+    return `אישרת הרחבה של ${fmt(added)} מקומות ב${club.stadiumName}. ${spec.weeks} שבועות עבודה.`;
+  return `אישרת שדרוג של ${spec.name}. ${spec.weeks} שבועות עבודה.`;
+}
+
+/** מקדם את הבנייה בשבוע ומחזיר הודעות על פרויקטים שהסתיימו. */
+function tickWorks(club) {
+  const messages = [];
+  const remaining = [];
+  for (const work of club.works || []) {
+    work.weeksLeft -= 1;
+    if (work.weeksLeft > 0) { remaining.push(work); continue; }
+    const spec = D.FACILITIES[work.kind];
+    if (work.kind === "stadium") {
+      club.capacity += work.added;
+      messages.push(`🏟️ ההרחבה הושלמה — ${club.stadiumName} מכיל עכשיו ${fmt(club.capacity)} מקומות.`);
+    } else {
+      const before = club[spec.field];
+      club[spec.field] = Math.round(clamp(before + spec.unit, 1, 99));
+      messages.push(`🏗️ ${spec.name} שודרגו: ${Math.round(before)} → ${club[spec.field]}.`);
+    }
+  }
+  club.works = remaining;
+  return messages;
+}
+
+// ---------------------------------------------------------------------------
+// שוק בעלי התפקיד
+// ---------------------------------------------------------------------------
+
+function staffCandidates(rng, club, role, count = 3) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const quality = Math.round(clamp(club.reputation + rng.gauss(4, 16), 12, 95));
+    out.push(staffMember(rng, role, quality));
+  }
+  return out.sort((a, b) => b.quality - a.quality);
+}
+
+/** דמי חתימה = שכר של ארבעה שבועות. */
+function hireStaffMember(club, role, candidate) {
+  const fee = Math.round(candidate.wage) * 4;
+  if (club.balance < fee) return "אין מספיק כסף בקופה לדמי החתימה.";
+  club.balance = Math.round(club.balance - fee);
+  const outgoing = club.staff[role];
+  club.staff[role] = Object.assign({}, candidate);
+  const name = D.STAFF_ROLES[role].name;
+  if (outgoing)
+    return `${candidate.name} מחליף את ${outgoing.name} בתפקיד ${name} (איכות ${candidate.quality}).`;
+  return `${candidate.name} נכנס לתפקיד ${name} (איכות ${candidate.quality}).`;
+}
+
+/** פיצויים = שכר של שמונה שבועות. */
+function fireStaffMember(club, role) {
+  const member = club.staff[role];
+  if (!member) return "המשרה כבר פנויה.";
+  const severance = Math.round(member.wage) * 8;
+  club.balance = Math.round(club.balance - severance);
+  delete club.staff[role];
+  return `${member.name} סיים את תפקידו. פיצויים: ₪${fmt(severance)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -3333,6 +3751,7 @@ class Game {
   startSeason() {
     this.week = 1;
     this.positionLog = [];
+    this.refreshStaffMarket();
     for (const club of Object.values(this.clubs)) club.formLog = [];
     this.fixtures = {}; this.tables = {};
     for (const league of D.LEAGUES) {
@@ -3449,7 +3868,9 @@ class Game {
 
   advanceWeek() {
     const report = { week: this.week, training: [], notes: [], match: null,
-                     personal: null, eventId: null, seasonEnded: false, seasonSummary: null };
+                     personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
+                     attendance: 0, finances: null };
+    this.weekAttendance = 0;
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
@@ -3668,8 +4089,29 @@ class Game {
     }
     const result = simulateMatch(home, away, this.players, this.rng,
       { homeTactics: homeTac, awayTactics: awayTac, competition, neutral });
+    // הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
+    // כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
+    const myHomeClub = this.myClub();
+    if (!neutral && myHomeClub && myHomeClub.cid === home.cid)
+      this.registerAttendance(home, away);
     if (["manager", "coach"].includes(this.stage)) this.tactics.talkBoost = 0;
     return result;
+  }
+
+  /** כמה קהל הגיע למשחק הבית, לפי מיקום בטבלה, יריבה וכושר. */
+  registerAttendance(home, away) {
+    const order = this.standings(home.leagueId);
+    const table = this.tables[home.leagueId] || {};
+    const idx = order.findIndex(row => row.clubId === home.cid);
+    const position = idx >= 0 ? idx + 1 : Math.max(1, Math.round(order.length / 2));
+    const row = table[home.cid];
+    const form = row && row.played
+      ? clamp((row.won * 3 + row.drawn) / (row.played * 3), 0, 1) : 0.5;
+    const attendance = attendanceFor(home, away, this.rng, position,
+                                     Math.max(2, order.length), form);
+    home.lastAttendance = attendance;
+    this.weekAttendance = attendance;
+    return attendance;
   }
 
   selected() {
@@ -3821,8 +4263,127 @@ class Game {
       if (club) base += Math.round(club.reputation * (this.stage === "coach" ? 60 : 260));
       this.earn(base);
     }
+
+    const club = this.myClub();
+    if (club) {
+      report.attendance = this.weekAttendance || 0;
+      const gate = report.attendance ? matchdayIncome(club, report.attendance) : 0;
+      this.finances = weeklyFinances(club, this.players, gate);
+      report.finances = this.finances;
+      this.boardFinancePressure(report, club);
+    }
+
+    // בנייה שהתחלת ממשיכה גם אם עברת מועדון — פשוט לא תיהנה ממנה
+    for (const other of Object.values(this.clubs)) {
+      if (!other.works || !other.works.length) continue;
+      for (const line of tickWorks(other)) {
+        if (club && other.cid === club.cid) {
+          report.notes.push({ icon: "🏗️", text: line });
+          this.log(line);
+        }
+      }
+    }
+
     const played = !!(report.match && me.pid in report.match.result.ratings);
-    weeklyRecovery(me, played, this.rng);
+    weeklyRecovery(me, played, this.rng, club);
+  }
+
+  // ==================================================================
+  // ניהול המועדון: מתקנים, אצטדיון וצוות
+  // ==================================================================
+
+  /** האם אני בעמדה שמאפשרת להוציא כסף של המועדון. */
+  controlsClub() {
+    return ["manager", "director", "owner"].includes(this.stage) && !!this.myClub();
+  }
+
+  /** מרענן את רשימת המועמדים. נקרא בתחילת עונה ואחרי כל גיוס. */
+  refreshStaffMarket(role = null) {
+    const club = this.myClub();
+    if (!club) { this.staffMarket = {}; return; }
+    if (!this.staffMarket) this.staffMarket = {};
+    for (const key of role ? [role] : Object.keys(D.STAFF_ROLES))
+      this.staffMarket[key] = staffCandidates(this.rng, club, key);
+  }
+
+  /** מצב כל מתקן: רמה נוכחית, מחיר השדרוג ומה חוסם אותו. */
+  facilityOptions() {
+    const club = this.myClub();
+    if (!club) return [];
+    return Object.entries(D.FACILITIES).map(([kind, spec]) => {
+      const work = workInProgress(club, kind);
+      return {
+        kind, name: spec.name, effect: spec.effect,
+        level: Math.round(kind === "stadium" ? club.capacity : facilityLevel(club, kind)),
+        cost: upgradeCost(club, kind),
+        weeks: spec.weeks,
+        added: kind === "stadium" ? stadiumExpansion(club) : 0,
+        building: work ? work.weeksLeft : 0,
+        blocked: canUpgrade(club, kind),
+      };
+    });
+  }
+
+  upgradeFacility(kind) {
+    if (!D.FACILITIES[kind]) return "אין מתקן כזה.";
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מחליט על תקציב המועדון.";
+    const club = this.myClub();
+    const message = startUpgrade(club, kind);
+    if (!workInProgress(club, kind)) return message;
+    this.log(message);
+    return message;
+  }
+
+  hireStaff(role, index) {
+    if (!D.STAFF_ROLES[role]) return "אין תפקיד כזה.";
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מגייס צוות.";
+    const candidates = (this.staffMarket && this.staffMarket[role]) || [];
+    if (index < 0 || index >= candidates.length) return "המועמד כבר לא זמין.";
+    const message = hireStaffMember(this.myClub(), role, candidates[index]);
+    if (message.includes("אין מספיק כסף")) return message;
+    this.refreshStaffMarket(role);
+    this.log(message);
+    return message;
+  }
+
+  releaseStaff(role) {
+    if (!this.controlsClub()) return "בתפקיד הנוכחי אתה לא מפטר צוות.";
+    const message = fireStaffMember(this.myClub(), role);
+    if (message !== "המשרה כבר פנויה.") {
+      this.refreshStaffMarket(role);
+      this.log(message);
+    }
+    return message;
+  }
+
+  /** תמונת המצב הכספית של המועדון שלי. */
+  clubFinanceSummary() {
+    const club = this.myClub();
+    if (!club) return null;
+    return {
+      balance: Math.round(club.balance),
+      commercial: commercialIncome(club),
+      wages: wageBill(club, this.players),
+      staffWages: staffWageBill(club),
+      capacity: club.capacity,
+      stadium: club.stadiumName,
+      attendance: club.lastAttendance,
+      ticket: ticketPrice(club),
+      lastWeek: this.finances || null,
+    };
+  }
+
+  /** קופה בגירעון שוחקת את אמון ההנהלה במאמן. */
+  boardFinancePressure(report, club) {
+    if (!["manager", "director", "owner"].includes(this.stage)) return;
+    if (club.balance < 0) {
+      club.boardConfidence = clamp(club.boardConfidence - 0.8, 0, 100);
+      if (this.week % 4 === 0)
+        report.notes.push({ icon: "💸",
+          text: `הקופה במינוס ₪${fmt(Math.abs(club.balance))}. ההנהלה לא אוהבת את זה.` });
+    } else if (club.balance > commercialIncome(club) * 26) {
+      club.boardConfidence = clamp(club.boardConfidence + 0.2, 0, 100);
+    }
   }
 
   // ==================================================================
@@ -4618,6 +5179,7 @@ class Game {
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
       positionLog: this.positionLog,
+      staffMarket: this.staffMarket, finances: this.finances,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
   }
@@ -4636,6 +5198,7 @@ class Game {
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
       positionLog: raw.positionLog || [],
+      staffMarket: raw.staffMarket || {}, finances: raw.finances || null,
     });
     g.rng = Rng.fromState(raw.rngState);
     PID_COUNTER = Math.max(PID_COUNTER, raw.pidCounter || 0);
@@ -5322,6 +5885,24 @@ function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
 
 // -- ניווט --------------------------------------------------------------
 
+/** הודעה קצרה שנעלמת מעצמה — משוב על פעולה שבוצעה. */
+let toastTimer = null;
+function toast(message) {
+  if (!message) return;
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.className = "toast";
+    el.setAttribute("role", "status");
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("on"), 3600);
+}
+
 function go(next, data = null) {
   view = next;
   viewData = data;
@@ -5572,6 +6153,7 @@ function appbar() {
 function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
+  if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
@@ -5592,8 +6174,145 @@ function screenMain() {
   if (view === "squad") return appbar() + screenSquad();
   if (view === "news") return appbar() + screenNews();
   if (view === "tactics") return appbar() + screenTactics();
+  if (view === "club") return appbar() + screenClub();
   if (view === "editor") return appbar() + screenEditor();
   return appbar() + screenHub() + dock(true);
+}
+
+/** שורת כסף: תווית, סכום וסימן. */
+function moneyRow(label, amount, kind) {
+  const sign = amount > 0 ? "+" : amount < 0 ? "−" : "";
+  if (!amount) kind = "";
+  return `<div class="row money ${kind || ""}">
+    <span class="nm">${esc(label)}</span>
+    <span class="val num">${sign}₪${fmt(Math.abs(amount))}</span>
+  </div>`;
+}
+
+/**
+ * מסך המועדון: אצטדיון, קופה, מתקנים וצוות מקצועי.
+ * כשאתה שחקן אתה רואה הכל אבל לא נוגע; כמנג'ר, מנהל או בעלים — אתה מחליט.
+ */
+function screenClub() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אתה לא משויך למועדון כרגע.</div></div>`;
+  const money = game.clubFinanceSummary();
+  const boss = game.controlsClub();
+  const last = money.lastWeek;
+  if (!viewData) viewData = {};
+  const openRole = viewData.staffRole;
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.name)}</span>
+        <span class="r">${esc(D.LEAGUES.find(l => l.id === club.leagueId).name)}</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(club, 46)}
+          <div class="kit-meta">
+            <span class="nm">🏟️ ${esc(club.stadiumName)}</span>
+            <span class="muted">${fmt(club.capacity)} מקומות · כרטיס ₪${fmt(money.ticket)}</span>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${fmt(money.attendance)}</div><div class="l">קהל אחרון</div></div>
+          <div class="stat"><div class="n">${money.attendance
+            ? Math.round(money.attendance / club.capacity * 100) + "%" : "—"}</div>
+            <div class="l">תפוסה</div></div>
+          <div class="stat"><div class="n">${Math.round(club.fanSupport)}</div><div class="l">אהדה</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הקופה</span>
+        <span class="r num ${money.balance < 0 ? "bad" : ""}">₪${fmt(money.balance)}</span></div>
+      <div class="panel-body tight">
+        ${last ? `
+          ${moneyRow("שידורים וחסויות", last.commercial, "in")}
+          ${moneyRow("יום משחק", last.matchday, "in")}
+          ${moneyRow("שכר שחקנים", -last.wages, "out")}
+          ${moneyRow("שכר צוות", -last.staff, "out")}
+          <hr class="rule">
+          ${moneyRow("מאזן השבוע", last.net, last.net >= 0 ? "in" : "out")}
+        ` : `<div class="muted">המאזן הראשון יופיע אחרי השבוע הבא.</div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מתקנים</span>
+        <span class="r">${boss ? "אתה מחליט" : "החלטה של ההנהלה"}</span></div>
+      <div class="panel-body">
+        ${game.facilityOptions().map(f => `
+          <div class="facility">
+            <div class="facility-top">
+              <span class="nm">${esc(f.name)}</span>
+              <span class="val num">${f.kind === "stadium" ? fmt(f.level) : f.level}</span>
+            </div>
+            ${f.kind === "stadium" ? "" :
+              `<span class="bar"><i style="width:${f.level}%"></i></span>`}
+            <div class="muted">${esc(f.effect)}</div>
+            ${f.building
+              ? `<div class="build">🏗️ בבנייה — עוד ${f.building} שבועות</div>`
+              : boss
+                ? `<button class="mini-btn wide" data-upgrade="${f.kind}"
+                     ${f.blocked ? "disabled" : ""}>
+                     ${f.kind === "stadium"
+                       ? `<span class="num">+${fmt(f.added)}</span> מקומות`
+                       : `<span class="num">+${D.FACILITIES[f.kind].unit}</span>`}
+                     · <span class="num">₪${fmt(f.cost)}</span>
+                     · <span class="num">${f.weeks}</span> שב'
+                   </button>
+                   ${f.blocked ? `<div class="blocked">${esc(f.blocked)}${
+                     f.blocked === "אין מספיק כסף בקופה."
+                       ? ` חסר ₪${fmt(f.cost - money.balance)}.` : ""}</div>` : ""}`
+                : `<div class="muted">שדרוג: ₪${fmt(f.cost)} · ${f.weeks} שבועות</div>`}
+          </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הצוות המקצועי</span>
+        <span class="r num">₪${fmt(money.staffWages)}/שבוע</span></div>
+      <div class="panel-body">
+        ${Object.entries(D.STAFF_ROLES).map(([role, spec]) => {
+          const member = club.staff[role];
+          const open = openRole === role;
+          const candidates = (game.staffMarket && game.staffMarket[role]) || [];
+          return `
+          <div class="staff">
+            <div class="staff-top">
+              <span class="nm">${esc(spec.name)}</span>
+              ${member
+                ? `<span class="val num">${member.quality}</span>`
+                : `<span class="val muted">פנוי</span>`}
+            </div>
+            <div class="muted">${member
+              ? `${esc(member.name)} · ₪${fmt(member.wage)}/שבוע`
+              : "אין מי שממלא את התפקיד."}</div>
+            <div class="muted small">${esc(spec.effect)}</div>
+            ${boss ? `
+              <div class="staff-actions">
+                <button class="mini-btn" data-staffrole="${role}">
+                  ${open ? "סגור" : member ? "להחליף" : "לגייס"}</button>
+                ${member ? `<button class="mini-btn danger" data-fire="${role}">לפטר</button>` : ""}
+              </div>
+              ${open ? `<div class="candidates">
+                ${candidates.length ? candidates.map((c, i) => `
+                  <button class="candidate" data-hire="${role}" data-idx="${i}">
+                    <span class="nm">${esc(c.name)}</span>
+                    <span class="q num">${c.quality}</span>
+                    <span class="w num">₪${fmt(c.wage)}/שב'</span>
+                    <span class="fee">חתימה ₪${fmt(c.wage * 4)}</span>
+                  </button>`).join("")
+                  : `<div class="muted">אין מועמדים כרגע.</div>`}
+              </div>` : ""}
+            ` : ""}
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>`;
 }
 
 /** מסך טקטיקה — מגרש עם ההרכב ובחירות המנג'ר. */
@@ -5817,10 +6536,44 @@ function screenHub() {
       </div>
     </div>
 
+    ${clubSnip()}
     ${tableSnip}
     ${messages}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
+  </div>`;
+}
+
+/** תקציר המועדון בסקירה: קופה, קהל ובנייה בתהליך. */
+function clubSnip() {
+  const club = game.myClub();
+  if (!club) return "";
+  const money = game.clubFinanceSummary();
+  const works = club.works || [];
+  const last = money.lastWeek;
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">המועדון</span>
+      <span class="r"><button class="mini-btn" data-go="club">לפרטים</button></span></div>
+    <div class="panel-body tight">
+      <div class="row">
+        <span class="nm">🏟️ ${esc(club.stadiumName)}</span>
+        <span class="val num">${fmt(club.capacity)}</span>
+      </div>
+      <div class="row">
+        <span class="nm">קופת המועדון</span>
+        <span class="val num ${money.balance < 0 ? "bad" : ""}">₪${fmt(money.balance)}</span>
+      </div>
+      ${last ? `<div class="row">
+        <span class="nm">מאזן השבוע</span>
+        <span class="val num ${last.net < 0 ? "bad" : "good"}">${
+          last.net < 0 ? "−" : "+"}₪${fmt(Math.abs(last.net))}</span>
+      </div>` : ""}
+      ${works.length ? works.map(w => `<div class="row">
+        <span class="nm">🏗️ ${esc(D.FACILITIES[w.kind].name)}</span>
+        <span class="val num">${w.weeksLeft} שב'</span>
+      </div>`).join("") : ""}
+    </div>
   </div>`;
 }
 
@@ -5865,6 +6618,9 @@ function screenWeek() {
           club && club.cid === away.cid ? "mine" : ""}">${esc(away.name)}</span></div>
       </div>
       ${penalties ? `<div class="muted center">הוכרע בפנדלים — ${esc(penalties)}</div>` : ""}
+      ${report.attendance ? `<div class="muted center">🏟️ <span class="num">${
+        fmt(report.attendance)}</span> צופים · הכנסות <span class="num">₪${
+        fmt(report.finances ? report.finances.matchday : 0)}</span></div>` : ""}
       ${goals.length ? goalTimeline(result, home, away, me.pid) : ""}
       ${goals.length ? `<div class="goals">${goals.map((e, i) => `
         <div class="goal-row ${e.playerId === me.pid ? "mine" : ""}" style="animation-delay:${i * 60}ms">
@@ -6448,6 +7204,34 @@ function bind() {
     el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
   app.querySelectorAll("[data-press]").forEach(el =>
     el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+  app.querySelectorAll("[data-upgrade]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.upgradeFacility(el.dataset.upgrade);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-staffrole]").forEach(el =>
+    el.addEventListener("click", () => {
+      viewData.staffRole = viewData.staffRole === el.dataset.staffrole
+        ? null : el.dataset.staffrole;
+      render();
+    }));
+  app.querySelectorAll("[data-hire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.hireStaff(el.dataset.hire, +el.dataset.idx);
+      viewData.staffRole = null;
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-fire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = game.releaseStaff(el.dataset.fire);
+      saveGame();
+      toast(message);
+      render();
+    }));
 
   const nameInput = $("#pname");
   if (nameInput) nameInput.addEventListener("input", e => { viewData.name = e.target.value; });

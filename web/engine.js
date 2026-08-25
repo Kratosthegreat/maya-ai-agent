@@ -194,6 +194,48 @@ function assignNumber(club, players, player) {
   return 0;
 }
 
+function stadiumNameFor(nickname, rng) {
+  const word = rng.choice(D.STADIUM_WORDS);
+  if (rng.random() < 0.45) return `${word} ${rng.choice(D.STADIUM_SUFFIX)}`;
+  return `${word} ${nickname}`;
+}
+
+function capacityFor(reputation, rng) {
+  const base = 900 + Math.pow(reputation / 10, 3.05) * 55;
+  const raw = base * rng.uniform(0.84, 1.16);
+  return Math.round(clamp(raw, 1500, 42000) / 500) * 500;
+}
+
+function staffMember(rng, role, quality) {
+  const q = Math.round(clamp(quality, 8, 96));
+  return {
+    name: rng.choice(D.STAFF_NAMES),
+    quality: q,
+    wage: Math.round(q * D.STAFF_ROLES[role].wagePerPoint * rng.uniform(0.85, 1.2)),
+  };
+}
+
+/** מועדון קטן לא תמיד מאייש את כל התפקידים. */
+function generateStaff(rng, reputation) {
+  const staff = {};
+  for (const role of Object.keys(D.STAFF_ROLES)) {
+    if (reputation < 35 && rng.random() < 0.45) continue;
+    staff[role] = staffMember(rng, role, Math.round(reputation + rng.gauss(0, 11)));
+  }
+  return staff;
+}
+
+function staffQuality(club, role) {
+  const member = club && club.staff ? club.staff[role] : null;
+  return member ? member.quality : 0;
+}
+
+/** איכות הטיפול הרפואי במועדון, 0..1 — מרכז רפואי ופיזיותרפיסט. */
+function medicalCare(club) {
+  if (!club) return 0.45;
+  return clamp(((club.medicalCentre || 45) + staffQuality(club, "physio")) / 200, 0, 1);
+}
+
 function generateWorld(seed) {
   const rng = new Rng(seed);
   const clubs = {}, players = {}, usedNames = new Set();
@@ -203,6 +245,7 @@ function generateWorld(seed) {
       wageBudget: Math.round(budget * 1000000 / 10),
       trainingFacilities: Math.round(clamp(rep + rng.gauss(0, 8), 15, 99)),
       youthAcademy: Math.round(clamp(rep + rng.gauss(0, 12), 15, 99)),
+      medicalCentre: Math.round(clamp(rep + rng.gauss(0, 10), 15, 99)),
       managerName: rng.choice(D.MANAGER_NAMES),
       managerTrust: 50,
       boardConfidence: 60,
@@ -211,7 +254,17 @@ function generateWorld(seed) {
       squad: [],
       seasonExpectation: "אמצע טבלה",
       trophies: [],
+      stadiumName: "",
+      capacity: 12000,
+      balance: 0,
+      lastAttendance: 0,
+      staff: {},
+      works: [],
     };
+    club.stadiumName = stadiumNameFor(nickname, rng);
+    club.capacity = capacityFor(rep, rng);
+    club.balance = Math.round(budget * 1000000 * rng.uniform(0.18, 0.42));
+    club.staff = generateStaff(rng, rep);
     for (const position of D.SQUAD_TEMPLATE) {
       const p = generatePlayer(rng, club, position, { usedNames });
       players[p.pid] = p;
@@ -333,7 +386,13 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   let hm = hs.mid;
   let aa = as.att * aMent[1] * (1 + aPress[1]);
   let ad = as.def * aMent[2] * (1 + aPress[2]);
-  const am = as.mid;
+  let am = as.mid;
+
+  // אנליסט: קריאת היריבה מתורגמת ליתרון קטן בכל הקווים (עד 4%)
+  const hEdge = 1 + staffQuality(home, "analyst") / 2400;
+  const aEdge = 1 + staffQuality(away, "analyst") / 2400;
+  ha *= hEdge; hd *= hEdge; hm *= hEdge;
+  aa *= aEdge; ad *= aEdge; am *= aEdge;
 
   if (!neutral) {
     ha *= 1 + home.fanSupport / 640;
@@ -393,8 +452,8 @@ function simulateMatch(home, away, players, rng, opts = {}) {
 
   applyDiscipline(result, homeLineup, home.cid, players, rng, hPress[3]);
   applyDiscipline(result, awayLineup, away.cid, players, rng, aPress[3]);
-  applyInjuries(result, homeLineup, home.cid, players, rng);
-  applyInjuries(result, awayLineup, away.cid, players, rng);
+  applyInjuries(result, homeLineup, home.cid, players, rng, home);
+  applyInjuries(result, awayLineup, away.cid, players, rng, away);
   ratePlayers(result, homeLineup, home.cid, players, rng);
   ratePlayers(result, awayLineup, away.cid, players, rng);
 
@@ -467,7 +526,8 @@ function applyDiscipline(result, lineup, clubId, players, rng, pressFactor) {
   }
 }
 
-function applyInjuries(result, lineup, clubId, players, rng) {
+function applyInjuries(result, lineup, clubId, players, rng, club = null) {
+  const care = medicalCare(club);
   for (const pid of lineup) {
     const p = players[pid];
     if (!p) continue;
@@ -477,7 +537,8 @@ function applyInjuries(result, lineup, clubId, players, rng) {
     if (hasTrait(p, "glass")) chance *= 2.2;
     if (rng.random() < chance) {
       const [name, low, high] = rng.choice(D.INJURY_TYPES);
-      const weeks = rng.randint(low, high);
+      let weeks = rng.randint(low, high);
+      if (care > 0.5 && weeks > 1 && rng.random() < (care - 0.5) * 1.6) weeks -= 1;
       p.injuryWeeks = weeks;
       p.injuryName = name;
       p.fitness = Math.min(p.fitness, 55);
@@ -561,13 +622,16 @@ function addGrowth(p, attr, delta) {
 function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const messages = [];
   const facilities = club ? club.trainingFacilities : 45;
+  const assistant = club ? staffQuality(club, "assistant") : 0;
+  const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
+  const care = medicalCare(club);
 
   if (focus === "rest") {
-    p.fitness = clamp(p.fitness + 26, 0, 100);
+    p.fitness = clamp(p.fitness + 26 + fitnessCoach / 14, 0, 100);
     p.morale = clamp(p.morale + 1.5, 0, 100);
     if (p.injuryWeeks > 0) {
       p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
-      if (rng.random() < 0.3) {
+      if (rng.random() < 0.20 + care * 0.34) {
         p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
         messages.push({ icon: "🏥", text: "השיקום מתקדם מהר מהצפוי." });
       }
@@ -611,6 +675,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const curve = ageFactor(p.age);
   let base = 0.30 * intensity;
   base *= 0.55 + facilities / 110;
+  base *= 1 + assistant / 420;          // עוזר מאמן — עד 23% יותר
   base *= Math.max(0.15, curve);
   base *= 1 + clamp(gap, -10, 25) * 0.05;
   if (hasTrait(p, "workhorse")) base *= 1.30;
@@ -633,7 +698,8 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
     messages.push({ icon: "📈", text:
       `${D.ATTRIBUTE_NAMES_HE[focus]} עלתה ב-${gained} (עכשיו ${p.attributes[focus]}).` });
   }
-  if (intensity > 1.15 && rng.random() < 0.035 * intensity) {
+  const injuryRisk = 0.035 * intensity * (1 - fitnessCoach / 260);
+  if (intensity > 1.15 && rng.random() < injuryRisk) {
     const weeks = rng.randint(1, 3);
     p.injuryWeeks = weeks;
     p.injuryName = "עומס יתר באימון";
@@ -642,12 +708,17 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   return messages;
 }
 
-function weeklyRecovery(p, played, rng) {
+function weeklyRecovery(p, played, rng, club = null) {
+  const care = medicalCare(club);
   if (p.injuryWeeks > 0) {
     p.injuryWeeks -= 1;
+    if (p.injuryWeeks > 0 && rng.random() < (care - 0.45) * 0.55) p.injuryWeeks -= 1;
     if (p.injuryWeeks === 0) { p.injuryName = ""; p.fitness = clamp(p.fitness + 15, 0, 100); }
   }
-  if (!played) p.fitness = clamp(p.fitness + 9, 0, 100);
+  if (!played) {
+    const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
+    p.fitness = clamp(p.fitness + 9 + fitnessCoach / 22, 0, 100);
+  }
   p.form = clamp(p.form + (played ? 0 : rng.uniform(-1.5, 1.5)), 5, 99);
 }
 
