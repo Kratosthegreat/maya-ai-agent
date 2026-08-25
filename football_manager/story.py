@@ -15,7 +15,8 @@ import random
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
-from .models import clamp
+from . import commercial as CM
+from .models import clamp, gain_reputation
 
 
 @dataclass
@@ -37,6 +38,8 @@ class StoryEvent:
     stages: Tuple[str, ...] = ()
     weight: float = 1.0
     once: bool = True
+    # אירוע חוזר לא אמור לקרות שוב מיד. ברירת המחדל: פעם בעונה בערך.
+    cooldown: int = 30
 
 
 REGISTRY: List[StoryEvent] = []
@@ -68,7 +71,7 @@ def _fans(game, delta: float) -> None:
 
 
 def _rep(game, delta: float) -> None:
-    game.me.reputation = clamp(game.me.reputation + delta, 1, 99)
+    gain_reputation(game.me, delta)
 
 
 def _attr(game, attr: str, delta: float) -> None:
@@ -114,6 +117,7 @@ register(StoryEvent(
     stages=("youth",),
     weight=4.0,
     once=False,
+    cooldown=24,
     condition=lambda g: g.me.age <= 15,
     body=lambda g: (
         "מחר גמר מחוזי. מחר גם מבחן במתמטיקה.\n"
@@ -190,6 +194,7 @@ register(StoryEvent(
     stages=("youth",),
     weight=3.5,
     once=False,
+    cooldown=10,
     condition=lambda g: g.me.age <= 15 and g.week >= 6,
     body=lambda g: (
         "רשימת הנוסעים לטורניר תלויה על דלת חדר ההלבשה.\n"
@@ -323,6 +328,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=3.0,
     once=False,
+    cooldown=12,
     condition=lambda g: g.weeks_without_start() >= 4 and g.me.age >= 19,
     body=lambda g: (
         f"חמישה משחקים. אפס דקות.\n"
@@ -350,6 +356,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=2.0,
     once=False,
+    cooldown=20,
     condition=lambda g: g.week >= 3,
     body=lambda g: (
         f"העיר לא ישנה. שלטי חוצות, אוהדים מחוץ למתחם האימונים,\n"
@@ -422,6 +429,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=4.5,
     once=False,
+    cooldown=34,
     condition=lambda g: g.big_club_suitor() is not None and g.week in (11, 12, 13),
     body=lambda g: (
         f"הסוכן שלך מתקשר בשתיים בלילה.\n"
@@ -467,6 +475,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=3.0,
     once=False,
+    cooldown=40,
     condition=lambda g: g.me.injury_weeks >= 8,
     body=lambda g: (
         f"{g.me.injury_name}. {g.me.injury_weeks} שבועות, אם הכל ילך טוב.\n"
@@ -487,29 +496,202 @@ register(StoryEvent(
     ],
 ))
 
+# --- החיים המסחריים -------------------------------------------------------
+#
+# ההצעות נבנות בזמן אמת מ-commercial.py לפי מי שאתה עכשיו: מוניטין,
+# שערים, כריזמה והמועדון. לכן אותו אירוע נראה אחרת בגיל 18 ובגיל 27.
+
+def _cool(game, key: str, weeks: int) -> bool:
+    """האם עבר מספיק זמן מאז הפעם הקודמת של האירוע הזה."""
+    last = game.flags.get(f"cool_{key}")
+    now = game.year * 100 + game.week
+    if last is None:
+        return True
+    gap = (now // 100 - last // 100) * 43 + (now % 100 - last % 100)
+    return gap >= weeks
+
+
+def _mark(game, key: str) -> None:
+    game.flags[f"cool_{key}"] = game.year * 100 + game.week
+
+
+def _pending_deal(game):
+    """ההצעה שנבנתה כשהאירוע נדרך. נשמרת כדי שהטקסט והתוצאה יתאימו."""
+    return game.flags.get("pending_deal")
+
+
+def _build_deal(game):
+    club = game.my_club
+    match_week = game.my_fixture() is not None
+    offer = CM.sponsor_offer(game.me, game.rng,
+                             club.reputation if club else 30, match_week)
+    if offer:
+        game.flags["pending_deal"] = offer
+    return offer
+
+
 register(StoryEvent(
     eid="sponsor_deal",
-    title="חוזה פרסום",
-    stages=("player", "veteran"),
-    weight=2.2,
+    title="טלפון ממחלקת השיווק",
+    stages=("academy", "player", "veteran"),
+    weight=1.3,
     once=False,
-    condition=lambda g: g.me.reputation >= 45,
-    body=lambda g: (
-        "חברת נעליים שמה על השולחן חוזה שנתי.\n"
-        "הכסף מכובד. התנאי: שלושה ימי צילומים בעונה, אחד מהם בשבוע של משחק."
-    ),
+    cooldown=16,
+    condition=lambda g: (_cool(g, "sponsor", 14) and CM.marketability(
+        g.me, g.my_club.reputation if g.my_club else 30) >= 12),
+    body=lambda g: _sponsor_body(g),
     choices=[
-        Choice("לחתום",
-               lambda g: (g.earn_money(450_000), g.me.__setattr__(
-                   "media_skill", clamp(g.me.media_skill + 6, 0, 100)),
-                   _trust(g, -3),
-                   "חתמת. הצטלמת. המאמן ראה את הפוסטר בכניסה למתחם ולא חייך.")[-1],
-               hint="₪450,000"),
-        Choice("לסרב — לא בשבוע של משחק",
-               lambda g: (_trust(g, 5), _attr(g, "mental", 0.5),
-                          "סירבת. הסוכן כעס. הצוות המקצועי לא.")[-1]),
+        Choice("לחתום", lambda g: _sponsor_sign(g), hint="כסף וכריזמה"),
+        Choice("לסרב", lambda g: _sponsor_decline(g)),
     ],
 ))
+
+
+def _sponsor_body(game) -> str:
+    offer = _build_deal(game)
+    if not offer:
+        return ""
+    lines = [
+        f"{offer['brand']} ({offer['tier_he']}) רוצים אותך על {offer['kind_he']}.",
+        "",
+        CM.deal_summary(offer),
+    ]
+    if offer["clashes"]:
+        lines.append("אחד מימי הצילומים נופל בשבוע של משחק.")
+    else:
+        lines.append("הצילומים בהפסקת הליגה — לא פוגע בשום דבר.")
+    return "\n".join(lines)
+
+
+def _sponsor_sign(game) -> str:
+    _mark(game, "sponsor")
+    offer = _pending_deal(game)
+    if not offer:
+        return "ההצעה ירדה מהשולחן."
+    total = offer["amount"] * offer["years"]
+    game.earn_money(total)
+    game.me.media_skill = clamp(game.me.media_skill + offer["media_gain"], 0, 100)
+    gain_reputation(game.me, offer["media_gain"] * 0.25)
+    game.flags["pending_deal"] = None
+    if offer["clashes"]:
+        _trust(game, -3)
+        return (f"חתמת עם {offer['brand']} על ₪{total:,}. "
+                "יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.")
+    return (f"חתמת עם {offer['brand']} על ₪{total:,}. "
+            "הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.")
+
+
+def _sponsor_decline(game) -> str:
+    _mark(game, "sponsor")
+    offer = _pending_deal(game)
+    game.flags["pending_deal"] = None
+    if offer and offer["clashes"]:
+        _trust(game, 4)
+        _attr(game, "mental", 0.4)
+        return "סירבת בגלל השבוע של המשחק. הצוות המקצועי שמע, וזכר."
+    return "סירבת. הסוכן שלך לא הבין למה, אבל זה הכסף שלך."
+
+
+register(StoryEvent(
+    eid="media_job",
+    title="הצעה מהתקשורת",
+    stages=("player", "veteran"),
+    weight=0.9,
+    once=False,
+    cooldown=22,
+    condition=lambda g: (_cool(g, "media", 20) and CM.media_offer(
+        g.me, random.Random(g.week * 31 + g.year)) is not None),
+    body=lambda g: _media_body(g),
+    choices=[
+        Choice("לקחת את זה", lambda g: _media_accept(g), hint="כסף וחשיפה"),
+        Choice("להישאר מחוץ לאור הזרקורים", lambda g: _media_decline(g)),
+    ],
+))
+
+
+def _media_body(game) -> str:
+    offer = CM.media_offer(game.me, game.rng)
+    if not offer:
+        return ""
+    game.flags["pending_media"] = offer
+    return (f"{offer['name']}.\n\n"
+            f"₪{offer['amount']:,}. זה גם אומר שהפנים שלך יהיו בכל מקום, "
+            "וזה חרב פיפיות: העיתונות אוהבת את מי שמדבר, עד שהיא לא.")
+
+
+def _media_accept(game) -> str:
+    _mark(game, "media")
+    offer = game.flags.get("pending_media")
+    if not offer:
+        return "ההצעה ירדה."
+    game.earn_money(offer["amount"])
+    game.me.media_skill = clamp(game.me.media_skill + 7, 0, 100)
+    gain_reputation(game.me, 2)
+    game.flags["pending_media"] = None
+    if game.rng.random() < 0.3:
+        _trust(game, -2)
+        return (f"לקחת. ₪{offer['amount']:,} בכיס, והמאמן שאל אותך "
+                "אם אתה שחקן או פרשן.")
+    return f"לקחת. ₪{offer['amount']:,}, וכולם ראו אותך."
+
+
+def _media_decline(game) -> str:
+    _mark(game, "media")
+    game.flags["pending_media"] = None
+    _trust(game, 2)
+    _attr(game, "mental", 0.3)
+    return "ויתרת. פחות רעש, יותר אימונים."
+
+
+register(StoryEvent(
+    eid="agent_pitch",
+    title="סוכן עם הצעה",
+    stages=("player", "veteran"),
+    weight=1.1,
+    once=False,
+    cooldown=26,
+    condition=lambda g: (_cool(g, "agent", 24) and g.my_club is not None
+                         and g.me.reputation >= 30
+                         and g.me.contract.years_left <= 2),
+    body=lambda g: _agent_body(g),
+    choices=[
+        Choice("לתת לו לעבוד", lambda g: _agent_accept(g), hint="פותח דלת למעבר"),
+        Choice("אני מסודר איפה שאני", lambda g: _agent_decline(g)),
+    ],
+))
+
+
+def _agent_body(game) -> str:
+    pitch = CM.agent_pitch(game.me, game.rng, list(game.clubs.values()), game.my_club)
+    if not pitch:
+        return ""
+    game.flags["pending_agent"] = pitch
+    return (f"{pitch['agent']} תפס אותך אחרי אימון.\n\n"
+            f"\"יש לי קשר ב{pitch['club_name']}. אתה מקבל היום "
+            f"₪{game.me.contract.wage:,} לשבוע — שם מדברים על "
+            f"₪{pitch['wage']:,}. תן לי לעבוד.\"\n\n"
+            f"העמלה שלו: ₪{pitch['fee']:,}.")
+
+
+def _agent_accept(game) -> str:
+    _mark(game, "agent")
+    pitch = game.flags.get("pending_agent")
+    if not pitch:
+        return "הסוכן נעלם."
+    game.spend_money(pitch["fee"])
+    game.set_flag("agent_target", pitch["club"])
+    game.flags["pending_agent"] = None
+    _morale(game, 3)
+    return (f"שילמת לו מקדמה. הוא כבר מדבר עם {pitch['club_name']} — "
+            "בחלון ההעברות זה יהיה על השולחן.")
+
+
+def _agent_decline(game) -> str:
+    _mark(game, "agent")
+    game.flags["pending_agent"] = None
+    _trust(game, 3)
+    return "אמרת לו שאתה מסודר. הידיעה הזו הגיעה למאמן, והוא חייך."
+
 
 register(StoryEvent(
     eid="contract_talks",
@@ -517,6 +699,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=8.0,
     once=False,
+    cooldown=8,
     condition=lambda g: g.me.contract.years_left <= 0 and g.my_club is not None,
     body=lambda g: (
         f"החוזה שלך נגמר בסוף העונה.\n"
@@ -543,6 +726,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=2.0,
     once=False,
+    cooldown=30,
     condition=lambda g: g.my_club is not None and g.my_club.manager_trust <= 40,
     body=lambda g: (
         f"חצי מהקבוצה רוצה ש{g.my_club.manager_name} ילך.\n"
@@ -571,6 +755,7 @@ register(StoryEvent(
     stages=("player", "veteran"),
     weight=2.0,
     once=False,
+    cooldown=34,
     condition=lambda g: g.me.age >= 26 and g.rival_youngster() is not None,
     body=lambda g: (
         f"{g.rival_youngster().name}, בן {g.rival_youngster().age}, נכנס לקבוצה.\n"
@@ -599,6 +784,7 @@ register(StoryEvent(
     stages=("veteran",),
     weight=3.0,
     once=False,
+    cooldown=30,
     condition=lambda g: g.me.age >= 32,
     body=lambda g: (
         f"אתה בן {g.me.age}. הבוקר לקח לך עשרים דקות לרדת מהמיטה.\n"
@@ -624,6 +810,7 @@ register(StoryEvent(
     stages=("veteran",),
     weight=9.0,
     once=False,
+    cooldown=20,
     condition=lambda g: g.retirement_ready(),
     body=lambda g: (
         f"{g.me.age}. {g.me.career.apps + g.me.season.apps} משחקים בקריירה.\n"
@@ -722,6 +909,7 @@ register(StoryEvent(
     stages=("manager",),
     weight=4.0,
     once=False,
+    cooldown=12,
     condition=lambda g: g.week in (6, 13, 20),
     body=lambda g: (
         f"היו\"ר פורש טבלה על השולחן.\n"
@@ -746,6 +934,7 @@ register(StoryEvent(
     stages=("manager",),
     weight=3.0,
     once=False,
+    cooldown=34,
     condition=lambda g: g.squad_star() is not None,
     body=lambda g: (
         f"{g.squad_star().name} ({g.squad_star().overall}) נכנס למשרד עם הסוכן.\n"
@@ -770,6 +959,7 @@ register(StoryEvent(
     stages=("manager",),
     weight=3.0,
     once=False,
+    cooldown=40,
     condition=lambda g: g.my_club is not None,
     body=lambda g: (
         "מאמן הנוער מביא לך שם.\n"
@@ -790,6 +980,7 @@ register(StoryEvent(
     stages=("manager",),
     weight=6.0,
     once=False,
+    cooldown=22,
     condition=lambda g: g.my_club is not None and g.my_club.board_confidence <= 32,
     body=lambda g: (
         f"\"{g.me.name} על הכוונת\" — כותרת ראשית.\n"
@@ -814,6 +1005,7 @@ register(StoryEvent(
     stages=("manager",),
     weight=4.0,
     once=False,
+    cooldown=34,
     condition=lambda g: g.manager_suitor() is not None,
     body=lambda g: (
         f"{g.manager_suitor().name} רוצים אותך.\n"
@@ -919,6 +1111,20 @@ register(StoryEvent(
 # בחירת אירוע
 # ---------------------------------------------------------------------------
 
+def weeks_since(game, eid: str) -> Optional[int]:
+    """כמה שבועות עברו מאז שהאירוע הזה נורה. None אם מעולם לא."""
+    stamp = game.flags.get("last_fired", {}).get(eid)
+    if stamp is None:
+        return None
+    return (game.year - stamp[0]) * 43 + (game.week - stamp[1])
+
+
+def note_fired(game, eid: str) -> None:
+    """מסמן מתי אירוע נורה, כדי שלא יחזור על עצמו בשבוע הבא."""
+    log = game.flags.setdefault("last_fired", {})
+    log[eid] = [game.year, game.week]
+
+
 def eligible_events(game) -> List[StoryEvent]:
     """מחזיר את כל האירועים שיכולים לקרות עכשיו."""
     out = []
@@ -927,6 +1133,10 @@ def eligible_events(game) -> List[StoryEvent]:
             continue
         if event.once and event.eid in game.fired_events:
             continue
+        if not event.once:
+            gap = weeks_since(game, event.eid)
+            if gap is not None and gap < event.cooldown:
+                continue
         try:
             if not event.condition(game):
                 continue

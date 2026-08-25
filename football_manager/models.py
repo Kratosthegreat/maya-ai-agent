@@ -119,7 +119,8 @@ class Player:
     nationality: str = "ישראל"
     attributes: Dict[str, int] = field(default_factory=dict)
     growth: Dict[str, float] = field(default_factory=dict)  # שברי התקדמות באימונים
-    potential: int = 70          # תקרת הדירוג הכללי
+    potential: int = 70          # תקרת הדירוג הנוכחית — זזה עם ההתפתחות
+    ceiling: int = 70            # התקרה המוחלטת שאי אפשר לעבור
     club_id: Optional[str] = None
     contract: Contract = field(default_factory=Contract)
 
@@ -132,6 +133,10 @@ class Player:
 
     traits: List[str] = field(default_factory=list)
     foot: str = "right"
+    height: int = 178            # ס"מ
+    weight: int = 74             # ק"ג
+    resilience: float = 50.0     # 0-100, עמידות לפציעות
+    sharpness: float = 60.0      # 0-100, חדות משחק — נבנית מדקות במגרש
     is_human: bool = False
 
     # כישורים לקריירה שאחרי הפרישה
@@ -165,6 +170,30 @@ class Player:
     @property
     def position_he(self) -> str:
         return D.POSITION_NAMES_HE[self.position]
+
+    @property
+    def bmi(self) -> float:
+        return self.weight / ((self.height / 100.0) ** 2)
+
+    @property
+    def injury_risk(self) -> float:
+        """מכפיל סיכון לפציעה, סביב 1.0. נמוך = חסין יותר.
+
+        עמידות, כוח פיזי, חדות משחק וגיל — כל אחד מושך לכיוון אחר,
+        וכולם ניתנים להשפעה: אימון כוח, מנוחה, ודקות משחק סדירות.
+        """
+        physical = self.attributes.get("physical", 50)
+        risk = 1.0
+        risk *= 1.35 - (self.resilience / 100.0) * 0.70      # 1.35 עד 0.65
+        risk *= 1.20 - (physical / 100.0) * 0.45             # 1.20 עד 0.75
+        risk *= 1.0 + max(0.0, (60.0 - self.sharpness)) / 190.0
+        risk *= 1.0 + max(0, self.age - 30) * 0.07
+        risk *= 1.0 + max(0.0, 70.0 - self.fitness) / 130.0
+        if self.has_trait("glass"):
+            risk *= 1.7
+        if self.has_trait("workhorse"):
+            risk *= 0.92
+        return clamp(risk, 0.30, 3.2)
 
     @property
     def available(self) -> bool:
@@ -371,8 +400,14 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
     # צעירים עדיין לא במיטבם
     if age < 21:
         quality = int(quality - (21 - age) * 2.5)
-    potential = int(clamp(quality + max(0, (26 - age)) * rng.uniform(0.4, 1.6) +
-                          rng.gauss(0, 3), quality, 95))
+    # תקרה מוחלטת: מה שהשחקן הזה יכול להיות במקרה הטוב ביותר.
+    # אצל צעירים הפיזור רחב בכוונה — יש כישרונות דור ויש מי שייתקע.
+    youth_room = max(0, 25 - age)
+    ceiling = int(clamp(quality + youth_room * rng.uniform(0.5, 2.1)
+                        + rng.gauss(2, 6), quality + 1, 96))
+    # הערכת הפוטנציאל שרואים היום — שמרנית, ותזוז עם ההתפתחות בפועל
+    potential = int(clamp(quality + (ceiling - quality) * rng.uniform(0.35, 0.75),
+                          quality, ceiling))
 
     player = Player(
         pid=f"p{rng.randrange(10 ** 9):09d}",
@@ -382,6 +417,7 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
         nationality=weighted_choice(rng, D.NATIONALITIES),
         attributes=generate_attributes(rng, position, quality),
         potential=potential,
+        ceiling=ceiling,
         club_id=club.cid if club else None,
         reputation=clamp(quality - 25 + rng.gauss(0, 6), 1, 95),
         form=rng.uniform(40, 60),
@@ -390,6 +426,7 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
     wage = wage_for_overall(player.overall)
     player.contract = Contract(wage=wage, years_left=rng.randint(1, 4))
     player.foot = "right" if rng.random() < 0.72 else ("left" if rng.random() < 0.78 else "both")
+    apply_physique(player, rng)
     if rng.random() < 0.35:
         player.traits.append(rng.choice(list(D.TRAITS.keys())))
     player.coaching = clamp(rng.gauss(10, 6), 0, 40)
@@ -406,6 +443,42 @@ def wage_for_overall(overall: int) -> int:
 SQUAD_TEMPLATE = ["GK", "GK", "GK", "CB", "CB", "CB", "CB", "LB", "LB", "RB", "RB",
                   "DM", "DM", "CM", "CM", "CM", "AM", "AM", "LW", "LW", "RW", "RW",
                   "ST", "ST", "ST"]
+
+
+def gain_reputation(player: Player, delta: float) -> None:
+    """נקודת החנק היחידה לשינוי מוניטין.
+
+    שם עולמי הוא לא סכום של אירועים: ככל שכבר מכירים אותך, כל צעד
+    נוסף עולה יותר. ירידות עוברות במלואן — מוניטין נשבר מהר.
+    """
+    if delta > 0:
+        delta *= max(0.10, 1.0 - max(0.0, player.reputation - 40) / 58.0)
+    player.reputation = clamp(player.reputation + delta, 1, 99)
+
+
+def apply_physique(player: Player, rng: random.Random) -> None:
+    """גובה, משקל ועמידות — לפי העמדה, עם רעש אישי.
+
+    ילדים עדיין לא גמרו לגדול, ולכן הגובה נקבע כיעד בוגר וההווה נגזר ממנו.
+    """
+    mean, spread = D.PHYSIQUE.get(player.position, (180, 5.0))
+    adult_height = int(round(clamp(rng.gauss(mean, spread), 158, 205)))
+    player.height = grown_height(adult_height, player.age)
+    bmi = rng.uniform(*D.BMI_RANGE)
+    player.weight = int(round(bmi * (player.height / 100.0) ** 2))
+    # עמידות: קשורה למבנה אבל לא נגזרת ממנו — יש שברירים חסונים
+    player.resilience = clamp(rng.gauss(52, 17)
+                              + (player.attributes.get("physical", 50) - 50) * 0.22,
+                              5, 96)
+    player.sharpness = clamp(rng.gauss(62, 12), 20, 95)
+
+
+def grown_height(adult_height: int, age: int) -> int:
+    """כמה מהגובה הבוגר כבר הושג בגיל הנתון."""
+    if age >= 19:
+        return adult_height
+    share = {13: 0.895, 14: 0.925, 15: 0.952, 16: 0.973, 17: 0.988, 18: 0.996}
+    return int(round(adult_height * share.get(age, 1.0)))
 
 
 def stadium_name_for(cid: str, nickname: str, rng: random.Random) -> str:

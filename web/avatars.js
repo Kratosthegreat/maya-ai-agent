@@ -6,15 +6,6 @@
 const FOOT_KEYS = ["right", "left", "both"];
 const FOOT_NAMES = { right: "ימין", left: "שמאל", both: "דו-רגלי" };
 
-function hashOf(str) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
-
 /** מבנה גוף לצללית — משתנה בין שחקנים כדי שרשימת הסגל לא תיראה משוכפלת. */
 function buildOf(player) {
   const h = hashOf((player.pid || "") + (player.name || ""));

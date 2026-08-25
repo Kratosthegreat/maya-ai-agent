@@ -4,6 +4,9 @@
 
 function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
 
+// בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
+const YOUTH_LOAD = 0.52;
+
 class Game {
   constructor() {
     this.seed = 0;
@@ -78,10 +81,14 @@ class Game {
     me.name = name;
     me.isHuman = true;
     if (identity && identity.foot) me.foot = identity.foot;
-    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
+    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול.
+    // התקרה נסתרת ורחבה; מה שמוצג הוא הערכה שתתעדכן לפי הביצועים.
+    me.ceiling = Math.round(clamp(
+      overall(me) + g.rng.randint(14, 34) + Math.max(0, 24 - age) * 1.9,
+      overall(me) + 6, 95));
     me.potential = Math.round(clamp(
-      overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
-      overall(me) + 2, 94));
+      overall(me) + (me.ceiling - overall(me)) * 0.45,
+      overall(me) + 2, me.ceiling));
     me.clubId = clubId;
     // חוזה שמתאים לגיל ולרמה
     if (age <= 15) me.contract = { wage: 0, yearsLeft: 0 };
@@ -289,6 +296,18 @@ class Game {
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
+    // מה המאמן ביקש ממך השבוע, ומה עשית בפועל
+    const directive = this.flag("directive");
+    if (directive) {
+      const club = this.myClub();
+      if (club && this.trainingFocus === directive) {
+        trustMove(club, 1.6);
+        report.notes.push({ icon: "✅", text: `עשית מה שהמאמן ביקש. ${club.managerName} שם לב.` });
+      } else if (club && ["academy", "player", "veteran"].includes(this.stage)) {
+        trustMove(club, -0.9);
+        report.notes.push({ icon: "↩️", text: `התאמנת על משהו אחר ממה ש${club.managerName} ביקש.` });
+      }
+    }
     report.training = this.doWeeklyAction();
     // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
     this.simulateWeekMatches(report, this.stage === "youth");
@@ -301,6 +320,12 @@ class Game {
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
+
+    // ההוראה לשבוע הבא
+    const next = weeklyDirective(this, this.rng);
+    this.setFlag("directive", next);
+    if (next && ["academy", "player", "veteran"].includes(this.stage))
+      report.notes.push({ icon: "🎙️", text: directiveLine(this.myClub(), next) });
 
     this.week += 1;
     if (this.week > SEASON_WEEKS) {
@@ -552,12 +577,18 @@ class Game {
           assists: result.events.filter(e => e.kind === "assist" && e.playerId === me.pid).length,
           motm: result.motm === me.pid,
         };
+        const club = this.myClub();
+        const note = postMatchLine(this, report.personal.rating,
+          club ? resultFor(result, club.cid) : "D", true, this.rng);
+        if (note) report.personal.managerNote = note;
       } else if (isAvailable(me)) {
         this.noStartStreak += 1;
         if (this.rng.random() < 0.4) report.personal = this.subAppearance(result);
         else {
           me.morale = clamp(me.morale - 2.5, 5, 99);
           report.personal = { status: "bench" };
+          const note = postMatchLine(this, null, "D", false, this.rng);
+          if (note) report.personal.managerNote = note;
         }
       } else {
         report.personal = { status: "injured", injuryName: me.injuryName, weeks: me.injuryWeeks };
@@ -809,6 +840,7 @@ class Game {
     let body;
     try { body = event.body(this); } catch (err) { return false; }
     if (!body) return false;
+    noteFired(this, event.eid);
     this.pendingEventId = event.eid;
     this.pendingEventBody = body;
     return true;
@@ -866,7 +898,8 @@ class Game {
     this.transferMe(target.cid, 0, 0);
     target.managerTrust = 40;
     this.me.morale = clamp(this.me.morale - 4, 5, 99);
-    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5), 40, 96));
+    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5),
+                                        40, this.me.ceiling));
     this.setFlag("big_academy", true);
     return `עברת ל${target.name}. מתקנים שלא הכרת, וילדים שכולם היו הכי טובים במועדון שלהם.`;
   }
@@ -1435,7 +1468,8 @@ class Game {
     for (const p of Object.values(this.players)) {
       if (p.retired) { if (p.pid === this.meId) p.age += 1; continue; }
       const share = clamp(p.season.minutes / (SEASON_WEEKS * 90), 0, 1);
-      endOfSeasonDevelopment(p, this.rng, share);
+      const notes = endOfSeasonDevelopment(p, this.rng, share, this.clubs[p.clubId]);
+      if (p.pid === this.meId) for (const n of notes) this.log(n);
     }
   }
 

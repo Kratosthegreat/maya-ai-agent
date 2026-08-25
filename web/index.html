@@ -786,6 +786,23 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 .btn-row { display: flex; gap: 8px; }
 .btn-row .btn { flex: 1; }
 
+.link-btn {
+  appearance: none; background: none; border: 0; padding: 0;
+  color: var(--accent); font: inherit; cursor: pointer; text-align: right;
+  text-decoration: underline; text-underline-offset: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.link-btn:hover { color: var(--accent-2); }
+.row .grow { flex: 1; min-width: 0; }
+.muted.selection { margin-top: 6px; }
+.directive {
+  margin-top: 7px; padding: 8px 10px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  font-size: 12.5px; line-height: 1.4;
+}
+
 .toast {
   position: fixed; inset-inline: 12px; bottom: 16px; z-index: 90;
   max-width: 560px; margin: 0 auto;
@@ -1871,6 +1888,224 @@ const D = {
   "שרון מזרחי",
   "פייר לובלן"
  ],
+ "PHYSIQUE": {
+  "GK": [
+   189,
+   4.5
+  ],
+  "CB": [
+   187,
+   4.5
+  ],
+  "LB": [
+   178,
+   4.0
+  ],
+  "RB": [
+   178,
+   4.0
+  ],
+  "DM": [
+   183,
+   5.0
+  ],
+  "CM": [
+   179,
+   5.0
+  ],
+  "AM": [
+   176,
+   5.0
+  ],
+  "LW": [
+   175,
+   5.0
+  ],
+  "RW": [
+   175,
+   5.0
+  ],
+  "ST": [
+   183,
+   6.0
+  ]
+ },
+ "BMI_RANGE": [
+  21.8,
+  24.2
+ ],
+ "TRAINING_SPILL": {
+  "pace": [
+   "physical",
+   "dribbling"
+  ],
+  "shooting": [
+   "dribbling",
+   "mental"
+  ],
+  "passing": [
+   "mental",
+   "dribbling"
+  ],
+  "dribbling": [
+   "pace",
+   "passing"
+  ],
+  "defending": [
+   "mental",
+   "physical"
+  ],
+  "physical": [
+   "pace",
+   "defending"
+  ],
+  "mental": [
+   "passing",
+   "defending"
+  ]
+ },
+ "SPILL_SHARE": 0.3,
+ "GENERAL_SHARE": 0.15,
+ "SPONSOR_TIERS": [
+  [
+   "local",
+   "מקומי",
+   12,
+   28000,
+   0.4,
+   [
+    "מוסך אלוני",
+    "פלאפל הבורסה",
+    "רהיטי בן־ארי",
+    "חדר כושר אולימפוס",
+    "סופרמרקט השכונה",
+    "מכללת הנגב"
+   ]
+  ],
+  [
+   "national",
+   "ארצי",
+   34,
+   140000,
+   0.8,
+   [
+    "בנק הראשון",
+    "סלקום ספורט",
+    "שופרסל",
+    "אלקטרה",
+    "טמפו",
+    "יס פלוס"
+   ]
+  ],
+  [
+   "continental",
+   "יבשתי",
+   58,
+   620000,
+   1.1,
+   [
+    "אאודי אירופה",
+    "לופטהנזה",
+    "סנטנדר",
+    "אמסטל",
+    "בוקינג"
+   ]
+  ],
+  [
+   "global",
+   "עולמי",
+   76,
+   2400000,
+   1.5,
+   [
+    "נייקי",
+    "אדידס",
+    "פומה",
+    "רד בול",
+    "ג'ילט",
+    "רולקס",
+    "אמירייטס"
+   ]
+  ]
+ ],
+ "DEAL_KINDS": {
+  "boots": {
+   "name": "חוזה נעליים",
+   "pay": 1.0,
+   "media": 3,
+   "days": 2
+  },
+  "apparel": {
+   "name": "חוזה ביגוד",
+   "pay": 1.25,
+   "media": 5,
+   "days": 3
+  },
+  "drink": {
+   "name": "משקה אנרגיה",
+   "pay": 0.85,
+   "media": 4,
+   "days": 2
+  },
+  "bank": {
+   "name": "קמפיין בנק",
+   "pay": 1.4,
+   "media": 7,
+   "days": 4
+  },
+  "car": {
+   "name": "יבואן רכב",
+   "pay": 1.15,
+   "media": 5,
+   "days": 3
+  },
+  "watch": {
+   "name": "מותג שעונים",
+   "pay": 1.6,
+   "media": 6,
+   "days": 2
+  }
+ },
+ "MEDIA_JOBS": [
+  [
+   "column",
+   "טור שבועי בעיתון ספורט",
+   22,
+   30,
+   45000
+  ],
+  [
+   "panel",
+   "פאנל אולפן אחרי משחקים",
+   40,
+   45,
+   120000
+  ],
+  [
+   "doc",
+   "סרט תיעודי על העונה שלך",
+   55,
+   55,
+   340000
+  ],
+  [
+   "boot_launch",
+   "השקה בינלאומית של דגם נעל",
+   70,
+   70,
+   900000
+  ]
+ ],
+ "AGENT_NAMES": [
+  "ז'ורז' מנדוזה",
+  "רפי אלמוג",
+  "סימונה בלאנקו",
+  "טוני קרסטיץ'",
+  "עידו שרעבי",
+  "מארק דיוויס",
+  "לואיז פררה",
+  "יוסי בן־דוד"
+ ],
  "INJURY_TYPES": [
   [
    "מתיחה בשריר הירך",
@@ -1961,31 +2196,31 @@ const D = {
   ]
  },
  "AGE_CURVE": {
-  "13": 2.1,
-  "14": 2.0,
-  "15": 1.85,
-  "16": 1.7,
-  "17": 1.6,
-  "18": 1.5,
-  "19": 1.4,
-  "20": 1.3,
-  "21": 1.18,
-  "22": 1.05,
-  "23": 0.92,
-  "24": 0.78,
-  "25": 0.62,
-  "26": 0.48,
-  "27": 0.34,
-  "28": 0.22,
-  "29": 0.12,
-  "30": 0.05,
-  "31": -0.05,
+  "13": 1.6,
+  "14": 1.58,
+  "15": 1.54,
+  "16": 1.48,
+  "17": 1.42,
+  "18": 1.34,
+  "19": 1.26,
+  "20": 1.18,
+  "21": 1.1,
+  "22": 1.02,
+  "23": 0.94,
+  "24": 0.85,
+  "25": 0.75,
+  "26": 0.63,
+  "27": 0.51,
+  "28": 0.39,
+  "29": 0.27,
+  "30": 0.14,
+  "31": 0.02,
   "32": -0.14,
-  "33": -0.26,
-  "34": -0.4,
-  "35": -0.55,
-  "36": -0.7,
-  "37": -0.85,
+  "33": -0.28,
+  "34": -0.42,
+  "35": -0.56,
+  "36": -0.72,
+  "37": -0.86,
   "38": -1.0
  },
  "DECLINE_SENSITIVITY": {
@@ -2290,8 +2525,12 @@ function generatePlayer(rng, club, position, opts = {}) {
   let quality = opts.quality;
   if (quality === undefined) quality = Math.round(clamp(rng.gauss(rep * 0.70 + 20, 6), 28, 92));
   if (age < 21) quality = Math.round(quality - (21 - age) * 2.5);
+  // תקרה מוחלטת נסתרת, והערכת פוטנציאל שמרנית שתזוז עם ההתפתחות בפועל
+  const youthRoom = Math.max(0, 25 - age);
+  const ceiling = Math.round(clamp(
+    quality + youthRoom * rng.uniform(0.5, 2.1) + rng.gauss(2, 6), quality + 1, 96));
   const potential = Math.round(clamp(
-    quality + Math.max(0, 26 - age) * rng.uniform(0.4, 1.6) + rng.gauss(0, 3), quality, 95));
+    quality + (ceiling - quality) * rng.uniform(0.35, 0.75), quality, ceiling));
 
   let name = null;
   for (let i = 0; i < 60 && name === null; i++) {
@@ -2317,6 +2556,11 @@ function generatePlayer(rng, club, position, opts = {}) {
     reputation: clamp(quality - 25 + rng.gauss(0, 6), 1, 95),
     traits: [],
     foot: rng.random() < 0.72 ? "right" : rng.random() < 0.78 ? "left" : "both",
+    height: 178,
+    weight: 74,
+    resilience: 50,
+    sharpness: 60,
+    ceiling,
     isHuman: false,
     coaching: clamp(rng.gauss(10, 6), 0, 40),
     mediaSkill: clamp(rng.gauss(10, 6), 0, 40),
@@ -2328,6 +2572,7 @@ function generatePlayer(rng, club, position, opts = {}) {
   };
   p.contract.wage = wageForOverall(overall(p));
   if (rng.random() < 0.35) p.traits.push(rng.choice(Object.keys(D.TRAITS)));
+  applyPhysique(p, rng);
   return p;
 }
 
@@ -2352,6 +2597,54 @@ function assignNumber(club, players, player) {
   }
   player.number = 0;
   return 0;
+}
+
+/** גיבוב יציב למחרוזת — לגזירת תכונות קבועות משמות ומזהים. */
+function hashOf(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+/** כמה מהגובה הבוגר כבר הושג בגיל הנתון. */
+function grownHeight(adultHeight, age) {
+  if (age >= 19) return adultHeight;
+  const share = { 13: 0.895, 14: 0.925, 15: 0.952, 16: 0.973, 17: 0.988, 18: 0.996 };
+  return Math.round(adultHeight * (share[age] ?? 1));
+}
+
+/** גובה, משקל ועמידות — לפי העמדה, עם רעש אישי. */
+function applyPhysique(p, rng) {
+  const [mean, spread] = D.PHYSIQUE[p.position] || [180, 5];
+  const adult = Math.round(clamp(rng.gauss(mean, spread), 158, 205));
+  p.height = grownHeight(adult, p.age);
+  const bmi = rng.uniform(D.BMI_RANGE[0], D.BMI_RANGE[1]);
+  p.weight = Math.round(bmi * Math.pow(p.height / 100, 2));
+  p.resilience = clamp(rng.gauss(52, 17) + ((p.attributes.physical ?? 50) - 50) * 0.22, 5, 96);
+  p.sharpness = clamp(rng.gauss(62, 12), 20, 95);
+}
+
+/** מכפיל סיכון לפציעה, סביב 1.0. נמוך = חסין יותר. */
+function injuryRisk(p) {
+  const physical = p.attributes.physical ?? 50;
+  let risk = 1;
+  risk *= 1.35 - (p.resilience / 100) * 0.70;
+  risk *= 1.20 - (physical / 100) * 0.45;
+  risk *= 1 + Math.max(0, 60 - p.sharpness) / 190;
+  risk *= 1 + Math.max(0, p.age - 30) * 0.07;
+  risk *= 1 + Math.max(0, 70 - p.fitness) / 130;
+  if (hasTrait(p, "glass")) risk *= 1.7;
+  if (hasTrait(p, "workhorse")) risk *= 0.92;
+  return clamp(risk, 0.30, 3.2);
+}
+
+/** נקודת החנק היחידה לשינוי מוניטין — שם עולמי נבנה לאט. */
+function gainReputation(p, delta) {
+  if (delta > 0) delta *= Math.max(0.10, 1 - Math.max(0, p.reputation - 40) / 58);
+  p.reputation = clamp(p.reputation + delta, 1, 99);
 }
 
 function stadiumNameFor(nickname, rng) {
@@ -2691,10 +2984,8 @@ function applyInjuries(result, lineup, clubId, players, rng, club = null) {
   for (const pid of lineup) {
     const p = players[pid];
     if (!p) continue;
-    let chance = 0.016;
-    chance *= 1 + Math.max(0, 70 - p.fitness) / 90;
-    chance *= 1 + Math.max(0, p.age - 30) * 0.09;
-    if (hasTrait(p, "glass")) chance *= 2.2;
+    // injuryRisk מרכז את כל מה שמשפיע, וכולם ניתנים להשפעה
+    const chance = 0.0115 * injuryRisk(p);
     if (rng.random() < chance) {
       const [name, low, high] = rng.choice(D.INJURY_TYPES);
       let weeks = rng.randint(low, high);
@@ -2765,7 +3056,7 @@ function buildCommentary(result, home, away, players) {
 const OFF_PITCH = ["rest", "badges", "media", "business"];
 
 function ageFactor(age) {
-  if (age < 16) return 1.7;
+  if (age < 13) return 1.65;
   if (age > 38) return -1.1;
   return D.AGE_CURVE[String(age)];
 }
@@ -2779,6 +3070,13 @@ function addGrowth(p, attr, delta) {
   }
 }
 
+/** בולם תכונה שרצה הרחק מכל השאר — אי אפשר בעיטה 95 עם גוף של ילד. */
+function specialisationDamper(level, ovr) {
+  const gap = level - ovr;
+  if (gap <= 12) return 1;
+  return Math.max(0.18, 1 - (gap - 12) * 0.055);
+}
+
 function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const messages = [];
   const facilities = club ? club.trainingFacilities : 45;
@@ -2789,6 +3087,8 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   if (focus === "rest") {
     p.fitness = clamp(p.fitness + 26 + fitnessCoach / 14, 0, 100);
     p.morale = clamp(p.morale + 1.5, 0, 100);
+    p.resilience = clamp(p.resilience + 0.14, 0, 96);
+    p.sharpness = clamp(p.sharpness - 1.6, 0, 100);
     if (p.injuryWeeks > 0) {
       p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
       if (rng.random() < 0.20 + care * 0.34) {
@@ -2814,7 +3114,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
 
   if (focus === "media") {
     p.mediaSkill = clamp(p.mediaSkill + 0.9 * intensity, 0, 100);
-    p.reputation = clamp(p.reputation + 0.25, 0, 100);
+    gainReputation(p, 0.25);
     p.fitness = clamp(p.fitness + 9, 0, 100);
     return messages;
   }
@@ -2833,33 +3133,52 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
 
   const gap = p.potential - overall(p);
   const curve = ageFactor(p.age);
-  let base = 0.30 * intensity;
+  let base = 0.165 * intensity;
   base *= 0.55 + facilities / 110;
   base *= 1 + assistant / 420;          // עוזר מאמן — עד 23% יותר
   base *= Math.max(0.15, curve);
-  base *= 1 + clamp(gap, -10, 25) * 0.05;
+  base *= 1 + clamp(gap, -10, 18) * 0.032;
   if (hasTrait(p, "workhorse")) base *= 1.30;
   base *= 0.75 + p.morale / 200;
   base *= rng.uniform(0.7, 1.35);
 
   const headroom = p.potential - overall(p);
-  if (headroom <= 0) base *= 0.08;
-  else if (headroom < 4) base *= 0.25 + headroom * 0.18;
+  if (headroom <= 0) base *= 0.06;
+  else if (headroom < 6) base *= 0.20 + headroom * 0.13;
 
-  let current = (p.growth[focus] || 0) + base;
-  let gained = 0;
-  while (current >= 1.0 && (p.attributes[focus] ?? 50) < 97) {
-    p.attributes[focus] = (p.attributes[focus] ?? 50) + 1;
-    current -= 1;
-    gained += 1;
+  // עבודת כוח בונה גוף שנשבר פחות — זו הידית לחיזוק שחקן פציע
+  if (focus === "physical") p.resilience = clamp(p.resilience + 0.22 * intensity, 0, 96);
+  else if (focus === "pace") p.resilience = clamp(p.resilience + 0.07 * intensity, 0, 96);
+  p.sharpness = clamp(p.sharpness - 0.5, 0, 100);
+
+  // האימון מתפזר בשלוש שכבות: מה שבחרת, מה שקרוב לזה, וכל השאר
+  const ovr = overall(p);
+  const weights = D.POSITION_WEIGHTS[p.position];
+  const shares = {};
+  for (const attr of D.ATTRIBUTES)
+    shares[attr] = D.GENERAL_SHARE * (0.45 + (weights[attr] ?? 0.1) * 2.4);
+  for (const attr of (D.TRAINING_SPILL[focus] || []))
+    shares[attr] = (shares[attr] || 0) + D.SPILL_SHARE;
+  shares[focus] = (shares[focus] || 0) + 1;
+
+  const gains = {};
+  for (const [attr, share] of Object.entries(shares)) {
+    const level = p.attributes[attr] ?? 50;
+    let current = (p.growth[attr] || 0) + base * share * specialisationDamper(level, ovr);
+    while (current >= 1.0 && (p.attributes[attr] ?? 50) < 97) {
+      p.attributes[attr] = (p.attributes[attr] ?? 50) + 1;
+      current -= 1;
+      gains[attr] = (gains[attr] || 0) + 1;
+    }
+    p.growth[attr] = current;
   }
-  p.growth[focus] = current;
-  if (gained) {
-    messages.push({ icon: "📈", text:
-      `${D.ATTRIBUTE_NAMES_HE[focus]} עלתה ב-${gained} (עכשיו ${p.attributes[focus]}).` });
+  if (Object.keys(gains).length) {
+    const parts = Object.keys(gains)
+      .map(a => `${D.ATTRIBUTE_NAMES_HE[a]} ל-${p.attributes[a]}`);
+    messages.push({ icon: "📈", text: parts.join(", ") + "." });
   }
-  const injuryRisk = 0.035 * intensity * (1 - fitnessCoach / 260);
-  if (intensity > 1.15 && rng.random() < injuryRisk) {
+  const injuryChance = 0.022 * intensity * injuryRisk(p) * (1 - fitnessCoach / 260);
+  if (intensity > 1.15 && rng.random() < injuryChance) {
     const weeks = rng.randint(1, 3);
     p.injuryWeeks = weeks;
     p.injuryName = "עומס יתר באימון";
@@ -2875,10 +3194,14 @@ function weeklyRecovery(p, played, rng, club = null) {
     if (p.injuryWeeks > 0 && rng.random() < (care - 0.45) * 0.55) p.injuryWeeks -= 1;
     if (p.injuryWeeks === 0) { p.injuryName = ""; p.fitness = clamp(p.fitness + 15, 0, 100); }
   }
-  if (!played) {
+  if (played) {
+    p.sharpness = clamp(p.sharpness + 5.5, 0, 100);
+  } else {
     const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
     p.fitness = clamp(p.fitness + 9 + fitnessCoach / 22, 0, 100);
+    p.sharpness = clamp(p.sharpness - 1.1, 0, 100);
   }
+  if (p.injuryWeeks > 0) p.sharpness = clamp(p.sharpness - 1.8, 0, 100);
   p.form = clamp(p.form + (played ? 0 : rng.uniform(-1.5, 1.5)), 5, 99);
 }
 
@@ -2897,7 +3220,38 @@ function simulateAiWeek(players, rng, clubs, skip) {
   }
 }
 
-function endOfSeasonDevelopment(p, rng, minutesShare = 0.5) {
+/**
+ * מעדכן את הערכת הפוטנציאל לפי מה שהשחקן באמת עשה השנה.
+ * התקרה המוחלטת נסתרת ולא זזה — מה שזז הוא ההערכה.
+ */
+function updatePotential(p, rng, minutesShare, club) {
+  const room = p.ceiling - p.potential;
+  if (room <= 0) return null;
+  const rating = p.season.apps ? avgRating(p.season) : 6.1;
+  const quality = (rating - 6.45) * 0.85 + (minutesShare - 0.45) * 1.1;
+  const youth = p.age <= 20 ? 1 : Math.max(0.12, 1 - (p.age - 20) * 0.15);
+  const facilities = (club ? club.trainingFacilities : 50) / 100;
+  let step = room * 0.30 * youth * (0.40 + facilities * 0.55) * Math.max(0, 0.45 + quality);
+  if (hasTrait(p, "workhorse")) step *= 1.30;
+  if (hasTrait(p, "student")) step *= 1.10;
+  step *= rng.uniform(0.65, 1.4);
+  if (quality < -0.45 && p.age > 21) step = -room * 0.06;
+
+  const gained = Math.round(step);
+  if (!gained) return null;
+  const before = p.potential;
+  p.potential = Math.round(clamp(p.potential + gained, overall(p), p.ceiling));
+  if (p.potential === before) return null;
+  if (p.potential > before)
+    return `📈 ההערכה עליך עלתה: הפוטנציאל שלך עכשיו ${p.potential} (היה ${before}).`;
+  return `📉 עונה כזו עולה — ההערכה ירדה ל-${p.potential}.`;
+}
+
+function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
+  const messages = [];
+  if (p.age >= 29) p.resilience = clamp(p.resilience - (p.age - 28) * 0.9, 3, 96);
+  const note = updatePotential(p, rng, minutesShare, club);
+  if (note && p.isHuman) messages.push(note);
   p.age += 1;
   const curve = ageFactor(p.age);
   const exposure = 0.45 + minutesShare * 1.1;
@@ -2905,7 +3259,8 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5) {
     const sensitivity = D.DECLINE_SENSITIVITY[attr];
     let delta;
     if (curve > 0) {
-      delta = curve * exposure * rng.uniform(0.4, 1.5);
+      // קפיצת הקיץ אמיתית אבל לא דרמטית — רוב ההתפתחות היא באימונים
+      delta = curve * exposure * rng.uniform(0.4, 1.5) * 0.45;
       if (overall(p) >= p.potential) delta *= 0.08;
     } else {
       delta = curve * Math.max(0.2, sensitivity) * rng.uniform(0.5, 1.5);
@@ -2915,13 +3270,14 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5) {
   const s = p.season;
   if (s.apps) {
     const contribution = (s.goals + s.assists) / Math.max(1, s.apps);
-    p.reputation = clamp(p.reputation + (avgRating(s) - 6.6) * 4 + contribution * 6, 1, 99);
+    gainReputation(p, (avgRating(s) - 6.6) * 3.2 + contribution * 5.0);
   }
   mergeStats(p.career, s);
   p.season = newStats();
   p.fitness = 100;
   p.form = 50;
   if (p.contract.yearsLeft > 0) p.contract.yearsLeft -= 1;
+  return messages;
 }
 
 function shouldRetire(p, rng) {
@@ -3139,6 +3495,222 @@ function fireStaffMember(club, role) {
 }
 
 // ---------------------------------------------------------------------------
+// החיים המסחריים — פורט מ-football_manager/commercial.py.
+// ההצעות שמגיעות אליך הן פונקציה של מי שאתה: מוניטין, שערים, כריזמה
+// והמועדון. אותו אירוע נראה אחרת בגיל 18 ובגיל 27.
+// ---------------------------------------------------------------------------
+
+/** 0-100. כמה מותג היה רוצה את הפנים שלך על שלט חוצות. */
+function marketability(p, clubReputation = 40) {
+  const goals = p.career.goals + p.season.goals * 2;
+  let score = p.reputation * 0.62;
+  score += p.mediaSkill * 0.20;
+  score += Math.min(22, goals * 0.16);
+  score += clubReputation * 0.12;
+  if (p.age <= 23) score += 5;
+  else if (p.age >= 33) score -= 6;
+  if (hasTrait(p, "media_darling")) score += 9;
+  if (hasTrait(p, "hothead")) score -= 4;
+  if (hasTrait(p, "loyal")) score += 2;
+  return clamp(score, 0, 100);
+}
+
+function openTiers(market) {
+  return D.SPONSOR_TIERS.filter(tier => market >= tier[2]);
+}
+
+/** בונה הצעת חסות שמתאימה לשחקן הזה עכשיו. null אם אף אחד לא מתעניין. */
+function sponsorOffer(p, rng, clubReputation = 40, matchWeek = false) {
+  const market = marketability(p, clubReputation);
+  const tiers = openTiers(market);
+  if (!tiers.length) return null;
+
+  const weights = tiers.map((tier, index) =>
+    Math.pow(index + 1, 2) * (0.4 + Math.max(0, market - tier[2]) / 30));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = rng.random() * total;
+  let chosen = tiers[tiers.length - 1];
+  for (let i = 0; i < tiers.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) { chosen = tiers[i]; break; }
+  }
+
+  const [tierKey, tierHe, minRep, base, mediaMult, brands] = chosen;
+  const kindKey = rng.choice(Object.keys(D.DEAL_KINDS));
+  const kind = D.DEAL_KINDS[kindKey];
+
+  const over = Math.max(0, market - minRep) / 40;
+  const amount = base * kind.pay * (0.75 + over * 1.5) * rng.uniform(0.85, 1.25);
+  const years = (tierKey === "continental" || tierKey === "global") ? rng.randint(1, 3) : 1;
+
+  return {
+    brand: rng.choice(brands),
+    tier: tierKey,
+    tierHe,
+    kind: kindKey,
+    kindHe: kind.name,
+    amount: Math.round(amount / 1000) * 1000,
+    years,
+    days: Math.max(1, Math.round(kind.days * mediaMult)),
+    mediaGain: kind.media,
+    clashes: matchWeek && rng.random() < 0.35,
+    market: Math.round(market * 10) / 10,
+  };
+}
+
+function dealSummary(offer) {
+  const span = offer.years === 1 ? "לשנה" : `ל-${offer.years} שנים`;
+  return `${offer.brand} · ${offer.kindHe} · ₪${fmt(offer.amount)} ${span} · ${offer.days} ימי צילומים`;
+}
+
+/** הצעת עבודה תקשורתית שמתאימה לכריזמה ולמוניטין הנוכחיים. */
+function mediaOffer(p, rng) {
+  const options = D.MEDIA_JOBS.filter(job => p.mediaSkill >= job[2] && p.reputation >= job[3]);
+  if (!options.length) return null;
+  const [key, name, , , base] = rng.choice(options);
+  const factor = 0.7 + (p.reputation / 100) * 0.9 + (p.mediaSkill / 100) * 0.6;
+  return { key, name, amount: Math.round(base * factor * rng.uniform(0.9, 1.2) / 1000) * 1000 };
+}
+
+/** סוכן שמזהה שאתה שווה יותר ממה שאתה מקבל, ומביא יעד קונקרטי. */
+function agentPitch(p, rng, clubs, currentClub) {
+  const currentRep = currentClub ? currentClub.reputation : 20;
+  const targets = clubs.filter(c =>
+    (!currentClub || c.cid !== currentClub.cid)
+    && c.reputation > currentRep + 6
+    && c.reputation <= p.reputation + 26);
+  if (!targets.length) return null;
+  const target = rng.choice(targets);
+  const raise = rng.uniform(1.25, 2.1) * (1 + (target.reputation - currentRep) / 130);
+  return {
+    agent: rng.choice(D.AGENT_NAMES),
+    club: target.cid,
+    clubName: target.name,
+    wage: Math.round(p.contract.wage * raise / 500) * 500,
+    fee: Math.round(p.contract.wage * raise * 0.12 / 500) * 500,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// המאמן של הקבוצה — פורט מ-football_manager/manager.py.
+// דמות שמדברת אליך אחרי כל משחק, דורשת ממך דברים בשבוע, ומסבירה
+// למה אתה בהרכב או מחוצה לו. לכל מאמן אופי, והאופי קובע מה מרגיז אותו.
+// ---------------------------------------------------------------------------
+
+// (מפתח, שם, תיאור, רגישות אמון, סבלנות לתקשורת, נטייה לרוטציה)
+const MANAGER_STYLES = [
+  ["disciplinarian", "איש משמעת",
+   "אצלו מגיעים ראשונים לאימון ועונים אחרונים לתקשורת.", 1.35, 0.55, 0.9],
+  ["man_manager", "מאמן של שחקנים",
+   "מדבר איתך, לא עליך. סולח יותר, מצפה יותר.", 0.85, 1.25, 1.0],
+  ["tactician", "טקטיקן",
+   "מה שמעניין אותו זה אם עמדת נכון, לא כמה רצת.", 1.05, 0.9, 1.15],
+  ["rotator", "מסובב סגל",
+   "מאמין שכל אחד מקבל דקות — וגם מאבד אותן.", 0.95, 1.05, 1.6],
+];
+
+/** אופי המאמן — נגזר מהשם, ולכן קבוע לכל אורך הכהונה שלו. */
+function managerStyle(club) {
+  if (!club || !club.managerName) return MANAGER_STYLES[1];
+  return MANAGER_STYLES[hashOf(club.managerName) % MANAGER_STYLES.length];
+}
+
+const DIRECTIVE_TEXT = {
+  pace: "רוצה אותך מהיר יותר בחמישה המטרים הראשונים.",
+  shooting: "אמר שאתה מבזבז מצבים. השבוע — סיומות.",
+  passing: "רוצה שתפסיק לאבד כדורים במסירה הראשונה.",
+  dribbling: "אמר שאתה מוסר מוקדם מדי. שיחקק אחד על אחד.",
+  defending: "דורש שתחזור אחורה. גם חלוץ מגן.",
+  physical: "שלח אותך לחדר הכושר. אמר שאתה נדחף מהכדור.",
+  mental: "רוצה אותך בחדר הווידאו. אתה קורא את המשחק לאט.",
+  rest: "אמר לך לנוח. הוא רואה שאתה שרוף.",
+};
+
+/** מה המאמן רוצה ממך השבוע. null כשאין לו מה להגיד. */
+function weeklyDirective(game, rng) {
+  const club = game.myClub();
+  const me = game.me;
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return null;
+  if (me.fitness < 55) return "rest";
+  const weights = D.POSITION_WEIGHTS[me.position];
+  const gaps = D.ATTRIBUTES.slice().sort((a, b) =>
+    ((me.attributes[a] ?? 50) - (weights[a] ?? 0.1) * 120)
+    - ((me.attributes[b] ?? 50) - (weights[b] ?? 0.1) * 120));
+  return rng.choice(gaps.slice(0, 3));
+}
+
+function directiveLine(club, focus) {
+  const name = club ? club.managerName : "המאמן";
+  return `${name} ${DIRECTIVE_TEXT[focus] || "רוצה אותך באימון נוסף."}`;
+}
+
+/** מה המאמן אמר לך אחרי המשחק. */
+function postMatchLine(game, rating, outcome, played, rng) {
+  const club = game.myClub();
+  if (!club) return null;
+  const [key] = managerStyle(club);
+  const name = club.managerName;
+
+  if (!played) {
+    if (club.managerTrust < 35) return `${name} עבר לידך בחדר ההלבשה ולא עצר.`;
+    if (rng.random() < 0.5) return `${name}: "תמשיך לעבוד. אני רואה אותך."`;
+    return null;
+  }
+  if (rating === null || rating === undefined) return null;
+
+  let pool;
+  if (rating >= 8.0) {
+    pool = [`${name}: "זה מה שחיפשתי ממך. עוד כאלה."`,
+            `${name} תפס אותך במנהרה ואמר רק: "מצוין."`];
+    if (key === "disciplinarian") pool.push(`${name}: "טוב. אל תתאהב בעצמך."`);
+  } else if (rating >= 6.8) {
+    pool = [`${name}: "עבודה טובה. תשמור על הרמה."`,
+            `${name} הנהן לכיוונך. זה הרבה, ממנו.`];
+  } else if (rating >= 6.0) {
+    pool = [`${name}: "בסדר. לא יותר מזה."`,
+            `${name} לא אמר כלום, וזה נשמע חזק.`];
+  } else if (key === "man_manager") {
+    pool = [`${name}: "יום קשה. קורה. מחר מתחילים מחדש."`];
+  } else {
+    pool = [`${name}: "מה זה היה? אנחנו נדבר מחר."`,
+            `${name} החליף אותך והסתכל עליך כל הדרך לספסל.`];
+  }
+  if (outcome === "L" && rating < 6.5 && key === "disciplinarian")
+    pool.push(`${name} ביטל את יום החופש של כל הקבוצה.`);
+  return rng.choice(pool);
+}
+
+/** הסבר מה עומד בינך לבין ההרכב הפותח. */
+function selectionNote(game) {
+  const club = game.myClub();
+  const me = game.me;
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return null;
+  if (!isAvailable(me))
+    return `${me.injuryName} — ${me.injuryWeeks} שבועות. לא רלוונטי להרכב.`;
+
+  const rivals = club.squad.map(pid => game.players[pid])
+    .filter(p => p && p.pid !== game.meId && isAvailable(p) && p.position === me.position);
+  const best = rivals.reduce((m, p) => Math.max(m, effective(p)), 0);
+  let mine = effective(me) + (club.managerTrust - 50) * 0.14;
+  if (game.flag("captain")) mine += 4;
+  const gap = mine - best;
+
+  if (gap >= 6) return `אתה הבחירה הראשונה של ${club.managerName} בעמדה.`;
+  if (gap >= -1) return "אתה והמתחרה שלך צמודים. כל משחק גרוע יעלה לך את המקום.";
+  const rival = rivals.reduce((a, b) => (a && effective(a) >= effective(b) ? a : b), null);
+  if (rival)
+    return `${rival.name} (${overall(rival)}) לפניך בתור. צריך ${Math.abs(Math.round(gap))} נקודות של פער כדי לעקוף אותו.`;
+  return null;
+}
+
+/** שינוי אמון מותאם לאופי המאמן. */
+function trustMove(club, delta) {
+  if (!club) return 0;
+  club.managerTrust = clamp(club.managerTrust + delta * managerStyle(club)[3], 0, 100);
+  return club.managerTrust;
+}
+
+// ---------------------------------------------------------------------------
 // מנוע העלילה — 28 צמתי החלטה. פורט מ-football_manager/story.py
 // ---------------------------------------------------------------------------
 
@@ -3149,7 +3721,7 @@ function ev(e) { STORY.push(e); return e; }
 const mor = (g, d) => { g.me.morale = clamp(g.me.morale + d, 5, 99); };
 const tru = (g, d) => { const c = g.myClub(); if (c) c.managerTrust = clamp(c.managerTrust + d, 0, 100); };
 const fan = (g, d) => { const c = g.myClub(); if (c) c.fanSupport = clamp(c.fanSupport + d, 0, 100); };
-const rep = (g, d) => { g.me.reputation = clamp(g.me.reputation + d, 1, 99); };
+const rep = (g, d) => gainReputation(g.me, d);
 const att = (g, a, d) => addGrowth(g.me, a, d);
 
 // ===========================================================================
@@ -3173,7 +3745,7 @@ ev({
 });
 
 ev({
-  eid: "school_or_football", title: "מבחן ביום משחק", stages: ["youth"], weight: 4.0, once: false,
+  eid: "school_or_football", title: "מבחן ביום משחק", stages: ["youth"], weight: 4.0, once: false, cooldown: 24,
   cond: g => g.me.age <= 15,
   body: g => `מחר גמר מחוזי. מחר גם מבחן במתמטיקה.\n` +
     `המחנכת אמרה שאם תיעדר שוב — היא מזמינה את ההורים.`,
@@ -3222,7 +3794,7 @@ ev({
 });
 
 ev({
-  eid: "left_out", title: "הרשימה על הדלת", stages: ["youth"], weight: 3.5, once: false,
+  eid: "left_out", title: "הרשימה על הדלת", stages: ["youth"], weight: 3.5, once: false, cooldown: 10,
   cond: g => g.me.age <= 15 && g.week >= 6,
   body: g => `רשימת הנוסעים לטורניר תלויה על דלת חדר ההלבשה.\n` +
     `קראת אותה שלוש פעמים. השם שלך לא שם.`,
@@ -3309,7 +3881,7 @@ ev({
 
 ev({
   eid: "bench_frustration", title: "שבוע חמישי על הספסל", stages: ["player", "veteran"],
-  weight: 3.0, once: false,
+  weight: 3.0, once: false, cooldown: 12,
   cond: g => g.noStartStreak >= 4 && g.me.age >= 19,
   body: g => `חמישה משחקים. אפס דקות.\nאתה עומד מול הדלת של ${g.myClub().managerName} ומחזיק את הידית.`,
   choices: [
@@ -3324,7 +3896,7 @@ ev({
 });
 
 ev({
-  eid: "derby_week", title: "שבוע דרבי", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "derby_week", title: "שבוע דרבי", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 20,
   cond: g => g.week >= 3,
   body: g => `העיר לא ישנה. שלטי חוצות, אוהדים מחוץ למתחם האימונים,\n` +
     `וכתבה שמצטטת שחקן מהיריבה: "${g.me.name}? לא מכיר."`,
@@ -3370,7 +3942,7 @@ ev({
 });
 
 ev({
-  eid: "big_club_interest", title: "שיחה מאירופה", stages: ["player", "veteran"], weight: 4.5, once: false,
+  eid: "big_club_interest", title: "שיחה מאירופה", stages: ["player", "veteran"], weight: 4.5, once: false, cooldown: 34,
   cond: g => g.bigClubSuitor() !== null && [11, 12, 13].includes(g.week),
   body: g => `הסוכן שלך מתקשר בשתיים בלילה.\n` +
     `"${g.bigClubSuitor().name} שאלו עליך. לא סתם שאלו — הם שלחו צופה לשלושה משחקים.\n` +
@@ -3400,7 +3972,7 @@ ev({
 });
 
 ev({
-  eid: "serious_injury", title: "הרגל נתקעה בדשא", stages: ["player", "veteran"], weight: 3.0, once: false,
+  eid: "serious_injury", title: "הרגל נתקעה בדשא", stages: ["player", "veteran"], weight: 3.0, once: false, cooldown: 40,
   cond: g => g.me.injuryWeeks >= 8,
   body: g => `${g.me.injuryName}. ${g.me.injuryWeeks} שבועות, אם הכל ילך טוב.\n` +
     `הרופא מדבר, אתה שומע רק את המילה "אם".`,
@@ -3413,22 +3985,128 @@ ev({
   ],
 });
 
+// --- החיים המסחריים -------------------------------------------------------
+//
+// ההצעות נבנות בזמן אמת לפי מי שאתה עכשיו: מוניטין, שערים, כריזמה
+// והמועדון. לכן אותו אירוע נראה אחרת בגיל 18 ובגיל 27.
+
+function buildDeal(g) {
+  const club = g.myClub();
+  const offer = sponsorOffer(g.me, g.rng, club ? club.reputation : 30, !!g.myFixture());
+  if (offer) g.flags.pendingDeal = offer;
+  return offer;
+}
+
 ev({
-  eid: "sponsor_deal", title: "חוזה פרסום", stages: ["player", "veteran"], weight: 2.2, once: false,
-  cond: g => g.me.reputation >= 45,
-  body: () => "חברת נעליים שמה על השולחן חוזה שנתי.\n" +
-    "הכסף מכובד. התנאי: שלושה ימי צילומים בעונה, אחד מהם בשבוע של משחק.",
+  eid: "sponsor_deal", title: "טלפון ממחלקת השיווק",
+  stages: ["academy", "player", "veteran"], weight: 1.3, once: false, cooldown: 16,
+  cond: g => marketability(g.me, g.myClub() ? g.myClub().reputation : 30) >= 12,
+  body: g => {
+    const offer = buildDeal(g);
+    if (!offer) return "";
+    const lines = [
+      `${offer.brand} (${offer.tierHe}) רוצים אותך על ${offer.kindHe}.`,
+      "",
+      dealSummary(offer),
+      offer.clashes
+        ? "אחד מימי הצילומים נופל בשבוע של משחק."
+        : "הצילומים בהפסקת הליגה — לא פוגע בשום דבר.",
+    ];
+    return lines.join("\n");
+  },
   choices: [
-    { label: "לחתום", hint: "₪450,000",
-      apply: g => { g.earn(450000); g.me.mediaSkill = clamp(g.me.mediaSkill + 6, 0, 100); tru(g, -3);
-        return "חתמת. הצטלמת. המאמן ראה את הפוסטר בכניסה למתחם ולא חייך."; } },
-    { label: "לסרב — לא בשבוע של משחק",
-      apply: g => { tru(g, 5); att(g, "mental", 0.5); return "סירבת. הסוכן כעס. הצוות המקצועי לא."; } },
+    { label: "לחתום", hint: "כסף וכריזמה", apply: g => {
+      const offer = g.flags.pendingDeal;
+      if (!offer) return "ההצעה ירדה מהשולחן.";
+      const total = offer.amount * offer.years;
+      g.earn(total);
+      g.me.mediaSkill = clamp(g.me.mediaSkill + offer.mediaGain, 0, 100);
+      gainReputation(g.me, offer.mediaGain * 0.25);
+      g.flags.pendingDeal = null;
+      if (offer.clashes) {
+        tru(g, -3);
+        return `חתמת עם ${offer.brand} על ₪${fmt(total)}. יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.`;
+      }
+      return `חתמת עם ${offer.brand} על ₪${fmt(total)}. הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.`;
+    } },
+    { label: "לסרב", apply: g => {
+      const offer = g.flags.pendingDeal;
+      g.flags.pendingDeal = null;
+      if (offer && offer.clashes) {
+        tru(g, 4); att(g, "mental", 0.4);
+        return "סירבת בגלל השבוע של המשחק. הצוות המקצועי שמע, וזכר.";
+      }
+      return "סירבת. הסוכן שלך לא הבין למה, אבל זה הכסף שלך.";
+    } },
   ],
 });
 
 ev({
-  eid: "contract_talks", title: "שולחן המשא ומתן", stages: ["player", "veteran"], weight: 8.0, once: false,
+  eid: "media_job", title: "הצעה מהתקשורת",
+  stages: ["player", "veteran"], weight: 0.9, once: false, cooldown: 22,
+  cond: g => mediaOffer(g.me, new Rng(g.week * 31 + g.year)) !== null,
+  body: g => {
+    const offer = mediaOffer(g.me, g.rng);
+    if (!offer) return "";
+    g.flags.pendingMedia = offer;
+    return `${offer.name}.\n\n₪${fmt(offer.amount)}. זה גם אומר שהפנים שלך יהיו בכל מקום, ` +
+      "וזה חרב פיפיות: העיתונות אוהבת את מי שמדבר, עד שהיא לא.";
+  },
+  choices: [
+    { label: "לקחת את זה", hint: "כסף וחשיפה", apply: g => {
+      const offer = g.flags.pendingMedia;
+      if (!offer) return "ההצעה ירדה.";
+      g.earn(offer.amount);
+      g.me.mediaSkill = clamp(g.me.mediaSkill + 7, 0, 100);
+      gainReputation(g.me, 2);
+      g.flags.pendingMedia = null;
+      if (g.rng.random() < 0.3) {
+        tru(g, -2);
+        return `לקחת. ₪${fmt(offer.amount)} בכיס, והמאמן שאל אותך אם אתה שחקן או פרשן.`;
+      }
+      return `לקחת. ₪${fmt(offer.amount)}, וכולם ראו אותך.`;
+    } },
+    { label: "להישאר מחוץ לאור הזרקורים", apply: g => {
+      g.flags.pendingMedia = null;
+      tru(g, 2); att(g, "mental", 0.3);
+      return "ויתרת. פחות רעש, יותר אימונים.";
+    } },
+  ],
+});
+
+ev({
+  eid: "agent_pitch", title: "סוכן עם הצעה",
+  stages: ["player", "veteran"], weight: 1.1, once: false, cooldown: 26,
+  cond: g => g.myClub() !== null && g.me.reputation >= 30 && g.me.contract.yearsLeft <= 2,
+  body: g => {
+    const pitch = agentPitch(g.me, g.rng, Object.values(g.clubs), g.myClub());
+    if (!pitch) return "";
+    g.flags.pendingAgent = pitch;
+    return `${pitch.agent} תפס אותך אחרי אימון.\n\n` +
+      `"יש לי קשר ב${pitch.clubName}. אתה מקבל היום ₪${fmt(g.me.contract.wage)} לשבוע — ` +
+      `שם מדברים על ₪${fmt(pitch.wage)}. תן לי לעבוד."\n\n` +
+      `העמלה שלו: ₪${fmt(pitch.fee)}.`;
+  },
+  choices: [
+    { label: "לתת לו לעבוד", hint: "פותח דלת למעבר", apply: g => {
+      const pitch = g.flags.pendingAgent;
+      if (!pitch) return "הסוכן נעלם.";
+      g.spend(pitch.fee);
+      g.setFlag("agent_target", pitch.club);
+      g.flags.pendingAgent = null;
+      mor(g, 3);
+      return `שילמת לו מקדמה. הוא כבר מדבר עם ${pitch.clubName} — בחלון ההעברות זה יהיה על השולחן.`;
+    } },
+    { label: "אני מסודר איפה שאני", apply: g => {
+      g.flags.pendingAgent = null;
+      tru(g, 3);
+      return "אמרת לו שאתה מסודר. הידיעה הזו הגיעה למאמן, והוא חייך.";
+    } },
+  ],
+});
+
+ev({
+  eid: "contract_talks", title: "שולחן המשא ומתן", stages: ["player", "veteran"], weight: 8.0, once: false, cooldown: 8,
   cond: g => g.me.contract.yearsLeft <= 0 && g.myClub() !== null,
   body: g => `החוזה שלך נגמר בסוף העונה.\n${g.myClub().name} הניחו הצעה על השולחן: ` +
     `₪${fmt(g.renewalOffer())} לשבוע.`,
@@ -3442,7 +4120,7 @@ ev({
 });
 
 ev({
-  eid: "dressing_room_split", title: "חדר הלבשה מפוצל", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "dressing_room_split", title: "חדר הלבשה מפוצל", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 30,
   cond: g => g.myClub() && g.myClub().managerTrust <= 40,
   body: g => `חצי מהקבוצה רוצה ש${g.myClub().managerName} ילך.\n` +
     `מישהו כבר דיבר עם עיתונאי. עכשיו מסתכלים עליך — אתה בין הבכירים.`,
@@ -3458,7 +4136,7 @@ ev({
 });
 
 ev({
-  eid: "youngster_threat", title: "הילד שהגיע לתפוס את המקום", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "youngster_threat", title: "הילד שהגיע לתפוס את המקום", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 34,
   cond: g => g.me.age >= 26 && g.rivalYoungster() !== null,
   body: g => {
     const kid = g.rivalYoungster();
@@ -3479,7 +4157,7 @@ ev({
 // ===========================================================================
 
 ev({
-  eid: "body_signals", title: "הגוף מדבר", stages: ["veteran"], weight: 3.0, once: false,
+  eid: "body_signals", title: "הגוף מדבר", stages: ["veteran"], weight: 3.0, once: false, cooldown: 30,
   cond: g => g.me.age >= 32,
   body: g => `אתה בן ${g.me.age}. הבוקר לקח לך עשרים דקות לרדת מהמיטה.\n` +
     `הפיזיותרפיסט אומר שאפשר להמשיך — עם מחיר.`,
@@ -3494,7 +4172,7 @@ ev({
 });
 
 ev({
-  eid: "retirement_call", title: "ההחלטה", stages: ["veteran"], weight: 9.0, once: false,
+  eid: "retirement_call", title: "ההחלטה", stages: ["veteran"], weight: 9.0, once: false, cooldown: 20,
   cond: g => g.retirementReady(),
   body: g => `${g.me.age}. ${g.me.career.apps + g.me.season.apps} משחקים בקריירה.\n` +
     `${g.me.career.goals + g.me.season.goals} שערים.\n` +
@@ -3557,7 +4235,7 @@ ev({
 });
 
 ev({
-  eid: "board_meeting", title: "ישיבת הנהלה", stages: ["manager"], weight: 4.0, once: false,
+  eid: "board_meeting", title: "ישיבת הנהלה", stages: ["manager"], weight: 4.0, once: false, cooldown: 12,
   cond: g => [6, 13, 20].includes(g.week) && g.myClub() !== null,
   body: g => `היו"ר פורש טבלה על השולחן.\n` +
     `"ציפינו ל${g.myClub().seasonExpectation}. אנחנו במקום ${g.leaguePosition()}.\n` +
@@ -3573,7 +4251,7 @@ ev({
 });
 
 ev({
-  eid: "star_wants_out", title: "הכוכב רוצה ללכת", stages: ["manager"], weight: 3.0, once: false,
+  eid: "star_wants_out", title: "הכוכב רוצה ללכת", stages: ["manager"], weight: 3.0, once: false, cooldown: 34,
   cond: g => g.squadStar() !== null,
   body: g => {
     const s = g.squadStar();
@@ -3587,7 +4265,7 @@ ev({
 });
 
 ev({
-  eid: "wonderkid", title: "ילד מהנוער", stages: ["manager"], weight: 3.0, once: false,
+  eid: "wonderkid", title: "ילד מהנוער", stages: ["manager"], weight: 3.0, once: false, cooldown: 40,
   cond: g => g.myClub() !== null,
   body: () => "מאמן הנוער מביא לך שם.\nבן 17. באימון הבוגרים הוריד שני בלמים בתנועה אחת.",
   choices: [
@@ -3598,7 +4276,7 @@ ev({
 });
 
 ev({
-  eid: "sack_race", title: "השם שלך בעיתון", stages: ["manager"], weight: 6.0, once: false,
+  eid: "sack_race", title: "השם שלך בעיתון", stages: ["manager"], weight: 6.0, once: false, cooldown: 22,
   cond: g => g.myClub() && g.myClub().boardConfidence <= 32,
   body: g => `"${g.me.name} על הכוונת" — כותרת ראשית.\n` +
     `אמון ההנהלה: ${Math.round(g.myClub().boardConfidence)}%. שלושה משחקים להוכיח.`,
@@ -3612,7 +4290,7 @@ ev({
 });
 
 ev({
-  eid: "bigger_job", title: "מועדון גדול מתקשר", stages: ["manager"], weight: 4.0, once: false,
+  eid: "bigger_job", title: "מועדון גדול מתקשר", stages: ["manager"], weight: 4.0, once: false, cooldown: 34,
   cond: g => g.managerSuitor() !== null,
   body: g => `${g.managerSuitor().name} רוצים אותך.\n` +
     `תקציב אחר, לחץ אחר, אצטדיון אחר.\nובמועדון שלך יש חוזה ואוהדים שקראו לך בשם.`,
@@ -3686,10 +4364,29 @@ ev({
 
 // ---------------------------------------------------------------------------
 
+/** כמה שבועות עברו מאז שהאירוע הזה נורה. null אם מעולם לא. */
+function weeksSince(g, eid) {
+  const log = g.flags.lastFired || {};
+  const stamp = log[eid];
+  if (!stamp) return null;
+  return (g.year - stamp[0]) * 43 + (g.week - stamp[1]);
+}
+
+/** מסמן מתי אירוע נורה, כדי שלא יחזור על עצמו בשבוע הבא. */
+function noteFired(g, eid) {
+  if (!g.flags.lastFired) g.flags.lastFired = {};
+  g.flags.lastFired[eid] = [g.year, g.week];
+}
+
 function eligibleEvents(g) {
   return STORY.filter(e => {
     if (e.stages.length && !e.stages.includes(g.stage)) return false;
     if (e.once && g.firedEvents.includes(e.eid)) return false;
+    if (!e.once) {
+      const gap = weeksSince(g, e.eid);
+      // אירוע חוזר לא אמור לקרות שוב מיד. ברירת המחדל: פעם בעונה בערך.
+      if (gap !== null && gap < (e.cooldown ?? 30)) return false;
+    }
     try { return !!e.cond(g); } catch (err) { return false; }
   });
 }
@@ -3710,6 +4407,9 @@ function findEvent(eid) { return STORY.find(e => e.eid === eid) || null; }
 // ---------------------------------------------------------------------------
 
 function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
+
+// בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
+const YOUTH_LOAD = 0.52;
 
 class Game {
   constructor() {
@@ -3785,10 +4485,14 @@ class Game {
     me.name = name;
     me.isHuman = true;
     if (identity && identity.foot) me.foot = identity.foot;
-    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
+    // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול.
+    // התקרה נסתרת ורחבה; מה שמוצג הוא הערכה שתתעדכן לפי הביצועים.
+    me.ceiling = Math.round(clamp(
+      overall(me) + g.rng.randint(14, 34) + Math.max(0, 24 - age) * 1.9,
+      overall(me) + 6, 95));
     me.potential = Math.round(clamp(
-      overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
-      overall(me) + 2, 94));
+      overall(me) + (me.ceiling - overall(me)) * 0.45,
+      overall(me) + 2, me.ceiling));
     me.clubId = clubId;
     // חוזה שמתאים לגיל ולרמה
     if (age <= 15) me.contract = { wage: 0, yearsLeft: 0 };
@@ -3996,6 +4700,18 @@ class Game {
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
+    // מה המאמן ביקש ממך השבוע, ומה עשית בפועל
+    const directive = this.flag("directive");
+    if (directive) {
+      const club = this.myClub();
+      if (club && this.trainingFocus === directive) {
+        trustMove(club, 1.6);
+        report.notes.push({ icon: "✅", text: `עשית מה שהמאמן ביקש. ${club.managerName} שם לב.` });
+      } else if (club && ["academy", "player", "veteran"].includes(this.stage)) {
+        trustMove(club, -0.9);
+        report.notes.push({ icon: "↩️", text: `התאמנת על משהו אחר ממה ש${club.managerName} ביקש.` });
+      }
+    }
     report.training = this.doWeeklyAction();
     // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
     this.simulateWeekMatches(report, this.stage === "youth");
@@ -4008,6 +4724,12 @@ class Game {
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
+
+    // ההוראה לשבוע הבא
+    const next = weeklyDirective(this, this.rng);
+    this.setFlag("directive", next);
+    if (next && ["academy", "player", "veteran"].includes(this.stage))
+      report.notes.push({ icon: "🎙️", text: directiveLine(this.myClub(), next) });
 
     this.week += 1;
     if (this.week > SEASON_WEEKS) {
@@ -4259,12 +4981,18 @@ class Game {
           assists: result.events.filter(e => e.kind === "assist" && e.playerId === me.pid).length,
           motm: result.motm === me.pid,
         };
+        const club = this.myClub();
+        const note = postMatchLine(this, report.personal.rating,
+          club ? resultFor(result, club.cid) : "D", true, this.rng);
+        if (note) report.personal.managerNote = note;
       } else if (isAvailable(me)) {
         this.noStartStreak += 1;
         if (this.rng.random() < 0.4) report.personal = this.subAppearance(result);
         else {
           me.morale = clamp(me.morale - 2.5, 5, 99);
           report.personal = { status: "bench" };
+          const note = postMatchLine(this, null, "D", false, this.rng);
+          if (note) report.personal.managerNote = note;
         }
       } else {
         report.personal = { status: "injured", injuryName: me.injuryName, weeks: me.injuryWeeks };
@@ -4516,6 +5244,7 @@ class Game {
     let body;
     try { body = event.body(this); } catch (err) { return false; }
     if (!body) return false;
+    noteFired(this, event.eid);
     this.pendingEventId = event.eid;
     this.pendingEventBody = body;
     return true;
@@ -4573,7 +5302,8 @@ class Game {
     this.transferMe(target.cid, 0, 0);
     target.managerTrust = 40;
     this.me.morale = clamp(this.me.morale - 4, 5, 99);
-    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5), 40, 96));
+    this.me.potential = Math.round(clamp(this.me.potential + this.rng.randint(1, 5),
+                                        40, this.me.ceiling));
     this.setFlag("big_academy", true);
     return `עברת ל${target.name}. מתקנים שלא הכרת, וילדים שכולם היו הכי טובים במועדון שלהם.`;
   }
@@ -5142,7 +5872,8 @@ class Game {
     for (const p of Object.values(this.players)) {
       if (p.retired) { if (p.pid === this.meId) p.age += 1; continue; }
       const share = clamp(p.season.minutes / (SEASON_WEEKS * 90), 0, 1);
-      endOfSeasonDevelopment(p, this.rng, share);
+      const notes = endOfSeasonDevelopment(p, this.rng, share, this.clubs[p.clubId]);
+      if (p.pid === this.meId) for (const n of notes) this.log(n);
     }
   }
 
@@ -5731,15 +6462,6 @@ function trophy(size = 16) {
 const FOOT_KEYS = ["right", "left", "both"];
 const FOOT_NAMES = { right: "ימין", left: "שמאל", both: "דו-רגלי" };
 
-function hashOf(str) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
-
 /** מבנה גוף לצללית — משתנה בין שחקנים כדי שרשימת הסגל לא תיראה משוכפלת. */
 function buildOf(player) {
   const h = hashOf((player.pid || "") + (player.name || ""));
@@ -6139,6 +6861,20 @@ function toast(message) {
   toastTimer = setTimeout(() => el.classList.remove("on"), 3600);
 }
 
+// מחסנית חזרה קצרה — כדי שאפשר יהיה לצלול לתיק של מועדון ולחזור
+const navStack = [];
+
+function goDeep(next, data = null) {
+  navStack.push([view, viewData]);
+  go(next, data);
+}
+
+function goBack() {
+  const previous = navStack.pop();
+  if (previous) { view = previous[0]; viewData = previous[1]; render(); }
+  else go("main");
+}
+
 function go(next, data = null) {
   view = next;
   viewData = data;
@@ -6416,8 +7152,209 @@ function screenMain() {
   if (view === "news") return appbar() + screenNews();
   if (view === "tactics") return appbar() + screenTactics();
   if (view === "club") return appbar() + screenClub();
+  if (view === "clubinfo") return appbar() + screenClubInfo();
+  if (view === "player") return appbar() + screenPlayer();
   if (view === "editor") return appbar() + screenEditor();
   return appbar() + screenHub() + dock(true);
+}
+
+/** תיאור עמידות/חדות במילים — מספר גולמי לא אומר כלום. */
+function bandLabel(value, labels) {
+  const index = Math.min(labels.length - 1, Math.floor(value / (100 / labels.length)));
+  return labels[index];
+}
+
+const RESILIENCE_WORDS = ["זכוכית", "שביר", "רגיל", "חסון", "ברזל"];
+const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בשיא"];
+
+/** תעודת זהות מלאה של שחקן — מה שחסר כשרואים רק גיל ורגל. */
+function screenPlayer() {
+  const pid = (viewData && viewData.pid) || game.meId;
+  const p = game.players[pid];
+  if (!p) return `<div class="screen"><div class="card">שחקן לא נמצא.</div></div>`;
+  const club = p.clubId ? game.clubs[p.clubId] : null;
+  const mine = pid === game.meId;
+  const s = p.season, c = p.career;
+
+  return `
+  <div class="screen">
+    ${playerCard(p, club, mine ? game.stage : "player")}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">תעודת זהות</span>
+        <span class="r">${esc(positionHe(p))}</span></div>
+      <div class="panel-body tight">
+        <div class="row"><span class="nm">גיל</span><span class="val num">${p.age}</span></div>
+        <div class="row"><span class="nm">גובה</span>
+          <span class="val num">${p.height} ס"מ</span></div>
+        <div class="row"><span class="nm">משקל</span>
+          <span class="val num">${p.weight} ק"ג</span></div>
+        <div class="row"><span class="nm">רגל חזקה</span>
+          <span class="val">${esc(FOOT_NAMES[playerFoot(p)])}</span></div>
+        <div class="row"><span class="nm">לאום</span>
+          <span class="val">${esc(p.nationality)}</span></div>
+        <div class="row"><span class="nm">מספר חולצה</span>
+          <span class="val num">${p.number || "—"}</span></div>
+        ${club ? `<div class="row"><span class="nm">מועדון</span>
+          <span class="val"><button class="link-btn" data-club="${club.cid}">${esc(club.name)}</button></span></div>` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מצב גופני</span>
+        <span class="r">${p.injuryWeeks ? esc(p.injuryName) : "כשיר"}</span></div>
+      <div class="panel-body">
+        <div class="attr"><span>עמידות לפציעות</span>
+          <span class="val">${esc(bandLabel(p.resilience, RESILIENCE_WORDS))}</span>
+          <span class="bar"><i style="width:${Math.round(p.resilience)}%"></i></span></div>
+        <div class="attr"><span>חדות משחק</span>
+          <span class="val">${esc(bandLabel(p.sharpness, SHARPNESS_WORDS))}</span>
+          <span class="bar"><i style="width:${Math.round(p.sharpness)}%"></i></span></div>
+        <div class="attr"><span>כושר</span>
+          <span class="val">${Math.round(p.fitness)}</span>
+          <span class="bar soft"><i style="width:${Math.round(p.fitness)}%"></i></span></div>
+        <div class="muted">סיכון פציעה: <span class="num">${
+          Math.round(injuryRisk(p) * 100)}%</span> מהרגיל.
+          ${mine ? "אימוני כוח ומנוחה מורידים אותו; דקות משחק מעלות חדות." : ""}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">תכונות</span>
+        <span class="r num">${overall(p)}${mine ? ` · תקרה ${p.potential}` : ""}</span></div>
+      <div class="panel-body">
+        <div class="attrs">
+          ${D.ATTRIBUTES.map(a => `<div class="attr">
+            <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
+            <span class="val">${p.attributes[a]}</span>
+            <span class="bar"><i style="width:${p.attributes[a]}%"></i></span>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    ${p.traits.length ? `<div class="panel">
+      <div class="panel-head"><span class="t">אופי</span></div>
+      <div class="panel-body">
+        <div class="chips">${p.traits.map(t =>
+          `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>
+        <div class="muted">${p.traits.map(t => D.TRAITS[t] ? esc(D.TRAITS[t].desc) : "").join(" ")}</div>
+      </div>
+    </div>` : ""}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מספרים</span></div>
+      <div class="panel-body">
+        <div class="eyebrow">העונה</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${s.apps}</div><div class="l">משחקים</div></div>
+          <div class="stat"><div class="n">${s.goals}</div><div class="l">שערים</div></div>
+          <div class="stat"><div class="n">${avgRating(s).toFixed(1)}</div><div class="l">ציון</div></div>
+        </div>
+        <div class="eyebrow">בקריירה</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${c.apps}</div><div class="l">משחקים</div></div>
+          <div class="stat"><div class="n">${c.goals}</div><div class="l">שערים</div></div>
+          <div class="stat"><div class="n">${c.assists}</div><div class="l">בישולים</div></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn ghost wide" data-act="back">חזרה</button>
+  </div>`;
+}
+
+/**
+ * תיק על מועדון אחר: מיקום, כושר, מוניטין, אצטדיון, מתקנים וסגל מלא.
+ * נפתח מכל מקום שבו מוזכר מועדון — הצעת העברה, המשחק הבא, הטבלה.
+ */
+function screenClubInfo() {
+  const cid = viewData && viewData.cid;
+  const club = cid ? game.clubs[cid] : null;
+  if (!club) return `<div class="screen"><div class="card">מועדון לא נמצא.</div></div>`;
+
+  const league = D.LEAGUES.find(l => l.id === club.leagueId);
+  const table = game.standings(club.leagueId);
+  const index = table.findIndex(r => r.clubId === club.cid);
+  const row = index >= 0 ? table[index] : null;
+  const squad = club.squad.map(pid => game.players[pid]).filter(Boolean)
+    .sort((a, b) => overall(b) - overall(a));
+  const best = squad.slice(0, 5);
+  const avg = squad.length
+    ? Math.round(squad.reduce((sum, p) => sum + overall(p), 0) / squad.length) : 0;
+  const mine = game.myClub();
+  const isMine = mine && mine.cid === club.cid;
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.name)}</span>
+        <span class="r">${esc(league ? league.name : "")}</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(club, 52)}
+          <div class="kit-meta">
+            <span class="nm">${esc(club.nickname)}</span>
+            <span class="muted">🏟️ ${esc(club.stadiumName)} · ${fmt(club.capacity)} מקומות</span>
+            <span class="muted">מאמן: ${esc(club.managerName)} · ${
+              esc(managerStyle(club)[1])}</span>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${index >= 0 ? index + 1 : "—"}</div>
+            <div class="l">בטבלה</div></div>
+          <div class="stat"><div class="n">${row ? row.points : "—"}</div>
+            <div class="l">נקודות</div></div>
+          <div class="stat"><div class="n">${club.reputation}</div>
+            <div class="l">מוניטין</div></div>
+        </div>
+        ${club.formLog && club.formLog.length ? `<div class="muted">כושר אחרון</div>
+          ${formGuide(club)}` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">איך זה בפנים</span>
+        <span class="r num">סגל ${avg}</span></div>
+      <div class="panel-body tight">
+        <div class="row"><span class="nm">מתקני אימון</span>
+          <span class="val num">${Math.round(club.trainingFacilities)}</span></div>
+        <div class="row"><span class="nm">מחלקת נוער</span>
+          <span class="val num">${Math.round(club.youthAcademy)}</span></div>
+        <div class="row"><span class="nm">מרכז רפואי</span>
+          <span class="val num">${Math.round(club.medicalCentre)}</span></div>
+        <div class="row"><span class="nm">אהדת קהל</span>
+          <span class="val num">${Math.round(club.fanSupport)}</span></div>
+        <div class="row"><span class="nm">צוות מקצועי</span>
+          <span class="val num">${Object.keys(club.staff || {}).length}/5</span></div>
+        ${isMine ? "" : `<div class="row"><span class="nm">שכר טיפוסי לשחקן ברמה שלך</span>
+          <span class="val num">₪${fmt(wageForOverall(
+            Math.round(club.reputation * 0.8 + 18)))}</span></div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי משחק שם</span>
+        <span class="r">${squad.length} שחקנים</span></div>
+      <div class="panel-body tight">
+        ${best.map(p => `<div class="row">
+          ${avatarChip(p, club, 26)}
+          <button class="link-btn grow" data-player="${p.pid}">${esc(p.name)}</button>
+          <span class="muted">${esc(positionHe(p))} · ${p.age}</span>
+          <span class="val num">${overall(p)}</span>
+        </div>`).join("")}
+        ${squad.length > 5 ? `<button class="mini-btn wide" data-act="club-squad">
+          ${viewData.full ? "להראות רק את החמישייה" : `כל הסגל (${squad.length})`}</button>` : ""}
+        ${viewData.full ? squad.slice(5).map(p => `<div class="row">
+          ${avatarChip(p, club, 26)}
+          <button class="link-btn grow" data-player="${p.pid}">${esc(p.name)}</button>
+          <span class="muted">${esc(positionHe(p))} · ${p.age}</span>
+          <span class="val num">${overall(p)}</span>
+        </div>`).join("") : ""}
+      </div>
+    </div>
+
+    <button class="btn ghost wide" data-act="back">חזרה</button>
+  </div>`;
 }
 
 /** שורת כסף: תווית, סכום וסימן. */
@@ -6657,6 +7594,8 @@ function screenHub() {
           </div>
           <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}${
             club ? " · מקום " + game.leaguePosition() : ""}</div>
+          <button class="mini-btn wide" data-club="${rival.cid}">
+            תיק על ${esc(rival.name)}</button>
         </div>
       </div>`;
   } else {
@@ -6748,6 +7687,8 @@ function screenHub() {
           <span class="nm"><strong>${esc(game.clubs[offer.club].name)}</strong><br>
           <span class="muted">₪${fmt(offer.wage)} לשבוע · עכשיו ₪${fmt(me.contract.wage)}</span></span>
         </div>
+        <button class="mini-btn wide" data-club="${offer.club}">
+          לבדוק את המועדון לפני שמחליטים</button>
         <div class="btn-row">
           <button class="btn primary" data-act="accept">לחתום</button>
           <button class="btn" data-act="reject">לדחות</button>
@@ -6758,7 +7699,12 @@ function screenHub() {
     <div class="panel">
       <div class="panel-head"><span class="t">המצב שלך</span>
         <span class="r">₪${fmt(game.money)}</span></div>
-      <div class="panel-body">${statusBody}</div>
+      <div class="panel-body">${statusBody}
+        ${(() => { const note = selectionNote(game);
+          return note ? `<div class="muted selection">${esc(note)}</div>` : ""; })()}
+        ${game.flag("directive") && club ? `<div class="directive">🎙️ ${
+          esc(directiveLine(club, game.flag("directive")))}</div>` : ""}
+      </div>
     </div>
 
     <div class="panel">
@@ -7081,7 +8027,8 @@ function screenProfile() {
   const s = me.season, c = me.career;
   return `
   <div class="screen">
-    ${isPlayer ? playerCard(me, club, game.stage) : `
+    ${isPlayer ? playerCard(me, club, game.stage)
+      + `<button class="mini-btn wide" data-player="${me.pid}">תעודת זהות מלאה</button>` : `
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
       <div class="kit-row">
@@ -7459,6 +8406,10 @@ function bind() {
     el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
   app.querySelectorAll("[data-press]").forEach(el =>
     el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+  app.querySelectorAll("[data-club]").forEach(el =>
+    el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
+  app.querySelectorAll("[data-player]:not(input)").forEach(el =>
+    el.addEventListener("click", () => goDeep("player", { pid: el.dataset.player })));
   app.querySelectorAll("[data-upgrade]").forEach(el =>
     el.addEventListener("click", () => {
       const message = game.upgradeFacility(el.dataset.upgrade);
@@ -7531,6 +8482,8 @@ function act(what) {
     } else viewData.identity = next;
     render();
   }
+  else if (what === "back") goBack();
+  else if (what === "club-squad") { viewData.full = !viewData.full; render(); }
   else if (what === "backup") backupCareer();
   else if (what === "restore") restoreCareer();
   else if (what === "export-db") exportDatabase();

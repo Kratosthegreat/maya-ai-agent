@@ -406,11 +406,9 @@ def _apply_injuries(result: MatchResult, lineup: List[str], club_id: str,
         p = players.get(pid)
         if not p:
             continue
-        chance = 0.016
-        chance *= 1.0 + max(0.0, (70 - p.fitness)) / 90.0
-        chance *= 1.0 + max(0, p.age - 30) * 0.09
-        if p.has_trait("glass"):
-            chance *= 2.2
+        # injury_risk מרכז את כל מה שמשפיע: עמידות, כוח פיזי, חדות
+        # משחק, גיל, כושר ותכונות אופי — וכולם ניתנים להשפעה
+        chance = 0.0115 * p.injury_risk
         if rng.random() < chance:
             name, low, high = rng.choice(INJURY_TYPES)
             weeks = rng.randint(low, high)

@@ -15,6 +15,9 @@ from football_manager.engine import (pick_lineup, position_fit, simulate_match,
 from football_manager.game import CUP_WEEKS, SEASON_WEEKS, GameState, round_robin
 from football_manager.models import (generate_player, generate_world,
                                      wage_for_overall)
+from football_manager import commercial as CM
+from football_manager import manager as MG
+from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
 
@@ -734,6 +737,7 @@ def test_the_gate_is_counted_during_the_youth_years_too():
     game = GameState.new_game("נער", "ST", "hapoel_carmel", 13, seed=5)
     assert game.stage == "youth"
     home_weeks = 0
+    gate = 0
     for _ in range(80):
         if game.pending_event_id:
             game.resolve_event(0)
@@ -742,10 +746,12 @@ def test_the_gate_is_counted_during_the_youth_years_too():
         if report.attendance:
             home_weeks += 1
             assert report.finances["matchday"] > 0
+        gate += report.finances["matchday"] if report.finances else 0
         if report.season_ended:
             break
     assert home_weeks >= 14
-    assert game.my_club.balance > 0
+    # מועדון יכול לסיים עונה במינוס — מה שנבדק כאן הוא שהקהל נספר בכלל
+    assert gate > CO.commercial_income(game.my_club) * 4
 
 
 def test_facility_upgrade_costs_money_takes_time_and_lands():
@@ -913,12 +919,143 @@ def test_club_books_survive_save_and_load(tmp_path):
             game.resolve_event(0)
         game.advance_week()
 
+    # ייתכן שהמנג'ר עבר מועדון באמצע — משווים את אותו מועדון בשני הצדדים
+    club = game.my_club
     path = game.save(str(tmp_path / "save.json"))
     loaded = GameState.load(path)
-    mirror = loaded.my_club
+    mirror = loaded.clubs[club.cid]
     assert mirror.stadium_name == club.stadium_name
     assert mirror.capacity == club.capacity
     assert int(mirror.balance) == int(club.balance)
     assert mirror.staff == club.staff
     assert mirror.works == club.works
     assert loaded.staff_market.keys() == game.staff_market.keys()
+
+
+# ---------------------------------------------------------------------------
+# התפתחות, פציעות ומסחר
+# ---------------------------------------------------------------------------
+
+def test_a_player_keeps_improving_after_eighteen():
+    """התלונה שהתחילה את זה: ההתפתחות מתה בגיל 17-18."""
+    game = GameState.new_game("צעיר", "ST", "hapoel_carmel", 17, seed=4)
+    marks = {}
+    for _ in range(400):
+        if game.me.age > 24 or game.game_over:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+        marks[game.me.age] = game.me.overall
+    assert marks[22] > marks[18] + 3, f"18→22 עלה רק {marks[22] - marks[18]}"
+    assert marks[24] >= marks[22]
+
+
+def test_potential_moves_but_the_ceiling_holds():
+    game = GameState.new_game("צעיר", "ST", "hapoel_carmel", 16, seed=8)
+    first = game.me.potential
+    assert game.me.ceiling >= first
+    for _ in range(300):
+        if game.me.age > 22 or game.game_over:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+        assert game.me.potential <= game.me.ceiling
+    assert game.me.potential != first
+
+
+def test_training_spreads_across_attributes():
+    clubs, _ = generate_world(seed=4)
+    club = clubs["hapoel_carmel"]
+    player = generate_player(random.Random(3), club, "ST", age=19, quality=50)
+    player.potential = 90
+    player.ceiling = 90
+    before = dict(player.attributes)
+    rng = random.Random(3)
+    for _ in range(43):
+        weekly_training(player, "shooting", club, rng)
+    moved = [a for a in D.ATTRIBUTES if player.attributes[a] > before[a]]
+    assert len(moved) >= 4, f"רק {len(moved)} תכונות זזו"
+    assert player.attributes["shooting"] > before["shooting"]
+
+
+def test_strength_and_resilience_lower_injury_risk():
+    clubs, _ = generate_world(seed=4)
+    club = clubs["hapoel_carmel"]
+    tough = generate_player(random.Random(5), club, "CB", age=24, quality=60)
+    frail = generate_player(random.Random(5), club, "CB", age=24, quality=60)
+    tough.resilience, tough.sharpness = 92, 85
+    tough.attributes["physical"] = 88
+    frail.resilience, frail.sharpness = 15, 30
+    frail.attributes["physical"] = 35
+    assert tough.injury_risk < frail.injury_risk * 0.6
+    assert tough.injury_risk < 1.0
+
+
+def test_every_player_has_a_believable_body():
+    _, players = generate_world(seed=4)
+    keepers, wingers = [], []
+    for player in players.values():
+        assert 150 <= player.height <= 210
+        assert 45 <= player.weight <= 110
+        assert 0 <= player.resilience <= 100
+        if player.position == "GK" and player.age >= 20:
+            keepers.append(player.height)
+        if player.position == "LW" and player.age >= 20:
+            wingers.append(player.height)
+    assert sum(keepers) / len(keepers) > sum(wingers) / len(wingers) + 6
+
+
+def test_sponsor_offers_scale_with_who_you_are():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=2)
+    rng = random.Random(9)
+
+    def sample(rep, media, goals):
+        game.me.reputation, game.me.media_skill = rep, media
+        game.me.career.goals = goals
+        offers = [CM.sponsor_offer(game.me, rng, 67) for _ in range(60)]
+        return sum(o["amount"] for o in offers if o) / len(offers)
+
+    young = sample(18, 8, 2)
+    star = sample(88, 72, 210)
+    assert star > young * 8, f"כוכב {star:.0f} מול צעיר {young:.0f}"
+    assert CM.marketability(game.me, 67) > 50
+
+
+def test_the_manager_has_a_character_and_speaks_up():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=5)
+    club = game.my_club
+    style = MG.style_of(club)
+    assert style[1]
+    assert MG.style_of(club) == style, "האופי משתנה בין קריאות"
+    rng = random.Random(1)
+    assert club.manager_name in MG.post_match_line(game, 8.6, "W", True, rng)
+    assert MG.selection_note(game)
+    directive = MG.weekly_directive(game, rng)
+    assert directive in list(D.ATTRIBUTES) + ["rest"]
+
+
+def test_repeat_events_respect_their_cooldown():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=6)
+    last_seen = {}
+    seen = set()
+    for _ in range(220):
+        if game.game_over:
+            break
+        if game.pending_event_id:
+            eid = game.pending_event_id
+            event = ST.find_event(eid)
+            stamp = game.year * 43 + game.week
+            if event and not event.once and eid in last_seen:
+                gap = stamp - last_seen[eid]
+                assert gap >= event.cooldown, \
+                    f"{eid} חזר אחרי {gap} שבועות במקום {event.cooldown}"
+            last_seen[eid] = stamp
+            seen.add(eid)
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+    assert len(seen) > 5

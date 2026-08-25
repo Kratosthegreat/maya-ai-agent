@@ -9,7 +9,7 @@ function ev(e) { STORY.push(e); return e; }
 const mor = (g, d) => { g.me.morale = clamp(g.me.morale + d, 5, 99); };
 const tru = (g, d) => { const c = g.myClub(); if (c) c.managerTrust = clamp(c.managerTrust + d, 0, 100); };
 const fan = (g, d) => { const c = g.myClub(); if (c) c.fanSupport = clamp(c.fanSupport + d, 0, 100); };
-const rep = (g, d) => { g.me.reputation = clamp(g.me.reputation + d, 1, 99); };
+const rep = (g, d) => gainReputation(g.me, d);
 const att = (g, a, d) => addGrowth(g.me, a, d);
 
 // ===========================================================================
@@ -33,7 +33,7 @@ ev({
 });
 
 ev({
-  eid: "school_or_football", title: "מבחן ביום משחק", stages: ["youth"], weight: 4.0, once: false,
+  eid: "school_or_football", title: "מבחן ביום משחק", stages: ["youth"], weight: 4.0, once: false, cooldown: 24,
   cond: g => g.me.age <= 15,
   body: g => `מחר גמר מחוזי. מחר גם מבחן במתמטיקה.\n` +
     `המחנכת אמרה שאם תיעדר שוב — היא מזמינה את ההורים.`,
@@ -82,7 +82,7 @@ ev({
 });
 
 ev({
-  eid: "left_out", title: "הרשימה על הדלת", stages: ["youth"], weight: 3.5, once: false,
+  eid: "left_out", title: "הרשימה על הדלת", stages: ["youth"], weight: 3.5, once: false, cooldown: 10,
   cond: g => g.me.age <= 15 && g.week >= 6,
   body: g => `רשימת הנוסעים לטורניר תלויה על דלת חדר ההלבשה.\n` +
     `קראת אותה שלוש פעמים. השם שלך לא שם.`,
@@ -169,7 +169,7 @@ ev({
 
 ev({
   eid: "bench_frustration", title: "שבוע חמישי על הספסל", stages: ["player", "veteran"],
-  weight: 3.0, once: false,
+  weight: 3.0, once: false, cooldown: 12,
   cond: g => g.noStartStreak >= 4 && g.me.age >= 19,
   body: g => `חמישה משחקים. אפס דקות.\nאתה עומד מול הדלת של ${g.myClub().managerName} ומחזיק את הידית.`,
   choices: [
@@ -184,7 +184,7 @@ ev({
 });
 
 ev({
-  eid: "derby_week", title: "שבוע דרבי", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "derby_week", title: "שבוע דרבי", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 20,
   cond: g => g.week >= 3,
   body: g => `העיר לא ישנה. שלטי חוצות, אוהדים מחוץ למתחם האימונים,\n` +
     `וכתבה שמצטטת שחקן מהיריבה: "${g.me.name}? לא מכיר."`,
@@ -230,7 +230,7 @@ ev({
 });
 
 ev({
-  eid: "big_club_interest", title: "שיחה מאירופה", stages: ["player", "veteran"], weight: 4.5, once: false,
+  eid: "big_club_interest", title: "שיחה מאירופה", stages: ["player", "veteran"], weight: 4.5, once: false, cooldown: 34,
   cond: g => g.bigClubSuitor() !== null && [11, 12, 13].includes(g.week),
   body: g => `הסוכן שלך מתקשר בשתיים בלילה.\n` +
     `"${g.bigClubSuitor().name} שאלו עליך. לא סתם שאלו — הם שלחו צופה לשלושה משחקים.\n` +
@@ -260,7 +260,7 @@ ev({
 });
 
 ev({
-  eid: "serious_injury", title: "הרגל נתקעה בדשא", stages: ["player", "veteran"], weight: 3.0, once: false,
+  eid: "serious_injury", title: "הרגל נתקעה בדשא", stages: ["player", "veteran"], weight: 3.0, once: false, cooldown: 40,
   cond: g => g.me.injuryWeeks >= 8,
   body: g => `${g.me.injuryName}. ${g.me.injuryWeeks} שבועות, אם הכל ילך טוב.\n` +
     `הרופא מדבר, אתה שומע רק את המילה "אם".`,
@@ -273,22 +273,128 @@ ev({
   ],
 });
 
+// --- החיים המסחריים -------------------------------------------------------
+//
+// ההצעות נבנות בזמן אמת לפי מי שאתה עכשיו: מוניטין, שערים, כריזמה
+// והמועדון. לכן אותו אירוע נראה אחרת בגיל 18 ובגיל 27.
+
+function buildDeal(g) {
+  const club = g.myClub();
+  const offer = sponsorOffer(g.me, g.rng, club ? club.reputation : 30, !!g.myFixture());
+  if (offer) g.flags.pendingDeal = offer;
+  return offer;
+}
+
 ev({
-  eid: "sponsor_deal", title: "חוזה פרסום", stages: ["player", "veteran"], weight: 2.2, once: false,
-  cond: g => g.me.reputation >= 45,
-  body: () => "חברת נעליים שמה על השולחן חוזה שנתי.\n" +
-    "הכסף מכובד. התנאי: שלושה ימי צילומים בעונה, אחד מהם בשבוע של משחק.",
+  eid: "sponsor_deal", title: "טלפון ממחלקת השיווק",
+  stages: ["academy", "player", "veteran"], weight: 1.3, once: false, cooldown: 16,
+  cond: g => marketability(g.me, g.myClub() ? g.myClub().reputation : 30) >= 12,
+  body: g => {
+    const offer = buildDeal(g);
+    if (!offer) return "";
+    const lines = [
+      `${offer.brand} (${offer.tierHe}) רוצים אותך על ${offer.kindHe}.`,
+      "",
+      dealSummary(offer),
+      offer.clashes
+        ? "אחד מימי הצילומים נופל בשבוע של משחק."
+        : "הצילומים בהפסקת הליגה — לא פוגע בשום דבר.",
+    ];
+    return lines.join("\n");
+  },
   choices: [
-    { label: "לחתום", hint: "₪450,000",
-      apply: g => { g.earn(450000); g.me.mediaSkill = clamp(g.me.mediaSkill + 6, 0, 100); tru(g, -3);
-        return "חתמת. הצטלמת. המאמן ראה את הפוסטר בכניסה למתחם ולא חייך."; } },
-    { label: "לסרב — לא בשבוע של משחק",
-      apply: g => { tru(g, 5); att(g, "mental", 0.5); return "סירבת. הסוכן כעס. הצוות המקצועי לא."; } },
+    { label: "לחתום", hint: "כסף וכריזמה", apply: g => {
+      const offer = g.flags.pendingDeal;
+      if (!offer) return "ההצעה ירדה מהשולחן.";
+      const total = offer.amount * offer.years;
+      g.earn(total);
+      g.me.mediaSkill = clamp(g.me.mediaSkill + offer.mediaGain, 0, 100);
+      gainReputation(g.me, offer.mediaGain * 0.25);
+      g.flags.pendingDeal = null;
+      if (offer.clashes) {
+        tru(g, -3);
+        return `חתמת עם ${offer.brand} על ₪${fmt(total)}. יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.`;
+      }
+      return `חתמת עם ${offer.brand} על ₪${fmt(total)}. הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.`;
+    } },
+    { label: "לסרב", apply: g => {
+      const offer = g.flags.pendingDeal;
+      g.flags.pendingDeal = null;
+      if (offer && offer.clashes) {
+        tru(g, 4); att(g, "mental", 0.4);
+        return "סירבת בגלל השבוע של המשחק. הצוות המקצועי שמע, וזכר.";
+      }
+      return "סירבת. הסוכן שלך לא הבין למה, אבל זה הכסף שלך.";
+    } },
   ],
 });
 
 ev({
-  eid: "contract_talks", title: "שולחן המשא ומתן", stages: ["player", "veteran"], weight: 8.0, once: false,
+  eid: "media_job", title: "הצעה מהתקשורת",
+  stages: ["player", "veteran"], weight: 0.9, once: false, cooldown: 22,
+  cond: g => mediaOffer(g.me, new Rng(g.week * 31 + g.year)) !== null,
+  body: g => {
+    const offer = mediaOffer(g.me, g.rng);
+    if (!offer) return "";
+    g.flags.pendingMedia = offer;
+    return `${offer.name}.\n\n₪${fmt(offer.amount)}. זה גם אומר שהפנים שלך יהיו בכל מקום, ` +
+      "וזה חרב פיפיות: העיתונות אוהבת את מי שמדבר, עד שהיא לא.";
+  },
+  choices: [
+    { label: "לקחת את זה", hint: "כסף וחשיפה", apply: g => {
+      const offer = g.flags.pendingMedia;
+      if (!offer) return "ההצעה ירדה.";
+      g.earn(offer.amount);
+      g.me.mediaSkill = clamp(g.me.mediaSkill + 7, 0, 100);
+      gainReputation(g.me, 2);
+      g.flags.pendingMedia = null;
+      if (g.rng.random() < 0.3) {
+        tru(g, -2);
+        return `לקחת. ₪${fmt(offer.amount)} בכיס, והמאמן שאל אותך אם אתה שחקן או פרשן.`;
+      }
+      return `לקחת. ₪${fmt(offer.amount)}, וכולם ראו אותך.`;
+    } },
+    { label: "להישאר מחוץ לאור הזרקורים", apply: g => {
+      g.flags.pendingMedia = null;
+      tru(g, 2); att(g, "mental", 0.3);
+      return "ויתרת. פחות רעש, יותר אימונים.";
+    } },
+  ],
+});
+
+ev({
+  eid: "agent_pitch", title: "סוכן עם הצעה",
+  stages: ["player", "veteran"], weight: 1.1, once: false, cooldown: 26,
+  cond: g => g.myClub() !== null && g.me.reputation >= 30 && g.me.contract.yearsLeft <= 2,
+  body: g => {
+    const pitch = agentPitch(g.me, g.rng, Object.values(g.clubs), g.myClub());
+    if (!pitch) return "";
+    g.flags.pendingAgent = pitch;
+    return `${pitch.agent} תפס אותך אחרי אימון.\n\n` +
+      `"יש לי קשר ב${pitch.clubName}. אתה מקבל היום ₪${fmt(g.me.contract.wage)} לשבוע — ` +
+      `שם מדברים על ₪${fmt(pitch.wage)}. תן לי לעבוד."\n\n` +
+      `העמלה שלו: ₪${fmt(pitch.fee)}.`;
+  },
+  choices: [
+    { label: "לתת לו לעבוד", hint: "פותח דלת למעבר", apply: g => {
+      const pitch = g.flags.pendingAgent;
+      if (!pitch) return "הסוכן נעלם.";
+      g.spend(pitch.fee);
+      g.setFlag("agent_target", pitch.club);
+      g.flags.pendingAgent = null;
+      mor(g, 3);
+      return `שילמת לו מקדמה. הוא כבר מדבר עם ${pitch.clubName} — בחלון ההעברות זה יהיה על השולחן.`;
+    } },
+    { label: "אני מסודר איפה שאני", apply: g => {
+      g.flags.pendingAgent = null;
+      tru(g, 3);
+      return "אמרת לו שאתה מסודר. הידיעה הזו הגיעה למאמן, והוא חייך.";
+    } },
+  ],
+});
+
+ev({
+  eid: "contract_talks", title: "שולחן המשא ומתן", stages: ["player", "veteran"], weight: 8.0, once: false, cooldown: 8,
   cond: g => g.me.contract.yearsLeft <= 0 && g.myClub() !== null,
   body: g => `החוזה שלך נגמר בסוף העונה.\n${g.myClub().name} הניחו הצעה על השולחן: ` +
     `₪${fmt(g.renewalOffer())} לשבוע.`,
@@ -302,7 +408,7 @@ ev({
 });
 
 ev({
-  eid: "dressing_room_split", title: "חדר הלבשה מפוצל", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "dressing_room_split", title: "חדר הלבשה מפוצל", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 30,
   cond: g => g.myClub() && g.myClub().managerTrust <= 40,
   body: g => `חצי מהקבוצה רוצה ש${g.myClub().managerName} ילך.\n` +
     `מישהו כבר דיבר עם עיתונאי. עכשיו מסתכלים עליך — אתה בין הבכירים.`,
@@ -318,7 +424,7 @@ ev({
 });
 
 ev({
-  eid: "youngster_threat", title: "הילד שהגיע לתפוס את המקום", stages: ["player", "veteran"], weight: 2.0, once: false,
+  eid: "youngster_threat", title: "הילד שהגיע לתפוס את המקום", stages: ["player", "veteran"], weight: 2.0, once: false, cooldown: 34,
   cond: g => g.me.age >= 26 && g.rivalYoungster() !== null,
   body: g => {
     const kid = g.rivalYoungster();
@@ -339,7 +445,7 @@ ev({
 // ===========================================================================
 
 ev({
-  eid: "body_signals", title: "הגוף מדבר", stages: ["veteran"], weight: 3.0, once: false,
+  eid: "body_signals", title: "הגוף מדבר", stages: ["veteran"], weight: 3.0, once: false, cooldown: 30,
   cond: g => g.me.age >= 32,
   body: g => `אתה בן ${g.me.age}. הבוקר לקח לך עשרים דקות לרדת מהמיטה.\n` +
     `הפיזיותרפיסט אומר שאפשר להמשיך — עם מחיר.`,
@@ -354,7 +460,7 @@ ev({
 });
 
 ev({
-  eid: "retirement_call", title: "ההחלטה", stages: ["veteran"], weight: 9.0, once: false,
+  eid: "retirement_call", title: "ההחלטה", stages: ["veteran"], weight: 9.0, once: false, cooldown: 20,
   cond: g => g.retirementReady(),
   body: g => `${g.me.age}. ${g.me.career.apps + g.me.season.apps} משחקים בקריירה.\n` +
     `${g.me.career.goals + g.me.season.goals} שערים.\n` +
@@ -417,7 +523,7 @@ ev({
 });
 
 ev({
-  eid: "board_meeting", title: "ישיבת הנהלה", stages: ["manager"], weight: 4.0, once: false,
+  eid: "board_meeting", title: "ישיבת הנהלה", stages: ["manager"], weight: 4.0, once: false, cooldown: 12,
   cond: g => [6, 13, 20].includes(g.week) && g.myClub() !== null,
   body: g => `היו"ר פורש טבלה על השולחן.\n` +
     `"ציפינו ל${g.myClub().seasonExpectation}. אנחנו במקום ${g.leaguePosition()}.\n` +
@@ -433,7 +539,7 @@ ev({
 });
 
 ev({
-  eid: "star_wants_out", title: "הכוכב רוצה ללכת", stages: ["manager"], weight: 3.0, once: false,
+  eid: "star_wants_out", title: "הכוכב רוצה ללכת", stages: ["manager"], weight: 3.0, once: false, cooldown: 34,
   cond: g => g.squadStar() !== null,
   body: g => {
     const s = g.squadStar();
@@ -447,7 +553,7 @@ ev({
 });
 
 ev({
-  eid: "wonderkid", title: "ילד מהנוער", stages: ["manager"], weight: 3.0, once: false,
+  eid: "wonderkid", title: "ילד מהנוער", stages: ["manager"], weight: 3.0, once: false, cooldown: 40,
   cond: g => g.myClub() !== null,
   body: () => "מאמן הנוער מביא לך שם.\nבן 17. באימון הבוגרים הוריד שני בלמים בתנועה אחת.",
   choices: [
@@ -458,7 +564,7 @@ ev({
 });
 
 ev({
-  eid: "sack_race", title: "השם שלך בעיתון", stages: ["manager"], weight: 6.0, once: false,
+  eid: "sack_race", title: "השם שלך בעיתון", stages: ["manager"], weight: 6.0, once: false, cooldown: 22,
   cond: g => g.myClub() && g.myClub().boardConfidence <= 32,
   body: g => `"${g.me.name} על הכוונת" — כותרת ראשית.\n` +
     `אמון ההנהלה: ${Math.round(g.myClub().boardConfidence)}%. שלושה משחקים להוכיח.`,
@@ -472,7 +578,7 @@ ev({
 });
 
 ev({
-  eid: "bigger_job", title: "מועדון גדול מתקשר", stages: ["manager"], weight: 4.0, once: false,
+  eid: "bigger_job", title: "מועדון גדול מתקשר", stages: ["manager"], weight: 4.0, once: false, cooldown: 34,
   cond: g => g.managerSuitor() !== null,
   body: g => `${g.managerSuitor().name} רוצים אותך.\n` +
     `תקציב אחר, לחץ אחר, אצטדיון אחר.\nובמועדון שלך יש חוזה ואוהדים שקראו לך בשם.`,
@@ -546,10 +652,29 @@ ev({
 
 // ---------------------------------------------------------------------------
 
+/** כמה שבועות עברו מאז שהאירוע הזה נורה. null אם מעולם לא. */
+function weeksSince(g, eid) {
+  const log = g.flags.lastFired || {};
+  const stamp = log[eid];
+  if (!stamp) return null;
+  return (g.year - stamp[0]) * 43 + (g.week - stamp[1]);
+}
+
+/** מסמן מתי אירוע נורה, כדי שלא יחזור על עצמו בשבוע הבא. */
+function noteFired(g, eid) {
+  if (!g.flags.lastFired) g.flags.lastFired = {};
+  g.flags.lastFired[eid] = [g.year, g.week];
+}
+
 function eligibleEvents(g) {
   return STORY.filter(e => {
     if (e.stages.length && !e.stages.includes(g.stage)) return false;
     if (e.once && g.firedEvents.includes(e.eid)) return false;
+    if (!e.once) {
+      const gap = weeksSince(g, e.eid);
+      // אירוע חוזר לא אמור לקרות שוב מיד. ברירת המחדל: פעם בעונה בערך.
+      if (gap !== null && gap < (e.cooldown ?? 30)) return false;
+    }
     try { return !!e.cond(g); } catch (err) { return false; }
   });
 }

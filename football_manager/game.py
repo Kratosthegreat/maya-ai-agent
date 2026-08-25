@@ -20,14 +20,18 @@ from . import data as D
 from . import story as ST
 from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
                      build_commentary, simulate_match)
-from .models import (Club, Contract, Player, TableRow, clamp,
+from .models import (gain_reputation, Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from . import club_ops as CO
+from . import manager as MG
 from .progression import (end_of_season_development, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
                           weekly_training)
 
 SEASON_WEEKS = 43
+
+# בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
+YOUTH_LOAD = 0.52
 CUP_WEEKS = {6: "שלב 32 האחרונות", 13: "שמינית הגמר", 21: "רבע הגמר",
              29: "חצי הגמר", 37: "גמר הגביע"}
 SAVE_DIR = os.path.join(os.path.expanduser("~"), ".football_manager_saves")
@@ -207,9 +211,12 @@ class GameState:
         me = generate_player(state.rng, club, position, age=age, quality=quality)
         me.name = name
         me.is_human = True
-        # מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
-        me.potential = int(clamp(me.overall + state.rng.randint(6, 22)
-                                 + max(0, 24 - age) * 2.2, me.overall + 2, 94))
+        # מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול.
+        # התקרה נסתרת ורחבה; מה שמוצג הוא הערכה שתתעדכן לפי הביצועים.
+        me.ceiling = int(clamp(me.overall + state.rng.randint(14, 34)
+                               + max(0, 24 - age) * 1.9, me.overall + 6, 95))
+        me.potential = int(clamp(me.overall + (me.ceiling - me.overall) * 0.45,
+                                 me.overall + 2, me.ceiling))
         me.club_id = club_id
         if age <= 15:
             me.contract = Contract(wage=0, years_left=0)   # בגיל הנוער אין חוזה
@@ -403,7 +410,16 @@ class GameState:
             report.event_id = self.pending_event_id
             return report
 
-        # 1. פעולת השבוע
+        # 1. מה המאמן רוצה ממך השבוע, ומה עשית בפועל
+        directive = self.flag("directive")
+        if directive:
+            club = self.my_club
+            if self.training_focus == directive:
+                MG.trust_move(club, 1.6)
+                report.add(f"✅ עשית מה שהמאמן ביקש. {club.manager_name} שם לב.")
+            elif self.stage in ("academy", "player", "veteran"):
+                MG.trust_move(club, -0.9)
+                report.add(f"↩️ התאמנת על משהו אחר ממה ש{club.manager_name} ביקש.")
         report.lines.extend(self._do_weekly_action())
 
         # 2. משחקים — הליגה הבוגרת רצה גם כשאתה עוד בקבוצת הנוער
@@ -422,7 +438,13 @@ class GameState:
         # 5. שכר
         self._weekly_income(report)
 
-        # 6. קידום השבוע
+        # 6. ההוראה לשבוע הבא
+        nxt = MG.weekly_directive(self, self.rng)
+        self.set_flag("directive", nxt)
+        if nxt and self.stage in ("academy", "player", "veteran"):
+            report.add(MG.directive_line(self.my_club, nxt))
+
+        # 7. קידום השבוע
         self.week += 1
         if self.week > SEASON_WEEKS:
             report.season_ended = True
@@ -445,10 +467,11 @@ class GameState:
                 return ["📚 שבוע של בית ספר. ההורים מרוצים, המאמן פחות."]
             if focus == "street":
                 attr = self.rng.choice(["dribbling", "shooting", "pace"])
-                lines = weekly_training(me, attr, club, self.rng, 1.15)
+                lines = weekly_training(me, attr, club, self.rng, YOUTH_LOAD * 1.15)
                 me.morale = clamp(me.morale + 4, 5, 99)
                 return ["🧱 שיחקת עד שהחשיך במגרש השכונתי."] + lines
-            return weekly_training(me, focus, club, self.rng, self.intensity)
+            return weekly_training(me, focus, club, self.rng,
+                                   self.intensity * YOUTH_LOAD)
 
         if self.stage in ("academy", "player", "veteran"):
             return weekly_training(me, focus, club, self.rng, self.intensity)
@@ -493,7 +516,7 @@ class GameState:
                 fee = int(6000 + me.media_skill * 260 + me.reputation * 190)
                 self.earn_money(fee)
                 me.media_skill = clamp(me.media_skill + 1.4, 0, 100)
-                me.reputation = clamp(me.reputation + 0.3, 0, 99)
+                gain_reputation(me, 0.3)
                 lines.append(f"📺 שידור באולפן. ₪{fee:,}.")
             elif focus == "column":
                 fee = int(3000 + me.media_skill * 120)
@@ -697,6 +720,11 @@ class GameState:
                 if result.motm == me.pid:
                     detail += " | ⭐ מצטיין המשחק"
                 lines.append(f"👤 {detail}")
+                club = self.my_club
+                outcome = result.result_for(club.cid) if club else "D"
+                note = MG.post_match_line(self, rating, outcome, True, self.rng)
+                if note:
+                    lines.append(note)
             elif me.available:
                 self.no_start_streak += 1
                 if self.rng.random() < 0.4:
@@ -704,6 +732,9 @@ class GameState:
                 else:
                     me.morale = clamp(me.morale - 2.5, 5, 99)
                     lines.append("🪑 ישבת 90 דקות על הספסל.")
+                    note = MG.post_match_line(self, None, "D", False, self.rng)
+                    if note:
+                        lines.append(note)
             else:
                 lines.append(f"🚑 פצוע — {me.injury_name} ({me.injury_weeks} שבועות).")
         else:
@@ -963,6 +994,7 @@ class GameState:
             return False
         self.pending_event_id = event.eid
         self.pending_event_body = body
+        ST.note_fired(self, event.eid)
         return True
 
     def pending_event(self) -> Optional[ST.StoryEvent]:
@@ -1045,14 +1077,15 @@ class GameState:
         self.transfer_me(target.cid, wage=0, years=0)
         target.manager_trust = 40.0
         self.me.morale = clamp(self.me.morale - 4, 5, 99)
-        self.me.potential = int(clamp(self.me.potential + self.rng.randint(1, 5), 40, 96))
+        self.me.potential = int(clamp(self.me.potential + self.rng.randint(1, 5),
+                                      40, self.me.ceiling))
         self.set_flag("big_academy", True)
         return (f"עברת ל{target.name}. מתקנים שלא הכרת, "
                 f"וילדים שכולם היו הכי טובים במועדון שלהם.")
 
     def show_off(self) -> str:
         if self.rng.random() < 0.5:
-            self.me.reputation = clamp(self.me.reputation + 6, 1, 99)
+            gain_reputation(self.me, 6)
             self.me.growth["dribbling"] = self.me.growth.get("dribbling", 0.0) + 1.0
             self.set_flag("scouted_wow", True)
             return "הורדת שניים בתנועה אחת והנחת כדור בזווית. הוא הפסיק לכתוב והסתכל."
@@ -1194,13 +1227,13 @@ class GameState:
             self.me.morale = clamp(self.me.morale - 10, 5, 99)
             return ("יומיים אחרי ההכחשה פורסם סרטון נוסף. "
                     "עכשיו זה לא הבילוי — זה השקר.")
-        self.me.reputation = clamp(self.me.reputation + 1, 1, 99)
+        gain_reputation(self.me, 1)
         return "הכחשת בתוקף והסיפור דעך. הפעם יצאת מזה."
 
     def national_debut(self) -> str:
         self.caps += 1
         self.set_flag("national_debut", True)
-        self.me.reputation = clamp(self.me.reputation + 9, 1, 99)
+        gain_reputation(self.me, 9)
         self.me.morale = clamp(self.me.morale + 8, 5, 99)
         self.record_honour("בכורה בנבחרת")
         if self.rng.random() < 0.25:
@@ -1215,7 +1248,7 @@ class GameState:
             club.manager_trust = clamp(club.manager_trust + 10, 0, 100)
             club.fan_support = clamp(club.fan_support + 8, 0, 100)
         self.me.morale = clamp(self.me.morale + 6, 5, 99)
-        self.me.reputation = clamp(self.me.reputation + 4, 1, 99)
+        gain_reputation(self.me, 4)
         if "leader" not in self.me.traits:
             self.me.traits.append("leader")
         self.me.coaching = clamp(self.me.coaching + 6, 0, 100)
@@ -1385,7 +1418,7 @@ class GameState:
         self.managed_club_id = target.cid
         target.manager_name = self.me.name
         target.board_confidence = 60.0
-        self.me.reputation = clamp(self.me.reputation + 6, 1, 99)
+        gain_reputation(self.me, 6)
         self.log(f"עברת לאמן את {target.name}.")
         return f"אתה המנג'ר של {target.name}. ליגה אחרת, לחץ אחר."
 
@@ -1663,7 +1696,8 @@ class GameState:
                     player.age += 1
                 continue
             share = clamp(player.season.minutes / (SEASON_WEEKS * 90.0), 0, 1)
-            end_of_season_development(player, self.rng, share)
+            end_of_season_development(player, self.rng, share,
+                                      self.clubs.get(player.club_id))
 
     def _process_retirements(self) -> None:
         """שחקני מחשב פורשים, מועדונים מגדלים נוער חדש."""

@@ -165,6 +165,20 @@ function toast(message) {
   toastTimer = setTimeout(() => el.classList.remove("on"), 3600);
 }
 
+// מחסנית חזרה קצרה — כדי שאפשר יהיה לצלול לתיק של מועדון ולחזור
+const navStack = [];
+
+function goDeep(next, data = null) {
+  navStack.push([view, viewData]);
+  go(next, data);
+}
+
+function goBack() {
+  const previous = navStack.pop();
+  if (previous) { view = previous[0]; viewData = previous[1]; render(); }
+  else go("main");
+}
+
 function go(next, data = null) {
   view = next;
   viewData = data;
@@ -442,8 +456,209 @@ function screenMain() {
   if (view === "news") return appbar() + screenNews();
   if (view === "tactics") return appbar() + screenTactics();
   if (view === "club") return appbar() + screenClub();
+  if (view === "clubinfo") return appbar() + screenClubInfo();
+  if (view === "player") return appbar() + screenPlayer();
   if (view === "editor") return appbar() + screenEditor();
   return appbar() + screenHub() + dock(true);
+}
+
+/** תיאור עמידות/חדות במילים — מספר גולמי לא אומר כלום. */
+function bandLabel(value, labels) {
+  const index = Math.min(labels.length - 1, Math.floor(value / (100 / labels.length)));
+  return labels[index];
+}
+
+const RESILIENCE_WORDS = ["זכוכית", "שביר", "רגיל", "חסון", "ברזל"];
+const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בשיא"];
+
+/** תעודת זהות מלאה של שחקן — מה שחסר כשרואים רק גיל ורגל. */
+function screenPlayer() {
+  const pid = (viewData && viewData.pid) || game.meId;
+  const p = game.players[pid];
+  if (!p) return `<div class="screen"><div class="card">שחקן לא נמצא.</div></div>`;
+  const club = p.clubId ? game.clubs[p.clubId] : null;
+  const mine = pid === game.meId;
+  const s = p.season, c = p.career;
+
+  return `
+  <div class="screen">
+    ${playerCard(p, club, mine ? game.stage : "player")}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">תעודת זהות</span>
+        <span class="r">${esc(positionHe(p))}</span></div>
+      <div class="panel-body tight">
+        <div class="row"><span class="nm">גיל</span><span class="val num">${p.age}</span></div>
+        <div class="row"><span class="nm">גובה</span>
+          <span class="val num">${p.height} ס"מ</span></div>
+        <div class="row"><span class="nm">משקל</span>
+          <span class="val num">${p.weight} ק"ג</span></div>
+        <div class="row"><span class="nm">רגל חזקה</span>
+          <span class="val">${esc(FOOT_NAMES[playerFoot(p)])}</span></div>
+        <div class="row"><span class="nm">לאום</span>
+          <span class="val">${esc(p.nationality)}</span></div>
+        <div class="row"><span class="nm">מספר חולצה</span>
+          <span class="val num">${p.number || "—"}</span></div>
+        ${club ? `<div class="row"><span class="nm">מועדון</span>
+          <span class="val"><button class="link-btn" data-club="${club.cid}">${esc(club.name)}</button></span></div>` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מצב גופני</span>
+        <span class="r">${p.injuryWeeks ? esc(p.injuryName) : "כשיר"}</span></div>
+      <div class="panel-body">
+        <div class="attr"><span>עמידות לפציעות</span>
+          <span class="val">${esc(bandLabel(p.resilience, RESILIENCE_WORDS))}</span>
+          <span class="bar"><i style="width:${Math.round(p.resilience)}%"></i></span></div>
+        <div class="attr"><span>חדות משחק</span>
+          <span class="val">${esc(bandLabel(p.sharpness, SHARPNESS_WORDS))}</span>
+          <span class="bar"><i style="width:${Math.round(p.sharpness)}%"></i></span></div>
+        <div class="attr"><span>כושר</span>
+          <span class="val">${Math.round(p.fitness)}</span>
+          <span class="bar soft"><i style="width:${Math.round(p.fitness)}%"></i></span></div>
+        <div class="muted">סיכון פציעה: <span class="num">${
+          Math.round(injuryRisk(p) * 100)}%</span> מהרגיל.
+          ${mine ? "אימוני כוח ומנוחה מורידים אותו; דקות משחק מעלות חדות." : ""}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">תכונות</span>
+        <span class="r num">${overall(p)}${mine ? ` · תקרה ${p.potential}` : ""}</span></div>
+      <div class="panel-body">
+        <div class="attrs">
+          ${D.ATTRIBUTES.map(a => `<div class="attr">
+            <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
+            <span class="val">${p.attributes[a]}</span>
+            <span class="bar"><i style="width:${p.attributes[a]}%"></i></span>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    ${p.traits.length ? `<div class="panel">
+      <div class="panel-head"><span class="t">אופי</span></div>
+      <div class="panel-body">
+        <div class="chips">${p.traits.map(t =>
+          `<span class="chip" style="cursor:default">${esc(D.TRAITS[t] ? D.TRAITS[t].name : t)}</span>`).join("")}</div>
+        <div class="muted">${p.traits.map(t => D.TRAITS[t] ? esc(D.TRAITS[t].desc) : "").join(" ")}</div>
+      </div>
+    </div>` : ""}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מספרים</span></div>
+      <div class="panel-body">
+        <div class="eyebrow">העונה</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${s.apps}</div><div class="l">משחקים</div></div>
+          <div class="stat"><div class="n">${s.goals}</div><div class="l">שערים</div></div>
+          <div class="stat"><div class="n">${avgRating(s).toFixed(1)}</div><div class="l">ציון</div></div>
+        </div>
+        <div class="eyebrow">בקריירה</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${c.apps}</div><div class="l">משחקים</div></div>
+          <div class="stat"><div class="n">${c.goals}</div><div class="l">שערים</div></div>
+          <div class="stat"><div class="n">${c.assists}</div><div class="l">בישולים</div></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn ghost wide" data-act="back">חזרה</button>
+  </div>`;
+}
+
+/**
+ * תיק על מועדון אחר: מיקום, כושר, מוניטין, אצטדיון, מתקנים וסגל מלא.
+ * נפתח מכל מקום שבו מוזכר מועדון — הצעת העברה, המשחק הבא, הטבלה.
+ */
+function screenClubInfo() {
+  const cid = viewData && viewData.cid;
+  const club = cid ? game.clubs[cid] : null;
+  if (!club) return `<div class="screen"><div class="card">מועדון לא נמצא.</div></div>`;
+
+  const league = D.LEAGUES.find(l => l.id === club.leagueId);
+  const table = game.standings(club.leagueId);
+  const index = table.findIndex(r => r.clubId === club.cid);
+  const row = index >= 0 ? table[index] : null;
+  const squad = club.squad.map(pid => game.players[pid]).filter(Boolean)
+    .sort((a, b) => overall(b) - overall(a));
+  const best = squad.slice(0, 5);
+  const avg = squad.length
+    ? Math.round(squad.reduce((sum, p) => sum + overall(p), 0) / squad.length) : 0;
+  const mine = game.myClub();
+  const isMine = mine && mine.cid === club.cid;
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.name)}</span>
+        <span class="r">${esc(league ? league.name : "")}</span></div>
+      <div class="panel-body">
+        <div class="crest-row">${crest(club, 52)}
+          <div class="kit-meta">
+            <span class="nm">${esc(club.nickname)}</span>
+            <span class="muted">🏟️ ${esc(club.stadiumName)} · ${fmt(club.capacity)} מקומות</span>
+            <span class="muted">מאמן: ${esc(club.managerName)} · ${
+              esc(managerStyle(club)[1])}</span>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${index >= 0 ? index + 1 : "—"}</div>
+            <div class="l">בטבלה</div></div>
+          <div class="stat"><div class="n">${row ? row.points : "—"}</div>
+            <div class="l">נקודות</div></div>
+          <div class="stat"><div class="n">${club.reputation}</div>
+            <div class="l">מוניטין</div></div>
+        </div>
+        ${club.formLog && club.formLog.length ? `<div class="muted">כושר אחרון</div>
+          ${formGuide(club)}` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">איך זה בפנים</span>
+        <span class="r num">סגל ${avg}</span></div>
+      <div class="panel-body tight">
+        <div class="row"><span class="nm">מתקני אימון</span>
+          <span class="val num">${Math.round(club.trainingFacilities)}</span></div>
+        <div class="row"><span class="nm">מחלקת נוער</span>
+          <span class="val num">${Math.round(club.youthAcademy)}</span></div>
+        <div class="row"><span class="nm">מרכז רפואי</span>
+          <span class="val num">${Math.round(club.medicalCentre)}</span></div>
+        <div class="row"><span class="nm">אהדת קהל</span>
+          <span class="val num">${Math.round(club.fanSupport)}</span></div>
+        <div class="row"><span class="nm">צוות מקצועי</span>
+          <span class="val num">${Object.keys(club.staff || {}).length}/5</span></div>
+        ${isMine ? "" : `<div class="row"><span class="nm">שכר טיפוסי לשחקן ברמה שלך</span>
+          <span class="val num">₪${fmt(wageForOverall(
+            Math.round(club.reputation * 0.8 + 18)))}</span></div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי משחק שם</span>
+        <span class="r">${squad.length} שחקנים</span></div>
+      <div class="panel-body tight">
+        ${best.map(p => `<div class="row">
+          ${avatarChip(p, club, 26)}
+          <button class="link-btn grow" data-player="${p.pid}">${esc(p.name)}</button>
+          <span class="muted">${esc(positionHe(p))} · ${p.age}</span>
+          <span class="val num">${overall(p)}</span>
+        </div>`).join("")}
+        ${squad.length > 5 ? `<button class="mini-btn wide" data-act="club-squad">
+          ${viewData.full ? "להראות רק את החמישייה" : `כל הסגל (${squad.length})`}</button>` : ""}
+        ${viewData.full ? squad.slice(5).map(p => `<div class="row">
+          ${avatarChip(p, club, 26)}
+          <button class="link-btn grow" data-player="${p.pid}">${esc(p.name)}</button>
+          <span class="muted">${esc(positionHe(p))} · ${p.age}</span>
+          <span class="val num">${overall(p)}</span>
+        </div>`).join("") : ""}
+      </div>
+    </div>
+
+    <button class="btn ghost wide" data-act="back">חזרה</button>
+  </div>`;
 }
 
 /** שורת כסף: תווית, סכום וסימן. */
@@ -683,6 +898,8 @@ function screenHub() {
           </div>
           <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}${
             club ? " · מקום " + game.leaguePosition() : ""}</div>
+          <button class="mini-btn wide" data-club="${rival.cid}">
+            תיק על ${esc(rival.name)}</button>
         </div>
       </div>`;
   } else {
@@ -774,6 +991,8 @@ function screenHub() {
           <span class="nm"><strong>${esc(game.clubs[offer.club].name)}</strong><br>
           <span class="muted">₪${fmt(offer.wage)} לשבוע · עכשיו ₪${fmt(me.contract.wage)}</span></span>
         </div>
+        <button class="mini-btn wide" data-club="${offer.club}">
+          לבדוק את המועדון לפני שמחליטים</button>
         <div class="btn-row">
           <button class="btn primary" data-act="accept">לחתום</button>
           <button class="btn" data-act="reject">לדחות</button>
@@ -784,7 +1003,12 @@ function screenHub() {
     <div class="panel">
       <div class="panel-head"><span class="t">המצב שלך</span>
         <span class="r">₪${fmt(game.money)}</span></div>
-      <div class="panel-body">${statusBody}</div>
+      <div class="panel-body">${statusBody}
+        ${(() => { const note = selectionNote(game);
+          return note ? `<div class="muted selection">${esc(note)}</div>` : ""; })()}
+        ${game.flag("directive") && club ? `<div class="directive">🎙️ ${
+          esc(directiveLine(club, game.flag("directive")))}</div>` : ""}
+      </div>
     </div>
 
     <div class="panel">
@@ -1107,7 +1331,8 @@ function screenProfile() {
   const s = me.season, c = me.career;
   return `
   <div class="screen">
-    ${isPlayer ? playerCard(me, club, game.stage) : `
+    ${isPlayer ? playerCard(me, club, game.stage)
+      + `<button class="mini-btn wide" data-player="${me.pid}">תעודת זהות מלאה</button>` : `
     <div class="card">
       <div class="eyebrow">${esc(D.CAREER_STAGES_HE[game.stage] || game.stage)}</div>
       <div class="kit-row">
@@ -1485,6 +1710,10 @@ function bind() {
     el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
   app.querySelectorAll("[data-press]").forEach(el =>
     el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+  app.querySelectorAll("[data-club]").forEach(el =>
+    el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
+  app.querySelectorAll("[data-player]:not(input)").forEach(el =>
+    el.addEventListener("click", () => goDeep("player", { pid: el.dataset.player })));
   app.querySelectorAll("[data-upgrade]").forEach(el =>
     el.addEventListener("click", () => {
       const message = game.upgradeFacility(el.dataset.upgrade);
@@ -1557,6 +1786,8 @@ function act(what) {
     } else viewData.identity = next;
     render();
   }
+  else if (what === "back") goBack();
+  else if (what === "club-squad") { viewData.full = !viewData.full; render(); }
   else if (what === "backup") backupCareer();
   else if (what === "restore") restoreCareer();
   else if (what === "export-db") exportDatabase();
