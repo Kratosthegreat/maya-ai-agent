@@ -112,3 +112,78 @@ function unpackSave(text) {
   }
   return JSON.parse(text);       // פורמט 1 — שמורה שנוצרה לפני הדחיסה
 }
+
+
+// ---------------------------------------------------------------------------
+// קובץ שמירה קבוע
+//
+// גיבוי שיוצר קובץ חדש בכל לחיצה הוא לא גיבוי — זו ערימה. דפדפנים
+// מודרניים מאפשרים לבחור קובץ פעם אחת ולכתוב אליו שוב ושוב, בלי
+// דיאלוג ובלי כפילויות. המזהה של הקובץ נשמר ב-IndexedDB כדי שהחיבור
+// ישרוד גם סגירה של הדף.
+// ---------------------------------------------------------------------------
+
+const FILE_DB = "fm_save_files";
+const FILE_STORE = "handles";
+const FILE_KEY = "career";
+const SAVE_FILENAME = "fm-career.txt";
+
+/** האם הדפדפן יודע לכתוב חזרה לקובץ שהמשתמש בחר. */
+function fileSaveSupported() {
+  return typeof window !== "undefined" && typeof window.showSaveFilePicker === "function";
+}
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(FILE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(FILE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function idbRun(mode, action) {
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(FILE_STORE, mode);
+    const request = action(tx.objectStore(FILE_STORE));
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  })).catch(() => null);
+}
+
+const rememberSaveHandle = handle => idbRun("readwrite", store => store.put(handle, FILE_KEY));
+const storedSaveHandle = () => idbRun("readonly", store => store.get(FILE_KEY));
+const forgetSaveHandle = () => idbRun("readwrite", store => store.delete(FILE_KEY));
+
+/**
+ * מצב ההרשאה לקובץ: "granted" מוכן לכתיבה, "prompt" צריך לחיצה,
+ * "denied" נחסם. request=true מבקש הרשאה — חייב לרוץ מתוך לחיצה.
+ */
+async function saveFilePermission(handle, request = false) {
+  if (!handle || !handle.queryPermission) return "denied";
+  const options = { mode: "readwrite" };
+  try {
+    let state = await handle.queryPermission(options);
+    if (state !== "granted" && request) state = await handle.requestPermission(options);
+    return state;
+  } catch (err) { return "denied"; }
+}
+
+/** בוחר קובץ שמירה. מחזיר את המזהה, או null אם המשתמש ביטל. */
+async function pickSaveFile() {
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: SAVE_FILENAME,
+      types: [{ description: "שמורת קריירה", accept: { "text/plain": [".txt"] } }],
+    });
+    await rememberSaveHandle(handle);
+    return handle;
+  } catch (err) { return null; }     // המשתמש ביטל
+}
+
+/** כותב לקובץ הקיים — דורס אותו, לא יוצר חדש. */
+async function writeSaveFile(handle, text) {
+  const writable = await handle.createWritable();
+  await writable.write(text);
+  await writable.close();
+}

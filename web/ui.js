@@ -20,6 +20,8 @@ let saveState = { ok: true, at: 0, error: "" };
 
 function saveGame() {
   if (!game) return false;
+  // אם יש קובץ מקושר עם הרשאה — לכתוב גם אליו, בשקט וברקע
+  if (saveFile.handle && saveFile.permission === "granted") writeCareerFile(true);
   let payload;
   try {
     payload = packSave(game.toJSON());
@@ -62,39 +64,115 @@ function clearSave() {
 }
 
 /**
- * גיבוי הקריירה לקובץ. זו הדרך היחידה שעוברת בין מכשירים,
- * ושורדת גם ניקוי של הדפדפן וגם גרסה חדשה של המשחק.
+ * חיבור לקובץ שמירה קבוע.
+ *
+ * הרעיון: בוחרים קובץ פעם אחת, ומאותו רגע כל שמירה דורסת אותו —
+ * בלי דיאלוג, בלי "(1)", בלי ערימת קבצים בתיקיית ההורדות.
  */
-async function backupCareer() {
+let saveFile = { handle: null, permission: "prompt", at: 0, error: "" };
+
+/** מחזיר את מצב הקובץ בטקסט, לתצוגה. */
+function saveFileState() {
+  if (!fileSaveSupported()) return "unsupported";
+  if (!saveFile.handle) return "none";
+  return saveFile.permission === "granted" ? "linked" : "needs-permission";
+}
+
+/** טוען את הקובץ שנבחר בעבר, אם יש. נקרא פעם אחת בעלייה. */
+async function loadSaveFile() {
+  if (!fileSaveSupported()) return;
+  const handle = await storedSaveHandle();
+  if (!handle) return;
+  saveFile.handle = handle;
+  saveFile.permission = await saveFilePermission(handle, false);
+  render();
+}
+
+// כתיבה לדיסק היא יקרה יותר מ-localStorage, ו-saveGame נקרא הרבה.
+// כתיבה שקטה מווסתת; לחיצה מפורשת תמיד נכתבת מיד.
+const FILE_WRITE_GAP = 10000;
+let fileWriteBusy = false;
+
+/** כותב את הקריירה לקובץ המקושר. שקט — בלי הודעות אם הכל תקין. */
+async function writeCareerFile(quiet = true) {
+  if (!saveFile.handle || !game) return false;
+  if (quiet && (fileWriteBusy || Date.now() - saveFile.at < FILE_WRITE_GAP)) return false;
+  fileWriteBusy = true;
+  try {
+    await writeSaveFile(saveFile.handle, packSave(game.toJSON()));
+    saveFile.at = Date.now();
+    saveFile.error = "";
+    if (!quiet) toast(`הקריירה נשמרה ל-${saveFile.handle.name}.`);
+    return true;
+  } catch (err) {
+    saveFile.permission = "prompt";
+    saveFile.error = "הכתיבה לקובץ נכשלה. צריך לחדש את החיבור.";
+    if (!quiet) toast(saveFile.error);
+    return false;
+  } finally {
+    fileWriteBusy = false;
+  }
+}
+
+/**
+ * הכפתור הראשי: בפעם הראשונה בוחר קובץ, ומכאן ואילך דורס אותו.
+ * בדפדפנים שלא תומכים — הורדה רגילה בשם קבוע.
+ */
+async function backupCareer(pickNew = false) {
   if (!game) return;
   let payload;
   try { payload = packSave(game.toJSON()); }
   catch (err) { toast("לא הצלחתי להכין את הגיבוי."); return; }
 
-  // שם קובץ באנגלית: חלק מהמארחים מסננים שמות עם תווים לא-לטיניים
-  const filename = `fm-career-${game.year}-w${game.week}.txt`;
+  if (fileSaveSupported()) {
+    if (pickNew || !saveFile.handle) {
+      const handle = await pickSaveFile();
+      if (!handle) return;                    // המשתמש ביטל
+      saveFile.handle = handle;
+      saveFile.permission = "granted";
+    } else if (saveFile.permission !== "granted") {
+      saveFile.permission = await saveFilePermission(saveFile.handle, true);
+      if (saveFile.permission !== "granted") {
+        toast("בלי הרשאה לקובץ אי אפשר לשמור אליו.");
+        render();
+        return;
+      }
+    }
+    const ok = await writeCareerFile(false);
+    render();
+    if (ok) return;
+  }
+
+  // דרך המילוט: הורדה רגילה, בשם קבוע כדי שלפחות יהיה ברור מה מחליף מה
   try {
     const downloads = window.claude && await window.claude.use("downloads");
     if (downloads) {
-      await downloads.save({ filename, data: payload });
+      await downloads.save({ filename: SAVE_FILENAME, data: payload });
       toast("הקריירה נשמרה לקובץ.");
       return;
     }
   } catch (err) {
     if (err && err.code === "declined") return;
-    // נופלים לדרך הרגילה
   }
 
   const blob = new Blob([payload], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = filename;
+  link.download = SAVE_FILENAME;
   document.body.appendChild(link);
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
   toast("הקריירה יורדת כקובץ גיבוי.");
+}
+
+/** מנתק את הקובץ המקושר. */
+async function unlinkSaveFile() {
+  await forgetSaveHandle();
+  saveFile = { handle: null, permission: "prompt", at: 0, error: "" };
+  toast("הקובץ נותק. הקריירה עדיין נשמרת בדפדפן.");
+  render();
 }
 
 /** שחזור קריירה מקובץ גיבוי. */
@@ -121,6 +199,55 @@ function restoreCareer() {
   input.click();
 }
 
+/** פאנל השמורה: מה נשמר, לאן, ומה אפשר לעשות עם זה. */
+function savePanel() {
+  const mode = saveFileState();
+  const name = saveFile.handle ? saveFile.handle.name : "";
+  const body = {
+    linked: `הקריירה נכתבת אוטומטית ל־<strong class="fname">${esc(name)}</strong> בכל סוף שבוע.
+             כל כתיבה דורסת את אותו קובץ — לא נוצרים עותקים.`,
+    "needs-permission": `הקובץ <strong class="fname">${esc(name)}</strong> מקושר, אבל הדפדפן
+             מבקש אישור מחדש אחרי שסגרת את הדף. לחיצה אחת והכל חוזר לעבוד.`,
+    none: `אפשר לקשר קובץ שמירה קבוע: בוחרים אותו פעם אחת, ומאותו רגע כל
+             שמירה דורסת אותו — בלי ערימת קבצים בהורדות.`,
+    unsupported: `הדפדפן הזה לא יודע לכתוב חזרה לקובץ קיים, אז גיבוי יורד
+             כקובץ רגיל בשם קבוע. במחשב עם כרום או Edge זה יעבוד כדריסה.`,
+  }[mode];
+
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">השמורה</span>
+      <span class="r">${saveState.ok ? esc(savedAgo()) : "לא נשמר"}</span></div>
+    <div class="panel-body">
+      <div class="row">
+        <span class="nm">בדפדפן</span>
+        <span class="val ${saveState.ok ? "good" : "bad"}">${
+          saveState.ok ? "פעיל" : "נכשל"}</span>
+      </div>
+      <div class="row">
+        <span class="nm">קובץ קבוע</span>
+        <span class="val ${mode === "linked" ? "good" : ""}">${
+          mode === "linked" ? `<span class="fname">${esc(name)}</span>`
+          : mode === "needs-permission" ? "ממתין לאישור"
+          : mode === "none" ? "לא מקושר" : "לא נתמך"}</span>
+      </div>
+      <div class="muted">${body}</div>
+      ${saveFile.error ? `<div class="muted bad">${esc(saveFile.error)}</div>` : ""}
+      <div class="btn-row">
+        <button class="btn ${mode === "linked" ? "" : "primary"}" data-act="backup">${
+          mode === "linked" ? "לשמור עכשיו"
+          : mode === "needs-permission" ? "לחדש את החיבור"
+          : mode === "none" ? "לבחור קובץ שמירה" : "להוריד גיבוי"}</button>
+        <button class="btn" data-act="restore">לשחזר</button>
+      </div>
+      ${saveFile.handle ? `<div class="btn-row">
+        <button class="mini-btn" data-act="backup-as">לבחור קובץ אחר</button>
+        <button class="mini-btn" data-act="unlink-file">לנתק</button>
+      </div>` : ""}
+    </div>
+  </div>`;
+}
+
 /** התראה כשהשמירה האוטומטית לא עובדת — עם דרך מוצא. */
 function saveWarning() {
   if (saveState.ok) return "";
@@ -130,7 +257,8 @@ function saveWarning() {
     <div class="panel-body">
       <div class="muted">${esc(saveState.error)}
         הקריירה תמשיך לרוץ, אבל היא לא תחכה לך אחרי שתסגור את הדף.</div>
-      <button class="btn wide" data-act="backup">להוריד קובץ גיבוי</button>
+      <button class="btn wide" data-act="backup">${
+        fileSaveSupported() ? "לקשר קובץ שמירה קבוע" : "להוריד קובץ גיבוי"}</button>
     </div>
   </div>`;
 }
@@ -1032,18 +1160,7 @@ function screenHub() {
     ${tableSnip}
     ${messages}
 
-    <div class="panel">
-      <div class="panel-head"><span class="t">השמורה</span>
-        <span class="r">${saveState.ok ? esc(savedAgo()) : "לא נשמר"}</span></div>
-      <div class="panel-body">
-        <div class="muted">הקריירה נשמרת בדפדפן הזה אחרי כל שבוע. קובץ גיבוי
-        מאפשר להעביר אותה למכשיר אחר, ולשחזר אותה אם הדפדפן ינוקה.</div>
-        <div class="btn-row">
-          <button class="btn" data-act="backup">קובץ גיבוי</button>
-          <button class="btn" data-act="restore">לשחזר</button>
-        </div>
-      </div>
-    </div>
+    ${savePanel()}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
   </div>`;
@@ -1772,7 +1889,12 @@ function act(what) {
   else if (what === "play") playWeek();
   else if (what === "after-week") afterWeek();
   else if (what === "after-outcome") afterOutcome();
-  else if (what === "after-season") { saveGame(); go(game.gameOver ? "end" : "main"); }
+  else if (what === "after-season") {
+    saveGame();
+    saveFile.at = 0;              // סוף עונה הוא נקודת ציון — לכתוב לקובץ בלי ויסות
+    writeCareerFile(true);
+    go(game.gameOver ? "end" : "main");
+  }
   else if (what === "accept") { showOutcome("הצעת העברה", game.acceptOffer()); }
   else if (what === "reject") { showOutcome("הצעת העברה", game.rejectOffer()); }
   else if (what === "restart") { clearSave(); game = null; go("menu"); }
@@ -1788,7 +1910,9 @@ function act(what) {
   }
   else if (what === "back") goBack();
   else if (what === "club-squad") { viewData.full = !viewData.full; render(); }
-  else if (what === "backup") backupCareer();
+  else if (what === "backup") backupCareer(false);
+  else if (what === "backup-as") backupCareer(true);
+  else if (what === "unlink-file") unlinkSaveFile();
   else if (what === "restore") restoreCareer();
   else if (what === "export-db") exportDatabase();
   else if (what === "import-db") importDatabase();
@@ -1878,6 +2002,7 @@ function boot() {
   }
   // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע
   const saveNow = () => { if (game) saveGame(); };
+  loadSaveFile();
   window.addEventListener("pagehide", saveNow);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveNow();
