@@ -34,11 +34,19 @@ const DIRECTIVE_TEXT = {
 };
 
 /** מה המאמן רוצה ממך השבוע. null כשאין לו מה להגיד. */
+/**
+ * מה המאמן רוצה ממך השבוע.
+ * הוא לא ממציא: הוא קורא את שורת הסטטיסטיקה של המשחק האחרון שלך
+ * ובוחר את התחום שבו נפלת הכי הרבה יחסית למה שהעמדה שלך דורשת.
+ */
 function weeklyDirective(game, rng) {
   const club = game.myClub();
   const me = game.me;
   if (!club || !["academy", "player", "veteran"].includes(game.stage)) return null;
-  if (me.fitness < 55) return "rest";
+  // מנוחה נדרשת רק כשהגוף באמת על הקצה — לא כברירת מחדל
+  if (me.fitness < 34 || (me.fitness < 46 && me.sharpness < 45)) return "rest";
+  const stats = game.flags.last_stats;
+  if (stats) return weakestArea(stats, me.position, me.attributes);
   const weights = D.POSITION_WEIGHTS[me.position];
   const gaps = D.ATTRIBUTES.slice().sort((a, b) =>
     ((me.attributes[a] ?? 50) - (weights[a] ?? 0.1) * 120)
@@ -46,9 +54,20 @@ function weeklyDirective(game, rng) {
   return rng.choice(gaps.slice(0, 3));
 }
 
-function directiveLine(club, focus) {
+/**
+ * ההוראה, עם הסיבה מהמשחק האחרון וההבטחה מה זה ייתן.
+ * בלי הסיבה זו שורת טקסט אקראית. עם הסיבה זו שיחה.
+ */
+function directiveLine(club, focus, stats = null) {
   const name = club ? club.managerName : "המאמן";
-  return `${name} ${DIRECTIVE_TEXT[focus] || "רוצה אותך באימון נוסף."}`;
+  const head = `${name} ${DIRECTIVE_TEXT[focus] || "רוצה אותך באימון נוסף."}`;
+  if (!stats) return head;
+  const reason = reasonLine(focus, stats);
+  const promise = promiseLine(focus);
+  const parts = [head];
+  if (reason) parts.push(`"${reason}"`);
+  if (promise) parts.push(`← ${promise}`);
+  return parts.join("\n");
 }
 
 /** מה המאמן אמר לך אחרי המשחק. */

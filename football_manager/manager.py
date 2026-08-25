@@ -13,6 +13,7 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import data as D
+from . import matchstats as MS
 from .models import Club, Player, clamp
 
 # (מפתח, שם בעברית, תיאור, רגישות אמון, סבלנות לתקשורת, נטייה לרוטציה)
@@ -60,25 +61,49 @@ DIRECTIVE_TEXT = {
 
 
 def weekly_directive(game, rng: random.Random) -> Optional[str]:
-    """מה המאמן רוצה ממך השבוע. None כשאין לו מה להגיד."""
+    """מה המאמן רוצה ממך השבוע.
+
+    הוא לא ממציא: הוא קורא את שורת הסטטיסטיקה של המשחק האחרון שלך
+    ובוחר את התחום שבו נפלת הכי הרבה יחסית למה שהעמדה שלך דורשת.
+    כשאין משחק אחרון — הוא נופל חזרה לפער מול פרופיל העמדה.
+    """
     club = game.my_club
     me = game.me
     if not club or game.stage not in ("academy", "player", "veteran"):
         return None
 
-    # הוא מגיב למה שבאמת חסר לך, לא באקראי
-    if me.fitness < 55:
+    # מנוחה נדרשת רק כשהגוף באמת על הקצה — לא כברירת מחדל
+    if me.fitness < 34 or (me.fitness < 46 and me.sharpness < 45):
         return "rest"
+
+    stats = game.flags.get("last_stats")
+    if stats:
+        return MS.weakest_area(stats, me.position, me.attributes)
+
     weights = D.POSITION_WEIGHTS[me.position]
     gaps = sorted(D.ATTRIBUTES,
                   key=lambda a: me.attributes.get(a, 50) - weights.get(a, 0.1) * 120)
-    pool = gaps[:3]
-    return rng.choice(pool)
+    return rng.choice(gaps[:3])
 
 
-def directive_line(club: Optional[Club], focus: str) -> str:
+def directive_line(club: Optional[Club], focus: str, stats=None) -> str:
+    """ההוראה, עם הסיבה מהמשחק האחרון וההבטחה מה זה ייתן.
+
+    בלי הסיבה זו הייתה שורת טקסט אקראית. עם הסיבה זו שיחה: הוא מצטט
+    לך את המספרים שלך מיום ראשון, ואומר מה ישתנה אם תעבוד על זה.
+    """
     name = club.manager_name if club else "המאמן"
-    return f"🎙️ {name} {DIRECTIVE_TEXT.get(focus, 'רוצה אותך באימון נוסף.')}"
+    head = f"🎙️ {name} {DIRECTIVE_TEXT.get(focus, 'רוצה אותך באימון נוסף.')}"
+    if not stats:
+        return head
+    reason = MS.reason_line(focus, stats)
+    promise = MS.promise_line(focus)
+    parts = [head]
+    if reason:
+        parts.append(f"   \"{reason}\"")
+    if promise:
+        parts.append(f"   → {promise}")
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------

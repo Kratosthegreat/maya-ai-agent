@@ -4,6 +4,22 @@
 
 function fmt(n) { return Math.round(n).toLocaleString("en-US"); }
 
+/**
+ * מה שנשאר ביד אחרי מס ועמלת סוכן.
+ * בלי זה הכסף רק נערם: אחרי עשור בשכר של מקצוען אין שום החלטה
+ * כלכלית שבאמת עולה משהו. המדרגות פרוגרסיביות, כמו במציאות.
+ */
+function netIncome(gross) {
+  if (gross <= 0) return 0;
+  let rate;
+  if (gross <= 3000) rate = 0.14;
+  else if (gross <= 20000) rate = 0.28;
+  else if (gross <= 80000) rate = 0.39;
+  else rate = 0.47;
+  rate += 0.05;                      // עמלת הסוכן, גם היא יורדת מהברוטו
+  return Math.round(gross * (1 - rate));
+}
+
 // בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
 const YOUTH_LOAD = 0.52;
 
@@ -325,6 +341,13 @@ class Game {
     const event = pickEvent(this, this.rng);
     if (event && this.armEvent(event)) report.eventId = event.eid;
 
+    // סקאוטים ביציע — מי ראה אותך השבוע ומה הוא כתב
+    const played = report.match && report.match.result
+      && report.match.result.ratings[this.meId] !== undefined;
+    const myRating = played ? report.match.result.ratings[this.meId] : null;
+    for (const line of scoutsThisWeek(this, this.rng, myRating))
+      report.notes.push({ icon: "", text: line });
+
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
@@ -333,7 +356,16 @@ class Game {
     const next = weeklyDirective(this, this.rng);
     this.setFlag("directive", next);
     if (next && ["academy", "player", "veteran"].includes(this.stage))
-      report.notes.push({ icon: "🎙️", text: directiveLine(this.myClub(), next) });
+      report.notes.push({ icon: "🎙️",
+        text: directiveLine(this.myClub(), next, this.flags.last_stats) });
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
+      const target = nextTarget(this);
+      if (target && this.week % 4 === 0)
+        report.notes.push({ icon: "", text: target });
+      else if (!target && this.week % 8 === 0)
+        report.notes.push({ icon: "🧭",
+          text: "עוד לא בחרת מסלול פיתוח. בלי מסלול אתה מתאמן בלי יעד." });
+    }
 
     this.week += 1;
     if (this.week > SEASON_WEEKS) {
@@ -535,8 +567,10 @@ class Game {
         mine = { forced: [this.meId] };
       if (myClub && myClub.cid === home.cid) homeTac = mine; else awayTac = mine;
     }
+    const focusPid = (isMine && ["academy", "player", "veteran"].includes(this.stage))
+      ? this.meId : null;
     const result = simulateMatch(home, away, this.players, this.rng,
-      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral });
+      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral, focusPid });
     // הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
     // כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
     const myHomeClub = this.myClub();
@@ -585,6 +619,12 @@ class Game {
           assists: result.events.filter(e => e.kind === "assist" && e.playerId === me.pid).length,
           motm: result.motm === me.pid,
         };
+        const stats = result.statLines ? result.statLines[me.pid] : null;
+        if (stats) {
+          this.flags.last_stats = stats;
+          report.personal.stats = stats;
+          report.personal.statLines = statSummary(stats, me.position);
+        }
         const club = this.myClub();
         const note = postMatchLine(this, report.personal.rating,
           club ? resultFor(result, club.cid) : "D", true, this.rng);
@@ -637,7 +677,13 @@ class Game {
     result.ratings[me.pid] = rating;
     me.fitness = clamp(me.fitness - minutes * 0.12, 8, 100);
     me.morale = clamp(me.morale + (rating - 6.2), 5, 99);
-    return { status: "sub", minutes, rating, goals: scored ? 1 : 0, assists: 0, motm: false };
+    // גם עשרים דקות מייצרות מספרים. מי שיושב על הספסל צריך לדעת
+    // על מה לעבוד לא פחות ממי שמשחק תשעים.
+    const stats = matchStatLine(me, minutes, scored ? 1 : 0, 0, this.rng);
+    if (result.statLines) result.statLines[me.pid] = stats;
+    this.flags.last_stats = stats;
+    return { status: "sub", minutes, rating, goals: scored ? 1 : 0, assists: 0,
+             motm: false, stats, statLines: statSummary(stats, me.position) };
   }
 
   registerResult(leagueId, result) {
@@ -710,12 +756,20 @@ class Game {
   weeklyIncome(report) {
     const me = this.me;
     if (this.stage === "youth") { /* בלי שכר — אתה עוד בבית ספר */ }
-    else if (["academy", "player", "veteran"].includes(this.stage)) this.earn(me.contract.wage);
+    else if (["academy", "player", "veteran"].includes(this.stage))
+      this.earn(netIncome(me.contract.wage));
     else if (["coach", "manager", "director"].includes(this.stage)) {
       const club = this.myClub();
       let base = this.stage === "coach" ? 4000 : 12000;
       if (club) base += Math.round(club.reputation * (this.stage === "coach" ? 60 : 260));
-      this.earn(base);
+      this.earn(netIncome(base));
+    }
+
+    // חסויות משלמות כל שבוע כל עוד החוזה בתוקף — לא פעם אחת ונגמר
+    const retainer = weeklyRetainer(this.deals(), SEASON_WEEKS);
+    if (retainer) {
+      report.sponsorIncome = netIncome(retainer);
+      this.earn(report.sponsorIncome);
     }
 
     const club = this.myClub();
@@ -850,6 +904,42 @@ class Game {
   }
 
   /** קופה בגירעון שוחקת את אמון ההנהלה במאמן. */
+  // -- חסויות ------------------------------------------------------------
+
+  /** תיק החסויות הפעיל. חי בדגלים, ולכן נשמר עם הקריירה. */
+  deals() {
+    if (!Array.isArray(this.flags.deals)) this.flags.deals = [];
+    return this.flags.deals;
+  }
+
+  /** בונוסים לפי הביצועים, ואז שנה קדימה בכל חוזה. */
+  commercialSeasonEnd() {
+    const portfolio = this.deals();
+    if (!portfolio.length) return [];
+    const lines = [];
+    const payouts = seasonBonuses(portfolio, this.me, this.honours.length, this.caps);
+    const total = payouts.reduce((a, pair) => a + pair[1], 0);
+    if (total) {
+      this.earn(total);
+      lines.push(`💰 בונוסים מחסויות: ₪${fmt(total)}`);
+      for (const [label, amount] of payouts.slice(0, 4))
+        lines.push(`   • ${label} — ₪${fmt(amount)}`);
+    }
+    const expiring = portfolio.filter(d => d.yearsLeft <= 1);
+    lines.push(...tickPortfolio(portfolio));
+    // מותג שהחוזה איתו נגמר חוזר עם הצעה חדשה, לפי מי שנעשית
+    for (const deal of expiring) {
+      if (this.rng.random() < 0.55) {
+        const club = this.myClub();
+        const offer = renewalOffer(deal, this.me, this.rng, club ? club.reputation : 30);
+        this.flags.pending_renewal = offer;
+        lines.push(`📞 ${deal.brand} רוצים לחדש — ₪${fmt(offer.annual)} לעונה.`);
+        break;
+      }
+    }
+    return lines;
+  }
+
   boardFinancePressure(report, club) {
     if (!["manager", "director", "owner"].includes(this.stage)) return;
     if (club.balance < 0) {
@@ -1420,6 +1510,12 @@ class Game {
     this.developEveryone();
     this.processRetirements();
     this.transferWindow(add);
+    // מסלול הפיתוח — מה נחתם העונה
+    for (const line of claimMilestones(this)) add("", line);
+    // חסויות: בונוסים לפי מה שבאמת עשית, ואז שנה קדימה בחוזים
+    for (const line of this.commercialSeasonEnd()) add("", line);
+    // נכסים והשקעות
+    for (const line of assetsSeasonTick(this, this.rng)) add("", line);
     this.advanceCareerStage(add);
 
     this.history.push({
@@ -1554,16 +1650,30 @@ class Game {
     }
   }
 
+  /**
+   * מועדון שמוכן להציע לי חוזה.
+   * קודם כול — מי שבאמת עקב אחריך לאורך העונה. הצעה כבר לא נופלת
+   * משמיים: היא הסוף של תהליך שראית קורה, שבוע אחרי שבוע, ביציע.
+   */
   transferOfferForMe() {
     const me = this.me;
-    let ceiling = overall(me) + 8 + (me.reputation - 40) * 0.25 + (avgRating(me.season) - 6.5) * 8;
-    if (this.flag("open_to_europe")) ceiling += 6;
-    if (this.flag("wants_transfer") || this.flag("free_agent_soon")) ceiling += 4;
-    const pool = Object.values(this.clubs).filter(c =>
-      c.cid !== me.clubId && c.reputation >= ceiling - 28 && c.reputation <= ceiling);
-    if (!pool.length || this.rng.random() > 0.55) return null;
+    const chaser = topSuitor(this, SCOUT_CHASED);
+    if (chaser) return chaser;
+    // סוכן ששילמת לו פותח דלת גם בלי שהצופים סיימו את העבודה
+    const target = this.flag("agent_target");
+    if (target && this.clubs[target] && target !== me.clubId
+        && this.rng.random() < 0.7) {
+      delete this.flags.agent_target;
+      return this.clubs[target];
+    }
+    const courting = watchers(this, SCOUT_COURTED);
+    if (courting.length && this.rng.random() < 0.5) return courting[0][0];
+    // ואם אף אחד לא עקב — עדיין קורה ששם עולה בישיבה
+    const pool = candidateClubs(this);
+    if (!pool.length || this.rng.random() > 0.35) return null;
     return pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
   }
+
 
   acceptOffer() {
     const offer = this.flag("pending_offer");

@@ -59,7 +59,7 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
 
     # מנוחה
     if focus == "rest":
-        player.fitness = clamp(player.fitness + 26 + fitness_coach / 14.0, 0, 100)
+        player.fitness = clamp(player.fitness + 20 + fitness_coach / 14.0, 0, 100)
         player.morale = clamp(player.morale + 1.5, 0, 100)
         player.resilience = clamp(player.resilience + 0.14, 0, 96)
         player.sharpness = clamp(player.sharpness - 1.6, 0, 100)
@@ -76,7 +76,7 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
         if player.has_trait("student"):
             gain *= 1.4
         player.coaching = clamp(player.coaching + gain, 0, 100)
-        player.fitness = clamp(player.fitness + 10, 0, 100)
+        player.fitness = clamp(player.fitness + 4, 0, 100)
         new_badges = min(4, int(player.coaching // 22))
         if new_badges > player.badges:
             player.badges = new_badges
@@ -86,16 +86,17 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     if focus == "media":
         player.media_skill = clamp(player.media_skill + 0.9 * intensity, 0, 100)
         gain_reputation(player, 0.25)
-        player.fitness = clamp(player.fitness + 9, 0, 100)
+        player.fitness = clamp(player.fitness + 3, 0, 100)
         return messages
 
     if focus == "business":
         player.business = clamp(player.business + 0.85 * intensity, 0, 100)
-        player.fitness = clamp(player.fitness + 9, 0, 100)
+        player.fitness = clamp(player.fitness + 3, 0, 100)
         return messages
 
-    # אימון תכונה
-    player.fitness = clamp(player.fitness + 12 - 6 * intensity, 0, 100)
+    # אימון תכונה. האימון עולה כושר — הוא לא מחזיר אותו.
+    # ההתאוששות עצמה קורית ב-weekly_recovery, פעם אחת בשבוע, לכולם.
+    player.fitness = clamp(player.fitness - (2.5 + 5.0 * intensity), 0, 100)
     if player.injury_weeks > 0:
         player.injury_weeks = max(0, player.injury_weeks - 1)
         return ["🩹 אתה בשיקום — האימון היה קל בהרבה."]
@@ -177,8 +178,14 @@ def specialisation_damper(level: int, overall: int) -> float:
 
 def weekly_recovery(player: Player, played: bool, rng: random.Random,
                     club: Optional[Club] = None) -> None:
-    """התאוששות טבעית בסוף שבוע. מרכז רפואי וצוות מקצרים שיקום."""
+    """התאוששות טבעית בסוף שבוע. מרכז רפואי וצוות מקצרים שיקום.
+
+    זו נקודת ההתאוששות היחידה, והיא רצה גם בשבוע שבו שיחקת: גוף של
+    מקצוען חוזר לעצמו בין משחק למשחק. בלי זה הכושר נשחק לאורך העונה
+    עד שהמאמן לא מבקש ממך יותר כלום חוץ ממנוחה.
+    """
     care = medical_care(club)
+    fitness_coach = club.staff_quality("fitness") if club else 0
     if player.injury_weeks > 0:
         player.injury_weeks -= 1
         if player.injury_weeks > 0 and rng.random() < (care - 0.45) * 0.55:
@@ -186,12 +193,15 @@ def weekly_recovery(player: Player, played: bool, rng: random.Random,
         if player.injury_weeks == 0:
             player.injury_name = ""
             player.fitness = clamp(player.fitness + 15, 0, 100)
+
+    recover = 11.0 + fitness_coach / 12.0 + care * 5.0
+    recover *= 1.06 - min(0.30, max(0, player.age - 29) * 0.028)   # ותיקים חוזרים לאט
     if played:
         player.sharpness = clamp(player.sharpness + 5.5, 0, 100)
     else:
-        fitness_coach = club.staff_quality("fitness") if club else 0
-        player.fitness = clamp(player.fitness + 9 + fitness_coach / 22.0, 0, 100)
+        recover += 4.0
         player.sharpness = clamp(player.sharpness - 1.1, 0, 100)
+    player.fitness = clamp(player.fitness + recover, 0, 100)
     if player.injury_weeks > 0:
         player.sharpness = clamp(player.sharpness - 1.8, 0, 100)
     player.form = clamp(player.form + (0 if played else rng.uniform(-1.5, 1.5)), 5, 99)
@@ -209,7 +219,12 @@ def simulate_ai_week(players: Dict[str, Player], rng: random.Random,
             if player.injury_weeks == 0:
                 player.injury_name = ""
             continue
-        player.fitness = clamp(player.fitness + rng.uniform(6, 16), 0, 100)
+        player.fitness = clamp(player.fitness + rng.uniform(13, 24), 0, 100)
+        # חדות משחק אצל שחקני מחשב מתכנסת לרמת "בתוך סגל" — בלי זה
+        # כל הליגה הייתה נכנסת למשחקים בלי דקות ברגליים, ושילמה על כך
+        target = 92.0 if player.club_id else 45.0
+        player.sharpness = clamp(player.sharpness + (target - player.sharpness) * 0.22
+                                 + rng.uniform(-2.0, 2.0), 0, 100)
         if rng.random() < 0.55:
             focus = rng.choice(D.ATTRIBUTES)
             weekly_training(player, focus, club, rng, intensity=0.85)

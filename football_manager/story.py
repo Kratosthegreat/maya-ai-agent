@@ -15,7 +15,9 @@ import random
 from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
+from . import data as D
 from . import commercial as CM
+from . import scouting as SC
 from . import story_engine as SE
 from .story_pack import PACK
 from .models import clamp, gain_reputation
@@ -525,8 +527,15 @@ def _pending_deal(game):
 def _build_deal(game):
     club = game.my_club
     match_week = game.my_fixture() is not None
+    # חידוש שממתין קודם — מותג שכבר עבד איתך חוזר לפני שמחפשים חדש
+    pending = game.flags.get("pending_renewal")
+    if pending:
+        game.flags["pending_renewal"] = None
+        game.flags["pending_deal"] = pending
+        return pending
     offer = CM.sponsor_offer(game.me, game.rng,
-                             club.reputation if club else 30, match_week)
+                             club.reputation if club else 30, match_week,
+                             honours=len(game.honours))
     if offer:
         game.flags["pending_deal"] = offer
     return offer
@@ -536,10 +545,10 @@ register(StoryEvent(
     eid="sponsor_deal",
     title="טלפון ממחלקת השיווק",
     stages=("academy", "player", "veteran"),
-    weight=1.3,
+    weight=2.4,
     once=False,
-    cooldown=16,
-    condition=lambda g: (_cool(g, "sponsor", 14) and CM.marketability(
+    cooldown=9,
+    condition=lambda g: (_cool(g, "sponsor", 8) and CM.marketability(
         g.me, g.my_club.reputation if g.my_club else 30) >= 12),
     body=lambda g: _sponsor_body(g),
     choices=[
@@ -553,11 +562,10 @@ def _sponsor_body(game) -> str:
     offer = _build_deal(game)
     if not offer:
         return ""
-    lines = [
-        f"{offer['brand']} ({offer['tier_he']}) רוצים אותך על {offer['kind_he']}.",
-        "",
-        CM.deal_summary(offer),
-    ]
+    head = (f"{offer['brand']} ({offer['tier_he']}) רוצים לחדש איתך."
+            if offer.get("renewal") else
+            f"{offer['brand']} ({offer['tier_he']}) רוצים אותך על {offer['kind_he']}.")
+    lines = [head, ""] + CM.deal_lines(offer) + [""]
     if offer["clashes"]:
         lines.append("אחד מימי הצילומים נופל בשבוע של משחק.")
     else:
@@ -570,16 +578,22 @@ def _sponsor_sign(game) -> str:
     offer = _pending_deal(game)
     if not offer:
         return "ההצעה ירדה מהשולחן."
-    total = offer["amount"] * offer["years"]
-    game.earn_money(total)
+    annual = offer.get("annual", offer.get("amount", 0))
+    CM.sign_deal(game.deals, offer, game.year)
+    # מקדמה בחתימה, ומכאן והלאה זה משלם כל שבוע לאורך כל החוזה
+    signing = int(annual * 0.35)
+    game.earn_money(signing)
     game.me.media_skill = clamp(game.me.media_skill + offer["media_gain"], 0, 100)
     gain_reputation(game.me, offer["media_gain"] * 0.25)
     game.flags["pending_deal"] = None
+    weekly = CM.weekly_retainer(game.deals, 43)
+    tail = (f"מקדמה של ₪{signing:,} נכנסה, ומעכשיו התיק המסחרי שלך "
+            f"משלם ₪{weekly:,} בשבוע.")
     if offer["clashes"]:
         _trust(game, -3)
-        return (f"חתמת עם {offer['brand']} על ₪{total:,}. "
+        return (f"חתמת עם {offer['brand']} על ₪{annual:,} לעונה. {tail} "
                 "יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.")
-    return (f"חתמת עם {offer['brand']} על ₪{total:,}. "
+    return (f"חתמת עם {offer['brand']} על ₪{annual:,} לעונה. {tail} "
             "הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.")
 
 
@@ -592,6 +606,76 @@ def _sponsor_decline(game) -> str:
         _attr(game, "mental", 0.4)
         return "סירבת בגלל השבוע של המשחק. הצוות המקצועי שמע, וזכר."
     return "סירבת. הסוכן שלך לא הבין למה, אבל זה הכסף שלך."
+
+
+register(StoryEvent(
+    eid="sponsor_global",
+    title="הפגישה בקומה העליונה",
+    stages=("player", "veteran"),
+    weight=3.0,
+    once=False,
+    cooldown=40,
+    condition=lambda g: (_cool(g, "global", 38) and g.my_club is not None
+                         and CM.marketability(
+                             g.me, g.my_club.reputation) >= 74),
+    body=lambda g: _global_body(g),
+    choices=[
+        Choice("לחתום", lambda g: _sponsor_sign(g), hint="חוזה רב־שנתי"),
+        Choice("לבקש מהסוכן לשפר", lambda g: _global_push(g), hint="הימור"),
+        Choice("לא עכשיו", lambda g: _sponsor_decline(g)),
+    ],
+))
+
+
+def _global_body(game) -> str:
+    """מותג עולמי לא מתקשר — הוא מזמין אותך למשרד."""
+    club = game.my_club
+    tiers = [t for t in D.SPONSOR_TIERS if t[0] in ("continental", "global")]
+    market = CM.marketability(game.me, club.reputation if club else 40)
+    tier = tiers[-1] if market >= 80 and game.rng.random() < 0.6 else tiers[0]
+    offer = CM.sponsor_offer(game.me, game.rng,
+                             club.reputation if club else 40, False,
+                             honours=len(game.honours))
+    if not offer:
+        return ""
+    # ההצעה הזאת מגיעה מהדרג הגבוה, לא מהגרלה רגילה
+    key, tier_he, min_rep, base, media_mult, brands = tier
+    over = max(0.0, market - min_rep) / 40.0
+    annual = int(round(base * (1.05 + over * 2.1) *
+                       game.rng.uniform(0.92, 1.3) / 1000) * 1000)
+    offer.update({"brand": game.rng.choice(brands), "tier": key,
+                  "tier_he": tier_he, "annual": annual, "amount": annual,
+                  "years": game.rng.randint(3, 5), "media_gain": 9,
+                  "clashes": False, "market": round(market, 1),
+                  "clauses": [c[0] for c in D.BONUS_CLAUSES[:3]]})
+    game.flags["pending_deal"] = offer
+    lines = [f"טסת לפגישה. {offer['brand']} — הדרג ה{tier_he}.", "",
+             f"\"עקבנו אחריך שנתיים. אנחנו לא מחפשים פרצוף לעונה, "
+             f"אנחנו מחפשים מישהו לבנות סביבו.\"", ""]
+    lines.extend(CM.deal_lines(offer))
+    return "\n".join(lines)
+
+
+def _global_push(game) -> str:
+    """לבקש יותר ממותג עולמי — או שמכבדים אותך, או שמצטננים."""
+    _mark(game, "global")
+    offer = _pending_deal(game)
+    if not offer:
+        return "ההצעה ירדה מהשולחן."
+    if game.rng.random() < 0.45 + game.me.business / 300.0:
+        offer["annual"] = int(offer["annual"] * game.rng.uniform(1.2, 1.5))
+        offer["amount"] = offer["annual"]
+        CM.sign_deal(game.deals, offer, game.year)
+        game.earn_money(int(offer["annual"] * 0.35))
+        gain_reputation(game.me, 3)
+        game.me.business = clamp(game.me.business + 3, 0, 100)
+        game.flags["pending_deal"] = None
+        return (f"הסוכן שלך עמד על שלו. {offer['brand']} עלו ל-"
+                f"₪{offer['annual']:,} לעונה. חתמת.")
+    game.flags["pending_deal"] = None
+    game.me.business = clamp(game.me.business + 1, 0, 100)
+    return (f"{offer['brand']} אמרו שיחזרו אליך. הם לא חזרו העונה. "
+            "לפעמים ההימור לא עובד.")
 
 
 register(StoryEvent(
@@ -693,6 +777,108 @@ def _agent_decline(game) -> str:
     game.flags["pending_agent"] = None
     _trust(game, 3)
     return "אמרת לו שאתה מסודר. הידיעה הזו הגיעה למאמן, והוא חייך."
+
+
+register(StoryEvent(
+    eid="foreign_agent",
+    title="שיחה מחו\"ל",
+    stages=("player", "veteran"),
+    weight=1.4,
+    once=False,
+    cooldown=20,
+    condition=lambda g: (_cool(g, "foreign", 18) and g.my_club is not None
+                         and SC.foreign_agent(g, random.Random(g.week * 17 + g.year))
+                         is not None),
+    body=lambda g: _foreign_body(g),
+    choices=[
+        Choice("להקשיב לו", lambda g: _foreign_accept(g), hint="פותח דלת לחו\"ל"),
+        Choice("עוד לא", lambda g: _foreign_decline(g)),
+    ],
+))
+
+
+def _foreign_body(game) -> str:
+    pitch = SC.foreign_agent(game, game.rng)
+    if not pitch:
+        return ""
+    game.flags["pending_foreign"] = pitch
+    return (f"{pitch['agent']} התקשר מ{pitch['country']}.\n\n"
+            f"\"אני עובד מול {pitch['club_name']}. הם שולחים אליך צופים "
+            f"כבר תקופה — התיק שלך אצלם פתוח ({pitch['score']:.0f} מתוך 100). "
+            f"אתה מקבל היום ₪{game.me.contract.wage:,} לשבוע; שם מדברים על "
+            f"₪{pitch['wage']:,}.\"\n\n"
+            f"העמלה שלו: ₪{pitch['fee']:,}. זה לא אומר שאתה עובר — "
+            "זה אומר שיש מי שיפתח את הדלת.")
+
+
+def _foreign_accept(game) -> str:
+    _mark(game, "foreign")
+    pitch = game.flags.get("pending_foreign")
+    if not pitch:
+        return "הקו התנתק."
+    game.spend_money(pitch["fee"])
+    game.set_flag("agent_target", pitch["club"])
+    game.set_flag("open_to_europe", True)
+    # עצם זה שיש נציג בשטח מחמם את העניין
+    table = SC.interest_map(game)
+    table[pitch["club"]] = min(100.0, float(table.get(pitch["club"], 0)) + 9.0)
+    game.flags["pending_foreign"] = None
+    _morale(game, 4)
+    return (f"שילמת לו מקדמה. {pitch['club_name']} יודעים עכשיו שאתה פתוח "
+            "לשמוע — ובחלון ההעברות זה יהיה על השולחן.")
+
+
+def _foreign_decline(game) -> str:
+    _mark(game, "foreign")
+    game.flags["pending_foreign"] = None
+    _trust(game, 3)
+    return "אמרת לו שאתה באמצע משהו כאן. הוא השאיר מספר."
+
+
+register(StoryEvent(
+    eid="scout_report",
+    title="מה כתבו עליך",
+    stages=("academy", "player", "veteran"),
+    weight=0.9,
+    once=False,
+    cooldown=24,
+    condition=lambda g: len(SC.watchers(g, SC.NOTICED)) >= 2,
+    body=lambda g: _scout_body(g),
+    choices=[
+        Choice("לעבוד על מה שחסר", lambda g: _scout_work(g), hint="מקצועי"),
+        Choice("לא לתת לזה להיכנס לראש", lambda g: _scout_ignore(g)),
+    ],
+))
+
+
+def _scout_body(game) -> str:
+    ranked = SC.watchers(game, SC.NOTICED)
+    if not ranked:
+        return ""
+    lines = ["הסוכן שלך שלח לך צילום מסך של דוח שדלף.", ""]
+    for club, score in ranked[:3]:
+        lines.append(f"• {club.name} — {SC.interest_label(score)} ({score:.0f}/100)")
+    lines.append("")
+    lines.extend(SC.scout_report(game, ranked[0][0]))
+    return "\n".join(lines)
+
+
+def _scout_work(game) -> str:
+    ranked = SC.watchers(game, SC.NOTICED)
+    weights = D.POSITION_WEIGHTS[game.me.position]
+    worst = min(D.ATTRIBUTES,
+                key=lambda a: game.me.attributes.get(a, 50) * weights.get(a, 0.1))
+    _attr(game, worst, 1.4)
+    _morale(game, 3)
+    club = ranked[0][0].name if ranked else "מי שעוקב אחריך"
+    return (f"לקחת את זה לאימון. {D.ATTRIBUTE_NAMES_HE[worst]} — "
+            f"בדיוק מה ש{club} סימנו לך. הצופה הבא יראה משהו אחר.")
+
+
+def _scout_ignore(game) -> str:
+    _morale(game, 5)
+    game.me.sharpness = clamp(game.me.sharpness + 4, 0, 100)
+    return "סגרת את הטלפון. יש שחקנים שנשברים מזה, ואתה לא אחד מהם."
 
 
 register(StoryEvent(

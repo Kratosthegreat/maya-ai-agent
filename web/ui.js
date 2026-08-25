@@ -588,6 +588,9 @@ function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
   if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
+  if (["youth", "academy", "player", "veteran"].includes(game.stage))
+    items.splice(1, 0, ["plan", "מסלול"]);
+  items.splice(items.length - 1, 0, ["money", "כסף"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
@@ -612,6 +615,9 @@ function screenMain() {
   if (view === "clubinfo") return appbar() + screenClubInfo();
   if (view === "player") return appbar() + screenPlayer();
   if (view === "editor") return appbar() + screenEditor();
+  if (view === "plan") return appbar() + screenPlan();
+  if (view === "money") return appbar() + screenMoney();
+  if (view === "scouts") return appbar() + screenScouts();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -1168,7 +1174,10 @@ function screenHub() {
         ${(() => { const note = selectionNote(game);
           return note ? `<div class="muted selection">${esc(note)}</div>` : ""; })()}
         ${game.flag("directive") && club ? `<div class="directive">🎙️ ${
-          esc(directiveLine(club, game.flag("directive")))}</div>` : ""}
+          esc(directiveLine(club, game.flag("directive"), game.flags.last_stats))
+            .replace(/\n/g, "<br>")}</div>` : ""}
+        ${(() => { const t = nextTarget(game);
+          return t ? `<div class="muted selection">${esc(t)}</div>` : ""; })()}
       </div>
     </div>
 
@@ -1189,6 +1198,7 @@ function screenHub() {
       </div>
     </div>
 
+    ${scoutSnip()}
     ${clubSnip()}
     ${tableSnip}
     ${messages}
@@ -1196,6 +1206,230 @@ function screenHub() {
     ${savePanel()}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
+  </div>`;
+}
+
+/**
+ * מסלול הפיתוח — ההכוונה שהייתה חסרה.
+ * במקום "תתאמן על משהו", כאן כתוב בדיוק מה צריך להיות לך ומתי.
+ */
+function screenPlan() {
+  const info = planSummary(game);
+  if (!info.chosen) {
+    return `
+    <div class="screen">
+      <div class="panel">
+        <div class="panel-head"><span class="t">איזה שחקן אתה רוצה להיות?</span></div>
+        <div class="panel-body">
+          <div class="muted">מסלול הוא דגם שחקן אמיתי עם יעדים לפי גיל.
+            בלי מסלול אתה מתאמן בלי לדעת לאן.</div>
+        </div>
+      </div>
+      ${info.options.map(row => `
+      <div class="panel">
+        <div class="panel-head"><span class="t">${esc(row.name)}</span>
+          <span class="r">${esc(row.attrs.join(" · "))}</span></div>
+        <div class="panel-body">
+          <div class="muted">${esc(row.desc)}</div>
+          <button class="btn primary wide" data-plan="${row.key}">לבחור את המסלול הזה</button>
+        </div>
+      </div>`).join("")}
+    </div>`;
+  }
+  const focusName = info.focus ? D.ATTRIBUTE_NAMES_HE[info.focus] : "";
+  return `
+  <div class="screen">
+    <div class="panel" ${info.breakthrough ? 'style="border-color:var(--accent)"' : ""}>
+      <div class="panel-head"><span class="t">${esc(info.name)}</span>
+        <span class="r">${info.done}/${info.total}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(info.desc)}</div>
+        ${info.breakthrough
+          ? `<div class="note"><span class="ico">💎</span><span>הפריצה הושלמה —
+             ${esc(info.trait)}.</span></div>`
+          : `<div class="muted">השלמת המסלול תיתן לך: ${esc(info.trait)}.</div>`}
+        ${info.next ? `<div class="directive">${esc(info.next)}</div>` : ""}
+        ${focusName ? `<button class="btn wide" data-focus="${info.focus}">
+          להתאמן השבוע על ${esc(focusName)}</button>` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">אבני דרך</span></div>
+      <div class="panel-body tight">
+        ${info.milestones.map(row => `
+        <div class="row">
+          <span class="val" style="min-width:26px">${
+            row.claimed ? "✅" : row.met ? "🟡" : row.late ? "⛔" : "▫️"}</span>
+          <span class="grow">
+            <span class="nm">גיל ${row.age}</span>
+            <span class="sub">${row.needs.map(pt =>
+              `${esc(pt.name)} ${pt.have}/${pt.need}`).join(" · ")}</span>
+          </span>
+        </div>
+        ${row.needs.map(pt => `<div class="attr">
+          <span>${esc(pt.name)}</span>
+          <span class="val">${pt.have}/${pt.need}</span>
+          <span class="bar"><i style="width:${Math.min(100,
+            Math.round(pt.have / pt.need * 100))}%"></i></span>
+        </div>`).join("")}`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">להחליף מסלול</span></div>
+      <div class="panel-body">
+        <div class="muted">החלפה מאפסת את אבני הדרך שנצברו.</div>
+        <div class="chips">
+          ${planOptionsFor(game.me.position).map(row =>
+            `<button class="chip" data-plan="${row[0]}"
+              aria-pressed="${row[0] === info.key}">${esc(row[1])}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/** מי עוקב אחריך — סקאוטינג כתהליך, לא כהטלת מטבע. */
+function screenScouts() {
+  const ranked = watchers(game);
+  if (!ranked.length) {
+    return `<div class="screen"><div class="panel">
+      <div class="panel-head"><span class="t">מי עוקב אחריך</span></div>
+      <div class="panel-body"><div class="muted">אף אחד עדיין לא פתח עליך תיק.
+        צופים מגיעים למשחקים — תמשיך לשחק.</div></div>
+    </div></div>`;
+  }
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי עוקב אחריך</span>
+        <span class="r">${ranked.length}</span></div>
+      <div class="panel-body tight">
+        ${ranked.slice(0, 10).map(([club, score]) => `
+        <div class="row" data-club="${club.cid}">
+          ${crest(club, 24)}
+          <span class="grow"><span class="nm">${esc(club.name)}</span>
+            <span class="sub">${esc(clubCountry(club.cid))} ·
+              ${esc(interestLabel(score))}</span></span>
+          <span class="val num">${Math.round(score)}</span>
+        </div>
+        <div class="attr"><span></span><span class="val"></span>
+          <span class="bar"><i style="width:${Math.round(score)}%"></i></span></div>`).join("")}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="t">התיק שלך אצל ${
+        esc(ranked[0][0].name)}</span></div>
+      <div class="panel-body">
+        ${scoutReport(game, ranked[0][0]).map(line =>
+          `<div class="muted">${esc(line)}</div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** כסף: תיק החסויות והנכסים. */
+function screenMoney() {
+  const portfolio = game.deals();
+  const info = wealthSummary(game);
+  const market = marketability(game.me,
+    game.myClub() ? game.myClub().reputation : 30);
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">שווי נטו</span>
+        <span class="r">₪${fmt(info.net_worth)}</span></div>
+      <div class="panel-body">
+        <div class="stat-grid">
+          <div class="stat"><div class="n num">₪${fmt(info.cash)}</div><div class="l">מזומן</div></div>
+          <div class="stat"><div class="n num">₪${fmt(info.assets)}</div><div class="l">נכסים</div></div>
+          <div class="stat"><div class="n num">₪${fmt(info.yearly)}</div><div class="l">תשואה/שנה</div></div>
+        </div>
+        <div class="muted">ערך מסחרי: ${Math.round(market)}/100 —
+          זה מה שקובע איזה מותגים בכלל מתקשרים אליך.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">חסויות</span>
+        <span class="r">₪${fmt(portfolioTotal(portfolio))} לעונה</span></div>
+      <div class="panel-body tight">
+        ${portfolio.length ? portfolio.map(deal => `
+        <div class="row">
+          <span class="grow"><span class="nm">${esc(deal.brand)}</span>
+            <span class="sub">${esc(deal.tierHe)} · ${esc(deal.kindHe)} ·
+              נותרו ${deal.yearsLeft} שנים</span></span>
+          <span class="val num">₪${fmt(deal.annual)}</span>
+        </div>
+        ${(deal.clauses || []).map(key => {
+          const text = clauseText(key, deal.annual);
+          return text ? `<div class="muted" style="padding-inline-start:8px">• ${
+            esc(text)}</div>` : "";
+        }).join("")}`).join("")
+        : `<div class="muted">אין לך חסויות פעילות. הן מגיעות לפי הערך המסחרי.</div>`}
+      </div>
+    </div>
+
+    ${info.items.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">הנכסים שלך</span>
+        <span class="r">${info.count}</span></div>
+      <div class="panel-body tight">
+        ${info.items.map((item, index) => {
+          const delta = item.value - item.paid;
+          return `<div class="row">
+            <span class="grow"><span class="nm">${esc(item.name)}</span>
+              <span class="sub">${esc(item.category)} · נקנה ב-${item.year} ·
+                ${delta >= 0 ? "+" : "−"}₪${fmt(Math.abs(delta))}</span></span>
+            <span class="val num">₪${fmt(item.value)}</span>
+            <button class="mini-btn" data-sell="${index}">למכור</button>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>` : ""}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">להשקיע</span></div>
+      <div class="panel-body tight">
+        ${assetsAvailable(game).map(row => `
+        <div class="row">
+          <span class="grow"><span class="nm">${
+            row.locked ? "🔒 " : ""}${esc(row.name)}</span>
+            <span class="sub">${esc(row.category)} ·
+              ${(row.yield * 100).toFixed(1)}% לשנה${
+              row.locked ? ` · צריך מוניטין ${row.min_rep}` : ""}</span></span>
+          <span class="val num">₪${fmt(row.price)}</span>
+          ${row.locked || !row.affordable
+            ? `<span class="mini-btn" style="opacity:.4">${
+                row.locked ? "נעול" : "אין מספיק"}</span>`
+            : `<button class="mini-btn" data-buy="${row.key}">לקנות</button>`}
+        </div>
+        <div class="muted" style="padding-inline-start:8px">${esc(row.desc)}</div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** תקציר הסקאוטינג בסקירה — מי היה ביציע ומי כבר פתח עליך תיק. */
+function scoutSnip() {
+  if (!["academy", "player", "veteran"].includes(game.stage)) return "";
+  const ranked = watchers(game);
+  if (!ranked.length) return "";
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">מי עוקב אחריך</span>
+      <span class="r"><button class="mini-btn" data-go="scouts">לפרטים</button></span></div>
+    <div class="panel-body tight">
+      ${ranked.slice(0, 3).map(([club, score]) => `
+      <div class="row">
+        ${crest(club, 22)}
+        <span class="grow"><span class="nm">${esc(club.name)}</span>
+          <span class="sub">${esc(clubCountry(club.cid))} ·
+            ${esc(interestLabel(score))}</span></span>
+        <span class="val num">${Math.round(score)}</span>
+      </div>`).join("")}
+    </div>
   </div>`;
 }
 
@@ -1400,6 +1634,9 @@ function personalCard(p) {
         <span>${bits.length ? esc(bits.join(" · ")) : "משחק שקט."}</span>
       </div>
     </div>
+    ${p.statLines ? `<hr class="rule">
+    <div class="statline">${p.statLines.map(line =>
+      `<div class="muted">${esc(line)}</div>`).join("")}</div>` : ""}
   </div>`;
 }
 
@@ -1879,6 +2116,27 @@ function bind() {
     el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
   app.querySelectorAll("[data-player]:not(input)").forEach(el =>
     el.addEventListener("click", () => goDeep("player", { pid: el.dataset.player })));
+  app.querySelectorAll("[data-plan]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = setPlan(game, el.dataset.plan);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-buy]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = buyAsset(game, el.dataset.buy);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-sell]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = sellAsset(game, +el.dataset.sell);
+      saveGame();
+      toast(message);
+      render();
+    }));
   app.querySelectorAll("[data-upgrade]").forEach(el =>
     el.addEventListener("click", () => {
       const message = game.upgradeFacility(el.dataset.upgrade);

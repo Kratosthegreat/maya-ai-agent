@@ -14,6 +14,10 @@ from typing import List, Optional
 
 from . import data as D
 from .game import CUP_WEEKS, SAVE_DIR, SEASON_WEEKS, GameState
+from . import development as DEV
+from . import scouting as SC
+from . import wealth as WL
+from . import commercial as CM
 from .engine import MENTALITIES, PRESSING
 
 LINE = "─" * 52
@@ -299,6 +303,13 @@ def game_loop(game: GameState) -> None:
         options = ["▶️  להתקדם שבוע", "👤 פרופיל", "📊 טבלה", "👥 סגל",
                    "📰 יומן והישגים", "📚 היסטוריית עונות"]
         keys = ["week", "profile", "table", "squad", "news", "history"]
+        if game.stage in ("youth", "academy", "player", "veteran"):
+            options.append("🧭 מסלול פיתוח")
+            keys.append("plan")
+            options.append("👀 מי עוקב אחריי")
+            keys.append("scouts")
+        options.append("💼 חסויות ונכסים")
+        keys.append("money")
         if game.stage in ("manager", "coach"):
             options.append("🧠 טקטיקה")
             keys.append("tactics")
@@ -326,6 +337,13 @@ def game_loop(game: GameState) -> None:
         elif key == "history":
             show_history(game)
             ask("\n[Enter]")
+        elif key == "plan":
+            show_plan(game)
+        elif key == "scouts":
+            show_scouts(game)
+            ask("\n[Enter]")
+        elif key == "money":
+            show_money(game)
         elif key == "tactics":
             show_tactics(game)
             ask("\n[Enter]")
@@ -492,3 +510,101 @@ def demo(argv: List[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# מסלול, סקאוטינג, כסף
+# ---------------------------------------------------------------------------
+
+def show_plan(game: GameState) -> None:
+    """מסלול הפיתוח — מה צריך להיות לך ומתי."""
+    info = DEV.plan_summary(game)
+    if not info["chosen"]:
+        out("\n🧭 מסלול פיתוח — בחר דגם שחקן, וקבל יעדים לפי גיל.\n")
+        rows = info["options"]
+        for row in rows:
+            out(f"  {row['name']} — {row['desc']}")
+            out(f"     מתמקד ב: {', '.join(row['attrs'])}")
+        idx = choose("איזה שחקן אתה רוצה להיות?",
+                     [r["name"] for r in rows] + ["עוד לא"])
+        if idx < len(rows):
+            out("\n" + DEV.set_plan(game, rows[idx]["key"]))
+        ask("\n[Enter]")
+        return
+    out(f"\n🧭 {info['name']} — {info['desc']}")
+    out(f"אבני דרך: {info['done']}/{info['total']}"
+        + ("  · 💎 פריצה הושלמה" if info["breakthrough"] else ""))
+    for row in info["milestones"]:
+        mark = "✅" if row["claimed"] else ("🟡" if row["met"] else
+                                           "⛔" if row["late"] else "▫️")
+        needs = ", ".join(f"{p['name']} {p['have']}/{p['need']}" for p in row["needs"])
+        out(f"  {mark} גיל {row['age']}: {needs}")
+    if info["next"]:
+        out("\n" + info["next"])
+    if info["focus"]:
+        out(f"מומלץ להתאמן השבוע על: {D.ATTRIBUTE_NAMES_HE[info['focus']]}")
+    if choose("להחליף מסלול?", ["לא", "כן"]) == 1:
+        rows = DEV.options_for(game.me.position)
+        idx = choose("לאיזה מסלול?", [r[1] for r in rows] + ["ביטול"])
+        if idx < len(rows):
+            out("\n" + DEV.set_plan(game, rows[idx][0]))
+            ask("\n[Enter]")
+
+
+def show_scouts(game: GameState) -> None:
+    """מי עוקב אחריך, ומה כתוב בתיק."""
+    ranked = SC.watchers(game)
+    out("\n👀 מי עוקב אחריך")
+    if not ranked:
+        out("  אף אחד עדיין לא פתח עליך תיק. תמשיך לשחק.")
+        return
+    for club, score in ranked[:8]:
+        country = D.club_country(club.cid, club.league_id)
+        out(f"  {club.name} ({country}) — {SC.interest_label(score)} "
+            f"[{score:.0f}/100]")
+    out("")
+    for line in SC.scout_report(game, ranked[0][0]):
+        out("  " + line)
+
+
+def show_money(game: GameState) -> None:
+    """תיק החסויות והנכסים."""
+    out(f"\n💼 מזומן: ₪{int(game.money):,}")
+    if game.deals:
+        out(f"\n📄 חסויות פעילות (₪{CM.portfolio_total(game.deals):,} לעונה):")
+        for deal in game.deals:
+            out(f"  {deal['brand']} ({deal['tier_he']}) — ₪{deal['annual']:,} "
+                f"לעונה, נותרו {deal['years_left']} שנים")
+            for key in deal.get("clauses", ()):
+                text = CM.clause_text(key, deal["annual"])
+                if text:
+                    out("     • " + text)
+    else:
+        out("\n📄 אין לך חסויות פעילות.")
+
+    info = WL.summary(game)
+    out(f"\n🏦 שווי נטו: ₪{info['net_worth']:,} "
+        f"(נכסים ₪{info['assets']:,}, תשואה צפויה ₪{info['yearly']:,} לשנה)")
+    for index, item in enumerate(info["items"]):
+        delta = item["value"] - item["paid"]
+        sign = "+" if delta >= 0 else "-"
+        out(f"  [{index}] {item['name']} — שווי ₪{item['value']:,} "
+            f"({sign}₪{abs(delta):,})")
+    idx = choose("מה עכשיו?", ["חזרה", "לקנות נכס", "למכור נכס"])
+    if idx == 1:
+        rows = WL.available(game)
+        labels = []
+        for row in rows:
+            mark = "🔒" if row["locked"] else ("💰" if row["affordable"] else "❌")
+            labels.append(f"{mark} {row['name']} — ₪{row['price']:,} "
+                          f"({row['yield'] * 100:.1f}% לשנה)")
+        pick = choose("מה לקנות?", labels + ["ביטול"])
+        if pick < len(rows):
+            out("\n" + WL.buy(game, rows[pick]["key"]))
+            ask("\n[Enter]")
+    elif idx == 2 and info["items"]:
+        labels = [f"{i['name']} — ₪{i['value']:,}" for i in info["items"]]
+        pick = choose("מה למכור?", labels + ["ביטול"])
+        if pick < len(info["items"]):
+            out("\n" + WL.sell(game, pick))
+            ask("\n[Enter]")

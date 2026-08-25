@@ -824,6 +824,13 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   font-size: 12.5px; line-height: 1.4;
 }
 
+/* שורת הסטטיסטיקה אחרי משחק — המספרים שהאימון של השבוע ייצר */
+.statline { display: grid; gap: 3px; }
+.statline .muted {
+  font-size: 12.5px; line-height: 1.5;
+  unicode-bidi: isolate;
+}
+
 .toast {
   position: fixed; inset-inline: 12px; bottom: 16px; z-index: 90;
   max-width: 560px; margin: 0 auto;

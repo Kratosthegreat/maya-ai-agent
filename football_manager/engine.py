@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from . import data as D
+from . import matchstats as MS
 from .models import Club, Player, clamp
 
 # מנטליות טקטית: (מכפיל התקפה, מכפיל הגנה, תוספת סיכון)
@@ -70,6 +71,8 @@ class MatchResult:
     away_lineup: List[str] = field(default_factory=list)
     commentary: List[str] = field(default_factory=list)
     competition: str = "ליגה"
+    # שורת סטטיסטיקה אישית — נבנית רק לשחקן שאתה משחק בו
+    stat_lines: Dict[str, dict] = field(default_factory=dict)
 
     @property
     def score(self) -> str:
@@ -219,7 +222,8 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
                    home_tactics: Optional[dict] = None,
                    away_tactics: Optional[dict] = None,
                    competition: str = "ליגה",
-                   neutral: bool = False) -> MatchResult:
+                   neutral: bool = False,
+                   focus_pid: Optional[str] = None) -> MatchResult:
     """מדמה משחק שלם בין שתי קבוצות ומחזיר תוצאה מלאה."""
     home_tactics = home_tactics or {}
     away_tactics = away_tactics or {}
@@ -303,8 +307,10 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
     _apply_injuries(result, home_lineup, home.cid, players, rng, home)
     _apply_injuries(result, away_lineup, away.cid, players, rng, away)
 
-    _rate_players(result, home_lineup, home.cid, players, rng)
-    _rate_players(result, away_lineup, away.cid, players, rng)
+    _rate_players(result, home_lineup, home.cid, players, rng,
+                  focus_pid=focus_pid, possession=h_control)
+    _rate_players(result, away_lineup, away.cid, players, rng,
+                  focus_pid=focus_pid, possession=a_control)
 
     if result.ratings:
         result.motm = max(result.ratings, key=lambda pid: result.ratings[pid])
@@ -422,8 +428,15 @@ def _apply_injuries(result: MatchResult, lineup: List[str], club_id: str,
 
 
 def _rate_players(result: MatchResult, lineup: List[str], club_id: str,
-                  players: Dict[str, Player], rng: random.Random) -> None:
-    """נותן ציון לכל שחקן בהרכב ומעדכן סטטיסטיקה."""
+                  players: Dict[str, Player], rng: random.Random,
+                  focus_pid: Optional[str] = None,
+                  possession: float = 0.5) -> None:
+    """נותן ציון לכל שחקן בהרכב ומעדכן סטטיסטיקה.
+
+    לשחקן שאתה משחק בו נבנית גם שורת סטטיסטיקה מלאה, והציון שלו נגזר
+    ממה שקרה בשורה הזאת — לא מדירוג כללי. ככה שבוע של אימון סיומות
+    מגיע עד לציון של יום ראשון.
+    """
     conceded = result.goals_against(club_id)
     outcome = result.result_for(club_id)
     team_mod = {"W": 0.45, "D": 0.0, "L": -0.35}[outcome]
@@ -445,10 +458,29 @@ def _rate_players(result: MatchResult, lineup: List[str], club_id: str,
         p = players.get(pid)
         if not p:
             continue
-        rating = 6.0 + team_mod + rng.gauss(0, 0.55)
-        rating += (p.effective - 60) * 0.017
-        rating += goals_by.get(pid, 0) * 1.05
-        rating += assists_by.get(pid, 0) * 0.65
+        minutes = 90 if rng.random() > 0.18 else rng.randint(55, 89)
+        goals = goals_by.get(pid, 0)
+        assists = assists_by.get(pid, 0)
+
+        rating = 5.80 + team_mod + rng.gauss(0, 0.44)
+        rating += (p.overall - 58) * 0.026
+        rating += (p.form - 50) * 0.003
+        # חדות וכושר הם קנס, לא בונוס: שחקן רענן הוא הבסיס, ומי שנכנס
+        # שרוף או בלי דקות ברגליים משלם על זה בציון. זה מה שהמאמן
+        # מתכוון אליו כשהוא שולח אותך לנוח.
+        rating -= max(0.0, 92.0 - p.sharpness) * 0.010
+        rating -= max(0.0, 90.0 - p.fitness) * 0.009
+
+        if pid == focus_pid:
+            stats = MS.match_stat_line(p, minutes, goals, assists, rng,
+                                       possession=possession)
+            result.stat_lines[pid] = stats
+            # הציון שלך נגזר ממה שבאמת עשית במגרש הערב, ולא רק ממי שאתה:
+            # 65 זה ערב ממוצע שלך, ומשם למעלה או למטה
+            rating += (MS.performance(stats, p.position) - 65) * 0.022
+
+        rating += goals * 1.05
+        rating += assists * 0.65
         rating -= cards.get(pid, 0) * 0.28
         share = D.POSITION_ROLE_SHARE[p.position]
         rating -= conceded * 0.24 * share["def"]
@@ -459,7 +491,6 @@ def _rate_players(result: MatchResult, lineup: List[str], club_id: str,
         rating = round(clamp(rating, 3.0, 10.0), 1)
         result.ratings[pid] = rating
 
-        minutes = 90 if rng.random() > 0.18 else rng.randint(55, 89)
         p.season.add_match(rating, minutes)
         p.fitness = clamp(p.fitness - minutes * 0.13 - rng.uniform(0, 6), 8, 100)
         # כושר ומורל מגיבים לביצוע

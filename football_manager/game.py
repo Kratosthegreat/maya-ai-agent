@@ -24,6 +24,11 @@ from .models import (assign_number, available_numbers, gain_reputation, Club, Co
                      generate_player, generate_world, wage_for_overall)
 from . import club_ops as CO
 from . import manager as MG
+from . import matchstats as MS
+from . import commercial as CM
+from . import development as DEV
+from . import scouting as SC
+from . import wealth as WL
 from .progression import (end_of_season_development, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
                           weekly_training)
@@ -71,6 +76,27 @@ def league_weeks() -> List[int]:
 # דוח שבועי
 # ---------------------------------------------------------------------------
 
+def net_income(gross: int) -> int:
+    """מה שנשאר ביד אחרי מס ועמלת סוכן.
+
+    בלי זה הכסף רק נערם: אחרי עשור בשכר של מקצוען אין שום החלטה
+    כלכלית שבאמת עולה משהו. המדרגות פרוגרסיביות, כמו במציאות.
+    """
+    if gross <= 0:
+        return 0
+    weekly = float(gross)
+    if weekly <= 3_000:
+        rate = 0.14
+    elif weekly <= 20_000:
+        rate = 0.28
+    elif weekly <= 80_000:
+        rate = 0.39
+    else:
+        rate = 0.47
+    rate += 0.05                      # עמלת הסוכן, גם היא יורדת מהברוטו
+    return int(round(gross * (1.0 - rate)))
+
+
 @dataclass
 class WeekReport:
     """סיכום מה שקרה בשבוע."""
@@ -81,6 +107,7 @@ class WeekReport:
     season_ended: bool = False
     attendance: int = 0
     finances: Optional[Dict[str, int]] = None
+    sponsor_income: int = 0
 
     def add(self, text: str) -> None:
         if text:
@@ -445,16 +472,31 @@ class GameState:
         if event and self._arm_event(event):
             report.event_id = event.eid
 
-        # 5. שכר
+        # 5. סקאוטים ביציע — מי ראה אותך השבוע ומה הוא כתב
+        my_rating = None
+        if report.match and self.me_id in report.match.ratings:
+            my_rating = report.match.ratings[self.me_id]
+        for line in SC.scouts_this_week(self, self.rng, my_rating):
+            report.add(line)
+
+        # 6. שכר
         self._weekly_income(report)
 
-        # 6. ההוראה לשבוע הבא
+        # 7. ההוראה לשבוע הבא
         nxt = MG.weekly_directive(self, self.rng)
         self.set_flag("directive", nxt)
         if nxt and self.stage in ("academy", "player", "veteran"):
-            report.add(MG.directive_line(self.my_club, nxt))
+            report.add(MG.directive_line(self.my_club, nxt,
+                                         self.flags.get("last_stats")))
+        if self.stage in ("youth", "academy", "player", "veteran"):
+            target = DEV.next_target(self)
+            if target and self.week % 4 == 0:
+                report.add(target)
+            elif not target and self.week % 8 == 0:
+                report.add("🧭 עוד לא בחרת מסלול פיתוח. בלי מסלול אתה מתאמן "
+                           "בלי יעד. (בתפריט: 'מסלול')")
 
-        # 7. קידום השבוע
+        # 8. קידום השבוע
         self.week += 1
         if self.week > SEASON_WEEKS:
             report.season_ended = True
@@ -667,8 +709,11 @@ class GameState:
                 home_tac = mine
             else:
                 away_tac = mine
+        focus = self.me_id if (is_mine and self.stage in
+                               ("academy", "player", "veteran")) else None
         result = simulate_match(home, away, self.players, self.rng,
-                                home_tac, away_tac, competition, neutral)
+                                home_tac, away_tac, competition, neutral,
+                                focus_pid=focus)
         # הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
         # כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
         my_club = self.my_club
@@ -730,6 +775,10 @@ class GameState:
                 if result.motm == me.pid:
                     detail += " | ⭐ מצטיין המשחק"
                 lines.append(f"👤 {detail}")
+                stats = result.stat_lines.get(me.pid)
+                if stats:
+                    self.flags["last_stats"] = stats
+                    lines.extend(MS.stat_summary(stats, me.position))
                 club = self.my_club
                 outcome = result.result_for(club.cid) if club else "D"
                 note = MG.post_match_line(self, rating, outcome, True, self.rng)
@@ -785,6 +834,12 @@ class GameState:
         me.fitness = clamp(me.fitness - minutes * 0.12, 8, 100)
         me.morale = clamp(me.morale + (rating - 6.2), 5, 99)
         lines.append(f"🔁 נכנסת בדקה {90 - minutes} — {minutes} דקות, ציון {rating}.")
+        # גם עשרים דקות מייצרות מספרים. מי שיושב על הספסל צריך לדעת
+        # על מה לעבוד לא פחות ממי שמשחק תשעים.
+        stats = MS.match_stat_line(me, minutes, 1 if scored else 0, 0, self.rng)
+        result.stat_lines[me.pid] = stats
+        self.flags["last_stats"] = stats
+        lines.extend(MS.stat_summary(stats, me.position))
         return lines
 
     # ==================================================================
@@ -950,13 +1005,19 @@ class GameState:
         if self.stage == "youth":
             pass                      # בגיל הזה עוד לא משלמים לך
         elif self.stage in ("academy", "player", "veteran"):
-            self.earn_money(me.contract.wage)
+            self.earn_money(net_income(me.contract.wage))
+
+        # חסויות משלמות כל שבוע כל עוד החוזה בתוקף — לא פעם אחת ונגמר
+        retainer = CM.weekly_retainer(self.deals, SEASON_WEEKS)
+        if retainer:
+            self.earn_money(net_income(retainer))
+            report.sponsor_income = net_income(retainer)
         elif self.stage in ("coach", "manager", "director"):
             club = self.my_club
             base = 4000 if self.stage == "coach" else 12000
             if club:
                 base += int(club.reputation * (60 if self.stage == "coach" else 260))
-            self.earn_money(base)
+            self.earn_money(net_income(base))
 
         club = self.my_club
         if club:
@@ -978,6 +1039,43 @@ class GameState:
 
         weekly_recovery(me, played=me.pid in (report.match.ratings if report.match else {}),
                         rng=self.rng, club=club)
+
+    # -- חסויות, מסלול ונכסים ---------------------------------------------
+
+    @property
+    def deals(self) -> List[Dict[str, Any]]:
+        """תיק החסויות הפעיל. חי בדגלים, ולכן נשמר עם הקריירה."""
+        data = self.flags.get("deals")
+        if not isinstance(data, list):
+            data = []
+            self.flags["deals"] = data
+        return data
+
+    def _commercial_season_end(self) -> List[str]:
+        """בונוסים לפי הביצועים, ואז שנה קדימה בכל חוזה."""
+        if not self.deals:
+            return []
+        lines: List[str] = []
+        payouts = CM.season_bonuses(self.deals, self.me,
+                                    len(self.honours), self.caps)
+        total = sum(amount for _, amount in payouts)
+        if total:
+            self.earn_money(total)
+            lines.append(f"💰 בונוסים מחסויות: ₪{total:,}")
+            for label, amount in payouts[:4]:
+                lines.append(f"   • {label} — ₪{amount:,}")
+        expiring = [d for d in self.deals if d["years_left"] <= 1]
+        lines.extend(CM.tick_portfolio(self.deals))
+        # מותג שהחוזה איתו נגמר חוזר עם הצעה חדשה, לפי מי שנעשית
+        for deal in expiring:
+            if self.rng.random() < 0.55:
+                offer = CM.renewal_offer(deal, self.me, self.rng,
+                                         self.my_club.reputation if self.my_club else 30)
+                self.flags["pending_renewal"] = offer
+                lines.append(f"📞 {deal['brand']} רוצים לחדש — "
+                             f"₪{offer['annual']:,} לעונה. (בתפריט: 'חסויות')")
+                break
+        return lines
 
     def _board_finance_pressure(self, report: WeekReport, club: Club) -> None:
         """קופה בגירעון שוחקת את אמון ההנהלה במאמן."""
@@ -1617,6 +1715,15 @@ class GameState:
         # שוק ההעברות
         lines.extend(self._transfer_window())
 
+        # מסלול הפיתוח — מה נחתם העונה
+        lines.extend(DEV.claim_milestones(self))
+
+        # חסויות: בונוסים לפי מה שבאמת עשית, ואז שנה קדימה בחוזים
+        lines.extend(self._commercial_season_end())
+
+        # נכסים והשקעות
+        lines.extend(WL.season_tick(self, self.rng))
+
         # מעבר שלב קריירה
         lines.extend(self._advance_career_stage())
 
@@ -1768,18 +1875,27 @@ class GameState:
         return lines
 
     def _transfer_offer_for_me(self) -> Optional[Club]:
-        """מועדון שמוכן להציע לי חוזה — לפי הרמה שלי בפועל."""
+        """מועדון שמוכן להציע לי חוזה.
+
+        קודם כול — מי שבאמת עקב אחריך לאורך העונה. הצעה כבר לא נופלת
+        משמיים: היא הסוף של תהליך שראית קורה, שבוע אחרי שבוע, ביציע.
+        """
         me = self.me
-        # תקרת המועדונים שאליהם אפשר לעבור נגזרת מהדירוג, מהמוניטין ומהעונה
-        ceiling = (me.overall + 8 + (me.reputation - 40) * 0.25
-                   + (me.season.avg_rating - 6.5) * 8)
-        if self.flag("open_to_europe"):
-            ceiling += 6
-        if self.flag("wants_transfer") or self.flag("free_agent_soon"):
-            ceiling += 4
-        pool = [c for c in self.clubs.values()
-                if c.cid != me.club_id and ceiling - 28 <= c.reputation <= ceiling]
-        if not pool or self.rng.random() > 0.55:
+        chaser = SC.top_suitor(self, SC.CHASED)
+        if chaser is not None:
+            return chaser
+        # סוכן ששילמת לו פותח דלת גם בלי שהצופים סיימו את העבודה
+        target = self.flag("agent_target")
+        if target and target in self.clubs and target != me.club_id:
+            if self.rng.random() < 0.7:
+                self.flags.pop("agent_target", None)
+                return self.clubs[target]
+        courting = SC.watchers(self, SC.COURTED)
+        if courting and self.rng.random() < 0.5:
+            return courting[0][0]
+        # ואם אף אחד לא עקב — עדיין קורה ששם עולה בישיבה
+        pool = SC.candidate_clubs(self)
+        if not pool or self.rng.random() > 0.35:
             return None
         return max(pool, key=lambda c: c.reputation)
 

@@ -497,6 +497,8 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   const result = {
     homeId: home.cid, awayId: away.cid, homeGoals, awayGoals,
     events: [], ratings: {}, motm: null,
+    // שורת סטטיסטיקה אישית — נבנית רק לשחקן שאתה משחק בו
+    statLines: {},
     homeLineup, awayLineup, commentary: [], competition,
   };
 
@@ -533,8 +535,9 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   applyDiscipline(result, awayLineup, away.cid, players, rng, aPress[3]);
   applyInjuries(result, homeLineup, home.cid, players, rng, home);
   applyInjuries(result, awayLineup, away.cid, players, rng, away);
-  ratePlayers(result, homeLineup, home.cid, players, rng);
-  ratePlayers(result, awayLineup, away.cid, players, rng);
+  const focusPid = opts.focusPid || null;
+  ratePlayers(result, homeLineup, home.cid, players, rng, focusPid, hControl);
+  ratePlayers(result, awayLineup, away.cid, players, rng, focusPid, aControl);
 
   const rated = Object.keys(result.ratings);
   if (rated.length) {
@@ -625,7 +628,13 @@ function applyInjuries(result, lineup, clubId, players, rng, club = null) {
   }
 }
 
-function ratePlayers(result, lineup, clubId, players, rng) {
+/**
+ * נותן ציון לכל שחקן בהרכב.
+ * לשחקן שאתה משחק בו נבנית גם שורת סטטיסטיקה מלאה, והציון שלו נגזר
+ * ממה שקרה בשורה הזאת — לא מדירוג כללי.
+ */
+function ratePlayers(result, lineup, clubId, players, rng,
+                     focusPid = null, possession = 0.5) {
   const conceded = goalsAgainst(result, clubId);
   const outcome = resultFor(result, clubId);
   const teamMod = { W: 0.45, D: 0, L: -0.35 }[outcome];
@@ -640,10 +649,27 @@ function ratePlayers(result, lineup, clubId, players, rng) {
   for (const pid of lineup) {
     const p = players[pid];
     if (!p) continue;
-    let rating = 6.0 + teamMod + rng.gauss(0, 0.55);
-    rating += (effective(p) - 60) * 0.017;
-    rating += (goalsBy[pid] || 0) * 1.05;
-    rating += (assistsBy[pid] || 0) * 0.65;
+    const minutes = rng.random() > 0.18 ? 90 : rng.randint(55, 89);
+    const goals = goalsBy[pid] || 0;
+    const assists = assistsBy[pid] || 0;
+
+    let rating = 5.80 + teamMod + rng.gauss(0, 0.44);
+    rating += (overall(p) - 58) * 0.026;
+    rating += (p.form - 50) * 0.003;
+    // חדות וכושר הם קנס, לא בונוס: שחקן רענן הוא הבסיס, ומי שנכנס
+    // שרוף או בלי דקות ברגליים משלם על זה בציון
+    rating -= Math.max(0, 92 - p.sharpness) * 0.010;
+    rating -= Math.max(0, 90 - p.fitness) * 0.009;
+
+    if (pid === focusPid) {
+      const stats = matchStatLine(p, minutes, goals, assists, rng, possession);
+      result.statLines[pid] = stats;
+      // 65 זה ערב ממוצע שלך, ומשם למעלה או למטה
+      rating += (matchPerformance(stats, p.position) - 65) * 0.022;
+    }
+
+    rating += goals * 1.05;
+    rating += assists * 0.65;
     rating -= (cards[pid] || 0) * 0.28;
     const share = D.POSITION_ROLE_SHARE[p.position];
     rating -= conceded * 0.24 * share.def;
@@ -652,7 +678,6 @@ function ratePlayers(result, lineup, clubId, players, rng) {
     rating = Math.round(clamp(rating, 3, 10) * 10) / 10;
     result.ratings[pid] = rating;
 
-    const minutes = rng.random() > 0.18 ? 90 : rng.randint(55, 89);
     p.season.apps += 1;
     p.season.minutes += minutes;
     p.season.ratingSum += rating;
@@ -711,7 +736,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   const care = medicalCare(club);
 
   if (focus === "rest") {
-    p.fitness = clamp(p.fitness + 26 + fitnessCoach / 14, 0, 100);
+    p.fitness = clamp(p.fitness + 20 + fitnessCoach / 14, 0, 100);
     p.morale = clamp(p.morale + 1.5, 0, 100);
     p.resilience = clamp(p.resilience + 0.14, 0, 96);
     p.sharpness = clamp(p.sharpness - 1.6, 0, 100);
@@ -729,7 +754,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
     let gain = (0.55 + (p.attributes.mental ?? 50) / 200) * intensity;
     if (hasTrait(p, "student")) gain *= 1.4;
     p.coaching = clamp(p.coaching + gain, 0, 100);
-    p.fitness = clamp(p.fitness + 10, 0, 100);
+    p.fitness = clamp(p.fitness + 4, 0, 100);
     const newBadges = Math.min(4, Math.floor(p.coaching / 22));
     if (newBadges > p.badges) {
       p.badges = newBadges;
@@ -741,17 +766,19 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   if (focus === "media") {
     p.mediaSkill = clamp(p.mediaSkill + 0.9 * intensity, 0, 100);
     gainReputation(p, 0.25);
-    p.fitness = clamp(p.fitness + 9, 0, 100);
+    p.fitness = clamp(p.fitness + 3, 0, 100);
     return messages;
   }
 
   if (focus === "business") {
     p.business = clamp(p.business + 0.85 * intensity, 0, 100);
-    p.fitness = clamp(p.fitness + 9, 0, 100);
+    p.fitness = clamp(p.fitness + 3, 0, 100);
     return messages;
   }
 
-  p.fitness = clamp(p.fitness + 12 - 6 * intensity, 0, 100);
+  // האימון עולה כושר — הוא לא מחזיר אותו. ההתאוששות עצמה קורית
+  // ב-weeklyRecovery, פעם אחת בשבוע, לכולם.
+  p.fitness = clamp(p.fitness - (2.5 + 5.0 * intensity), 0, 100);
   if (p.injuryWeeks > 0) {
     p.injuryWeeks = Math.max(0, p.injuryWeeks - 1);
     return [{ icon: "🩹", text: "אתה בשיקום — האימון היה קל בהרבה." }];
@@ -813,20 +840,28 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   return messages;
 }
 
+/**
+ * התאוששות טבעית בסוף שבוע — נקודת ההתאוששות היחידה, והיא רצה גם
+ * בשבוע שבו שיחקת: גוף של מקצוען חוזר לעצמו בין משחק למשחק. בלי זה
+ * הכושר נשחק לאורך העונה עד שהמאמן לא מבקש ממך יותר כלום חוץ ממנוחה.
+ */
 function weeklyRecovery(p, played, rng, club = null) {
   const care = medicalCare(club);
+  const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
   if (p.injuryWeeks > 0) {
     p.injuryWeeks -= 1;
     if (p.injuryWeeks > 0 && rng.random() < (care - 0.45) * 0.55) p.injuryWeeks -= 1;
     if (p.injuryWeeks === 0) { p.injuryName = ""; p.fitness = clamp(p.fitness + 15, 0, 100); }
   }
+  let recover = 11.0 + fitnessCoach / 12 + care * 5.0;
+  recover *= 1.06 - Math.min(0.30, Math.max(0, p.age - 29) * 0.028);
   if (played) {
     p.sharpness = clamp(p.sharpness + 5.5, 0, 100);
   } else {
-    const fitnessCoach = club ? staffQuality(club, "fitness") : 0;
-    p.fitness = clamp(p.fitness + 9 + fitnessCoach / 22, 0, 100);
+    recover += 4.0;
     p.sharpness = clamp(p.sharpness - 1.1, 0, 100);
   }
+  p.fitness = clamp(p.fitness + recover, 0, 100);
   if (p.injuryWeeks > 0) p.sharpness = clamp(p.sharpness - 1.8, 0, 100);
   p.form = clamp(p.form + (played ? 0 : rng.uniform(-1.5, 1.5)), 5, 99);
 }
@@ -841,7 +876,12 @@ function simulateAiWeek(players, rng, clubs, skip) {
       if (p.injuryWeeks === 0) p.injuryName = "";
       continue;
     }
-    p.fitness = clamp(p.fitness + rng.uniform(6, 16), 0, 100);
+    p.fitness = clamp(p.fitness + rng.uniform(13, 24), 0, 100);
+    // חדות משחק אצל שחקני מחשב מתכנסת לרמת "בתוך סגל" — בלי זה כל
+    // הליגה הייתה נכנסת למשחקים בלי דקות ברגליים, ומשלמת על כך
+    const target = p.clubId ? 92 : 45;
+    p.sharpness = clamp(p.sharpness + (target - p.sharpness) * 0.22
+                        + rng.uniform(-2, 2), 0, 100);
     if (rng.random() < 0.55) weeklyTraining(p, rng.choice(D.ATTRIBUTES), club, rng, 0.85);
   }
 }

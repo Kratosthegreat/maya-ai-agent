@@ -280,43 +280,60 @@ ev({
 
 function buildDeal(g) {
   const club = g.myClub();
-  const offer = sponsorOffer(g.me, g.rng, club ? club.reputation : 30, !!g.myFixture());
+  // חידוש שממתין קודם — מותג שכבר עבד איתך חוזר לפני שמחפשים חדש
+  const pending = g.flags.pending_renewal;
+  if (pending) {
+    g.flags.pending_renewal = null;
+    g.flags.pendingDeal = pending;
+    return pending;
+  }
+  const offer = sponsorOffer(g.me, g.rng, club ? club.reputation : 30,
+                             !!g.myFixture(), g.honours.length);
   if (offer) g.flags.pendingDeal = offer;
   return offer;
 }
 
+/** חתימה על חוזה חסות — מקדמה עכשיו, ואז תשלום שבועי לאורך החוזה. */
+function signSponsorDeal(g) {
+  const offer = g.flags.pendingDeal;
+  if (!offer) return "ההצעה ירדה מהשולחן.";
+  const annual = offer.annual ?? offer.amount ?? 0;
+  signDeal(g.deals(), offer, g.year);
+  const signing = Math.trunc(annual * 0.35);
+  g.earn(signing);
+  g.me.mediaSkill = clamp(g.me.mediaSkill + offer.mediaGain, 0, 100);
+  gainReputation(g.me, offer.mediaGain * 0.25);
+  g.flags.pendingDeal = null;
+  const weekly = weeklyRetainer(g.deals(), 43);
+  const tail = `מקדמה של ₪${fmt(signing)} נכנסה, ומעכשיו התיק המסחרי שלך `
+             + `משלם ₪${fmt(weekly)} בשבוע.`;
+  if (offer.clashes) {
+    tru(g, -3);
+    return `חתמת עם ${offer.brand} על ₪${fmt(annual)} לעונה. ${tail} `
+         + "יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.";
+  }
+  return `חתמת עם ${offer.brand} על ₪${fmt(annual)} לעונה. ${tail} `
+       + "הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.";
+}
+
 ev({
   eid: "sponsor_deal", title: "טלפון ממחלקת השיווק",
-  stages: ["academy", "player", "veteran"], weight: 1.3, once: false, cooldown: 16,
+  stages: ["academy", "player", "veteran"], weight: 2.4, once: false, cooldown: 9,
   cond: g => marketability(g.me, g.myClub() ? g.myClub().reputation : 30) >= 12,
   body: g => {
     const offer = buildDeal(g);
     if (!offer) return "";
-    const lines = [
-      `${offer.brand} (${offer.tierHe}) רוצים אותך על ${offer.kindHe}.`,
-      "",
-      dealSummary(offer),
-      offer.clashes
-        ? "אחד מימי הצילומים נופל בשבוע של משחק."
-        : "הצילומים בהפסקת הליגה — לא פוגע בשום דבר.",
-    ];
+    const head = offer.renewal
+      ? `${offer.brand} (${offer.tierHe}) רוצים לחדש איתך.`
+      : `${offer.brand} (${offer.tierHe}) רוצים אותך על ${offer.kindHe}.`;
+    const lines = [head, ""].concat(dealLines(offer), [""]);
+    lines.push(offer.clashes
+      ? "אחד מימי הצילומים נופל בשבוע של משחק."
+      : "הצילומים בהפסקת הליגה — לא פוגע בשום דבר.");
     return lines.join("\n");
   },
   choices: [
-    { label: "לחתום", hint: "כסף וכריזמה", apply: g => {
-      const offer = g.flags.pendingDeal;
-      if (!offer) return "ההצעה ירדה מהשולחן.";
-      const total = offer.amount * offer.years;
-      g.earn(total);
-      g.me.mediaSkill = clamp(g.me.mediaSkill + offer.mediaGain, 0, 100);
-      gainReputation(g.me, offer.mediaGain * 0.25);
-      g.flags.pendingDeal = null;
-      if (offer.clashes) {
-        tru(g, -3);
-        return `חתמת עם ${offer.brand} על ₪${fmt(total)}. יום הצילומים בשבוע המשחק לא עבר בשקט אצל המאמן.`;
-      }
-      return `חתמת עם ${offer.brand} על ₪${fmt(total)}. הצילומים בהפסקה — אף אחד במועדון לא הרים גבה.`;
-    } },
+    { label: "לחתום", hint: "כסף וכריזמה", apply: g => signSponsorDeal(g) },
     { label: "לסרב", apply: g => {
       const offer = g.flags.pendingDeal;
       g.flags.pendingDeal = null;
@@ -358,6 +375,143 @@ ev({
       g.flags.pendingMedia = null;
       tru(g, 2); att(g, "mental", 0.3);
       return "ויתרת. פחות רעש, יותר אימונים.";
+    } },
+  ],
+});
+
+ev({
+  eid: "sponsor_global", title: "הפגישה בקומה העליונה",
+  stages: ["player", "veteran"], weight: 3.0, once: false, cooldown: 40,
+  cond: g => g.myClub() !== null
+             && marketability(g.me, g.myClub().reputation) >= 74,
+  body: g => {
+    // מותג עולמי לא מתקשר — הוא מזמין אותך למשרד
+    const club = g.myClub();
+    const tiers = D.SPONSOR_TIERS.filter(t => t[0] === "continental" || t[0] === "global");
+    const market = marketability(g.me, club ? club.reputation : 40);
+    const tier = (market >= 80 && g.rng.random() < 0.6) ? tiers[tiers.length - 1] : tiers[0];
+    const offer = sponsorOffer(g.me, g.rng, club ? club.reputation : 40, false,
+                               g.honours.length);
+    if (!offer) return "";
+    const [key, tierHe, minRep, base] = tier;
+    const over = Math.max(0, market - minRep) / 40;
+    const annual = Math.round(base * (1.05 + over * 2.1)
+                              * g.rng.uniform(0.92, 1.3) / 1000) * 1000;
+    Object.assign(offer, {
+      brand: g.rng.choice(tier[5]), tier: key, tierHe, annual, amount: annual,
+      years: g.rng.randint(3, 5), mediaGain: 9, clashes: false,
+      market: Math.round(market * 10) / 10,
+      clauses: D.BONUS_CLAUSES.slice(0, 3).map(c => c[0]),
+    });
+    g.flags.pendingDeal = offer;
+    const lines = [`טסת לפגישה. ${offer.brand} — הדרג ה${tierHe}.`, "",
+      '"עקבנו אחריך שנתיים. אנחנו לא מחפשים פרצוף לעונה, אנחנו מחפשים מישהו לבנות סביבו."',
+      ""];
+    return lines.concat(dealLines(offer)).join("\n");
+  },
+  choices: [
+    { label: "לחתום", hint: "חוזה רב־שנתי", apply: g => signSponsorDeal(g) },
+    { label: "לבקש מהסוכן לשפר", hint: "הימור", apply: g => {
+      const offer = g.flags.pendingDeal;
+      if (!offer) return "ההצעה ירדה מהשולחן.";
+      if (g.rng.random() < 0.45 + g.me.business / 300) {
+        offer.annual = Math.round(offer.annual * g.rng.uniform(1.2, 1.5));
+        offer.amount = offer.annual;
+        signDeal(g.deals(), offer, g.year);
+        g.earn(Math.trunc(offer.annual * 0.35));
+        gainReputation(g.me, 3);
+        g.me.business = clamp(g.me.business + 3, 0, 100);
+        g.flags.pendingDeal = null;
+        return `הסוכן שלך עמד על שלו. ${offer.brand} עלו ל-₪${fmt(offer.annual)} לעונה. חתמת.`;
+      }
+      g.flags.pendingDeal = null;
+      g.me.business = clamp(g.me.business + 1, 0, 100);
+      return `${offer.brand} אמרו שיחזרו אליך. הם לא חזרו העונה. `
+           + "לפעמים ההימור לא עובד.";
+    } },
+    { label: "לא עכשיו", apply: g => {
+      const offer = g.flags.pendingDeal;
+      g.flags.pendingDeal = null;
+      if (offer && offer.clashes) {
+        tru(g, 4); att(g, "mental", 0.4);
+        return "סירבת בגלל השבוע של המשחק. הצוות המקצועי שמע, וזכר.";
+      }
+      return "סירבת. הסוכן שלך לא הבין למה, אבל זה הכסף שלך.";
+    } },
+  ],
+});
+
+ev({
+  eid: "foreign_agent", title: 'שיחה מחו"ל',
+  stages: ["player", "veteran"], weight: 1.4, once: false, cooldown: 20,
+  cond: g => g.myClub() !== null && watchers(g, SCOUT_COURTED)
+             .some(([club]) => clubCountry(club.cid) !== "ישראל"),
+  body: g => {
+    const pitch = foreignAgent(g, g.rng);
+    if (!pitch) return "";
+    g.flags.pendingForeign = pitch;
+    return `${pitch.agent} התקשר מ${pitch.country}.\n\n`
+      + `"אני עובד מול ${pitch.club_name}. הם שולחים אליך צופים כבר תקופה — `
+      + `התיק שלך אצלם פתוח (${Math.round(pitch.score)} מתוך 100). `
+      + `אתה מקבל היום ₪${fmt(g.me.contract.wage)} לשבוע; שם מדברים על `
+      + `₪${fmt(pitch.wage)}."\n\n`
+      + `העמלה שלו: ₪${fmt(pitch.fee)}. זה לא אומר שאתה עובר — `
+      + "זה אומר שיש מי שיפתח את הדלת.";
+  },
+  choices: [
+    { label: "להקשיב לו", hint: 'פותח דלת לחו"ל', apply: g => {
+      const pitch = g.flags.pendingForeign;
+      if (!pitch) return "הקו התנתק.";
+      g.spend(pitch.fee);
+      g.setFlag("agent_target", pitch.club);
+      g.setFlag("open_to_europe", true);
+      // עצם זה שיש נציג בשטח מחמם את העניין
+      const table = interestMap(g);
+      table[pitch.club] = Math.min(100, (table[pitch.club] || 0) + 9);
+      g.flags.pendingForeign = null;
+      mor(g, 4);
+      return `שילמת לו מקדמה. ${pitch.club_name} יודעים עכשיו שאתה פתוח `
+           + "לשמוע — ובחלון ההעברות זה יהיה על השולחן.";
+    } },
+    { label: "עוד לא", apply: g => {
+      g.flags.pendingForeign = null;
+      tru(g, 3);
+      return "אמרת לו שאתה באמצע משהו כאן. הוא השאיר מספר.";
+    } },
+  ],
+});
+
+ev({
+  eid: "scout_report", title: "מה כתבו עליך",
+  stages: ["academy", "player", "veteran"], weight: 0.9, once: false, cooldown: 24,
+  cond: g => watchers(g, SCOUT_NOTICED).length >= 2,
+  body: g => {
+    const ranked = watchers(g, SCOUT_NOTICED);
+    if (!ranked.length) return "";
+    const lines = ["הסוכן שלך שלח לך צילום מסך של דוח שדלף.", ""];
+    for (const [club, score] of ranked.slice(0, 3))
+      lines.push(`• ${club.name} — ${interestLabel(score)} (${Math.round(score)}/100)`);
+    lines.push("");
+    return lines.concat(scoutReport(g, ranked[0][0])).join("\n");
+  },
+  choices: [
+    { label: "לעבוד על מה שחסר", hint: "מקצועי", apply: g => {
+      const ranked = watchers(g, SCOUT_NOTICED);
+      const weights = D.POSITION_WEIGHTS[g.me.position];
+      let worst = D.ATTRIBUTES[0];
+      for (const a of D.ATTRIBUTES)
+        if ((g.me.attributes[a] ?? 50) * (weights[a] || 0.1)
+            < (g.me.attributes[worst] ?? 50) * (weights[worst] || 0.1)) worst = a;
+      att(g, worst, 1.4);
+      mor(g, 3);
+      const club = ranked.length ? ranked[0][0].name : "מי שעוקב אחריך";
+      return `לקחת את זה לאימון. ${D.ATTRIBUTE_NAMES_HE[worst]} — `
+           + `בדיוק מה ש${club} סימנו לך. הצופה הבא יראה משהו אחר.`;
+    } },
+    { label: "לא לתת לזה להיכנס לראש", apply: g => {
+      mor(g, 5);
+      g.me.sharpness = clamp(g.me.sharpness + 4, 0, 100);
+      return "סגרת את הטלפון. יש שחקנים שנשברים מזה, ואתה לא אחד מהם.";
     } },
   ],
 });

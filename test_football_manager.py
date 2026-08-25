@@ -19,6 +19,10 @@ from football_manager import commercial as CM
 from football_manager import story_engine as SE
 from football_manager.story_pack import PACK
 from football_manager import manager as MG
+from football_manager import matchstats as MS
+from football_manager import scouting as SC
+from football_manager import development as DEV
+from football_manager import wealth as WL
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -1167,3 +1171,367 @@ def test_choice_effects_change_the_state():
     assert club.manager_trust < trust
     assert game.flag("test_flag") is True
     assert "leader" in game.me.traits
+
+
+# ---------------------------------------------------------------------------
+# שורת הסטטיסטיקה: החוט בין האימון למגרש
+# ---------------------------------------------------------------------------
+
+def _striker(shooting=60, passing=60, **rest):
+    player = generate_player(random.Random(3), None, "ST", 24, 65)
+    for attr in D.ATTRIBUTES:
+        player.attributes[attr] = 60
+    player.attributes["shooting"] = shooting
+    player.attributes["passing"] = passing
+    for key, value in rest.items():
+        player.attributes[key] = value
+    player.fitness, player.sharpness = 90.0, 85.0
+    return player
+
+
+def _mean_stats(player, rng, n=250):
+    totals = {}
+    for _ in range(n):
+        stats = MS.match_stat_line(player, 90, 0, 0, rng)
+        for key, value in stats.items():
+            if isinstance(value, (int, float)):
+                totals[key] = totals.get(key, 0) + value
+    return {key: value / n for key, value in totals.items()}
+
+
+def test_training_shows_up_in_the_match():
+    """התלונה: מתאמנים, והמגרש לא מרגיש את זה."""
+    rng = random.Random(11)
+    weak = _mean_stats(_striker(shooting=45), rng)
+    strong = _mean_stats(_striker(shooting=90), rng)
+    assert strong["on_target"] > weak["on_target"] * 1.5, \
+        f"בעיטה 45→90 העלתה למסגרת רק מ-{weak['on_target']:.2f} ל-{strong['on_target']:.2f}"
+
+    sloppy = _mean_stats(_striker(passing=40), rng)
+    tidy = _mean_stats(_striker(passing=88), rng)
+    assert tidy["pass_pct"] > sloppy["pass_pct"] + 8
+    assert tidy["losses"] < sloppy["losses"]
+
+
+def test_area_scores_are_centred_on_the_players_own_level():
+    """70 = ערב ממוצע שלך, בכל עמדה ובכל רמה."""
+    rng = random.Random(5)
+    for position in ("ST", "CM", "CB", "LW", "GK"):
+        for level in (45, 85):
+            player = generate_player(rng, None, position, 24, level)
+            for attr in D.ATTRIBUTES:
+                player.attributes[attr] = level
+            player.fitness, player.sharpness = 88.0, 80.0
+            scores = [MS.performance(MS.match_stat_line(player, 90, 0, 0, rng), position)
+                      for _ in range(120)]
+            mean = sum(scores) / len(scores)
+            assert 55 <= mean <= 80, f"{position}/{level}: ממוצע {mean:.1f}"
+
+
+def test_the_manager_asks_for_something_a_striker_actually_does():
+    """מאמן לא דורש מחלוץ בור לחטוף כדורים כל שבוע."""
+    rng = random.Random(7)
+    player = _striker()
+    asks = {}
+    for _ in range(300):
+        stats = MS.match_stat_line(player, 90, 0, 0, rng)
+        area = MS.weakest_area(stats, "ST", player.attributes)
+        asks[area] = asks.get(area, 0) + 1
+    assert asks.get("defending", 0) <= 15, f"דרש הגנה {asks.get('defending')} פעמים"
+    assert set(asks) <= set(D.ATTRIBUTES)
+
+
+def test_rest_is_not_the_default_directive():
+    """התלונה: 'לרוב המאמן דורש מנוחה'."""
+    counts = {}
+    for seed in (11, 24):
+        game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=seed)
+        for _ in range(260):
+            if game.game_over or game.me.age > 22:
+                break
+            if game.pending_event_id:
+                game.resolve_event(0)
+                continue
+            game.advance_week()
+            focus = game.flag("directive")
+            if focus:
+                counts[focus] = counts.get(focus, 0) + 1
+    total = sum(counts.values())
+    assert total > 100
+    top = max(counts, key=lambda key: counts[key])
+    assert top != "rest", f"מנוחה היא עדיין ההוראה הנפוצה ביותר ({counts})"
+    # כמה מנוחה תידרש תלוי גם במאמן הכושר של המועדון — אבל לא רוב השבועות
+    assert counts.get("rest", 0) / total < 0.30, \
+        f"מנוחה נדרשה ב-{counts.get('rest', 0)}/{total} מהשבועות"
+
+
+def test_the_directive_quotes_the_last_match():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=6)
+    for _ in range(80):
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+        if game.flags.get("last_stats") and game.flag("directive"):
+            break
+    stats = game.flags.get("last_stats")
+    assert stats, "לא נשמרה שורת סטטיסטיקה"
+    line = MG.directive_line(game.my_club, game.flag("directive"), stats)
+    assert "\n" in line, "ההוראה לא כוללת סיבה מהמשחק"
+    assert "{" not in line
+
+
+def test_fitness_no_longer_collapses_over_a_season():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=9)
+    readings = []
+    for _ in range(120):
+        if game.game_over:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+        readings.append(game.me.fitness)
+    mean = sum(readings) / len(readings)
+    assert mean > 70, f"כושר ממוצע {mean:.0f} — הגוף לא מתאושש"
+    assert min(readings) < 95, "הכושר לא זז בכלל — אין מחיר לעומס"
+
+
+# ---------------------------------------------------------------------------
+# סקאוטינג
+# ---------------------------------------------------------------------------
+
+def test_scouts_build_interest_over_a_season():
+    """התלונה: 'אין פניה של סקאוטינג כמעט'."""
+    found = 0
+    for seed in (8, 21, 33, 44):
+        game = GameState.new_game("בודק", "ST", "hapoel_carmel", 19, seed=seed)
+        for _ in range(300):
+            if game.game_over or game.me.age > 25:
+                break
+            if game.pending_event_id:
+                game.resolve_event(0)
+                continue
+            game.advance_week()
+        if SC.watchers(game):
+            found += 1
+    assert found >= 3, f"רק {found} מתוך 4 קריירות משכו צופים"
+
+
+def test_scouting_reaches_beyond_israel():
+    seen_abroad = False
+    for seed in (33, 44, 52, 61):
+        game = GameState.new_game("בודק", "ST", "maccabi_harel", 20, seed=seed)
+        for _ in range(320):
+            if game.game_over or game.me.age > 27:
+                break
+            if game.pending_event_id:
+                game.resolve_event(0)
+                continue
+            game.advance_week()
+        for club, _ in SC.watchers(game):
+            if D.club_country(club.cid, club.league_id) != "ישראל":
+                seen_abroad = True
+    assert seen_abroad, "אף מועדון מחו\"ל לא עקב אחרי אף אחת מהקריירות"
+
+
+def test_a_small_club_does_not_chase_a_star():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 26, seed=4)
+    for attr in D.ATTRIBUTES:
+        game.me.attributes[attr] = 88
+    pool = SC.candidate_clubs(game)
+    assert pool, "אין בכלל יעדים"
+    assert all(c.reputation >= game.me.overall - 24 for c in pool)
+
+
+def test_interest_decays_when_nobody_watches():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=2)
+    SC.interest_map(game)["real_castilla"] = 60.0
+    for _ in range(40):
+        SC.scouts_this_week(game, game.rng, None)
+    assert SC.interest_map(game).get("real_castilla", 0) < 55
+
+
+# ---------------------------------------------------------------------------
+# מסלול הפיתוח
+# ---------------------------------------------------------------------------
+
+def test_every_position_has_a_plan():
+    for position in D.POSITIONS:
+        options = DEV.options_for(position)
+        assert options, position
+        for row in options:
+            assert len(row[4]) >= 3, f"{row[0]}: פחות משלוש אבני דרך"
+
+
+def test_the_plan_tells_you_what_is_missing():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 15, seed=3)
+    assert DEV.next_target(game) is None
+    DEV.set_plan(game, "poacher")
+    target = DEV.next_target(game)
+    assert target and "בעיטה" in target or "קריאת" in target
+    focus = DEV.recommended_focus(game)
+    assert focus in D.ATTRIBUTES
+
+
+def test_milestones_pay_out_and_a_full_plan_breaks_through():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=3)
+    DEV.set_plan(game, "poacher")
+    game.me.ceiling = 99
+    game.me.potential = 60
+    for attr in D.ATTRIBUTES:
+        game.me.attributes[attr] = 90
+    before = game.me.potential
+    lines = DEV.claim_milestones(game)
+    assert len(lines) >= 5, lines            # ארבע אבני דרך + פריצה
+    assert any("💎" in line for line in lines)
+    assert game.me.potential > before
+    assert game.flag("breakthrough") is True
+    assert "clutch" in game.me.traits
+    assert DEV.claim_milestones(game) == []   # לא משלמים פעמיים
+
+
+def test_changing_the_plan_resets_progress():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=3)
+    DEV.set_plan(game, "poacher")
+    game.flags["plan_done"] = [0, 1]
+    DEV.set_plan(game, "target_man")
+    assert game.flags["plan_done"] == []
+
+
+def test_a_milestone_never_pushes_potential_past_the_ceiling():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=3)
+    DEV.set_plan(game, "poacher")
+    game.me.ceiling = 70
+    game.me.potential = 69
+    for attr in D.ATTRIBUTES:
+        game.me.attributes[attr] = 92
+    DEV.claim_milestones(game)
+    assert game.me.potential <= game.me.ceiling
+
+
+# ---------------------------------------------------------------------------
+# חסויות כתיק, לא כתשלום חד־פעמי
+# ---------------------------------------------------------------------------
+
+def test_a_deal_keeps_paying_every_week():
+    """התלונה: 'החסויות מקובעות ואין להן רווחים'."""
+    rng = random.Random(2)
+    player = generate_player(rng, None, "ST", 26, 82)
+    player.reputation, player.media_skill = 78, 65
+    offer = CM.sponsor_offer(player, rng, 80, False, honours=2)
+    assert offer and offer["annual"] > 0
+    portfolio = []
+    CM.sign_deal(portfolio, offer, 2030)
+    weekly = CM.weekly_retainer(portfolio, 43)
+    assert weekly > 0
+    assert abs(weekly * 43 - offer["annual"]) < offer["annual"] * 0.05
+
+
+def test_bonus_clauses_pay_for_a_real_season():
+    rng = random.Random(2)
+    player = generate_player(rng, None, "ST", 26, 82)
+    player.reputation, player.media_skill = 78, 65
+    portfolio = []
+    deal = CM.sign_deal(portfolio, {
+        "brand": "מותג", "tier": "global", "tier_he": "עולמי", "kind_he": "נעליים",
+        "annual": 1_000_000, "years": 3,
+        "clauses": ["per_goal", "trophy"]}, 2030)
+    assert CM.season_bonuses(portfolio, player, 0, 0) == []
+    player.season.goals = 20
+    payouts = CM.season_bonuses(portfolio, player, 1, 0)
+    assert len(payouts) == 2
+    assert sum(amount for _, amount in payouts) > 800_000
+    assert deal["earned"] > 0
+
+
+def test_a_deal_expires_and_the_renewal_reflects_who_you_became():
+    rng = random.Random(2)
+    player = generate_player(rng, None, "ST", 27, 88)
+    player.reputation, player.media_skill = 90, 80
+    portfolio = []
+    CM.sign_deal(portfolio, {"brand": "מותג", "tier": "national", "tier_he": "ארצי",
+                             "kind_he": "ביגוד", "annual": 200_000, "years": 2,
+                             "clauses": []}, 2030)
+    assert CM.tick_portfolio(portfolio) == []
+    assert portfolio[0]["years_left"] == 1
+    renewal = CM.renewal_offer(portfolio[0], player, rng, 85)
+    assert renewal["annual"] > 200_000, "החידוש לא משקף כוכב"
+    lines = CM.tick_portfolio(portfolio)
+    assert portfolio == [] and lines
+
+
+def test_big_brands_open_up_for_a_big_career():
+    rng = random.Random(2)
+    kid = generate_player(rng, None, "ST", 17, 55)
+    kid.reputation, kid.media_skill = 18, 10
+    star = generate_player(rng, None, "ST", 27, 90)
+    star.reputation, star.media_skill = 88, 75
+    star.career.goals = 180
+    assert [t[0] for t in CM.open_tiers(CM.marketability(kid, 40))] == ["local"]
+    assert "global" in [t[0] for t in CM.open_tiers(CM.marketability(star, 90))]
+
+
+def test_sponsor_money_actually_reaches_the_bank():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 25, seed=5)
+    game.deals.append({"brand": "מותג", "tier": "global", "tier_he": "עולמי",
+                       "kind_he": "נעליים", "annual": 4_300_000, "years_left": 3,
+                       "clauses": [], "signed": game.year, "earned": 0})
+    before = game.money
+    game.advance_week()
+    assert game.money > before + 40_000, "התיק המסחרי לא שילם השבוע"
+
+
+# ---------------------------------------------------------------------------
+# נכסים והשקעות
+# ---------------------------------------------------------------------------
+
+def test_you_cannot_buy_what_you_cannot_afford_or_reach():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=5)
+    game.money = 2_000_000
+    game.me.reputation = 10
+    assert "מוניטין" in WL.buy(game, "club_shares")
+    game.me.reputation = 95
+    assert "אין מספיק" in WL.buy(game, "club_shares")
+    assert WL.holdings(game) == []
+    assert "קנית" in WL.buy(game, "studio_flat")
+    assert game.money < 2_000_000
+    assert len(WL.holdings(game)) == 1
+
+
+def test_assets_pay_out_and_can_be_sold():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 26, seed=5)
+    game.money = 20_000_000
+    game.me.reputation = 60
+    WL.buy(game, "padel")
+    assert WL.portfolio_yield(game) > 0
+    worth_before = WL.net_worth(game)
+    lines = WL.season_tick(game, game.rng)
+    assert lines, "עונה שלמה בלי שום תנועה בנכסים"
+    assert WL.net_worth(game) != worth_before
+    cash = game.money
+    assert "מכרת" in WL.sell(game, 0)
+    assert game.money > cash
+    assert WL.holdings(game) == []
+
+
+def test_net_worth_counts_cash_and_assets():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 26, seed=5)
+    game.money = 10_000_000
+    game.me.reputation = 60
+    WL.buy(game, "restaurant")
+    info = WL.summary(game)
+    assert info["net_worth"] == info["cash"] + info["assets"]
+    assert info["assets"] == 5_000_000
+    assert info["count"] == 1
+
+
+def test_tax_leaves_less_than_the_gross():
+    from football_manager.game import net_income
+    assert net_income(0) == 0
+    assert net_income(2_000) > net_income(2_000) * 0        # לא שלילי
+    assert net_income(2_000) < 2_000
+    # מדרגות פרוגרסיביות: אחוז הנטו יורד ככל שהברוטו עולה
+    low = net_income(2_000) / 2_000
+    high = net_income(200_000) / 200_000
+    assert low > high

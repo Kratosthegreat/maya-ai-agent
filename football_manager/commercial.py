@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from . import data as D
 from .models import Player, clamp
@@ -53,8 +53,14 @@ def open_tiers(market: float) -> List[tuple]:
 
 def sponsor_offer(player: Player, rng: random.Random,
                   club_reputation: float = 40.0,
-                  match_week: bool = False) -> Optional[Dict[str, Any]]:
-    """בונה הצעת חסות שמתאימה לשחקן הזה עכשיו. None אם אף אחד לא מתעניין."""
+                  match_week: bool = False,
+                  honours: int = 0) -> Optional[Dict[str, Any]]:
+    """בונה הצעת חסות שמתאימה לשחקן הזה עכשיו. None אם אף אחד לא מתעניין.
+
+    ההצעה איננה סכום חד־פעמי: זה חוזה שנתי לכמה שנים, עם סעיפי בונוס
+    שמשלמים לפי מה שתעשה בפועל. חוזה של כוכב באמת נראה אחרת מחוזה
+    של נער — גם בסכום, גם באורך וגם במה שכתוב בו.
+    """
     market = marketability(player, club_reputation)
     tiers = open_tiers(market)
     if not tiers:
@@ -78,11 +84,22 @@ def sponsor_offer(player: Player, rng: random.Random,
     kind_key = rng.choice(list(D.DEAL_KINDS))
     kind = D.DEAL_KINDS[kind_key]
 
-    # התשלום נגזר מהדרג, מהערך המסחרי ומסוג החוזה
+    # התשלום נגזר מהדרג, מהערך המסחרי, מהתארים ומסוג החוזה
     over = max(0.0, market - min_rep) / 40.0
-    amount = base * kind["pay"] * (0.75 + over * 1.5) * rng.uniform(0.85, 1.25)
-    years = rng.randint(1, 3) if key in ("continental", "global") else 1
+    annual = base * kind["pay"] * (0.75 + over * 1.9) * rng.uniform(0.88, 1.22)
+    annual *= 1.0 + min(0.45, honours * 0.06)
+    years = 1
+    if key == "national":
+        years = rng.randint(1, 2)
+    elif key in ("continental", "global"):
+        years = rng.randint(2, 4)
     shoot_days = max(1, round(kind["days"] * media_mult))
+
+    # סעיפי בונוס — כמה שהמותג גדול יותר, כך יש בהם יותר בשר
+    clause_count = {"local": 1, "national": 1, "continental": 2, "global": 3}[key]
+    pool = list(D.BONUS_CLAUSES)
+    rng.shuffle(pool)
+    clauses = [c[0] for c in pool[:clause_count]]
 
     return {
         "brand": rng.choice(brands),
@@ -90,21 +107,131 @@ def sponsor_offer(player: Player, rng: random.Random,
         "tier_he": tier_he,
         "kind": kind_key,
         "kind_he": kind["name"],
-        "amount": int(round(amount / 1000) * 1000),
+        "annual": int(round(annual / 1000) * 1000),
+        "amount": int(round(annual / 1000) * 1000),   # תאימות לשמורות ישנות
         "years": years,
         "days": shoot_days,
         "media_gain": kind["media"],
-        # רק חלק מההצעות דורשות ימי צילום בשבוע משחק
-        "clashes": match_week and rng.random() < 0.35,
+        "clauses": clauses,
+        # ימי צילום נופלים בשבוע משחק רק לפעמים — ותמיד אפשר לדחות אותם
+        "clashes": match_week and rng.random() < 0.30,
         "market": round(market, 1),
     }
 
 
+CLAUSE_BY_KEY = {row[0]: row for row in D.BONUS_CLAUSES}
+
+
+def clause_text(key: str, annual: int) -> str:
+    row = CLAUSE_BY_KEY.get(key)
+    if not row:
+        return ""
+    unit = int(round(annual * row[3] / 100) * 100)
+    return f"{row[1]}: ₪{unit:,}"
+
+
 def deal_summary(offer: Dict[str, Any]) -> str:
     """תיאור ההצעה בשורה אחת."""
-    span = "לשנה" if offer["years"] == 1 else f"ל-{offer['years']} שנים"
+    annual = offer.get("annual", offer.get("amount", 0))
+    span = "לשנה" if offer["years"] == 1 else f"× {offer['years']} שנים"
     return (f"{offer['brand']} · {offer['kind_he']} · "
-            f"₪{offer['amount']:,} {span} · {offer['days']} ימי צילומים")
+            f"₪{annual:,} לעונה {span} · {offer['days']} ימי צילומים")
+
+
+def deal_lines(offer: Dict[str, Any]) -> List[str]:
+    """פירוט מלא של החוזה, כולל מה שכתוב בסעיפים."""
+    annual = offer.get("annual", offer.get("amount", 0))
+    lines = [deal_summary(offer),
+             f"סך הכל מובטח: ₪{annual * offer['years']:,}"]
+    for key in offer.get("clauses", ()):
+        text = clause_text(key, annual)
+        if text:
+            lines.append("• " + text)
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# תיק החסויות
+# ---------------------------------------------------------------------------
+
+def sign_deal(portfolio: List[Dict[str, Any]], offer: Dict[str, Any],
+              year: int) -> Dict[str, Any]:
+    """מוסיף חוזה חתום לתיק. מותג שכבר איתך פשוט מתחדש."""
+    annual = offer.get("annual", offer.get("amount", 0))
+    deal = {
+        "brand": offer["brand"], "tier": offer["tier"],
+        "tier_he": offer["tier_he"], "kind_he": offer["kind_he"],
+        "annual": annual, "years_left": offer["years"],
+        "clauses": list(offer.get("clauses", ())),
+        "signed": year, "earned": 0,
+    }
+    portfolio[:] = [d for d in portfolio if d["brand"] != offer["brand"]]
+    portfolio.append(deal)
+    return deal
+
+
+def weekly_retainer(portfolio: List[Dict[str, Any]], season_weeks: int) -> int:
+    """מה שהחסויות משלמות לך כל שבוע. זה ההבדל בין תשלום חד־פעמי
+    לבין הכנסה שממשיכה לזרום כל עוד החוזה בתוקף."""
+    if not portfolio:
+        return 0
+    return int(sum(d["annual"] for d in portfolio) / max(1, season_weeks))
+
+
+def season_bonuses(portfolio: List[Dict[str, Any]], player: Player,
+                   trophies: int, caps: int) -> List[Tuple[str, int]]:
+    """תשלומי הסעיפים בסוף עונה, לפי מה שבאמת עשית."""
+    payouts: List[Tuple[str, int]] = []
+    measures = {
+        "goals": player.season.goals,
+        "assists": player.season.assists,
+        "trophies": trophies,
+        "caps": caps,
+        "rating": 1 if player.season.apps >= 10 and player.season.avg_rating >= 7.0 else 0,
+    }
+    for deal in portfolio:
+        for key in deal.get("clauses", ()):
+            row = CLAUSE_BY_KEY.get(key)
+            if not row:
+                continue
+            units = measures.get(row[2], 0)
+            if units <= 0:
+                continue
+            amount = int(round(deal["annual"] * row[3] * units / 100) * 100)
+            if amount:
+                deal["earned"] = deal.get("earned", 0) + amount
+                payouts.append((f"{deal['brand']} · {row[1]}", amount))
+    return payouts
+
+
+def tick_portfolio(portfolio: List[Dict[str, Any]]) -> List[str]:
+    """מקדם שנה בכל החוזים ומוציא את מה שנגמר."""
+    lines: List[str] = []
+    for deal in list(portfolio):
+        deal["years_left"] -= 1
+        if deal["years_left"] <= 0:
+            portfolio.remove(deal)
+            lines.append(f"📄 החוזה עם {deal['brand']} הסתיים.")
+    return lines
+
+
+def renewal_offer(deal: Dict[str, Any], player: Player, rng: random.Random,
+                  club_reputation: float = 40.0) -> Dict[str, Any]:
+    """הצעת חידוש. הסכום החדש משקף את מי שנעשית מאז שחתמת."""
+    market = marketability(player, club_reputation)
+    factor = clamp(0.55 + market / 55.0, 0.5, 2.6) * rng.uniform(0.9, 1.15)
+    annual = int(round(deal["annual"] * factor / 1000) * 1000)
+    return {
+        "brand": deal["brand"], "tier": deal["tier"], "tier_he": deal["tier_he"],
+        "kind_he": deal["kind_he"], "annual": annual, "amount": annual,
+        "years": rng.randint(2, 4), "days": 2,
+        "media_gain": 4, "clauses": list(deal.get("clauses", ())),
+        "clashes": False, "market": round(market, 1), "renewal": True,
+    }
+
+
+def portfolio_total(portfolio: List[Dict[str, Any]]) -> int:
+    return int(sum(d["annual"] for d in portfolio))
 
 
 # ---------------------------------------------------------------------------

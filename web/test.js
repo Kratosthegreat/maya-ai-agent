@@ -8,7 +8,8 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "art.js", "save.js", "engine.js", "clubops.js", "commercial.js", "manager.js",
+const PARTS = ["data.js", "art.js", "save.js", "engine.js", "matchstats.js", "clubops.js",
+               "commercial.js", "scouting.js", "development.js", "wealth.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -26,9 +27,20 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, injuryRisk, marketability, sponsorOffer, " +
-  "managerStyle, postMatchLine, selectionNote, weeklyDirective, STORY, " +
+  "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
-  "EFFECT_KEYS };", ctx);
+  "EFFECT_KEYS, " +
+  "matchStatLine, statSummary, areaScores, matchPerformance, weakestArea, " +
+  "reasonLine, promiseLine, netIncome, " +
+  "watchers, interestMap, interestLabel, candidateClubs, scoutsThisWeek, " +
+  "topSuitor, foreignAgent, scoutReport, clubCountry, " +
+  "SCOUT_NOTICED, SCOUT_COURTED, SCOUT_CHASED, " +
+  "planOptionsFor, setPlan, planSummary, milestoneRows, nextTarget, " +
+  "recommendedFocus, claimMilestones, " +
+  "holdings, assetsAvailable, buyAsset, sellAsset, netWorth, portfolioYield, " +
+  "assetsSeasonTick, wealthSummary, " +
+  "signDeal, weeklyRetainer, seasonBonuses, tickPortfolio, renewalOffer, " +
+  "dealLines, clauseText, portfolioTotal };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -1071,6 +1083,335 @@ test("שליש מהעלילה לפחות נורה בקריירות שונות", 
   }
   assert(fired.size >= Math.floor(A.STORY.length / 3),
     `רק ${fired.size} אירועים מתוך ${A.STORY.length}`);
+});
+
+
+// ---------------------------------------------------------------------------
+// שורת הסטטיסטיקה: החוט בין האימון למגרש
+// ---------------------------------------------------------------------------
+
+function striker(rng, overrides) {
+  const p = A.generatePlayer(rng, null, "ST", { age: 24, quality: 65 });
+  for (const attr of A.D.ATTRIBUTES) p.attributes[attr] = 60;
+  Object.assign(p.attributes, overrides || {});
+  p.fitness = 90; p.sharpness = 85;
+  return p;
+}
+
+function meanStats(player, rng, n = 250) {
+  const totals = {};
+  for (let i = 0; i < n; i++) {
+    const stats = A.matchStatLine(player, 90, 0, 0, rng);
+    for (const key in stats)
+      if (typeof stats[key] === "number") totals[key] = (totals[key] || 0) + stats[key];
+  }
+  for (const key in totals) totals[key] /= n;
+  return totals;
+}
+
+test("אימון נראה במגרש", () => {
+  const rng = new A.Rng(11);
+  const weak = meanStats(striker(rng, { shooting: 45 }), rng);
+  const strong = meanStats(striker(rng, { shooting: 90 }), rng);
+  assert(strong.on_target > weak.on_target * 1.5,
+    `בעיטה 45→90 העלתה למסגרת רק מ-${weak.on_target.toFixed(2)} ל-${strong.on_target.toFixed(2)}`);
+  const sloppy = meanStats(striker(rng, { passing: 40 }), rng);
+  const tidy = meanStats(striker(rng, { passing: 88 }), rng);
+  assert(tidy.pass_pct > sloppy.pass_pct + 8, "אחוז המסירה לא הגיב לאימון");
+  assert(tidy.losses < sloppy.losses, "איבודי הכדור לא ירדו");
+});
+
+test("ציון המשחק ממורכז על הרמה של השחקן עצמו", () => {
+  const rng = new A.Rng(5);
+  for (const position of ["ST", "CM", "CB", "LW", "GK"]) {
+    for (const level of [45, 85]) {
+      const p = A.generatePlayer(rng, null, position, { age: 24, quality: level });
+      for (const attr of A.D.ATTRIBUTES) p.attributes[attr] = level;
+      p.fitness = 88; p.sharpness = 80;
+      let sum = 0;
+      for (let i = 0; i < 120; i++)
+        sum += A.matchPerformance(A.matchStatLine(p, 90, 0, 0, rng), position);
+      const mean = sum / 120;
+      assert(mean >= 55 && mean <= 80, `${position}/${level}: ממוצע ${mean.toFixed(1)}`);
+    }
+  }
+});
+
+test("המאמן מבקש מחלוץ משהו שחלוץ באמת עושה", () => {
+  const rng = new A.Rng(7);
+  const p = striker(rng);
+  const asks = {};
+  for (let i = 0; i < 300; i++) {
+    const area = A.weakestArea(A.matchStatLine(p, 90, 0, 0, rng), "ST", p.attributes);
+    asks[area] = (asks[area] || 0) + 1;
+  }
+  assert((asks.defending || 0) <= 15, `דרש הגנה ${asks.defending} פעמים`);
+  for (const key in asks) assert(A.D.ATTRIBUTES.includes(key), `תחום לא מוכר: ${key}`);
+});
+
+test("מנוחה היא לא ברירת המחדל של המאמן", () => {
+  const counts = {};
+  for (const seed of [11, 24]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, seed);
+    for (let i = 0; i < 260; i++) {
+      if (g.gameOver || g.me.age > 22) break;
+      if (g.pendingEventId) { g.resolveEvent(0); continue; }
+      g.advanceWeek();
+      const focus = g.flag("directive");
+      if (focus) counts[focus] = (counts[focus] || 0) + 1;
+    }
+  }
+  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  assert(total > 100, `רק ${total} הוראות`);
+  const top = Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b);
+  assert(top !== "rest", `מנוחה היא עדיין ההוראה הנפוצה ביותר (${JSON.stringify(counts)})`);
+  // כמה מנוחה תידרש תלוי גם במאמן הכושר של המועדון — אבל לא רוב השבועות
+  assert((counts.rest || 0) / total < 0.30,
+    `מנוחה נדרשה ב-${counts.rest}/${total} מהשבועות`);
+});
+
+test("ההוראה מצטטת את המשחק האחרון", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 6);
+  for (let i = 0; i < 80; i++) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+    if (g.flags.last_stats && g.flag("directive")) break;
+  }
+  assert(g.flags.last_stats, "לא נשמרה שורת סטטיסטיקה");
+  const line = A.directiveLine(g.myClub(), g.flag("directive"), g.flags.last_stats);
+  assert(line.includes("\n"), "ההוראה לא כוללת סיבה מהמשחק");
+  assert(!line.includes("{"), "מקום שלא מולא בהוראה");
+});
+
+test("הכושר לא קורס לאורך עונה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 9);
+  const readings = [];
+  for (let i = 0; i < 120; i++) {
+    if (g.gameOver) break;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+    readings.push(g.me.fitness);
+  }
+  const mean = readings.reduce((a, b) => a + b, 0) / readings.length;
+  assert(mean > 70, `כושר ממוצע ${Math.round(mean)} — הגוף לא מתאושש`);
+  assert(Math.min(...readings) < 95, "הכושר לא זז בכלל — אין מחיר לעומס");
+});
+
+// ---------------------------------------------------------------------------
+// סקאוטינג
+// ---------------------------------------------------------------------------
+
+test("צופים בונים עניין לאורך עונה", () => {
+  let found = 0;
+  for (const seed of [8, 21, 33, 44]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 19, seed);
+    for (let i = 0; i < 300; i++) {
+      if (g.gameOver || g.me.age > 25) break;
+      if (g.pendingEventId) { g.resolveEvent(0); continue; }
+      g.advanceWeek();
+    }
+    if (A.watchers(g).length) found++;
+  }
+  assert(found >= 3, `רק ${found} מתוך 4 קריירות משכו צופים`);
+});
+
+test("הסקאוטינג מגיע גם מחוץ לישראל", () => {
+  let abroad = false;
+  for (const seed of [33, 44, 52, 61]) {
+    const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 20, seed);
+    for (let i = 0; i < 320; i++) {
+      if (g.gameOver || g.me.age > 27) break;
+      if (g.pendingEventId) { g.resolveEvent(0); continue; }
+      g.advanceWeek();
+    }
+    for (const [club] of A.watchers(g))
+      if (A.clubCountry(club.cid) !== "ישראל") abroad = true;
+  }
+  assert(abroad, 'אף מועדון מחו"ל לא עקב אחרי אף אחת מהקריירות');
+});
+
+test("קבוצה קטנה לא רודפת אחרי כוכב", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 26, 4);
+  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 88;
+  const pool = A.candidateClubs(g);
+  assert(pool.length, "אין בכלל יעדים");
+  for (const club of pool)
+    assert(club.reputation >= A.overall(g.me) - 24, `${club.name} קטן מדי`);
+});
+
+test("עניין נשחק כשאף אחד לא צופה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 2);
+  A.interestMap(g).real_castilla = 60;
+  for (let i = 0; i < 40; i++) A.scoutsThisWeek(g, g.rng, null);
+  assert((A.interestMap(g).real_castilla || 0) < 55, "העניין לא נשחק");
+});
+
+// ---------------------------------------------------------------------------
+// מסלול הפיתוח
+// ---------------------------------------------------------------------------
+
+test("לכל עמדה יש מסלול", () => {
+  for (const position of A.D.POSITIONS) {
+    const options = A.planOptionsFor(position);
+    assert(options.length, position);
+    for (const row of options)
+      assert(row[4].length >= 3, `${row[0]}: פחות משלוש אבני דרך`);
+  }
+});
+
+test("המסלול אומר מה חסר", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 15, 3);
+  assert(A.nextTarget(g) === null, "יש יעד בלי מסלול");
+  A.setPlan(g, "poacher");
+  const target = A.nextTarget(g);
+  assert(target && target.includes("🎯"), "אין יעד אחרי בחירת מסלול");
+  assert(A.D.ATTRIBUTES.includes(A.recommendedFocus(g)), "המלצת אימון לא תקינה");
+});
+
+test("אבני דרך משלמות, ומסלול מלא נותן פריצה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 3);
+  A.setPlan(g, "poacher");
+  g.me.ceiling = 99; g.me.potential = 60;
+  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 90;
+  const before = g.me.potential;
+  const lines = A.claimMilestones(g);
+  assert(lines.length >= 5, `רק ${lines.length} שורות`);
+  assert(lines.some(l => l.includes("💎")), "בלי פריצה");
+  assert(g.me.potential > before, "הפוטנציאל לא זז");
+  assert(g.flag("breakthrough") === true, "דגל הפריצה לא נדלק");
+  assert(g.me.traits.includes("clutch"), "לא ניתנה תכונת אופי");
+  assert(A.claimMilestones(g).length === 0, "שולם פעמיים");
+});
+
+test("החלפת מסלול מאפסת את ההתקדמות", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 3);
+  A.setPlan(g, "poacher");
+  g.flags.plan_done = [0, 1];
+  A.setPlan(g, "target_man");
+  assert(g.flags.plan_done.length === 0, "ההתקדמות לא אופסה");
+});
+
+test("אבן דרך לא דוחפת פוטנציאל מעל התקרה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 3);
+  A.setPlan(g, "poacher");
+  g.me.ceiling = 70; g.me.potential = 69;
+  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 92;
+  A.claimMilestones(g);
+  assert(g.me.potential <= g.me.ceiling, "הפוטנציאל עבר את התקרה");
+});
+
+// ---------------------------------------------------------------------------
+// חסויות כתיק, לא כתשלום חד־פעמי
+// ---------------------------------------------------------------------------
+
+test("חוזה חסות ממשיך לשלם כל שבוע", () => {
+  const rng = new A.Rng(2);
+  const p = A.generatePlayer(rng, null, "ST", { age: 26, quality: 82 });
+  p.reputation = 78; p.mediaSkill = 65;
+  const offer = A.sponsorOffer(p, rng, 80, false, 2);
+  assert(offer && offer.annual > 0, "אין הצעה");
+  const portfolio = [];
+  A.signDeal(portfolio, offer, 2030);
+  const weekly = A.weeklyRetainer(portfolio, 43);
+  assert(weekly > 0, "אין תשלום שבועי");
+  assert(Math.abs(weekly * 43 - offer.annual) < offer.annual * 0.05, "התשלום לא מסתדר");
+});
+
+test("סעיפי בונוס משלמים על עונה אמיתית", () => {
+  const rng = new A.Rng(2);
+  const p = A.generatePlayer(rng, null, "ST", { age: 26, quality: 82 });
+  const portfolio = [];
+  const deal = A.signDeal(portfolio, {
+    brand: "מותג", tier: "global", tierHe: "עולמי", kindHe: "נעליים",
+    annual: 1000000, years: 3, clauses: ["per_goal", "trophy"] }, 2030);
+  assert(A.seasonBonuses(portfolio, p, 0, 0).length === 0, "שילם בלי סיבה");
+  p.season.goals = 20;
+  const payouts = A.seasonBonuses(portfolio, p, 1, 0);
+  assert(payouts.length === 2, `${payouts.length} תשלומים`);
+  assert(payouts.reduce((a, x) => a + x[1], 0) > 800000, "בונוס זעום");
+  assert(deal.earned > 0, "לא נרשם לחוזה");
+});
+
+test("חוזה נגמר, והחידוש משקף את מי שנעשית", () => {
+  const rng = new A.Rng(2);
+  const p = A.generatePlayer(rng, null, "ST", { age: 27, quality: 88 });
+  p.reputation = 90; p.mediaSkill = 80;
+  const portfolio = [];
+  A.signDeal(portfolio, { brand: "מותג", tier: "national", tierHe: "ארצי",
+    kindHe: "ביגוד", annual: 200000, years: 2, clauses: [] }, 2030);
+  assert(A.tickPortfolio(portfolio).length === 0, "נמחק מוקדם");
+  assert(portfolio[0].yearsLeft === 1, "השנים לא ירדו");
+  const renewal = A.renewalOffer(portfolio[0], p, rng, 85);
+  assert(renewal.annual > 200000, "החידוש לא משקף כוכב");
+  assert(A.tickPortfolio(portfolio).length === 1 && portfolio.length === 0, "לא פג");
+});
+
+test("מותגים גדולים נפתחים לקריירה גדולה", () => {
+  const rng = new A.Rng(2);
+  const kid = A.generatePlayer(rng, null, "ST", { age: 17, quality: 55 });
+  kid.reputation = 18; kid.mediaSkill = 10;
+  const star = A.generatePlayer(rng, null, "ST", { age: 27, quality: 90 });
+  star.reputation = 88; star.mediaSkill = 75; star.career.goals = 180;
+  const kidTiers = A.D.SPONSOR_TIERS.filter(t => A.marketability(kid, 40) >= t[2]);
+  const starTiers = A.D.SPONSOR_TIERS.filter(t => A.marketability(star, 90) >= t[2]);
+  assert(kidTiers.length === 1 && kidTiers[0][0] === "local", "לנער נפתח יותר מדי");
+  assert(starTiers.some(t => t[0] === "global"), "לכוכב לא נפתח דרג עולמי");
+});
+
+test("כסף מחסויות באמת מגיע לבנק", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 25, 5);
+  g.deals().push({ brand: "מותג", tier: "global", tierHe: "עולמי", kindHe: "נעליים",
+    annual: 4300000, yearsLeft: 3, clauses: [], signed: g.year, earned: 0 });
+  const before = g.money;
+  g.advanceWeek();
+  assert(g.money > before + 40000, "התיק המסחרי לא שילם השבוע");
+});
+
+// ---------------------------------------------------------------------------
+// נכסים והשקעות
+// ---------------------------------------------------------------------------
+
+test("אי אפשר לקנות מה שאין עליו כסף או מוניטין", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 5);
+  g.money = 2000000; g.me.reputation = 10;
+  assert(A.buyAsset(g, "club_shares").includes("מוניטין"), "נמכר בלי מוניטין");
+  g.me.reputation = 95;
+  assert(A.buyAsset(g, "club_shares").includes("אין מספיק"), "נמכר בלי כסף");
+  assert(A.holdings(g).length === 0, "נרשם נכס שלא נקנה");
+  assert(A.buyAsset(g, "studio_flat").includes("קנית"), "לא נקנה");
+  assert(g.money < 2000000, "הכסף לא ירד");
+  assert(A.holdings(g).length === 1, "הנכס לא נרשם");
+});
+
+test("נכסים משלמים תשואה, ואפשר למכור אותם", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 26, 5);
+  g.money = 20000000; g.me.reputation = 60;
+  A.buyAsset(g, "padel");
+  assert(A.portfolioYield(g) > 0, "אין תשואה");
+  const before = A.netWorth(g);
+  const lines = A.assetsSeasonTick(g, g.rng);
+  assert(lines.length, "עונה שלמה בלי שום תנועה בנכסים");
+  assert(A.netWorth(g) !== before, "השווי לא זז");
+  const cash = g.money;
+  assert(A.sellAsset(g, 0).includes("מכרת"), "לא נמכר");
+  assert(g.money > cash, "הכסף לא חזר");
+  assert(A.holdings(g).length === 0, "הנכס נשאר");
+});
+
+test("שווי נטו סופר מזומן ונכסים", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 26, 5);
+  g.money = 10000000; g.me.reputation = 60;
+  A.buyAsset(g, "restaurant");
+  const info = A.wealthSummary(g);
+  assert(info.net_worth === info.cash + info.assets, "החשבון לא מסתדר");
+  assert(info.assets === 5000000, `שווי ${info.assets}`);
+  assert(info.count === 1, "מספר נכסים");
+});
+
+test("מס משאיר פחות מהברוטו, ובמדרגות", () => {
+  assert(A.netIncome(0) === 0, "מס על אפס");
+  assert(A.netIncome(2000) < 2000 && A.netIncome(2000) > 0, "נטו לא הגיוני");
+  assert(A.netIncome(2000) / 2000 > A.netIncome(200000) / 200000, "המדרגות לא פרוגרסיביות");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);
