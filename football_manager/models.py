@@ -131,6 +131,7 @@ class Player:
     reputation: float = 20.0     # 0-100, מוניטין עולמי
 
     traits: List[str] = field(default_factory=list)
+    foot: str = "right"
     is_human: bool = False
 
     # כישורים לקריירה שאחרי הפרישה
@@ -361,6 +362,7 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
     )
     wage = wage_for_overall(player.overall)
     player.contract = Contract(wage=wage, years_left=rng.randint(1, 4))
+    player.foot = "right" if rng.random() < 0.72 else ("left" if rng.random() < 0.78 else "both")
     if rng.random() < 0.35:
         player.traits.append(rng.choice(list(D.TRAITS.keys())))
     player.coaching = clamp(rng.gauss(10, 6), 0, 40)

@@ -95,7 +95,7 @@ function playerCard(player, club, stage) {
       ${club ? crest(club, 20) : ""}
       <span>${club ? escAttr(club.name) : "ללא מועדון"}</span>
       <span class="spacer"></span>
-      <span>${escAttr(D.CAREER_STAGES_HE[stage] || "")}</span>
+      <span>רגל ${escAttr(FOOT_NAMES[playerFoot(player)])}</span>
     </div>
   </div>`;
 }

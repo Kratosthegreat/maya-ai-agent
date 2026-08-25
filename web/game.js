@@ -60,7 +60,7 @@ class Game {
   }
 
   static newGame(name, position, clubId, age = 15, seed = null, role = "player",
-                 face = null) {
+                 identity = null) {
     const g = new Game();
     g.seed = seed ?? Math.floor(Math.random() * 100000000) + 1;
     g.rng = new Rng(g.seed);
@@ -68,7 +68,7 @@ class Game {
     g.clubs = world.clubs; g.players = world.players;
     const club = g.clubs[clubId];
 
-    if (role === "manager") return g.startAsManager(name, club, age, face);
+    if (role === "manager") return g.startAsManager(name, club, age, identity);
 
     // ככל שמתחילים מבוגר יותר, מתחילים כשחקן מגובש יותר
     const quality = age <= 17
@@ -77,7 +77,7 @@ class Game {
     const me = generatePlayer(g.rng, club, position, { age, quality });
     me.name = name;
     me.isHuman = true;
-    if (face) me.face = face;
+    if (identity && identity.foot) me.foot = identity.foot;
     // מי שמתחיל צעיר יותר — יש לו יותר לאן לגדול
     me.potential = Math.round(clamp(
       overall(me) + g.rng.randint(6, 22) + Math.max(0, 24 - age) * 2.2,
@@ -106,7 +106,8 @@ class Game {
       me.career.ratingSum = me.career.apps * g.rng.uniform(6.3, 7.0);
       me.coaching = clamp(me.coaching + (age - 18) * 1.1, 0, 60);
     }
-    me.traits = [g.rng.choice(Object.keys(D.TRAITS))];
+    me.traits = [identity && D.TRAITS[identity.trait]
+      ? identity.trait : g.rng.choice(Object.keys(D.TRAITS))];
     g.players[me.pid] = me;
     club.squad.push(me.pid);
     assignNumber(club, g.players, me);
@@ -121,11 +122,12 @@ class Game {
   }
 
   /** קריירה שמתחילה מהספסל: מנג'ר ראשי, בלי עבר כשחקן פעיל. */
-  startAsManager(name, club, age, face) {
+  startAsManager(name, club, age, identity) {
     const me = generatePlayer(this.rng, club, "CM", { age: Math.min(age, 40), quality: 55 });
     me.name = name;
     me.isHuman = true;
-    if (face) me.face = face;
+    if (identity && identity.foot) me.foot = identity.foot;
+    if (identity && D.TRAITS[identity.trait]) me.traits = [identity.trait];
     me.age = age;
     me.retired = true;
     me.clubId = null;

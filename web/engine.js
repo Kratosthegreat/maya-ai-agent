@@ -156,6 +156,7 @@ function generatePlayer(rng, club, position, opts = {}) {
     injuryName: "",
     reputation: clamp(quality - 25 + rng.gauss(0, 6), 1, 95),
     traits: [],
+    foot: rng.random() < 0.72 ? "right" : rng.random() < 0.78 ? "left" : "both",
     isHuman: false,
     coaching: clamp(rng.gauss(10, 6), 0, 40),
     mediaSkill: clamp(rng.gauss(10, 6), 0, 40),

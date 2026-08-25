@@ -109,98 +109,57 @@ function ageBlurb(age, role) {
   return "בסוף הדרך. עוד עונה או שתיים, ואז ההחלטה הגדולה.";
 }
 
-/** שחקן דמה לתצוגה מקדימה בבורר הדמות. */
-function facePreviewPlayer(face, overrides) {
-  return {
-    pid: "preview", name: "preview", age: 25, number: 9,
-    face: Object.assign({}, face, overrides || {}),
-  };
-}
-
 const PREVIEW_CLUB = { cid: "__preview__" };
 
-/** בורר הדמות: תצוגה מקדימה גדולה, ובחירה לכל מאפיין. */
-function facePicker(face, club) {
+/** שחקן דמה לתצוגה מקדימה בכרטיס הזהות. */
+function identityPreviewPlayer(identity) {
+  return { pid: "preview", name: "preview", age: 25, number: 9, foot: identity.foot };
+}
+
+/**
+ * כרטיס הזהות: רגל חזקה ותכונת אופי.
+ * שתיהן משפיעות על המשחק עצמו — הן לא קישוט.
+ */
+function identityPicker(identity, club) {
   const previewClub = club || PREVIEW_CLUB;
-  const swatch = (field, index, color, label) => `
-    <button class="swatch" data-face="${field}" data-idx="${index}"
-      aria-pressed="${face[field] === index}" title="${escAttr(label)}"
-      style="--sw:${color}"><span></span></button>`;
+  const preview = identityPreviewPlayer(identity);
 
   return `
   <div class="panel">
-    <div class="panel-head"><span class="t">הדמות שלך</span>
-      <span class="r"><button class="mini-btn" data-act="random-face">הגרל</button></span></div>
+    <div class="panel-head"><span class="t">הזהות שלך</span>
+      <span class="r"><button class="mini-btn" data-act="random-identity">הגרל</button></span></div>
     <div class="panel-body">
-      <div class="face-preview">${avatar(facePreviewPlayer(face), previewClub, 132)}</div>
+      <div class="ident-preview">${avatar(preview, previewClub, 132, { number: null })}</div>
+      <div class="muted center">כמו בפוטבול מנג'ר — בלי תמונות שחקנים. מה שמזהה אותך זה המדים, המספר והנתונים.</div>
 
-      <div class="face-group">
-        <div class="muted">גוון עור</div>
-        <div class="swatches">
-          ${SKIN.map((tones, i) => swatch("skin", i, tones[0], "גוון " + (i + 1))).join("")}
-        </div>
-      </div>
-
-      <div class="face-group">
-        <div class="muted">תסרוקת</div>
-        <div class="face-thumbs">
-          ${HAIR_STYLE_NAMES.map((name, i) => `
-            <button class="thumb" data-face="hairStyle" data-idx="${i}"
-              aria-pressed="${face.hairStyle === i}">
-              ${avatar(facePreviewPlayer(face, { hairStyle: i }), previewClub, 52)}
-              <span>${esc(name)}</span>
-            </button>`).join("")}
-        </div>
-      </div>
-
-      <div class="face-group">
-        <div class="muted">צבע שיער</div>
-        <div class="swatches">
-          ${HAIR_COLORS.map((c, i) => swatch("hairColor", i, c, "צבע " + (i + 1))).join("")}
-        </div>
-      </div>
-
-      <div class="face-group">
-        <div class="muted">זקן</div>
-        <div class="face-thumbs">
-          ${FACIAL_NAMES.map((name, i) => `
-            <button class="thumb" data-face="facial" data-idx="${i}"
-              aria-pressed="${face.facial === i}">
-              ${avatar(facePreviewPlayer(face, { facial: i }), previewClub, 52)}
-              <span>${esc(name)}</span>
-            </button>`).join("")}
-        </div>
-      </div>
-
-      <div class="face-group">
-        <div class="muted">עיניים</div>
-        <div class="swatches">
-          ${EYES.map((c, i) => swatch("eye", i, c, "עיניים " + (i + 1))).join("")}
-        </div>
-      </div>
-
-      <div class="face-group">
-        <div class="muted">מבנה פנים</div>
+      <div class="ident-group">
+        <div class="muted">רגל חזקה</div>
         <div class="chips">
-          ${["צר", "רחב", "מוארך"].map((name, i) => `<button class="chip"
-            data-face="jaw" data-idx="${i}" aria-pressed="${face.jaw === i}">${name}</button>`).join("")}
+          ${FOOT_KEYS.map(k => `<button class="chip" data-ident="foot" data-val="${k}"
+            aria-pressed="${identity.foot === k}">${FOOT_NAMES[k]}</button>`).join("")}
         </div>
       </div>
 
-      <div class="face-group">
-        <div class="muted">גבות</div>
-        <div class="chips">
-          ${["דקות", "רגילות", "עבות"].map((name, i) => `<button class="chip"
-            data-face="brow" data-idx="${i}" aria-pressed="${face.brow === i}">${name}</button>`).join("")}
+      <div class="ident-group">
+        <div class="muted">תכונת אופי</div>
+        <div class="trait-list">
+          ${Object.entries(D.TRAITS).map(([key, t]) => `
+            <button class="trait-opt" data-ident="trait" data-val="${key}"
+              aria-pressed="${identity.trait === key}">
+              <span class="tn">${esc(t.name)}</span>
+              <span class="td">${esc(t.desc)}</span>
+            </button>`).join("")}
         </div>
       </div>
     </div>
   </div>`;
 }
 
+/** מסך פתיחה: תפקיד, גיל, עמדה, מועדון וזהות. */
 function screenNew() {
   const state = viewData || (viewData = { name: "", position: "ST",
-    club: "hapoel_carmel", age: 15, role: "player" });
+    club: "hapoel_carmel", age: 15, role: "player", identity: randomIdentity() });
+  if (!state.identity) state.identity = randomIdentity();
   const isManager = state.role === "manager";
   const clubs = D.CLUBS.filter(c => c[3] !== "euro").sort((a, b) => a[4] - b[4]);
   const minAge = isManager ? 32 : 13;
@@ -234,7 +193,7 @@ function screenNew() {
       </div>
     </div>
 
-    ${facePicker(state.face, { cid: state.club })}
+    ${identityPicker(state.identity, { cid: state.club })}
 
     ${isManager ? "" : `
     <div class="panel">
@@ -829,7 +788,8 @@ function screenProfile() {
         ${club ? crest(club, 58) : ""}
         <div class="kit-meta">
           <span class="display big">${esc(me.name)}</span>
-          <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}</span>
+          <span class="muted">בן ${me.age} · ${esc(positionHe(me))} · ${esc(me.nationality)}
+            · רגל ${esc(FOOT_NAMES[playerFoot(me)])}</span>
           ${club ? `<span class="muted">${esc(club.name)}</span>` : ""}
         </div>
       </div>
@@ -1012,12 +972,6 @@ function screenSquad() {
  * עורך מסד הנתונים — שינוי שמות מועדונים ושחקנים, ייצוא וייבוא.
  * מה שנשמר כאן נשמר רק בדפדפן שלך.
  */
-/** המאפיינים הנוכחיים של הדמות כאינדקסים, לעריכה בבורר. */
-function faceTraitsIndices(player) {
-  if (player.face) return Object.assign(faceFromId(player), player.face);
-  return faceFromId(player);
-}
-
 function screenEditor() {
   const club = game.myClub();
   const leagues = D.LEAGUES.map(l => l.id);
@@ -1061,7 +1015,7 @@ function screenEditor() {
       </div>
     </div>
 
-    ${facePicker(faceTraitsIndices(game.me), club)}
+    ${identityPicker({ foot: playerFoot(game.me), trait: game.me.traits[0] }, club)}
 
     ${squad.length ? `
     <div class="panel">
@@ -1155,15 +1109,17 @@ function bind() {
     el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
-  app.querySelectorAll("[data-face]").forEach(el =>
+  app.querySelectorAll("[data-ident]").forEach(el =>
     el.addEventListener("click", () => {
-      const field = el.dataset.face;
-      const index = +el.dataset.idx;
+      const field = el.dataset.ident;
+      const value = el.dataset.val;
       if (view === "editor") {
-        game.me.face = Object.assign({}, faceTraitsIndices(game.me), { [field]: index });
+        if (field === "foot") game.me.foot = value;
+        else game.me.traits = [value].concat(
+          game.me.traits.slice(1).filter(t => t !== value));
         saveGame();
       } else {
-        viewData.face = Object.assign({}, viewData.face, { [field]: index });
+        viewData.identity = Object.assign({}, viewData.identity, { [field]: value });
       }
       render();
     }));
@@ -1215,7 +1171,7 @@ function bind() {
 
 function act(what) {
   if (what === "new") { go("new", { name: "", position: "ST", club: "hapoel_carmel", age: 15,
-      role: "player", face: randomFace() }); }
+      role: "player", identity: randomIdentity() }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
     const loaded = loadGame();
@@ -1226,7 +1182,7 @@ function act(what) {
   else if (what === "start") {
     const name = (viewData.name || "").trim() || (viewData.role === "manager" ? "דני מנג'ר" : "עומר לוי");
     game = Game.newGame(name, viewData.position, viewData.club, viewData.age,
-                        null, viewData.role, viewData.face);
+                        null, viewData.role, viewData.identity);
     saveGame();
     go("main");
   }
@@ -1237,9 +1193,14 @@ function act(what) {
   else if (what === "accept") { showOutcome("הצעת העברה", game.acceptOffer()); }
   else if (what === "reject") { showOutcome("הצעת העברה", game.rejectOffer()); }
   else if (what === "restart") { clearSave(); game = null; go("menu"); }
-  else if (what === "random-face") {
-    if (view === "editor") { game.me.face = randomFace(); saveGame(); }
-    else viewData.face = randomFace();
+  else if (what === "random-identity") {
+    const next = randomIdentity();
+    if (view === "editor") {
+      game.me.foot = next.foot;
+      game.me.traits = [next.trait].concat(
+        game.me.traits.slice(1).filter(t => t !== next.trait));
+      saveGame();
+    } else viewData.identity = next;
     render();
   }
   else if (what === "export-db") exportDatabase();

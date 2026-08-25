@@ -17,8 +17,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "wageForOverall, positionFit, avgRating, weeklyTraining, endOfSeasonDevelopment, fmt, " +
   "SCENES, sceneFor, crest, kit, playerCard, pitch, goalTimeline, formGuide, " +
   "SEASON_WEEKS, leagueWeeks, " +
-  "ART, avatar, faceTraits, SCENE_LABELS, randomFace, faceFromId, " +
-  "SKIN, HAIR_COLORS, EYES };", ctx);
+  "ART, avatar, avatarChip, SCENE_LABELS, randomIdentity, playerFoot, " +
+  "buildOf, FOOT_KEYS, FOOT_NAMES };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -274,57 +274,46 @@ test("לכל אירוע עלילה יש סצנה", () => {
   }
 });
 
-test("אפשר לבחור דמות, והיא נשמרת עם הקריירה", () => {
-  const chosen = { skin: 4, hairStyle: 3, hairColor: 5, eye: 2, facial: 2, brow: 0, jaw: 1 };
+test("אפשר לבחור זהות, והיא נשמרת עם הקריירה", () => {
+  const chosen = { foot: "left", trait: "clutch" };
   const g = A.Game.newGame("עומר לוי", "ST", "hapoel_carmel", 24, 8, "player", chosen);
-  assert(g.me.face, "הדמות לא נשמרה על השחקן");
-  for (const [k, v] of Object.entries(chosen))
-    assert(g.me.face[k] === v, `${k}: ${g.me.face[k]} במקום ${v}`);
-
-  const t = A.faceTraits(g.me);
-  assert(t.skin === A.SKIN[4], "גוון העור שנבחר לא הוחל");
-  assert(t.hairStyle === 3, "התסרוקת שנבחרה לא הוחלה");
-  assert(t.hairColor === A.HAIR_COLORS[5], "צבע השיער שנבחר לא הוחל");
-  assert(t.facial === 2, "הזקן שנבחר לא הוחל");
+  assert(g.me.foot === "left", `רגל: ${g.me.foot}`);
+  assert(g.me.traits[0] === "clutch", `תכונה: ${g.me.traits[0]}`);
+  assert(A.playerFoot(g.me) === "left", "הרגל שנבחרה לא הוחלה");
 
   // שמירה וטעינה
   const copy = A.Game.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
-  assert(JSON.stringify(copy.me.face) === JSON.stringify(g.me.face),
-    "הדמות לא שרדה שמירה וטעינה");
+  assert(copy.me.foot === "left" && copy.me.traits[0] === "clutch",
+    "הזהות לא שרדה שמירה וטעינה");
 
-  // דמות אקראית תמיד חוקית
+  // זהות אקראית תמיד חוקית
   for (let i = 0; i < 60; i++) {
-    const f = A.randomFace();
-    assert(f.skin >= 0 && f.skin < A.SKIN.length, "גוון עור מחוץ לטווח");
-    assert(f.hairStyle >= 0 && f.hairStyle < 8, "תסרוקת מחוץ לטווח");
-    assert(f.hairColor >= 0 && f.hairColor < A.HAIR_COLORS.length, "צבע שיער מחוץ לטווח");
-    assert(f.eye >= 0 && f.eye < A.EYES.length, "עיניים מחוץ לטווח");
-    assert(f.facial >= 0 && f.facial < 4, "זקן מחוץ לטווח");
+    const id = A.randomIdentity();
+    assert(A.FOOT_KEYS.includes(id.foot), `רגל לא חוקית: ${id.foot}`);
+    assert(A.D.TRAITS[id.trait], `תכונה לא חוקית: ${id.trait}`);
   }
 
-  // שחקן שלא נבחרה לו דמות — עדיין מקבל פנים יציבות
+  // שחקן מחשב — רגל יציבה, נגזרת מהמזהה
   const other = g.players[g.myClub().squad.find(p => p !== g.meId)];
-  assert(!other.face, "לשחקן מחשב לא אמורה להישמר דמות");
-  assert(JSON.stringify(A.faceTraits(other)) === JSON.stringify(A.faceTraits(other)),
-    "הפנים של שחקן המחשב משתנות");
+  assert(A.FOOT_KEYS.includes(A.playerFoot(other)), "לשחקן מחשב אין רגל חוקית");
+  assert(A.playerFoot(other) === A.playerFoot(other), "הרגל של שחקן המחשב משתנה");
 });
 
-test("לכל שחקן יש דיוקן קבוע ותקין", () => {
+test("לכל שחקן יש דיוקן במדי המועדון, בלי פנים מומצאות", () => {
   const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 17, 61);
   const club = g.myClub();
   const sample = club.squad.slice(0, 12).map(pid => g.players[pid]);
-  const faces = new Set();
+  const shapes = new Set();
   for (const p of sample) {
     const svg = A.avatar(p, club, 80);
     assert(svg.startsWith("<svg") && svg.trim().endsWith("</svg>"), `${p.name}: לא SVG`);
     assert(!svg.includes("undefined") && !svg.includes("NaN"), `${p.name}: ערך חסר`);
-    const t = A.faceTraits(p);
-    assert(t.skin && t.hairColor && t.eye, "מאפייני פנים חסרים");
-    faces.add([t.skin[0], t.hairColor, t.hairStyle, t.facial].join("|"));
-    // אותו שחקן — אותן פנים, תמיד
-    assert(JSON.stringify(A.faceTraits(p)) === JSON.stringify(t), "הפנים משתנות בין קריאות");
+    // אותו שחקן — אותה צללית, תמיד
+    const b = A.buildOf(p);
+    assert(JSON.stringify(A.buildOf(p)) === JSON.stringify(b), "הצללית משתנה בין קריאות");
+    shapes.add([b.frame, b.crop, b.shoulder].join("|"));
   }
-  assert(faces.size >= 6, `רק ${faces.size} פרצופים שונים מתוך ${sample.length}`);
+  assert(shapes.size >= 5, `רק ${shapes.size} צלליות שונות מתוך ${sample.length}`);
 });
 
 test("סמל, מגרש וכרטיס שחקן נבנים לכל מועדון", () => {
