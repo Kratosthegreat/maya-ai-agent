@@ -27,7 +27,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, STORY, " +
-  "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects };", ctx);
+  "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
+  "EFFECT_KEYS };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -819,7 +820,7 @@ console.log("\nספריית העלילה");
 
 test("החבילה מונחת-הנתונים תקינה ותואמת בין המנועים", () => {
   const pack = A.D.STORY_PACK;
-  assert(pack.length >= 60, `רק ${pack.length} אירועים בחבילה`);
+  assert(pack.length >= 140, `רק ${pack.length} אירועים בחבילה`);
   const ids = new Set();
   const stages = new Set(["youth", "academy", "player", "veteran", "retired",
                           "coach", "manager", "director", "pundit", "agent",
@@ -837,6 +838,9 @@ test("החבילה מונחת-הנתונים תקינה ותואמת בין המ
     }
     for (const key of Object.keys(row.when || {}))
       assert(key in A.STORY_CONDITIONS, `${row.eid}: תנאי לא מוכר ${key}`);
+    for (const choice of row.choices)
+      for (const key of Object.keys(choice.fx || {}))
+        assert(A.EFFECT_KEYS.has(key), `${row.eid}: אפקט לא מוכר ${key}`);
   }
   // כל אירוע בחבילה נרשם במנוע
   const registered = new Set(A.STORY.map(e => e.eid));
@@ -844,13 +848,14 @@ test("החבילה מונחת-הנתונים תקינה ותואמת בין המ
 });
 
 test("ספריית העלילה גדולה ומכסה את כל שלבי הקריירה", () => {
-  assert(A.STORY.length >= 100, `רק ${A.STORY.length} אירועים`);
+  assert(A.STORY.length >= 170, `רק ${A.STORY.length} אירועים`);
   const byStage = {};
   for (const e of A.STORY)
     for (const st of (e.stages.length ? e.stages : ["כללי"]))
       byStage[st] = (byStage[st] || 0) + 1;
-  for (const st of ["youth", "academy", "player", "veteran", "manager"])
-    assert((byStage[st] || 0) >= 4, `${st}: רק ${byStage[st] || 0} אירועים`);
+  for (const st of ["youth", "academy", "player", "veteran", "manager",
+                    "coach", "director", "owner", "pundit", "agent", "legend"])
+    assert((byStage[st] || 0) >= 5, `${st}: רק ${byStage[st] || 0} אירועים`);
 });
 
 test("כל אירוע שנורה מייצר טקסט מלא בלי מקומות ריקים", () => {
@@ -870,7 +875,7 @@ test("כל אירוע שנורה מייצר טקסט מלא בלי מקומות 
       g.advanceWeek();
     }
   }
-  assert(seen.size >= 40, `רק ${seen.size} אירועים שונים נורו בשלוש קריירות`);
+  assert(seen.size >= 60, `רק ${seen.size} אירועים שונים נורו בשלוש קריירות`);
 });
 
 test("אפקטים של בחירה באמת משנים את המצב", () => {

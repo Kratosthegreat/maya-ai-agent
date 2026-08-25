@@ -942,13 +942,15 @@ def test_a_player_keeps_improving_after_eighteen():
     """התלונה שהתחילה את זה: ההתפתחות מתה בגיל 17-18."""
     game = GameState.new_game("צעיר", "ST", "hapoel_carmel", 17, seed=4)
     marks = {}
-    for _ in range(400):
-        if game.me.age > 24 or game.game_over:
-            break
+    weeks = 0
+    # התקציב נספר בשבועות בלבד — פתרון צומת עלילה אינו מקדם את הלוח,
+    # ועם ספרייה של מאות אירועים הוא היה אוכל את התקציב לפני גיל 24.
+    while weeks < 420 and game.me.age <= 24 and not game.game_over:
         if game.pending_event_id:
             game.resolve_event(0)
             continue
         game.advance_week()
+        weeks += 1
         marks[game.me.age] = game.me.overall
     assert marks[22] > marks[18] + 3, f"18→22 עלה רק {marks[22] - marks[18]}"
     assert marks[24] >= marks[22]
@@ -1113,16 +1115,21 @@ def test_the_story_pack_is_well_formed():
             assert choice["label"] and choice["text"]
         for key in (row.get("when") or {}):
             assert key in SE.CONDITIONS, f"{row['eid']}: תנאי לא מוכר {key}"
+        for choice in row["choices"]:
+            for key in (choice.get("fx") or {}):
+                assert key in SE.EFFECT_KEYS, \
+                    f"{row['eid']}: אפקט לא מוכר {key}"
 
 
 def test_the_story_library_is_large_and_covers_every_stage():
-    assert len(ST.REGISTRY) >= 100, f"רק {len(ST.REGISTRY)} אירועים"
+    assert len(ST.REGISTRY) >= 170, f"רק {len(ST.REGISTRY)} אירועים"
     counts = {}
     for event in ST.REGISTRY:
         for stage in (event.stages or ("כללי",)):
             counts[stage] = counts.get(stage, 0) + 1
-    for stage in ("youth", "academy", "player", "veteran", "manager"):
-        assert counts.get(stage, 0) >= 4, f"{stage}: רק {counts.get(stage, 0)}"
+    for stage in ("youth", "academy", "player", "veteran", "manager",
+                  "coach", "director", "owner", "pundit", "agent", "legend"):
+        assert counts.get(stage, 0) >= 5, f"{stage}: רק {counts.get(stage, 0)}"
 
 
 def test_every_fired_event_renders_complete_text():
@@ -1142,7 +1149,7 @@ def test_every_fired_event_renders_complete_text():
                 game.resolve_event(game.rng.randrange(len(event.choices)))
                 continue
             game.advance_week()
-    assert len(seen) >= 40, f"רק {len(seen)} אירועים שונים נורו"
+    assert len(seen) >= 60, f"רק {len(seen)} אירועים שונים נורו"
 
 
 def test_choice_effects_change_the_state():

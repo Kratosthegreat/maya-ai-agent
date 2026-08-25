@@ -792,6 +792,15 @@ function storyMatches(g, when) {
   return true;
 }
 
+// כל מה ש-applyStoryEffects יודע לעשות. בדיקות מוודאות שאין בספרייה
+// מפתח שלא ברשימה — טעות הקלדה באפקט נבלעת אחרת בשקט.
+const EFFECT_KEYS = new Set([
+  "morale", "trust", "fans", "board", "rep", "money", "form", "fitness",
+  "resilience", "sharpness", "coaching", "media", "business", "potential",
+  "attr", "attrs", "injury", "flag", "clear_flag", "trait", "drop_trait",
+  "honour",
+]);
+
 /** מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט. */
 function applyStoryEffects(g, fx) {
   if (!fx) return;

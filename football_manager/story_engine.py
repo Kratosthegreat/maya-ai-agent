@@ -150,6 +150,16 @@ def matches(game, when: Optional[Dict[str, Any]]) -> bool:
 # אפקטים
 # ---------------------------------------------------------------------------
 
+# כל מה ש-apply_effects יודע לעשות. בדיקות מוודאות שאין בספרייה
+# מפתח שלא ברשימה הזאת — טעות הקלדה באפקט נבלעת אחרת בשקט.
+EFFECT_KEYS = {
+    "morale", "trust", "fans", "board", "rep", "money", "form", "fitness",
+    "resilience", "sharpness", "coaching", "media", "business", "potential",
+    "attr", "attrs", "injury", "flag", "clear_flag", "trait", "drop_trait",
+    "honour",
+}
+
+
 def apply_effects(game, fx: Optional[Dict[str, Any]]) -> None:
     """מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט."""
     if not fx:
