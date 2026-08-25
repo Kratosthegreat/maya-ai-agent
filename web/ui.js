@@ -366,7 +366,7 @@ function screenMenu() {
       <div class="eyebrow">מה יש כאן</div>
       <div class="notes">
         <div class="note"><span class="ico">⚽</span><span>3 ליגות, 32 מועדונים, סימולציה מלאה של כל משחק בעונה.</span></div>
-        <div class="note"><span class="ico">📖</span><span>28 צמתי עלילה — פציעות, מריבות, הצעות מאירופה, פרישה.</span></div>
+        <div class="note"><span class="ico">📖</span><span>${STORY.length} צמתי עלילה — מהנעליים הראשונות ועד הפסל מחוץ לאצטדיון.</span></div>
         <div class="note"><span class="ico">🎓</span><span>מה שתלמד בזמן הקריירה יקבע מה תעשה אחריה.</span></div>
       </div>
     </div>

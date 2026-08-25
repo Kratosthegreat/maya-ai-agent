@@ -689,3 +689,167 @@ function pickEvent(g, rng, chance = 0.34) {
 }
 
 function findEvent(eid) { return STORY.find(e => e.eid === eid) || null; }
+
+
+// ---------------------------------------------------------------------------
+// מנוע אירועים מונחה-נתונים — פורט מ-football_manager/story_engine.py
+//
+// האירועים עצמם נכתבים פעם אחת ב-story_pack.py ומגיעים לכאן דרך
+// D.STORY_PACK, כדי ששני המנועים יריצו בדיוק את אותה ספרייה.
+// ---------------------------------------------------------------------------
+
+function squadMate(g, predicate) {
+  const club = g.myClub();
+  if (!club) return null;
+  let pool = club.squad.map(pid => g.players[pid])
+    .filter(p => p && p.pid !== g.meId);
+  if (predicate) pool = pool.filter(predicate);
+  return pool.length ? g.rng.choice(pool) : null;
+}
+
+/** כל מה שאפשר לשתול בטקסט של אירוע. */
+function storyTokens(g) {
+  const me = g.me;
+  const club = g.myClub();
+  const mate = squadMate(g);
+  const rival = squadMate(g, p => p.position === me.position);
+  const fixture = g.myFixture();
+  let opponent = null;
+  if (fixture && club) {
+    const other = fixture[0] === club.cid ? fixture[1] : fixture[0];
+    opponent = g.clubs[other];
+  }
+  const league = club ? D.LEAGUES.find(l => l.id === club.leagueId) : null;
+  return {
+    me: me.name,
+    age: String(me.age),
+    position: positionHe(me),
+    club: club ? club.name : "המועדון",
+    nickname: club ? club.nickname : "",
+    manager: club ? club.managerName : "המאמן",
+    stadium: club ? club.stadiumName : "האצטדיון",
+    mate: mate ? mate.name : "אחד השחקנים",
+    rival: rival ? rival.name : (mate ? mate.name : "המתחרה שלך"),
+    opponent: opponent ? opponent.name : "היריבה",
+    league: league ? league.name : "הליגה",
+    wage: fmt(me.contract.wage),
+    money: fmt(g.money),
+    number: String(me.number || 0),
+  };
+}
+
+function fillStory(text, g) {
+  if (!text.includes("{")) return text;
+  const values = storyTokens(g);
+  let out = text;
+  for (const key of Object.keys(values))
+    out = out.split("{" + key + "}").join(values[key]);
+  return out;
+}
+
+function tablePosition(g) {
+  try { return g.leaguePosition(); } catch (err) { return 10; }
+}
+
+const STORY_CONDITIONS = {
+  age_min: (g, v) => g.me.age >= v,
+  age_max: (g, v) => g.me.age <= v,
+  rep_min: (g, v) => g.me.reputation >= v,
+  rep_max: (g, v) => g.me.reputation <= v,
+  overall_min: (g, v) => overall(g.me) >= v,
+  overall_max: (g, v) => overall(g.me) <= v,
+  morale_max: (g, v) => g.me.morale <= v,
+  morale_min: (g, v) => g.me.morale >= v,
+  form_max: (g, v) => g.me.form <= v,
+  form_min: (g, v) => g.me.form >= v,
+  fitness_max: (g, v) => g.me.fitness <= v,
+  trust_max: (g, v) => (g.myClub() ? g.myClub().managerTrust : 50) <= v,
+  trust_min: (g, v) => (g.myClub() ? g.myClub().managerTrust : 50) >= v,
+  needs_club: (g, v) => (g.myClub() !== null) === !!v,
+  injured: (g, v) => (g.me.injuryWeeks > 0) === !!v,
+  week_min: (g, v) => g.week >= v,
+  week_max: (g, v) => g.week <= v,
+  contract_max: (g, v) => g.me.contract.yearsLeft <= v,
+  apps_min: (g, v) => g.me.season.apps >= v,
+  apps_max: (g, v) => g.me.season.apps <= v,
+  career_goals_min: (g, v) => g.me.career.goals >= v,
+  position_in: (g, v) => v.includes(g.me.position),
+  table_top: (g, v) => tablePosition(g) <= v,
+  table_bottom: (g, v) => tablePosition(g) >= v,
+  flag: (g, v) => !!g.flag(v),
+  not_flag: (g, v) => !g.flag(v),
+  has_mate: (g, v) => (squadMate(g) !== null) === !!v,
+};
+
+function storyMatches(g, when) {
+  if (!when) return true;
+  for (const key of Object.keys(when)) {
+    const check = STORY_CONDITIONS[key];
+    if (!check) continue;
+    try { if (!check(g, when[key])) return false; }
+    catch (err) { return false; }
+  }
+  return true;
+}
+
+/** מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט. */
+function applyStoryEffects(g, fx) {
+  if (!fx) return;
+  const me = g.me;
+  const club = g.myClub();
+  for (const [key, value] of Object.entries(fx)) {
+    switch (key) {
+      case "morale": me.morale = clamp(me.morale + value, 5, 99); break;
+      case "trust": if (club) club.managerTrust = clamp(club.managerTrust + value, 0, 100); break;
+      case "fans": if (club) club.fanSupport = clamp(club.fanSupport + value, 0, 100); break;
+      case "board": if (club) club.boardConfidence = clamp(club.boardConfidence + value, 0, 100); break;
+      case "rep": gainReputation(me, value); break;
+      case "money": if (value >= 0) g.earn(value); else g.spend(-value); break;
+      case "form": me.form = clamp(me.form + value, 5, 99); break;
+      case "fitness": me.fitness = clamp(me.fitness + value, 0, 100); break;
+      case "resilience": me.resilience = clamp(me.resilience + value, 0, 96); break;
+      case "sharpness": me.sharpness = clamp(me.sharpness + value, 0, 100); break;
+      case "coaching": me.coaching = clamp(me.coaching + value, 0, 100); break;
+      case "media": me.mediaSkill = clamp(me.mediaSkill + value, 0, 100); break;
+      case "business": me.business = clamp(me.business + value, 0, 100); break;
+      case "potential":
+        me.potential = Math.round(clamp(me.potential + value, overall(me), me.ceiling)); break;
+      case "attr": addGrowth(me, value[0], value[1]); break;
+      case "attrs": for (const [a, d] of value) addGrowth(me, a, d); break;
+      case "injury":
+        me.injuryWeeks = Math.max(me.injuryWeeks, value[0]);
+        me.injuryName = value[1];
+        break;
+      case "flag": g.setFlag(value, true); break;
+      case "clear_flag": g.setFlag(value, false); break;
+      case "trait": if (!me.traits.includes(value)) me.traits.push(value); break;
+      case "drop_trait": me.traits = me.traits.filter(t => t !== value); break;
+      case "honour": g.recordHonour(fillStory(value, g)); break;
+      default: break;
+    }
+  }
+}
+
+/** מרשם את כל האירועים שנכתבו כנתונים. */
+function registerStoryPack(pack) {
+  for (const row of pack) {
+    ev({
+      eid: row.eid,
+      title: row.title,
+      stages: row.stages || [],
+      weight: row.weight ?? 1.0,
+      once: !!row.once,
+      cooldown: row.cooldown ?? 30,
+      cond: g => storyMatches(g, row.when),
+      body: g => fillStory(row.body, g),
+      choices: row.choices.map(choice => ({
+        label: choice.label,
+        hint: choice.hint || "",
+        apply: g => { applyStoryEffects(g, choice.fx); return fillStory(choice.text || "", g); },
+      })),
+    });
+  }
+  return pack.length;
+}
+
+const STORY_PACK_COUNT = registerStoryPack(D.STORY_PACK || []);

@@ -422,8 +422,8 @@ class GameState:
 
         # 1. מה המאמן רוצה ממך השבוע, ומה עשית בפועל
         directive = self.flag("directive")
-        if directive:
-            club = self.my_club
+        club = self.my_club
+        if directive and club:
             if self.training_focus == directive:
                 MG.trust_move(club, 1.6)
                 report.add(f"✅ עשית מה שהמאמן ביקש. {club.manager_name} שם לב.")

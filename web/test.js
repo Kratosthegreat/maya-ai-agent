@@ -27,7 +27,7 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, STORY, " +
-  "availableNumbers, assignNumber };", ctx);
+  "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -813,6 +813,80 @@ test("מספר תפוס לא נגנב, ומוסבר למי הוא שייך", () 
   assert(g.me.number === free, "המספר לא התעדכן");
   const squadNumbers = club.squad.map(pid => g.players[pid].number);
   assert(new Set(squadNumbers).size === squadNumbers.length, "כפילות אחרי החלפה");
+});
+
+console.log("\nספריית העלילה");
+
+test("החבילה מונחת-הנתונים תקינה ותואמת בין המנועים", () => {
+  const pack = A.D.STORY_PACK;
+  assert(pack.length >= 60, `רק ${pack.length} אירועים בחבילה`);
+  const ids = new Set();
+  const stages = new Set(["youth", "academy", "player", "veteran", "retired",
+                          "coach", "manager", "director", "pundit", "agent",
+                          "owner", "legend"]);
+  for (const row of pack) {
+    assert(row.eid && !ids.has(row.eid), `מזהה כפול: ${row.eid}`);
+    ids.add(row.eid);
+    assert(row.title && row.body, `${row.eid}: חסר כותרת או טקסט`);
+    assert(row.choices && row.choices.length >= 2, `${row.eid}: פחות משתי בחירות`);
+    for (const st of (row.stages || []))
+      assert(stages.has(st), `${row.eid}: שלב לא מוכר ${st}`);
+    for (const choice of row.choices) {
+      assert(choice.label, `${row.eid}: בחירה בלי תווית`);
+      assert(choice.text, `${row.eid}: בחירה בלי תוצאה`);
+    }
+    for (const key of Object.keys(row.when || {}))
+      assert(key in A.STORY_CONDITIONS, `${row.eid}: תנאי לא מוכר ${key}`);
+  }
+  // כל אירוע בחבילה נרשם במנוע
+  const registered = new Set(A.STORY.map(e => e.eid));
+  for (const row of pack) assert(registered.has(row.eid), `${row.eid} לא נרשם`);
+});
+
+test("ספריית העלילה גדולה ומכסה את כל שלבי הקריירה", () => {
+  assert(A.STORY.length >= 100, `רק ${A.STORY.length} אירועים`);
+  const byStage = {};
+  for (const e of A.STORY)
+    for (const st of (e.stages.length ? e.stages : ["כללי"]))
+      byStage[st] = (byStage[st] || 0) + 1;
+  for (const st of ["youth", "academy", "player", "veteran", "manager"])
+    assert((byStage[st] || 0) >= 4, `${st}: רק ${byStage[st] || 0} אירועים`);
+});
+
+test("כל אירוע שנורה מייצר טקסט מלא בלי מקומות ריקים", () => {
+  const seen = new Set();
+  for (const seed of [3, 9, 17]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 13, seed);
+    for (let i = 0; i < 700 && !g.gameOver; i++) {
+      if (g.pendingEventId) {
+        const body = g.pendingEventBody || "";
+        assert(body.trim(), `${g.pendingEventId}: טקסט ריק`);
+        assert(!body.includes("{"), `${g.pendingEventId}: מקום שלא מולא — ${body.slice(0, 40)}`);
+        seen.add(g.pendingEventId);
+        const event = A.STORY.find(e => e.eid === g.pendingEventId);
+        g.resolveEvent(g.rng.randint(0, event.choices.length - 1));
+        continue;
+      }
+      g.advanceWeek();
+    }
+  }
+  assert(seen.size >= 40, `רק ${seen.size} אירועים שונים נורו בשלוש קריירות`);
+});
+
+test("אפקטים של בחירה באמת משנים את המצב", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 4);
+  const before = { morale: g.me.morale, money: g.money, rep: g.me.reputation };
+  A.applyStoryEffects(g, { morale: 9, money: 50000, rep: 4, attr: ["shooting", 1.0] });
+  assert(g.me.morale > before.morale, "מורל לא השתנה");
+  assert(g.money === before.money + 50000, "כסף לא השתנה");
+  assert(g.me.reputation > before.rep, "מוניטין לא השתנה");
+
+  const club = g.myClub();
+  const trust = club.managerTrust;
+  A.applyStoryEffects(g, { trust: -10, flag: "test_flag", trait: "leader" });
+  assert(club.managerTrust < trust, "אמון לא ירד");
+  assert(g.flag("test_flag") === true, "דגל לא נדלק");
+  assert(g.me.traits.includes("leader"), "תכונה לא נוספה");
 });
 
 console.log("\nמצב המשחק");

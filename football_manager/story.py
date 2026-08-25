@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Tuple
 
 from . import commercial as CM
+from . import story_engine as SE
+from .story_pack import PACK
 from .models import clamp, gain_reputation
 
 
@@ -1170,3 +1172,37 @@ def find_event(eid: str) -> Optional[StoryEvent]:
         if event.eid == eid:
             return event
     return None
+
+
+# ---------------------------------------------------------------------------
+# רישום החבילה מונחת-הנתונים
+# ---------------------------------------------------------------------------
+
+def _pack_choice(row: dict):
+    """הופך שורת בחירה מהטבלה ל-Choice אמיתי."""
+    return Choice(row["label"],
+                  lambda game, row=row: SE.choice_result(game, row),
+                  row.get("hint", ""))
+
+
+def register_pack(pack=PACK) -> int:
+    """מרשם את כל האירועים שנכתבו כנתונים. מחזיר כמה נוספו."""
+    added = 0
+    for row in pack:
+        when = row.get("when")
+        register(StoryEvent(
+            eid=row["eid"],
+            title=row["title"],
+            stages=tuple(row.get("stages", ())),
+            weight=float(row.get("weight", 1.0)),
+            once=bool(row.get("once", False)),
+            cooldown=int(row.get("cooldown", 30)),
+            condition=lambda g, when=when: SE.matches(g, when),
+            body=lambda g, text=row["body"]: SE.fill(text, g),
+            choices=[_pack_choice(c) for c in row["choices"]],
+        ))
+        added += 1
+    return added
+
+
+PACK_COUNT = register_pack()

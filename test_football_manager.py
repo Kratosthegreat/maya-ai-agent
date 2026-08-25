@@ -16,6 +16,8 @@ from football_manager.game import CUP_WEEKS, SEASON_WEEKS, GameState, round_robi
 from football_manager.models import (available_numbers, generate_player,
                                      generate_world, wage_for_overall)
 from football_manager import commercial as CM
+from football_manager import story_engine as SE
+from football_manager.story_pack import PACK
 from football_manager import manager as MG
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
@@ -1088,3 +1090,73 @@ def test_a_taken_number_is_not_stolen():
     assert game.me.number != other.number or before == other.number
     squad = [game.players[pid].number for pid in club.squad]
     assert len(set(squad)) == len(squad)
+
+
+# ---------------------------------------------------------------------------
+# ספריית העלילה
+# ---------------------------------------------------------------------------
+
+STAGES = {"youth", "academy", "player", "veteran", "retired", "coach",
+          "manager", "director", "pundit", "agent", "owner", "legend"}
+
+
+def test_the_story_pack_is_well_formed():
+    seen = set()
+    for row in PACK:
+        assert row["eid"] not in seen, f"מזהה כפול: {row['eid']}"
+        seen.add(row["eid"])
+        assert row["title"] and row["body"]
+        assert len(row["choices"]) >= 2, f"{row['eid']}: פחות משתי בחירות"
+        for stage in row.get("stages", []):
+            assert stage in STAGES, f"{row['eid']}: שלב לא מוכר {stage}"
+        for choice in row["choices"]:
+            assert choice["label"] and choice["text"]
+        for key in (row.get("when") or {}):
+            assert key in SE.CONDITIONS, f"{row['eid']}: תנאי לא מוכר {key}"
+
+
+def test_the_story_library_is_large_and_covers_every_stage():
+    assert len(ST.REGISTRY) >= 100, f"רק {len(ST.REGISTRY)} אירועים"
+    counts = {}
+    for event in ST.REGISTRY:
+        for stage in (event.stages or ("כללי",)):
+            counts[stage] = counts.get(stage, 0) + 1
+    for stage in ("youth", "academy", "player", "veteran", "manager"):
+        assert counts.get(stage, 0) >= 4, f"{stage}: רק {counts.get(stage, 0)}"
+
+
+def test_every_fired_event_renders_complete_text():
+    seen = set()
+    for seed in (3, 9, 17):
+        game = GameState.new_game("בודק", "ST", "hapoel_carmel", 13, seed=seed)
+        for _ in range(700):
+            if game.game_over:
+                break
+            if game.pending_event_id:
+                body = game.pending_event_body or ""
+                assert body.strip(), f"{game.pending_event_id}: טקסט ריק"
+                assert "{" not in body, \
+                    f"{game.pending_event_id}: מקום שלא מולא — {body[:40]}"
+                seen.add(game.pending_event_id)
+                event = game.pending_event()
+                game.resolve_event(game.rng.randrange(len(event.choices)))
+                continue
+            game.advance_week()
+    assert len(seen) >= 40, f"רק {len(seen)} אירועים שונים נורו"
+
+
+def test_choice_effects_change_the_state():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=4)
+    morale, money, rep = game.me.morale, game.money, game.me.reputation
+    SE.apply_effects(game, {"morale": 9, "money": 50_000, "rep": 4,
+                            "attr": ["shooting", 1.0]})
+    assert game.me.morale > morale
+    assert game.money == money + 50_000
+    assert game.me.reputation > rep
+
+    club = game.my_club
+    trust = club.manager_trust
+    SE.apply_effects(game, {"trust": -10, "flag": "test_flag", "trait": "leader"})
+    assert club.manager_trust < trust
+    assert game.flag("test_flag") is True
+    assert "leader" in game.me.traits

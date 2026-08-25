@@ -19,6 +19,7 @@ from football_manager import data as D          # noqa: E402
 from football_manager import engine as E        # noqa: E402
 from football_manager import models as M        # noqa: E402
 from football_manager import progression as P   # noqa: E402
+from football_manager import story_pack as SP  # noqa: E402
 
 # (שם בפלט, המודול שממנו לוקחים)
 SOURCES = [
@@ -36,6 +37,7 @@ SOURCES = [
     ("INJURY_TYPES", E), ("MENTALITIES", E), ("PRESSING", E),
     ("AGE_CURVE", P), ("DECLINE_SENSITIVITY", P),
     ("SQUAD_TEMPLATE", M),
+    ("PACK", SP),
 ]
 
 
@@ -66,6 +68,8 @@ def main() -> None:
             raise SystemExit(f"חסר {name} ב-{module.__name__}")
         value = getattr(module, name)
         out[name] = camelise(value) if name in CAMEL_TABLES else value
+
+    out["STORY_PACK"] = out.pop("PACK")     # שם ברור יותר בצד ה-JS
 
     path = os.path.join(HERE, "data.js")
     with open(path, "w", encoding="utf-8") as fh:
