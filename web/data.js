@@ -1590,6 +1590,8 @@ const D = {
    "זריקה"
   ]
  ],
+ "MIN_DETAIL": 1,
+ "MAX_DETAIL": 20,
  "ATTR_GROUPS": [
   [
    "technical",

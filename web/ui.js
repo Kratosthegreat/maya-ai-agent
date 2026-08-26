@@ -175,6 +175,15 @@ function hasSave() { return savedCareer.exists; }
  */
 let storageOk = true;
 
+/**
+ * האם הדפדפן הבטיח לא למחוק את האחסון. null = עוד לא נענה.
+ *
+ * זה לא פרט טכני: אחסון שלא סומן כקבוע נמחק כשהמקום במכשיר נגמר,
+ * מקור שלם בבת אחת, בלי שאף אחד ביקש. משתמש שיודע שזה המצב יגבה
+ * לקובץ; משתמש שלא יודע מגלה את זה כשהקריירה כבר איננה.
+ */
+let storagePersisted = null;
+
 function checkStorage() {
   try {
     localStorage.setItem("fm_probe", "1");
@@ -421,6 +430,33 @@ function storeRow() {
           <span class="sub">${esc(sub)}</span></span>
         <span class="val ${store === "both" ? "good" : ""}">${
           store === "both" ? "✓✓" : "✓"}</span>
+      </div>
+      ${persistRow()}`;
+}
+
+/**
+ * האם הדפדפן התחייב לא למחוק את האחסון.
+ *
+ * כשהתשובה היא לא, זה הדבר היחיד במסך הזה ששווה באמת לקרוא: הקריירה
+ * נשמרת כרגיל, אבל היא חשופה לפינוי אוטומטי ברגע שהמקום במכשיר נגמר.
+ * זה קורה בלי אזהרה ובלי שאף אחד לחץ על כלום.
+ */
+function persistRow() {
+  if (storagePersisted === null) return "";
+  if (storagePersisted) {
+    return `
+      <div class="row">
+        <span class="grow"><span class="nm">אחסון קבוע</span>
+          <span class="sub">הדפדפן התחייב לא למחוק את הקריירה כשנגמר לו מקום.</span></span>
+        <span class="val good">✓</span>
+      </div>`;
+  }
+  return `
+      <div class="row">
+        <span class="grow"><span class="nm">אחסון זמני</span>
+          <span class="sub">הדפדפן לא מתחייב לשמור על הקריירה. כשהמקום במכשיר
+            נגמר הוא מפנה אתרים שלמים — כדאי לגבות לקובץ מדי כמה עונות.</span></span>
+        <span class="val warn">!</span>
       </div>`;
 }
 
@@ -2039,7 +2075,9 @@ function trainingBrief(focus) {
       <span class="muted">${esc(does)}</span></div>` : "";
   }
   const info = relevanceOf(game, focus);
-  const tone = info.rank <= 3 ? "good" : info.rank > info.of * 0.7 ? "bad" : "";
+  // תכונה בתקרה מסומנת אחרת מ"לא דחוף": שם אפשר להתקדם, כאן לא
+  const tone = info.capped ? "bad"
+             : info.rank <= 3 ? "good" : info.rank > info.of * 0.7 ? "bad" : "";
   return `
     <div class="brief">
       <div class="brief-head">
@@ -3017,6 +3055,11 @@ function boot() {
   go("menu");
   known.then(() => { if (view === "menu") render(); });
   checkStorage().then(ok => { if (!ok && view === "menu") render(); });
+  // לבקש מהדפדפן לא לפנות את האחסון הזה כשנגמר לו מקום
+  persistStorage().then(granted => {
+    storagePersisted = granted === null ? null : !!granted;
+    refreshSaveBadge();
+  });
   refreshCheckpoints().then(rows => { if (rows.length) render(); });
 }
 

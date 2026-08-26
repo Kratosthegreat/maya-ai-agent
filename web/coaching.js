@@ -117,6 +117,10 @@ function needsTable(game) {
     else if (share >= 0.62) row.verdict = "שווה, אבל לא הכי דחוף";
     else if (share >= 0.35) row.verdict = "לא בראש סדר העדיפויות";
     else row.verdict = "לא רלוונטי אליך";
+    // תכונה בתקרה היא לא "פחות דחופה" — היא גמורה, וזה מה שצריך
+    // להיכתב. בלי זה שחקן מתאמן שבועות על משהו שאי אפשר לשפר.
+    row.capped = row.level >= D.MAX_DETAIL;
+    if (row.capped) row.verdict = "בתקרה — אין לאן לשפר";
   });
   return rows;
 }
@@ -142,7 +146,7 @@ function weeklyRate(game, attr, intensity = null) {
   const facilities = club ? club.trainingFacilities : 45;
   const assistant = club ? staffQuality(club, "assistant") : 0;
 
-  let base = 0.165 * intensity;
+  let base = 0.178 * intensity;
   base *= 0.55 + facilities / 110;
   base *= 1 + assistant / 420;
   base *= Math.max(0.15, ageFactor(me.age));
@@ -163,7 +167,7 @@ function weeklyRate(game, attr, intensity = null) {
   const average = keys.length
     ? keys.reduce((a, k) => a + (me.detail[k] ?? 10), 0) / keys.length : 10;
   const level = me.detail[attr] ?? 10;
-  return base * share * detailDamper(level, average) / 5;
+  return base * share * detailDamper(level, average) * ceilingDamper(level) / 5;
 }
 
 /**
@@ -185,8 +189,8 @@ function projectedGain(game, attr, weeks, intensity = null) {
   let total = 0;
   for (let i = 0; i < weeks && level < 20; i++) {
     const average = (others + level) / count;
-    const base = detailDamper(baseLevel, average);
-    const now = detailDamper(level, average);
+    const base = detailDamper(baseLevel, average) * ceilingDamper(baseLevel);
+    const now = detailDamper(level, average) * ceilingDamper(level);
     const step = rate * (base > 0 ? now / base : 1);
     level = Math.min(20, level + step);
     total += step;
@@ -219,6 +223,9 @@ function forecast(game, attr, weeks = 6, intensity = null) {
 function forecastLine(game, attr) {
   const data = forecast(game, attr);
   const name = D.DETAIL_NAMES_HE[attr] || attr;
+  if ((game.me.detail[attr] ?? 10) >= D.MAX_DETAIL)
+    return `${name} ${D.MAX_DETAIL} — התקרה של הסולם. אי אפשר לשפר את זה `
+         + `יותר, והאימון שמכוון לכאן עובר לתכונות שלידו.`;
   if (data.weeks_per_point === null)
     return `${name}: כרגע לא תתקדם בזה — הגעת לתקרת הפוטנציאל.`;
   const weeks = data.weeks_per_point;

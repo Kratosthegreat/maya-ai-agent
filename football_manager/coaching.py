@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from . import data as D
 from .models import Player, clamp
-from .progression import (SET_PIECE_ATTRS, age_factor, detail_damper,
+from .progression import (SET_PIECE_ATTRS, age_factor, ceiling_damper, detail_damper,
                           training_shares)
 
 # כמה כל מקור תורם לציון הרלוונטיות
@@ -147,6 +147,13 @@ def needs_table(game) -> List[Dict[str, Any]]:
             row["verdict"] = "לא בראש סדר העדיפויות"
         else:
             row["verdict"] = "לא רלוונטי אליך"
+        # תכונה בתקרה היא לא "פחות דחופה" — היא גמורה, וזה מה שצריך
+        # להיכתב. בלי זה שחקן מתאמן שבועות על משהו שאי אפשר לשפר.
+        if row["level"] >= D.MAX_DETAIL:
+            row["capped"] = True
+            row["verdict"] = "בתקרה — אין לאן לשפר"
+        else:
+            row["capped"] = False
     return rows
 
 
@@ -207,7 +214,7 @@ def weekly_rate(game, attr: str, intensity: Optional[float] = None) -> float:
     average = (sum(me.detail.get(a, 10) for a in allowed) / len(allowed)
                if allowed else 10.0)
     level = me.detail.get(attr, 10)
-    return base * share * detail_damper(level, average) / 5.0
+    return base * share * detail_damper(level, average) * ceiling_damper(level) / 5.0
 
 
 def projected_gain(game, attr: str, weeks: int,
@@ -235,8 +242,8 @@ def projected_gain(game, attr: str, weeks: int,
             break
         average = (others + level) / count
         # מנרמלים מול הבלם שכבר נכלל ב-rate, ומחילים את הבלם העדכני
-        base = detail_damper(base_level, average)
-        now = detail_damper(level, average)
+        base = detail_damper(base_level, average) * ceiling_damper(base_level)
+        now = detail_damper(level, average) * ceiling_damper(level)
         step = rate * (now / base if base > 0 else 1.0)
         level = min(20.0, level + step)
         total += step
@@ -275,6 +282,9 @@ def forecast_line(game, attr: str) -> str:
     """שורה אחת שאומרת מה יקרה. זה מה שהיה חסר כדי לבחור אימון."""
     data = forecast(game, attr)
     name = D.DETAIL_NAMES_HE.get(attr, attr)
+    if game.me.detail.get(attr, 10) >= D.MAX_DETAIL:
+        return (f"{name} {D.MAX_DETAIL} — התקרה של הסולם. אי אפשר לשפר את זה "
+                f"יותר, והאימון שמכוון לכאן עובר לתכונות שלידו.")
     if data["weeks_per_point"] is None:
         return f"{name}: כרגע לא תתקדם בזה — הגעת לתקרת הפוטנציאל."
     weeks = data["weeks_per_point"]

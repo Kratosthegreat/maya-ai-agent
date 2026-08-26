@@ -1953,3 +1953,82 @@ def test_the_squad_report_tells_you_who_is_ahead():
         assert row["overall"] > game.me.overall
     assert len(report["facilities"]) == len(D.FACILITIES)
     assert len(report["staff"]) == len(D.STAFF_ROLES)
+
+# ---------------------------------------------------------------------------
+# התקרה: להתקרב אליה לאט, ולא להיעצר בה בלי הסבר
+# ---------------------------------------------------------------------------
+
+def test_ceiling_damper_slows_the_approach_to_twenty():
+    """20 הוא הישג של קריירה, לא מדרגה שמגיעים אליה בקצב אחיד."""
+    from football_manager.progression import ceiling_damper
+    # עד 16 אין בלם: זו רמה שמגיעים אליה באימון רגיל
+    assert ceiling_damper(10) == 1.0
+    assert ceiling_damper(15.9) == 1.0
+    # מ-16 והלאה כל נקודה יקרה יותר, ובאופן מונוטוני
+    values = [ceiling_damper(l) for l in range(16, 21)]
+    assert values == sorted(values, reverse=True)
+    assert values[0] == 1.0
+    assert values[-1] < 0.05, "19→20 חייב להיות יקר בהרבה מ-16→17"
+    assert ceiling_damper(19) < ceiling_damper(17) * 0.3
+
+
+def test_training_a_capped_attribute_is_not_wasted():
+    """אימון שמכוון לתכונה בתקרה עובר לשכנותיה במקום להתאדות."""
+    from football_manager.progression import _spill_from_capped
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=5)
+    me = game.me
+    me.detail["finishing"] = D.MAX_DETAIL
+    shares = {"finishing": 3.0, "long_shots": 0.5, "technique": 0.5}
+    out = _spill_from_capped(me, shares)
+    assert "finishing" not in out, "תכונה בתקרה לא אמורה לקבל עבודה"
+    assert out["long_shots"] > 0.5 and out["technique"] > 0.5, "העבודה לא עברה הלאה"
+    # לא במלואה — אימון מוסט פחות יעיל
+    assert sum(out.values()) < sum(shares.values())
+
+
+def test_a_capped_attribute_says_so_instead_of_being_ranked():
+    """הפסק על תכונה בתקרה חייב להיות "אין לאן", לא "פחות דחוף"."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=6)
+    game.me.detail["finishing"] = D.MAX_DETAIL
+    row = COACH.relevance_of(game, "finishing")
+    assert row["capped"] is True
+    assert "תקרה" in row["verdict"]
+    line = COACH.forecast_line(game, "finishing")
+    assert "התקרה" in line, line
+    # והתחזית לא מבטיחה שום רווח
+    assert COACH.projected_gain(game, "finishing", 12) == 0.0
+
+
+def test_an_exceptional_season_pushes_the_ceiling_itself():
+    """מי שמיצה את התקרה שלו לא נתקע שם לעשרים שנה."""
+    import random
+    from football_manager.progression import _push_ceiling, ABSOLUTE_CEILING
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=8)
+    me = game.me
+    me.ceiling = 90
+    me.potential = 90
+
+    # עונה בינונית לא מזיזה תקרה, כמה פעמים שלא ננסה
+    for seed in range(40):
+        assert _push_ceiling(me, random.Random(seed), quality=0.30) is None
+    assert me.ceiling == 90
+
+    # עונה יוצאת דופן כן, ובסופו של דבר נעצרת בתקרה המוחלטת
+    rng = random.Random(1)
+    for _ in range(400):
+        _push_ceiling(me, rng, quality=0.65)
+    assert me.ceiling == ABSOLUTE_CEILING
+    assert me.ceiling > 90, "תקרה שלא זזה היא קיר לשארית הקריירה"
+
+
+def test_the_ceiling_does_not_move_for_a_veteran():
+    """אחרי 32 כבר לא מגלים בך פוטנציאל חדש."""
+    import random
+    from football_manager.progression import _push_ceiling
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=9)
+    me = game.me
+    me.ceiling = 90
+    me.potential = 90
+    me.age = 34
+    for seed in range(40):
+        assert _push_ceiling(me, random.Random(seed), quality=0.9) is None

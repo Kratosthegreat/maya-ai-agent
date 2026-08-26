@@ -803,6 +803,54 @@ function detailDamper(level, average) {
   return Math.max(0.25, 1 - (gap - 4) * 0.14);
 }
 
+/**
+ * בולם ככל שמתקרבים ל-20.
+ *
+ * זה מה שהיה חסר: בלי הבלם הזה תכונה עולה בקצב אחיד עד שהיא נתקעת
+ * בקיר של 20 — ואז נעצרת בבת אחת, בלי אזהרה. בכדורגל אמיתי ההפך
+ * נכון: ככל שאתה טוב יותר, כל שיפור נוסף יקר יותר. 20 הוא הישג של
+ * קריירה בתכונה אחת או שתיים, לא מצב שמגיעים אליו בעשר תכונות בגיל
+ * עשרים ושש.
+ */
+function ceilingDamper(level) {
+  if (level < 16) return 1;
+  // 16 → 1.0,  17 → 0.64,  18 → 0.35,  19 → 0.14,  20 → 0.02
+  // מתחת ל-16 אין בלם בכלל: זו עדיין רמה שאפשר להגיע אליה באימון
+  // רגיל, ובלימה שם רק מאטה קריירה שלמה בלי לפתור כלום.
+  return Math.pow(Math.max(0.05, 1 - (level - 16) * 0.22), 1.8);
+}
+
+/** התכונות שכבר אי אפשר לשפר. מה שהמסך צריך כדי להגיד את זה. */
+function cappedAttrs(p) {
+  return Object.keys(p.detail).filter(a => p.detail[a] >= D.MAX_DETAIL);
+}
+
+/**
+ * מעביר את חלקן של תכונות שבתקרה לשכנותיהן באותה קבוצה.
+ *
+ * בלי זה, שחקן שמיצה את התכונות שהאימון שלו מכוון אליהן מגלה
+ * שהאימון הפסיק לעשות משהו — בלי הסבר ובלי דרך לצאת מזה.
+ */
+function spillFromCapped(p, shares) {
+  const capped = Object.keys(shares)
+    .filter(a => (p.detail[a] ?? 10) >= D.MAX_DETAIL && shares[a] > 0);
+  if (!capped.length) return shares;
+  const out = {};
+  for (const a of Object.keys(shares)) if (!capped.includes(a)) out[a] = shares[a];
+  for (const attr of capped) {
+    const group = D.DETAIL_GROUP[attr];
+    let targets = Object.keys(out).filter(a =>
+      D.DETAIL_GROUP[a] === group && (p.detail[a] ?? 10) < D.MAX_DETAIL);
+    if (!targets.length)              // כל הקבוצה מיצתה — לכל השאר
+      targets = Object.keys(out).filter(a => (p.detail[a] ?? 10) < D.MAX_DETAIL);
+    if (!targets.length) continue;
+    // לא במלואו: אימון מוסט הוא פחות יעיל מאימון מכוון
+    const share = shares[attr] * 0.6 / targets.length;
+    for (const t of targets) out[t] = (out[t] || 0) + share;
+  }
+  return out;
+}
+
 // תכונות מומחיות: משתפרות רק כשמתאמנים עליהן ישירות
 const SET_PIECE_ATTRS = new Set(["corners", "free_kick", "penalty_taking",
                                  "long_throws", "eccentricity", "tendency_to_punch"]);
@@ -864,11 +912,18 @@ function trainDetail(p, focus, base, full = true) {
   const keys = Object.keys(shares);
   const average = keys.length
     ? keys.reduce((a, k) => a + (p.detail[k] ?? 10), 0) / keys.length : 10;
+
+  // עבודה שמכוונת לתכונה שכבר בתקרה לא מתאדה — היא עוברת הלאה.
+  // שחקן שהסיום שלו 20 לא מפסיק להשתפר, הוא פשוט משתפר בדברים
+  // אחרים; בלי זה שבוע אימון של שחקן בוגר פשוט לא עושה כלום.
+  shares = spillFromCapped(p, shares);
+
   const gains = {};
-  for (const attr of keys) {
+  for (const attr of Object.keys(shares)) {
     const level = p.detail[attr] ?? 10;
     // base מכויל בסולם 1-100 של הקבוצות; התכונות הן 1-20
-    const step = base * shares[attr] * detailDamper(level, average) / 5;
+    const step = base * shares[attr] * detailDamper(level, average)
+                 * ceilingDamper(level) / 5;
     const got = addDetail(p, attr, step);
     if (got) gains[attr] = (gains[attr] || 0) + got;
   }
@@ -936,7 +991,7 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
 
   const gap = p.potential - overall(p);
   const curve = ageFactor(p.age);
-  let base = 0.165 * intensity;
+  let base = 0.178 * intensity;
   base *= 0.55 + facilities / 110;
   base *= 1 + assistant / 420;          // עוזר מאמן — עד 23% יותר
   base *= Math.max(0.15, curve);
@@ -1021,11 +1076,36 @@ function simulateAiWeek(players, rng, clubs, skip) {
  * מעדכן את הערכת הפוטנציאל לפי מה שהשחקן באמת עשה השנה.
  * התקרה המוחלטת נסתרת ולא זזה — מה שזז הוא ההערכה.
  */
+// התקרה המוחלטת. 95 נקבע בלידה; מעבר לזה מגיעים רק בהוכחה על הדשא.
+const ABSOLUTE_CEILING = 99;
+
+/**
+ * עונה יוצאת דופן דוחפת את התקרה עצמה, לא רק את ההערכה.
+ *
+ * בלי זה, שחקן שמיצה את התקרה שנקבעה לו בהגרלה בגיל שבע־עשרה מגלה
+ * שנשארו לו עשרים שנות קריירה שבהן שום דבר לא זז — לא משנה כמה טוב
+ * הוא משחק. תקרה היא הערכה של העולם, ומי שמנפץ אותה עונה אחרי עונה
+ * אמור לגרום לעולם לעדכן אותה.
+ *
+ * זה יקר בכוונה: צריך עונה מצוינת ממש, וזה מזיז נקודה אחת.
+ */
+function pushCeiling(p, rng, quality) {
+  if (p.ceiling >= ABSOLUTE_CEILING || p.age > 32) return null;
+  if (quality < 0.42) return null;    // עונה טובה לא מספיקה — צריך יוצאת דופן
+  let chance = p.age <= 24 ? 0.55 : 0.30;
+  if (hasTrait(p, "workhorse")) chance += 0.12;
+  chance *= personalityEffect(p)[0];
+  if (rng.random() > chance) return null;
+  p.ceiling = Math.min(ABSOLUTE_CEILING, p.ceiling + 1);
+  p.potential = Math.round(clamp(p.potential + 1, overall(p), p.ceiling));
+  return `🌟 עברת את מה שחשבו שאתה מסוגל לו. התקרה שלך עלתה ל-${p.ceiling}.`;
+}
+
 function updatePotential(p, rng, minutesShare, club) {
   const room = p.ceiling - p.potential;
-  if (room <= 0) return null;
   const rating = p.season.apps ? avgRating(p.season) : 6.1;
   const quality = (rating - 6.45) * 0.85 + (minutesShare - 0.45) * 1.1;
+  if (room <= 0) return pushCeiling(p, rng, quality);
   const youth = p.age <= 20 ? 1 : Math.max(0.12, 1 - (p.age - 20) * 0.15);
   const facilities = (club ? club.trainingFacilities : 50) / 100;
   let step = room * 0.30 * youth * (0.40 + facilities * 0.55) * Math.max(0, 0.45 + quality);

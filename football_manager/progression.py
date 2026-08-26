@@ -125,7 +125,7 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
 
     gap = player.potential - player.overall
     curve = age_factor(player.age)
-    base = 0.165 * intensity
+    base = 0.178 * intensity
     base *= 0.55 + facilities / 110.0
     base *= 1.0 + assistant / 420.0          # עוזר מאמן — עד 23% יותר
     base *= max(0.15, curve)
@@ -235,11 +235,18 @@ def _train_detail(player: Player, focus: str, base: float,
     # נקודת הייחוס לבלם ההתמחות היא הרמה הממוצעת שלך בפועל
     levels = [player.detail.get(a, 10) for a in shares]
     average = sum(levels) / len(levels) if levels else 10.0
+
+    # עבודה שמכוונת לתכונה שכבר בתקרה לא מתאדה — היא עוברת הלאה.
+    # שחקן שהסיום שלו 20 לא מפסיק להשתפר, הוא פשוט משתפר בדברים
+    # אחרים; בלי זה שבוע אימון של שחקן בוגר פשוט לא עושה כלום.
+    shares = _spill_from_capped(player, shares)
+
     gains: Dict[str, int] = {}
     for attr, share in shares.items():
         level = player.detail.get(attr, 10)
         # base מכויל בסולם 1-100 של הקבוצות; התכונות הן 1-20
-        step = base * share * detail_damper(level, average) / 5.0
+        step = (base * share * detail_damper(level, average)
+                * ceiling_damper(level) / 5.0)
         got = add_detail(player, attr, step)
         if got:
             gains[attr] = gains.get(attr, 0) + got
@@ -247,6 +254,55 @@ def _train_detail(player: Player, focus: str, base: float,
         return []
     parts = [f"{D.DETAIL_NAMES_HE[a]} ל-{player.detail[a]}" for a in gains]
     return ["📈 " + ", ".join(parts) + "."]
+
+
+def _spill_from_capped(player: Player, shares: Dict[str, float]) -> Dict[str, float]:
+    """מעביר את חלקן של תכונות שבתקרה לשכנותיהן באותה קבוצה.
+
+    בלי זה, שחקן שמיצה את התכונות שהאימון שלו מכוון אליהן מגלה
+    שהאימון הפסיק לעשות משהו — בלי הסבר ובלי דרך לצאת מזה.
+    """
+    capped = {a: w for a, w in shares.items()
+              if player.detail.get(a, 10) >= D.MAX_DETAIL and w > 0}
+    if not capped:
+        return shares
+    out = {a: w for a, w in shares.items() if a not in capped}
+    for attr, weight in capped.items():
+        group = D.DETAIL_GROUP.get(attr)
+        targets = [a for a in out
+                   if D.DETAIL_GROUP.get(a) == group
+                   and player.detail.get(a, 10) < D.MAX_DETAIL]
+        if not targets:                       # כל הקבוצה מיצתה — לכל השאר
+            targets = [a for a in out if player.detail.get(a, 10) < D.MAX_DETAIL]
+        if not targets:
+            continue
+        # לא במלואו: אימון מוסט הוא פחות יעיל מאימון מכוון
+        share = weight * 0.6 / len(targets)
+        for target in targets:
+            out[target] = out.get(target, 0.0) + share
+    return out
+
+
+def capped_attrs(player: Player) -> List[str]:
+    """התכונות שכבר אי אפשר לשפר. מה שהמסך צריך כדי להגיד את זה."""
+    return [a for a, v in player.detail.items() if v >= D.MAX_DETAIL]
+
+
+def ceiling_damper(level: float) -> float:
+    """בולם ככל שמתקרבים ל-20.
+
+    זה מה שהיה חסר: בלי הבלם הזה תכונה עולה בקצב אחיד עד שהיא נתקעת
+    בקיר של 20 — ואז נעצרת בבת אחת, בלי אזהרה. בכדורגל אמיתי ההפך
+    נכון: ככל שאתה טוב יותר, כל שיפור נוסף יקר יותר. 20 הוא הישג של
+    קריירה בתכונה אחת או שתיים, לא מצב שמגיעים אליו בעשר תכונות בגיל
+    עשרים ושש.
+    """
+    if level < 16.0:
+        return 1.0
+    # 16 → 1.0,  17 → 0.64,  18 → 0.35,  19 → 0.14,  20 → 0.02
+    # מתחת ל-16 אין בלם בכלל: זו עדיין רמה שאפשר להגיע אליה באימון
+    # רגיל, ובלימה שם רק מאטה קריירה שלמה בלי לפתור כלום.
+    return max(0.05, 1.0 - (level - 16.0) * 0.22) ** 1.8
 
 
 def detail_damper(level: float, average: float) -> float:
@@ -344,7 +400,7 @@ def update_potential(player: Player, rng: random.Random,
     quality = (rating - 6.45) * 0.85 + (minutes_share - 0.45) * 1.1
 
     if room <= 0:
-        return None
+        return _push_ceiling(player, rng, quality)
 
     youth = 1.0 if player.age <= 20 else max(0.12, 1.0 - (player.age - 20) * 0.15)
     facilities = (club.training_facilities if club else 50) / 100.0
@@ -369,6 +425,38 @@ def update_potential(player: Player, rng: random.Random,
         return (f"📈 ההערכה עליך עלתה: הפוטנציאל שלך עכשיו {player.potential} "
                 f"(היה {before}).")
     return f"📉 עונה כזו עולה — ההערכה ירדה ל-{player.potential}."
+
+
+# התקרה המוחלטת. 95 נקבע בלידה; מעבר לזה מגיעים רק בהוכחה על הדשא.
+ABSOLUTE_CEILING = 99
+
+
+def _push_ceiling(player: Player, rng: random.Random,
+                  quality: float) -> Optional[str]:
+    """עונה יוצאת דופן דוחפת את התקרה עצמה, לא רק את ההערכה.
+
+    בלי זה, שחקן שמיצה את התקרה שנקבעה לו בהגרלה בגיל שבע־עשרה מגלה
+    שנשארו לו עשרים שנות קריירה שבהן שום דבר לא זז — לא משנה כמה טוב
+    הוא משחק. תקרה היא הערכה של העולם, ומי שמנפץ אותה עונה אחרי עונה
+    אמור לגרום לעולם לעדכן אותה.
+
+    זה יקר בכוונה: צריך עונה מצוינת ממש, וזה מזיז נקודה אחת.
+    """
+    if player.ceiling >= ABSOLUTE_CEILING or player.age > 32:
+        return None
+    if quality < 0.42:                # עונה טובה לא מספיקה — צריך יוצאת דופן
+        return None
+    chance = 0.55 if player.age <= 24 else 0.30
+    if player.has_trait("workhorse"):
+        chance += 0.12
+    chance *= personality_effect(player)[0]
+    if rng.random() > chance:
+        return None
+    player.ceiling = int(min(ABSOLUTE_CEILING, player.ceiling + 1))
+    player.potential = int(clamp(player.potential + 1, player.overall,
+                                 player.ceiling))
+    return (f"🌟 עברת את מה שחשבו שאתה מסוגל לו. התקרה שלך עלתה "
+            f"ל-{player.ceiling}.")
 
 
 def end_of_season_development(player: Player, rng: random.Random,

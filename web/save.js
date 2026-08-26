@@ -247,7 +247,10 @@ function unpackSave(text) {
 const SAVE_DB = "fm_saves";
 const SAVE_STORE = "careers";
 const SLOT_AUTO = "auto";
-const CHECKPOINT_LIMIT = 5;
+// חמש נקודות שחזור היו כמעט שבעה מגה־בייט, ועם השמורה המהירה תשעה
+// למקור אחד. ככל שהמקור שמן יותר כך הוא מועמד טוב יותר לפינוי כשהמקום
+// במכשיר נגמר — ושלוש עונות אחורה זה בדיוק אותו ערך מעשי בשליש מקום.
+const CHECKPOINT_LIMIT = 3;
 const SAVE_DB_TIMEOUT = 4000;
 
 let saveDb = null;          // חיבור פתוח, נשמר בין פניות
@@ -393,6 +396,33 @@ function saveCheckpoint(bytes, meta) {
         .map(row => deleteSlot(row.slot)));
     })
     .catch(() => null);
+}
+
+/**
+ * מבקש מהדפדפן לא למחוק את האחסון של העמוד הזה.
+ *
+ * זה החלק שחסר, וזה מה שמסביר שמורה שנעלמת בלי שאף אחד מחק אותה:
+ * כברירת מחדל אחסון של אתר הוא "מיטב המאמץ", וכשהמקום במכשיר נהיה
+ * צפוף הדפדפן מפנה מקום — ולא מפתח־מפתח אלא מקור שלם בבת אחת.
+ * קריירה, נקודות שחזור והכל, ביחד.
+ *
+ * persist() מסמן את המקור כלא-לפינוי. הדפדפן מחליט לבד אם לאשר,
+ * ולכן מחזירים את התשובה כדי שאפשר יהיה להגיד למשתמש את האמת.
+ */
+function persistStorage() {
+  if (typeof navigator === "undefined" || !navigator.storage
+      || !navigator.storage.persist) return Promise.resolve(null);
+  let ask;
+  try {
+    ask = navigator.storage.persisted
+      ? navigator.storage.persisted().then(has => has || navigator.storage.persist())
+      : navigator.storage.persist();
+  } catch (err) { return Promise.resolve(null); }
+  // שעון עצר משלו, ובלי לסמן את IndexedDB כשבור: זו שאלה נפרדת
+  return Promise.race([
+    Promise.resolve(ask),
+    new Promise(resolve => setTimeout(() => resolve(null), SAVE_DB_TIMEOUT)),
+  ]).catch(() => null);
 }
 
 /** כמה מקום השמורות תופסות, ומה הדפדפן מרשה. */

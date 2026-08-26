@@ -28,7 +28,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, packSaveBytes, unpackSaveBytes, " +
-  "bytesToBase64, bytesToBits15, bits15ToBytes, bytesToText, " +
+  "bytesToBase64, bytesToBits15, bits15ToBytes, bytesToText, persistStorage, " +
+  "ceilingDamper, spillFromCapped, cappedAttrs, pushCeiling, ABSOLUTE_CEILING, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -1199,18 +1200,29 @@ test("ההוראה מצטטת את המשחק האחרון", () => {
   assert(!line.includes("{"), "מקום שלא מולא בהוראה");
 });
 
-test("הכושר לא קורס לאורך עונה", () => {
-  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 9);
-  const readings = [];
-  for (let i = 0; i < 120; i++) {
-    if (g.gameOver) break;
-    if (g.pendingEventId) { g.resolveEvent(0); continue; }
-    g.advanceWeek();
-    readings.push(g.me.fitness);
+test("הכושר לא קורס לאורך עונה, ויש מחיר לעומס", () => {
+  // כמה קריירות ולא אחת: שחקן שבמקרה כמעט לא נבחר לסגל לא נותן
+  // מחיר לעומס, וזה מצב לגיטימי — לא ראיה שהכלכלה שבורה.
+  const means = [], mins = [];
+  for (const seed of [9, 11, 14, 22, 31, 40]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, seed);
+    const readings = [];
+    for (let i = 0; i < 120; i++) {
+      if (g.gameOver) break;
+      if (g.pendingEventId) { g.resolveEvent(0); continue; }
+      g.advanceWeek();
+      readings.push(g.me.fitness);
+    }
+    means.push(readings.reduce((a, b) => a + b, 0) / readings.length);
+    mins.push(Math.min(...readings));
   }
-  const mean = readings.reduce((a, b) => a + b, 0) / readings.length;
-  assert(mean > 70, `כושר ממוצע ${Math.round(mean)} — הגוף לא מתאושש`);
-  assert(Math.min(...readings) < 95, "הכושר לא זז בכלל — אין מחיר לעומס");
+  const worst = Math.min(...means);
+  assert(worst > 50, `כושר ממוצע ${Math.round(worst)} — הגוף לא מתאושש`);
+  const mean = means.reduce((a, b) => a + b, 0) / means.length;
+  assert(mean > 70, `ממוצע הממוצעים ${Math.round(mean)} — ההתאוששות חלשה מדי`);
+  // ולפחות ברוב הקריירות העומס באמת עולה כושר
+  const bit = mins.filter(m => m < 90).length;
+  assert(bit >= 4, `רק ב-${bit} מתוך ${mins.length} קריירות היה מחיר לעומס`);
 });
 
 // ---------------------------------------------------------------------------
@@ -1864,6 +1876,71 @@ test("unpackSave מזהה את כל הפורמטים", () => {
   assert(same(JSON.stringify(state)), "פורמט 1 — JSON גולמי");
   assert(same(A.packSave(state)), "פורמט 2 — base64");
   assert(same("fm3:" + A.bytesToBits15(A.packSaveBytes(state))), "פורמט 3 — 15 סיביות");
+});
+
+// ---------------------------------------------------------------------------
+// התקרה: להתקרב אליה לאט, ולא להיעצר בה בלי הסבר
+// ---------------------------------------------------------------------------
+
+test("הבלם מאט את ההתקרבות ל-20", () => {
+  // עד 16 אין בלם: זו רמה שמגיעים אליה באימון רגיל
+  assert(A.ceilingDamper(10) === 1, "מתחת ל-16 אין בלם");
+  assert(A.ceilingDamper(15.9) === 1, "15.9 עדיין חופשי");
+  const values = [];
+  for (let l = 16; l <= 20; l++) values.push(A.ceilingDamper(l));
+  assert(values[0] === 1, "16 עצמו עדיין חופשי");
+  for (let i = 1; i < values.length; i++)
+    assert(values[i] < values[i - 1], `הבלם לא מונוטוני ב-${15 + i}`);
+  assert(values[values.length - 1] < 0.05, "19→20 חייב להיות יקר בהרבה");
+  assert(A.ceilingDamper(19) < A.ceilingDamper(17) * 0.3, "הפער בין 17 ל-19 קטן מדי");
+});
+
+test("אימון על תכונה בתקרה עובר הלאה ולא מתאדה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 5);
+  g.me.detail.finishing = A.D.MAX_DETAIL;
+  const shares = { finishing: 3.0, long_shots: 0.5, technique: 0.5 };
+  const out = A.spillFromCapped(g.me, shares);
+  assert(!("finishing" in out), "תכונה בתקרה לא אמורה לקבל עבודה");
+  assert(out.long_shots > 0.5 && out.technique > 0.5, "העבודה לא עברה הלאה");
+  const before = Object.values(shares).reduce((a, b) => a + b, 0);
+  const after = Object.values(out).reduce((a, b) => a + b, 0);
+  assert(after < before, "אימון מוסט אמור להיות פחות יעיל");
+});
+
+test("תכונה בתקרה אומרת את זה, במקום להידחק בדירוג", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 6);
+  g.me.detail.finishing = A.D.MAX_DETAIL;
+  const row = A.relevanceOf(g, "finishing");
+  assert(row.capped === true, "לא סומן כתקרה");
+  assert(row.verdict.includes("תקרה"), row.verdict);
+  assert(A.forecastLine(g, "finishing").includes("התקרה"), "התחזית לא מסבירה");
+  assert(A.projectedGain(g, "finishing", 12) === 0, "התחזית מבטיחה רווח שלא יקרה");
+  assert(A.cappedAttrs(g.me).includes("finishing"), "cappedAttrs פספס");
+});
+
+test("עונה יוצאת דופן דוחפת את התקרה עצמה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 8);
+  const me = g.me;
+  me.ceiling = 90; me.potential = 90;
+
+  // עונה בינונית לא מזיזה תקרה
+  for (let seed = 0; seed < 40; seed++)
+    assert(A.pushCeiling(me, new A.Rng(seed), 0.30) === null, "עונה בינונית הזיזה תקרה");
+  assert(me.ceiling === 90, "התקרה זזה בלי הצדקה");
+
+  // עונה יוצאת דופן כן, ונעצרת בתקרה המוחלטת
+  const rng = new A.Rng(1);
+  for (let i = 0; i < 400; i++) A.pushCeiling(me, rng, 0.65);
+  assert(me.ceiling === A.ABSOLUTE_CEILING, `נעצר ב-${me.ceiling}`);
+  assert(me.ceiling > 90, "תקרה שלא זזה היא קיר לשארית הקריירה");
+});
+
+test("התקרה לא זזה לוותיק", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 9);
+  const me = g.me;
+  me.ceiling = 90; me.potential = 90; me.age = 34;
+  for (let seed = 0; seed < 40; seed++)
+    assert(A.pushCeiling(me, new A.Rng(seed), 0.9) === null, "ותיק קיבל תקרה חדשה");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);
