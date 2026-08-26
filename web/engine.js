@@ -173,7 +173,6 @@ function generatePlayer(rng, club, position, opts = {}) {
     height: 178,
     adultHeight: 178,
     weight: 74,
-    history: [],
     resilience: 50,
     sharpness: 60,
     ceiling,

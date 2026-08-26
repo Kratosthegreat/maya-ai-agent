@@ -16,37 +16,69 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
  * מצב השמירה האחרונה. כשהדפדפן מסרב לשמור — ואצל חלק מהדפדפנים
  * בטלפון זה קורה — עדיף שתדע מיד ולא שתגלה כשהקריירה נעלמת.
  */
-let saveState = { ok: true, at: 0, error: "" };
+let saveState = { ok: true, at: 0, error: "", store: "" };
 
+/** תיאור קצר של הקריירה, כדי שרשימת השמורות תגיד משהו. */
+function saveMeta() {
+  const club = game.myClub();
+  return {
+    name: game.me.name, age: game.me.age, year: game.year, week: game.week,
+    stage: game.stage, club: club ? club.name : "",
+    overall: overall(game.me),
+  };
+}
+
+/**
+ * שמירה אוטומטית. נקראת אחרי כל פעולה, ולכן חייבת להיות זולה:
+ * IndexedDB אסינכרוני ולא חוסם, ותור הכתיבה שומר רק את המצב האחרון.
+ */
 function saveGame() {
   if (!game) return false;
   // אם יש קובץ מקושר עם הרשאה — לכתוב גם אליו, בשקט וברקע
   if (saveFile.handle && saveFile.permission === "granted") writeCareerFile(true);
-  let payload;
+  let bytes;
   try {
-    payload = packSave(game.toJSON());
+    bytes = packSaveBytes(game.toJSON());
   } catch (err) {
-    saveState = { ok: false, at: saveState.at, error: "הכנת השמורה נכשלה." };
+    saveState = { ok: false, at: saveState.at, error: "הכנת השמורה נכשלה.",
+                  store: saveState.store };
     return false;
   }
-  try {
-    localStorage.setItem(SAVE_KEY, payload);
-    saveState = { ok: true, at: Date.now(), error: "" };
-    return true;
-  } catch (err) {
-    const full = err && (err.name === "QuotaExceededError"
-      || err.name === "NS_ERROR_DOM_QUOTA_REACHED" || err.code === 22);
-    saveState = {
-      ok: false, at: saveState.at,
-      error: full
-        ? "אין מספיק מקום פנוי בדפדפן כדי לשמור את הקריירה."
-        : "הדפדפן חוסם שמירה מקומית בעמוד הזה.",
-    };
-    return false;
-  }
+  queueSave(bytes, saveMeta(), (ok, error) => {
+    if (ok) {
+      saveState = { ok: true, at: Date.now(), error: "", store: "idb" };
+    } else {
+      // IndexedDB נכשל — נופלים חזרה ל-localStorage, שתמיד היה כאן
+      const fallback = saveToLocal();
+      saveState = fallback
+        ? { ok: true, at: Date.now(), error: "", store: "local" }
+        : { ok: false, at: saveState.at, error, store: "" };
+    }
+    refreshSaveBadge();
+  });
+  return true;
 }
 
+/** רשת ביטחון סינכרונית: כשאין IndexedDB, או כשסוגרים את הדף. */
+function saveToLocal() {
+  if (!game) return false;
+  try {
+    localStorage.setItem(SAVE_KEY, packSave(game.toJSON()));
+    return true;
+  } catch (err) { return false; }
+}
+
+/** טעינה: קודם IndexedDB, ואם אין — השמורה הישנה מ-localStorage. */
 function loadGame() {
+  return getSlot(SLOT_AUTO).then(row => {
+    if (row && row.bytes) {
+      try { return Game.fromJSON(unpackSaveBytes(row.bytes)); } catch (err) {}
+    }
+    return loadFromLocal();
+  }).catch(() => loadFromLocal());
+}
+
+function loadFromLocal() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
@@ -54,13 +86,40 @@ function loadGame() {
   } catch (err) { return null; }
 }
 
-function hasSave() {
-  try { return !!localStorage.getItem(SAVE_KEY); } catch (err) { return false; }
+/** האם יש בכלל קריירה שמורה. נבדק פעם אחת בעליית הדף. */
+let savedCareer = { known: false, meta: null, exists: false };
+
+function refreshSavedCareer() {
+  return getSlot(SLOT_AUTO).then(row => {
+    if (row && row.bytes) {
+      savedCareer = { known: true, meta: row.meta || null, exists: true };
+      return true;
+    }
+    let local = false;
+    try { local = !!localStorage.getItem(SAVE_KEY); } catch (err) {}
+    savedCareer = { known: true, meta: null, exists: local };
+    return local;
+  }).catch(() => {
+    let local = false;
+    try { local = !!localStorage.getItem(SAVE_KEY); } catch (err) {}
+    savedCareer = { known: true, meta: null, exists: local };
+    return local;
+  });
 }
 
+function hasSave() { return savedCareer.exists; }
+
 function clearSave() {
+  deleteSlot(SLOT_AUTO);
   try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
-  saveState = { ok: true, at: 0, error: "" };
+  savedCareer = { known: true, meta: null, exists: false };
+  saveState = { ok: true, at: 0, error: "", store: "" };
+}
+
+/** מרענן רק את חיווי השמירה, בלי לצייר מחדש את כל המסך. */
+function refreshSaveBadge() {
+  const badge = document.querySelector("[data-save-badge]");
+  if (badge) badge.textContent = saveState.ok ? savedAgo() : "לא נשמר";
 }
 
 /**
@@ -216,16 +275,25 @@ function savePanel() {
 
   return `
   <div class="panel">
-    <div class="panel-head"><span class="t">השמורה</span>
-      <span class="r">${saveState.ok ? esc(savedAgo()) : "לא נשמר"}</span></div>
+    <div class="panel-head"><span class="t">שמירה אוטומטית</span>
+      <span class="r" data-save-badge>${
+        saveState.ok ? esc(savedAgo()) : "לא נשמר"}</span></div>
     <div class="panel-body">
       <div class="row">
-        <span class="nm">בדפדפן</span>
+        <span class="grow"><span class="nm">${
+          saveState.ok ? "הקריירה נשמרת מעצמה" : "השמירה נכשלה"}</span>
+          <span class="sub">${saveState.ok
+            ? "אחרי כל שבוע, כל החלטה, וכשסוגרים את הדף — בלי לגעת בכלום."
+            : esc(saveState.error)}</span></span>
         <span class="val ${saveState.ok ? "good" : "bad"}">${
-          saveState.ok ? "פעיל" : "נכשל"}</span>
+          saveState.ok ? "✓" : "✕"}</span>
       </div>
+      ${checkpointRows()}
+      <hr class="rule">
+      <div class="muted">קובץ הוא לא השמירה — הוא רק דרך להעביר את
+        הקריירה למכשיר אחר או לגבות אותה בחוץ.</div>
       <div class="row">
-        <span class="nm">קובץ קבוע</span>
+        <span class="nm">קובץ העברה</span>
         <span class="val ${mode === "linked" ? "good" : ""}">${
           mode === "linked" ? `<span class="fname">${esc(name)}</span>`
           : mode === "needs-permission" ? "ממתין לאישור"
@@ -234,11 +302,11 @@ function savePanel() {
       <div class="muted">${body}</div>
       ${saveFile.error ? `<div class="muted bad">${esc(saveFile.error)}</div>` : ""}
       <div class="btn-row">
-        <button class="btn ${mode === "linked" ? "" : "primary"}" data-act="backup">${
-          mode === "linked" ? "לשמור עכשיו"
+        <button class="btn" data-act="backup">${
+          mode === "linked" ? "לכתוב עכשיו"
           : mode === "needs-permission" ? "לחדש את החיבור"
-          : mode === "none" ? "לבחור קובץ שמירה" : "להוריד גיבוי"}</button>
-        <button class="btn" data-act="restore">לשחזר</button>
+          : mode === "none" ? "לבחור קובץ" : "להוריד עותק"}</button>
+        <button class="btn" data-act="restore">לייבא מקובץ</button>
       </div>
       ${saveFile.handle ? `<div class="btn-row">
         <button class="mini-btn" data-act="backup-as">לבחור קובץ אחר</button>
@@ -246,6 +314,43 @@ function savePanel() {
       </div>` : ""}
     </div>
   </div>`;
+}
+
+/**
+ * נקודות שחזור — תמונת מצב אוטומטית בתחילת כל עונה.
+ * זה מה שהופך שמירה אוטומטית לשמירה של משחק ולא רק לזיכרון דפדפן.
+ */
+let checkpoints = { known: false, rows: [] };
+
+function refreshCheckpoints() {
+  return listSlots().then(rows => {
+    checkpoints = {
+      known: true,
+      rows: rows.filter(row => String(row.slot).startsWith("cp_"))
+                .sort((a, b) => b.at - a.at),
+    };
+    return checkpoints.rows;
+  });
+}
+
+function checkpointRows() {
+  if (!checkpoints.known) return "";
+  if (!checkpoints.rows.length) {
+    return `<div class="muted">נקודת שחזור נשמרת אוטומטית בתחילת כל עונה.</div>`;
+  }
+  return `
+    <hr class="rule">
+    <div class="muted">נקודות שחזור — תחילת עונה, אוטומטית:</div>
+    ${checkpoints.rows.map(row => {
+      const meta = row.meta || {};
+      return `<div class="row">
+        <span class="grow"><span class="nm">עונת ${meta.year || "?"}</span>
+          <span class="sub">גיל ${meta.age ?? "?"}${
+            meta.club ? " · " + esc(meta.club) : ""}${
+            meta.overall ? " · כללי " + meta.overall : ""}</span></span>
+        <button class="mini-btn" data-checkpoint="${esc(row.slot)}">לחזור לכאן</button>
+      </div>`;
+    }).join("")}`;
 }
 
 /** התראה כשהשמירה האוטומטית לא עובדת — עם דרך מוצא. */
@@ -352,7 +457,14 @@ function screenMenu() {
       וכל החלטה נשארת איתך עד סוף הדרך.</p>
     </div>
     <div class="actions">
-      ${saved ? `<button class="btn primary" data-act="continue">להמשיך קריירה</button>` : ""}
+      ${saved ? (() => {
+        const meta = savedCareer.meta;
+        return `<button class="btn primary" data-act="continue">
+          <span class="k">להמשיך קריירה</span>
+          ${meta ? `<span class="hint">${esc(meta.name || "")} · בן ${meta.age} ·
+            ${esc(meta.club || "")} · עונת ${meta.year}, שבוע ${meta.week}</span>` : ""}
+        </button>`;
+      })() : ""}
       <button class="btn ${saved ? "" : "primary"}" data-act="new">
         <span class="k">${saved ? "קריירה חדשה" : "להתחיל קריירה"}</span>
         ${saved ? `<span class="hint">מוחק את השמורה</span>` : ""}
@@ -2556,6 +2668,19 @@ function bind() {
       toast(message);
       render();
     }));
+  app.querySelectorAll("[data-checkpoint]").forEach(el =>
+    el.addEventListener("click", () => {
+      if (!confirm("לחזור לנקודת השחזור הזאת? כל מה שקרה אחריה יימחק.")) return;
+      getSlot(el.dataset.checkpoint).then(row => {
+        if (!row || !row.bytes) { toast("נקודת השחזור לא נקראה."); return; }
+        try {
+          game = Game.fromJSON(unpackSaveBytes(row.bytes));
+        } catch (err) { toast("נקודת השחזור פגומה."); return; }
+        saveGame();
+        toast("חזרת לנקודת השחזור.");
+        go(game.gameOver ? "end" : "main");
+      });
+    }));
   app.querySelectorAll("[data-scout]").forEach(el =>
     el.addEventListener("click", () => {
       const message = scoutPlayer(game, game.players[el.dataset.scout]);
@@ -2627,10 +2752,11 @@ function act(what) {
       role: "player", identity: randomIdentity() }); }
   else if (what === "menu") { if (game) saveGame(); go("menu"); }
   else if (what === "continue") {
-    const loaded = loadGame();
-    if (!loaded) { alert("לא נמצאה שמורה תקינה."); return; }
-    game = loaded;
-    go(game.gameOver ? "end" : "main");
+    loadGame().then(loaded => {
+      if (!loaded) { toast("לא נמצאה שמורה תקינה."); return; }
+      game = loaded;
+      go(game.gameOver ? "end" : "main");
+    });
   }
   else if (what === "start") {
     const name = (viewData.name || "").trim() || (viewData.role === "manager" ? "דני מנג'ר" : "עומר לוי");
@@ -2717,6 +2843,13 @@ function playWeek() {
   window.lastReport = report;
   pendingSeason = report.seasonEnded ? report.seasonSummary : null;
   saveGame();
+  // תחילת עונה חדשה — נקודת שחזור אוטומטית, בלי שתצטרך לבקש
+  if (report.seasonEnded) {
+    try {
+      saveCheckpoint(packSaveBytes(game.toJSON()), saveMeta())
+        .then(() => refreshCheckpoints());
+    } catch (err) { /* נקודת שחזור היא בונוס, לא תנאי */ }
+  }
   go("week", report);
 }
 
@@ -2749,19 +2882,48 @@ function afterOutcome() {
 // ---------------------------------------------------------------------------
 
 function boot() {
-  const saved = hasSave();
-  if (saved) {
-    const loaded = loadGame();
-    if (loaded) { game = loaded; }
-  }
-  // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע
-  const saveNow = () => { if (game) saveGame(); };
+  // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע. ברגע הסגירה אין
+  // זמן לחכות ל-IndexedDB, ולכן שם דווקא localStorage הוא הנכון.
+  const saveNow = () => { if (game) { saveGame(); saveToLocal(); } };
   loadSaveFile();
   window.addEventListener("pagehide", saveNow);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveNow();
   });
+
   go("menu");
+  // הבדיקה אם יש שמורה היא אסינכרונית — התפריט מתעדכן כשהתשובה מגיעה
+  refreshSavedCareer().then(() => {
+    migrateLegacySave();
+    if (view === "menu") render();
+  });
+  refreshCheckpoints().then(rows => { if (rows.length) render(); });
+}
+
+/**
+ * שמורה ישנה מ-localStorage עוברת ל-IndexedDB פעם אחת, כדי שקריירה
+ * שהתחילה לפני השינוי לא תיעלם ולא תמשיך לתפוס את המכסה הצפופה.
+ */
+function migrateLegacySave() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (err) { return; }
+  if (!raw) return;
+  getSlot(SLOT_AUTO).then(row => {
+    if (row && row.bytes) return;          // כבר יש שמורה חדשה
+    let state;
+    try { state = unpackSave(raw); } catch (err) { return; }
+    if (!state) return;
+    let loaded;
+    try { loaded = Game.fromJSON(state); } catch (err) { return; }
+    putSlot(SLOT_AUTO, packSaveBytes(state), {
+      name: loaded.me.name, age: loaded.me.age, year: loaded.year,
+      week: loaded.week, stage: loaded.stage,
+      club: loaded.myClub() ? loaded.myClub().name : "",
+      overall: overall(loaded.me),
+    }).then(() => refreshSavedCareer()).then(() => {
+      if (view === "menu") render();
+    }).catch(() => null);
+  });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

@@ -145,7 +145,6 @@ class Player:
     height: int = 178            # ס"מ, בהווה
     adult_height: int = 178      # הגובה שאליו הגוף הזה גדל
     weight: int = 74             # ק"ג
-    history: List[Dict[str, Any]] = field(default_factory=list)  # תמונת מצב לעונה
     resilience: float = 50.0     # 0-100, עמידות לפציעות
     sharpness: float = 60.0      # 0-100, חדות משחק — נבנית מדקות במגרש
     is_human: bool = False

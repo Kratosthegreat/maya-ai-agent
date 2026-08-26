@@ -27,7 +27,8 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "buildOf, FOOT_KEYS, FOOT_NAMES, attendanceFor, matchdayIncome, " +
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
-  "packSave, unpackSave, injuryRisk, marketability, sponsorOffer, " +
+  "packSave, unpackSave, packSaveBytes, unpackSaveBytes, " +
+  "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
   "EFFECT_KEYS, " +
@@ -1769,6 +1770,56 @@ test("דוח הסגל אומר מי לפניך", () => {
     assert(row.overall > A.overall(g.me), "מישהו חלש נרשם כלפניך");
   assert(r.facilities.length === Object.keys(A.D.FACILITIES).length, "מתקנים");
   assert(r.staff.length === Object.keys(A.D.STAFF_ROLES).length, "צוות");
+});
+
+
+// ---------------------------------------------------------------------------
+// השמירה
+// ---------------------------------------------------------------------------
+
+test("שמורה בבייטים היא מדויקת וקטנה בהרבה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 16, 7);
+  for (let i = 0; i < 60; i++) {
+    if (g.gameOver) break;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+  }
+  const state = g.toJSON();
+  const bytes = A.packSaveBytes(state);
+  const text = A.packSave(state);
+
+  // הלוך-חזור בלי לאבד סיבית אחת — מצב ההגרלה מזין את הסימולציה
+  const back = A.unpackSaveBytes(bytes);
+  assert(JSON.stringify(back) === JSON.stringify(state), "השמורה לא זהה למקור");
+
+  // localStorage סופר UTF-16, ולכן base64 עולה פי שניים מאורכו
+  const localCost = text.length * 2;
+  assert(bytes.length < localCost * 0.5,
+    `בייטים ${bytes.length} מול ${localCost} ב-localStorage — אין חיסכון`);
+});
+
+test("המשך אחרי טעינה מבייטים זהה למקור", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 17, 41);
+  for (let i = 0; i < 6; i++) {
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.setAction("passing"); g.advanceWeek();
+  }
+  const copy = A.Game.fromJSON(A.unpackSaveBytes(A.packSaveBytes(g.toJSON())));
+  for (const state of [g, copy]) {
+    if (state.pendingEventId) state.resolveEvent(0);
+    state.setAction("passing"); state.advanceWeek();
+  }
+  assert(copy.money === g.money && A.overall(copy.me) === A.overall(g.me),
+    "ההמשך אחרי טעינה שונה מהמקור");
+  assert(JSON.stringify(copy.me.detail) === JSON.stringify(g.me.detail), "תכונות");
+});
+
+test("שמורה ריקה או פגומה לא מפילה כלום", () => {
+  assert(A.unpackSaveBytes(null) === null, "null");
+  assert(A.unpackSaveBytes(new Uint8Array(0)) === null, "ריק");
+  let threw = false;
+  try { A.unpackSaveBytes(new Uint8Array([1, 2, 3, 4])); } catch (err) { threw = true; }
+  assert(threw, "בייטים אקראיים אמורים לזרוק ולא להחזיר זבל");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

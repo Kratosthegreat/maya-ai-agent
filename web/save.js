@@ -103,6 +103,33 @@ function packSave(state) {
   return SAVE_PREFIX + codesToBase64(lzwEncode(bytes));
 }
 
+/**
+ * מצב משחק → בייטים דחוסים, בלי base64.
+ *
+ * base64 מנפח ב-33%, ו-localStorage מאחסן ב-UTF-16 ולכן מכפיל שוב:
+ * שמורה של מגה־בייט הופכת שם לשלושה. IndexedDB מקבל בייטים כמו שהם,
+ * ולכן זו הדרך היחידה שבה שמירה אוטומטית של קריירה מלאה נכנסת בנוחות.
+ */
+function packSaveBytes(state) {
+  const json = JSON.stringify(state);
+  const codes = lzwEncode(new TextEncoder().encode(json));
+  const out = new Uint8Array(codes.length * 2);
+  for (let i = 0; i < codes.length; i++) {
+    out[i * 2] = codes[i] >> 8;
+    out[i * 2 + 1] = codes[i] & 255;
+  }
+  return out;
+}
+
+function unpackSaveBytes(bytes) {
+  if (!bytes || !bytes.length) return null;
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const codes = new Array(view.length >> 1);
+  for (let i = 0; i < codes.length; i++)
+    codes[i] = (view[i * 2] << 8) | view[i * 2 + 1];
+  return JSON.parse(new TextDecoder().decode(lzwDecode(codes)));
+}
+
 /** מחרוזת → מצב משחק. מקבל גם שמורות ישנות שנשמרו כ-JSON גולמי. */
 function unpackSave(text) {
   if (!text) return null;
@@ -111,6 +138,130 @@ function unpackSave(text) {
     return JSON.parse(new TextDecoder().decode(bytes));
   }
   return JSON.parse(text);       // פורמט 1 — שמורה שנוצרה לפני הדחיסה
+}
+
+
+// ---------------------------------------------------------------------------
+// אחסון השמורה — אוטומטי, בלי קבצים
+//
+// עד עכשיו השמורה ישבה ב-localStorage כ-base64. שתי בעיות: base64
+// מנפח ב-33%, ו-localStorage סופר UTF-16 ולכן מכפיל שוב — קריירה של
+// מגה־בייט וחצי תפסה שם שלושה מגה מתוך מכסה של חמישה. ברגע שהמכסה
+// נגמרת השמירה נכשלת, ואז נשארים רק קבצים.
+//
+// IndexedDB פותר את שניהם: בייטים כמו שהם, ומכסה של מאות מגה־בייטים.
+// localStorage נשאר כרשת ביטחון לדפדפנים שחוסמים IndexedDB.
+// ---------------------------------------------------------------------------
+
+const SAVE_DB = "fm_saves";
+const SAVE_STORE = "careers";
+const SLOT_AUTO = "auto";
+const CHECKPOINT_LIMIT = 5;
+
+function saveDbOpen() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") { reject(new Error("no idb")); return; }
+    const request = indexedDB.open(SAVE_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore(SAVE_STORE);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function saveDbRun(mode, action) {
+  return saveDbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(SAVE_STORE, mode);
+    const request = action(tx.objectStore(SAVE_STORE));
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  }));
+}
+
+/** שומר תא. הערך כולל מטא־דאטה כדי שמסך השמירה יידע מה יש בו. */
+function putSlot(slot, bytes, meta) {
+  return saveDbRun("readwrite", store =>
+    store.put({ bytes, meta, at: Date.now() }, slot));
+}
+
+function getSlot(slot) {
+  return saveDbRun("readonly", store => store.get(slot)).catch(() => null);
+}
+
+function deleteSlot(slot) {
+  return saveDbRun("readwrite", store => store.delete(slot)).catch(() => null);
+}
+
+function listSlots() {
+  return saveDbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(SAVE_STORE, "readonly");
+    const store = tx.objectStore(SAVE_STORE);
+    const keys = store.getAllKeys();
+    const values = store.getAll();
+    tx.oncomplete = () => resolve(keys.result.map((key, index) => ({
+      slot: key, at: values.result[index] ? values.result[index].at : 0,
+      meta: values.result[index] ? values.result[index].meta : null,
+      size: values.result[index] && values.result[index].bytes
+        ? values.result[index].bytes.length : 0,
+    })));
+    tx.onerror = () => reject(tx.error);
+  })).catch(() => []);
+}
+
+/**
+ * תור כתיבה: השמירה נקראת אחרי כל פעולה, ו-IndexedDB אסינכרוני.
+ * במקום להריץ עשרים כתיבות במקביל שומרים תמיד את האחרונה בלבד.
+ */
+let savePending = null;
+let saveWriting = false;
+let saveOnDone = null;
+
+function queueSave(bytes, meta, onDone) {
+  savePending = { bytes, meta };
+  saveOnDone = onDone || saveOnDone;
+  if (saveWriting) return;
+  saveWriting = true;
+  const flush = () => {
+    const job = savePending;
+    savePending = null;
+    if (!job) { saveWriting = false; return; }
+    putSlot(SLOT_AUTO, job.bytes, job.meta)
+      .then(() => { if (saveOnDone) saveOnDone(true, ""); })
+      .catch(err => {
+        if (saveOnDone) saveOnDone(false, describeSaveError(err));
+      })
+      .then(flush, flush);
+  };
+  flush();
+}
+
+function describeSaveError(err) {
+  const name = err && err.name;
+  if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED")
+    return "נגמר המקום הפנוי בדפדפן. אפשר למחוק נקודות שחזור ישנות.";
+  return "הדפדפן חוסם אחסון בעמוד הזה — נסה לצאת ממצב גלישה פרטית.";
+}
+
+/** נקודת שחזור אוטומטית לתחילת עונה, עם גלגול של הישנות. */
+function saveCheckpoint(bytes, meta) {
+  const slot = `cp_${meta.year}_${String(meta.week).padStart(2, "0")}`;
+  return putSlot(slot, bytes, meta)
+    .then(() => listSlots())
+    .then(rows => {
+      const points = rows.filter(row => row.slot.startsWith("cp_"))
+        .sort((a, b) => b.at - a.at);
+      return Promise.all(points.slice(CHECKPOINT_LIMIT)
+        .map(row => deleteSlot(row.slot)));
+    })
+    .catch(() => null);
+}
+
+/** כמה מקום השמורות תופסות, ומה הדפדפן מרשה. */
+function storageEstimate() {
+  if (typeof navigator === "undefined" || !navigator.storage
+      || !navigator.storage.estimate) return Promise.resolve(null);
+  return navigator.storage.estimate()
+    .then(info => ({ used: info.usage || 0, quota: info.quota || 0 }))
+    .catch(() => null);
 }
 
 
