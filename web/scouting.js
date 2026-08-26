@@ -149,13 +149,14 @@ function scoutReport(game, club) {
   const country = clubCountry(club.cid);
   const lines = [`${club.name} · ${country} · מוניטין ${club.reputation}`,
                  `רמת עניין: ${interestLabel(score)} (${Math.round(score)}/100)`];
-  const weights = D.POSITION_WEIGHTS[me.position];
-  const ranked = [...D.ATTRIBUTES].sort((a, b) =>
-    (me.attributes[b] ?? 50) * (weights[b] || 0.1)
-    - (me.attributes[a] ?? 50) * (weights[a] || 0.1));
+  // הצופה כותב על תכונות אמיתיות, לא על קטגוריות
+  const row = roleRow(me.role);
+  const watched = row ? row[4].concat(row[5]) : attrsFor(me.position);
+  const ranked = watched.slice().sort((a, b) => (me.detail[b] ?? 10) - (me.detail[a] ?? 10));
   const best = ranked[0], worst = ranked[ranked.length - 1];
-  lines.push(`"${D.ATTRIBUTE_NAMES_HE[best]} ברמה שאנחנו מחפשים `
-             + `(${me.attributes[best] ?? 50}). ${D.ATTRIBUTE_NAMES_HE[worst]} — עוד לא."`);
+  lines.push(`"${D.DETAIL_NAMES_HE[best]} ברמה שאנחנו מחפשים `
+             + `(${me.detail[best] ?? 10}). ${D.DETAIL_NAMES_HE[worst]} — עוד לא."`);
+  if (row) lines.push(`מסומן אצלנו כ${row[1]}.`);
   if (me.age <= 21) lines.push('"בגיל הזה, מה שחסר עוד אפשר ללמד."');
   else if (me.age >= 30) lines.push('"הגיל אצלנו הוא שיקול. חוזה קצר, לא יותר."');
   if (score < SCOUT_NOTICED) lines.push("עוד לא פתחו עליך תיק אמיתי.");

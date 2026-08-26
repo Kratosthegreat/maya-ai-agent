@@ -5,8 +5,8 @@ football_manager.development
 מסלול הפיתוח — איך הופכים ילד ליהלום.
 
 התלונה הייתה מדויקת: אפשר היה להתאמן שנים בלי לדעת לאן. כאן בוחרים
-דגם שחקן (ארכיטיפ), והמסלול אומר בדיוק מה צריך להיות לך ומתי —
-"בעיטה 72 עד גיל 19" — ומה תקבל אם תגיע לשם בזמן.
+**תפקיד** — אותם תפקידים שהמאמן מחלק — והמסלול נגזר ממנו: התכונות
+שהתפקיד באמת דורש, בסולם 1-20, עם סף לכל גיל. "סיום 14 עד גיל 19".
 
 עמידה באבן דרך בזמן היא לא נקודה בטבלה: היא דוחפת את הערכת
 הפוטנציאל למעלה, מרימה מוניטין, ומי שמשלים את כל המסלול עובר
@@ -20,13 +20,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from . import data as D
 from .models import Player, clamp, gain_reputation
 
-ARCHETYPE_BY_KEY = {row[0]: row for row in D.ARCHETYPES}
+# רמת הסף לכל אבן דרך, בסולם 1-20 של התכונות המפורטות
+MILESTONE_AGES = [(17, 11), (19, 14), (21, 16), (24, 18)]
 
 
 def options_for(position: str) -> List[tuple]:
-    """המסלולים שפתוחים לעמדה. תמיד יש לפחות אחד."""
-    fits = [row for row in D.ARCHETYPES if position in row[2]]
-    return fits or list(D.ARCHETYPES)
+    """המסלולים שפתוחים לעמדה — אלה בדיוק התפקידים שהמאמן מחלק."""
+    return D.roles_for(position)
 
 
 def plan_key(game) -> Optional[str]:
@@ -35,12 +35,12 @@ def plan_key(game) -> Optional[str]:
 
 def plan_row(game) -> Optional[tuple]:
     key = plan_key(game)
-    return ARCHETYPE_BY_KEY.get(key) if key else None
+    return D.ROLE_BY_KEY.get(key) if key else None
 
 
 def set_plan(game, key: str) -> str:
     """בוחר מסלול. החלפה באמצע הדרך מאפסת את מה שכבר נצבר."""
-    row = ARCHETYPE_BY_KEY.get(key)
+    row = D.ROLE_BY_KEY.get(key)
     if not row:
         return "אין מסלול כזה."
     previous = plan_key(game)
@@ -61,6 +61,15 @@ def done_list(game) -> List[int]:
     return done
 
 
+def milestone_needs(row: tuple, level: int) -> Dict[str, int]:
+    """מה נדרש באבן דרך: תכונות המפתח של התפקיד ברמה נתונה."""
+    needs = {}
+    for index, attr in enumerate(row[4][:4]):
+        # התכונה הראשונה של התפקיד היא הקשה ביותר — היא הליבה שלו
+        needs[attr] = int(min(20, level + (1 if index == 0 else 0)))
+    return needs
+
+
 # ---------------------------------------------------------------------------
 # איפה אתה עומד
 # ---------------------------------------------------------------------------
@@ -73,14 +82,14 @@ def milestone_rows(game) -> List[Dict[str, Any]]:
     me = game.me
     done = done_list(game)
     out = []
-    for index, (age, needs) in enumerate(row[4]):
+    for index, (age, level) in enumerate(MILESTONE_AGES):
         parts = []
         met = True
-        for attr, target in sorted(needs.items()):
-            have = me.attributes.get(attr, 50)
+        for attr, target in sorted(milestone_needs(row, level).items()):
+            have = me.detail.get(attr, 10)
             if have < target:
                 met = False
-            parts.append({"attr": attr, "name": D.ATTRIBUTE_NAMES_HE[attr],
+            parts.append({"attr": attr, "name": D.DETAIL_NAMES_HE[attr],
                           "have": have, "need": target})
         out.append({
             "index": index, "age": age, "needs": parts,
@@ -114,15 +123,14 @@ def next_target(game) -> Optional[str]:
 
 def recommended_focus(game) -> Optional[str]:
     """על מה כדאי להתאמן השבוע כדי להתקדם במסלול."""
-    rows = milestone_rows(game)
-    for entry in rows:
+    for entry in milestone_rows(game):
         if entry["claimed"]:
             continue
         gaps = [p for p in entry["needs"] if p["have"] < p["need"]]
         if gaps:
             return min(gaps, key=lambda p: p["have"] - p["need"])["attr"]
     row = plan_row(game)
-    return row[3][0][0] if row else None
+    return row[4][0] if row else None
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +165,7 @@ def claim_milestones(game) -> List[str]:
         lines.append(f"✅ אבן דרך במסלול \"{row[1]}\" (גיל {entry['age']}) — {stamp}.")
 
     # פריצה: כל המסלול הושלם
-    if len(done) >= len(row[4]) and not game.flag("breakthrough"):
+    if len(done) >= len(MILESTONE_AGES) and not game.flag("breakthrough"):
         lines.extend(_breakthrough(game, row))
     return lines
 
@@ -169,9 +177,10 @@ def _breakthrough(game, row: tuple) -> List[str]:
     me.potential = clamp(me.potential + 6.0, 0, me.ceiling)
     gain_reputation(me, 7.0)
     me.morale = clamp(me.morale + 14, 5, 99)
-    trait = row[5]
     lines = [f"💎 פריצה. השלמת את מסלול \"{row[1]}\" במלואו.",
              f"   {row[6]}"]
+    # התכונה הנסתרת שנפתחת היא זו שמתאימה למה שבנית
+    trait = _trait_for(row)
     if trait and not me.has_trait(trait):
         me.traits.append(trait)
         lines.append(f"   נוספה לך תכונת אופי: {D.TRAITS[trait]['name']}.")
@@ -183,18 +192,30 @@ def _breakthrough(game, row: tuple) -> List[str]:
     return lines
 
 
+def _trait_for(row: tuple) -> str:
+    """תכונת האופי שמתאימה לתפקיד שהשלמת."""
+    keys = set(row[4]) | set(row[5])
+    if "leadership" in keys or "communication" in keys:
+        return "leader"
+    if "stamina" in keys or "work_rate" in keys:
+        return "workhorse"
+    if "composure" in keys or "finishing" in keys or "flair" in keys:
+        return "clutch"
+    return "student"
+
+
 def plan_summary(game) -> Dict[str, Any]:
     """תמונת מצב למסך המסלול."""
     row = plan_row(game)
     if not row:
         return {"chosen": False, "options": [
             {"key": r[0], "name": r[1], "desc": r[6],
-             "attrs": [D.ATTRIBUTE_NAMES_HE[a] for a, _ in r[3]]}
+             "attrs": [D.DETAIL_NAMES_HE[a] for a in r[4][:4]]}
             for r in options_for(game.me.position)]}
     rows = milestone_rows(game)
     return {
         "chosen": True, "key": row[0], "name": row[1], "desc": row[6],
-        "trait": D.TRAITS[row[5]]["name"],
+        "trait": D.TRAITS[_trait_for(row)]["name"],
         "milestones": rows,
         "done": sum(1 for r in rows if r["claimed"]),
         "total": len(rows),

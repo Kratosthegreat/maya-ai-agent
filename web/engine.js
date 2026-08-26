@@ -144,11 +144,20 @@ function generatePlayer(rng, club, position, opts = {}) {
   }
   if (name === null) name = `${rng.choice(D.FIRST_NAMES)} ${rng.choice(D.LAST_NAMES)} ${rng.randint(2, 99)}`;
 
+  // התפקיד נבחר קודם, כי הוא זה שקובע איך ייראה פרופיל התכונות
+  const roleOptions = rolesFor(position);
+  const role = roleOptions.length ? rng.choice(roleOptions) : null;
+
   const p = {
     pid: "p" + (++PID_COUNTER),
     name, age, position,
     nationality: rng.weighted(D.NATIONALITIES),
-    attributes: generateAttributes(rng, position, quality),
+    attributes: {},
+    detail: generateDetail(rng, position, quality, role ? role[0] : ""),
+    detailGrowth: {},
+    hidden: generateHidden(rng),
+    role: role ? role[0] : "",
+    duty: role ? rng.choice(role[3]) : "support",
     growth: {},
     potential,
     clubId: club ? club.cid : null,
@@ -175,6 +184,7 @@ function generatePlayer(rng, club, position, opts = {}) {
     career: newStats(),
     retired: false,
   };
+  fitDetailToOverall(p, quality);
   p.contract.wage = wageForOverall(overall(p));
   if (rng.random() < 0.35) p.traits.push(rng.choice(Object.keys(D.TRAITS)));
   applyPhysique(p, rng);
@@ -408,6 +418,12 @@ function pickLineup(club, players, formation, forced) {
   return lineup.filter(Boolean);
 }
 
+/** 0.88-1.10 — כמה התפקיד שנתנו לך מוציא ממך את מה שיש בך. */
+function roleFactor(p) {
+  if (!p.role) return 1;
+  return clamp(1 + (roleSuitability(p, p.role) - overall(p)) / 260, 0.88, 1.10);
+}
+
 function teamStrength(lineup, players, formation) {
   const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
   const sums = { def: 0, mid: 0, att: 0 };
@@ -417,7 +433,9 @@ function teamStrength(lineup, players, formation) {
     if (!p) return;
     const slot = idx < slots.length ? slots[idx] : p.position;
     const fit = positionFit(p.position, slot);
-    const power = effective(p) * (0.62 + 0.38 * fit);
+    // ההתאמה לתפקיד היא חלק מהעוצמה: חלוץ מטרה בתפקיד של חלוץ בור
+    // יביא פחות ממה שהדירוג שלו מבטיח
+    const power = effective(p) * (0.62 + 0.38 * fit) * roleFactor(p);
     const share = D.POSITION_ROLE_SHARE[slot];
     for (const line of ["def", "mid", "att"]) {
       sums[line] += power * share[line];
@@ -536,8 +554,9 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   applyInjuries(result, homeLineup, home.cid, players, rng, home);
   applyInjuries(result, awayLineup, away.cid, players, rng, away);
   const focusPid = opts.focusPid || null;
-  ratePlayers(result, homeLineup, home.cid, players, rng, focusPid, hControl);
-  ratePlayers(result, awayLineup, away.cid, players, rng, focusPid, aControl);
+  const focusMods = opts.focusMods || null;
+  ratePlayers(result, homeLineup, home.cid, players, rng, focusPid, hControl, focusMods);
+  ratePlayers(result, awayLineup, away.cid, players, rng, focusPid, aControl, focusMods);
 
   const rated = Object.keys(result.ratings);
   if (rated.length) {
@@ -634,7 +653,7 @@ function applyInjuries(result, lineup, clubId, players, rng, club = null) {
  * ממה שקרה בשורה הזאת — לא מדירוג כללי.
  */
 function ratePlayers(result, lineup, clubId, players, rng,
-                     focusPid = null, possession = 0.5) {
+                     focusPid = null, possession = 0.5, focusMods = null) {
   const conceded = goalsAgainst(result, clubId);
   const outcome = resultFor(result, clubId);
   const teamMod = { W: 0.45, D: 0, L: -0.35 }[outcome];
@@ -662,7 +681,8 @@ function ratePlayers(result, lineup, clubId, players, rng,
     rating -= Math.max(0, 90 - p.fitness) * 0.009;
 
     if (pid === focusPid) {
-      const stats = matchStatLine(p, minutes, goals, assists, rng, possession);
+      const stats = matchStatLine(p, minutes, goals, assists, rng, possession,
+                                  null, focusMods);
       result.statLines[pid] = stats;
       // 65 זה ערב ממוצע שלך, ומשם למעלה או למטה
       rating += (matchPerformance(stats, p.position) - 65) * 0.022;
@@ -712,20 +732,103 @@ function ageFactor(age) {
   return D.AGE_CURVE[String(age)];
 }
 
+/**
+ * שינוי תכונה, בשפת הקבוצות או בשפת התכונות המפורטות.
+ * אירועי העלילה כתובים בשפת שבע הקבוצות והם ממשיכים לעבוד: הכתיבה
+ * מתפזרת על התכונות שמרכיבות את הקבוצה.
+ */
 function addGrowth(p, attr, delta) {
-  p.growth[attr] = (p.growth[attr] || 0) + delta;
-  const whole = Math.trunc(p.growth[attr]);
-  if (whole) {
-    p.attributes[attr] = Math.round(clamp((p.attributes[attr] ?? 50) + whole, 10, 97));
-    p.growth[attr] -= whole;
-  }
+  if (attr in D.DETAIL_NAMES_HE) addDetail(p, attr, delta / 5);
+  else addGroup(p, attr, delta);
 }
 
-/** בולם תכונה שרצה הרחק מכל השאר — אי אפשר בעיטה 95 עם גוף של ילד. */
+/** בולם תכונה שרצה הרחק מכל השאר — אי אפשר סיום 20 עם גוף של ילד. */
 function specialisationDamper(level, ovr) {
   const gap = level - ovr;
   if (gap <= 12) return 1;
   return Math.max(0.18, 1 - (gap - 12) * 0.055);
+}
+
+/** אותו רעיון, ברזולוציה של התכונות המפורטות (1-20). */
+function detailDamper(level, average) {
+  const gap = level - average;
+  if (gap <= 4) return 1;
+  return Math.max(0.25, 1 - (gap - 4) * 0.14);
+}
+
+// תכונות מומחיות: משתפרות רק כשמתאמנים עליהן ישירות
+const SET_PIECE_ATTRS = new Set(["corners", "free_kick", "penalty_taking",
+                                 "long_throws", "eccentricity", "tendency_to_punch"]);
+
+const SHARES_CACHE = new Map();
+
+/**
+ * כמה מהאימון הולך לכל תכונה מפורטת — שלוש שכבות, כמו לוח אימונים
+ * אמיתי: מה שביקשת, מה שלידו, וכל השאר.
+ */
+function trainingShares(p, focus) {
+  const cacheKey = `${p.position}|${p.role}|${focus}`;
+  const cached = SHARES_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const allowed = attrsFor(p.position);
+  const shares = {};
+  const row = roleRow(p.role);
+  const roleAttrs = new Set(row ? row[4].concat(row[5]) : []);
+
+  for (const attr of allowed) {
+    let weight = D.GENERAL_SHARE;
+    if (roleAttrs.has(attr)) weight *= 2.1;
+    if (SET_PIECE_ATTRS.has(attr)) weight *= 0.18;
+    shares[attr] = weight;
+  }
+
+  if (focus in D.DETAIL_NAMES_HE) {
+    const group = D.DETAIL_GROUP[focus];
+    for (const attr of allowed) {
+      if (attr === focus || D.DETAIL_GROUP[attr] !== group) continue;
+      let spill = roleAttrs.has(attr) ? 0.9 : 0.28;
+      if (SET_PIECE_ATTRS.has(attr)) spill = 0.08;
+      shares[attr] += D.SPILL_SHARE * spill;
+    }
+    shares[focus] = (shares[focus] || 0) + 3.4;
+    SHARES_CACHE.set(cacheKey, shares);
+    return shares;
+  }
+
+  const members = groupMapFor(p.position)[focus];
+  if (members) {
+    const keys = Object.keys(members);
+    const total = keys.reduce((a, k) => a + members[k], 0) || 1;
+    for (const attr of keys)
+      if (attr in shares) shares[attr] += 1.6 * (members[attr] / total) * keys.length / 2;
+  }
+  SHARES_CACHE.set(cacheKey, shares);
+  return shares;
+}
+
+/** מריץ שבוע אימון על התכונות המפורטות ומחזיר את מה שהשתפר. */
+function trainDetail(p, focus, base, full = true) {
+  let shares = trainingShares(p, focus);
+  if (!full) {
+    const top = Object.entries(shares).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    shares = Object.fromEntries(top);
+  }
+  const keys = Object.keys(shares);
+  const average = keys.length
+    ? keys.reduce((a, k) => a + (p.detail[k] ?? 10), 0) / keys.length : 10;
+  const gains = {};
+  for (const attr of keys) {
+    const level = p.detail[attr] ?? 10;
+    // base מכויל בסולם 1-100 של הקבוצות; התכונות הן 1-20
+    const step = base * shares[attr] * detailDamper(level, average) / 5;
+    const got = addDetail(p, attr, step);
+    if (got) gains[attr] = (gains[attr] || 0) + got;
+  }
+  const moved = Object.keys(gains);
+  if (!moved.length) return [];
+  return [{ icon: "📈",
+            text: moved.map(a => `${D.DETAIL_NAMES_HE[a]} ל-${p.detail[a]}`).join(", ") + "." }];
 }
 
 function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
@@ -793,43 +896,24 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   base *= 1 + clamp(gap, -10, 18) * 0.032;
   if (hasTrait(p, "workhorse")) base *= 1.30;
   base *= 0.75 + p.morale / 200;
+  // אישיות: מקצוענות ונחישות הן ההבדל בין כישרון שהתממש לכזה שלא
+  base *= personalityEffect(p)[0];
+  base *= 0.55 + (p.detail.determination ?? 10) / 22;
   base *= rng.uniform(0.7, 1.35);
 
   const headroom = p.potential - overall(p);
   if (headroom <= 0) base *= 0.06;
   else if (headroom < 6) base *= 0.20 + headroom * 0.13;
 
+  messages.push(...trainDetail(p, focus, base, p.isHuman));
+
   // עבודת כוח בונה גוף שנשבר פחות — זו הידית לחיזוק שחקן פציע
-  if (focus === "physical") p.resilience = clamp(p.resilience + 0.22 * intensity, 0, 96);
-  else if (focus === "pace") p.resilience = clamp(p.resilience + 0.07 * intensity, 0, 96);
+  if (["physical", "strength", "stamina", "natural_fitness", "balance"].includes(focus))
+    p.resilience = clamp(p.resilience + 0.22 * intensity, 0, 96);
+  else if (["pace", "acceleration", "agility"].includes(focus))
+    p.resilience = clamp(p.resilience + 0.07 * intensity, 0, 96);
   p.sharpness = clamp(p.sharpness - 0.5, 0, 100);
 
-  // האימון מתפזר בשלוש שכבות: מה שבחרת, מה שקרוב לזה, וכל השאר
-  const ovr = overall(p);
-  const weights = D.POSITION_WEIGHTS[p.position];
-  const shares = {};
-  for (const attr of D.ATTRIBUTES)
-    shares[attr] = D.GENERAL_SHARE * (0.45 + (weights[attr] ?? 0.1) * 2.4);
-  for (const attr of (D.TRAINING_SPILL[focus] || []))
-    shares[attr] = (shares[attr] || 0) + D.SPILL_SHARE;
-  shares[focus] = (shares[focus] || 0) + 1;
-
-  const gains = {};
-  for (const [attr, share] of Object.entries(shares)) {
-    const level = p.attributes[attr] ?? 50;
-    let current = (p.growth[attr] || 0) + base * share * specialisationDamper(level, ovr);
-    while (current >= 1.0 && (p.attributes[attr] ?? 50) < 97) {
-      p.attributes[attr] = (p.attributes[attr] ?? 50) + 1;
-      current -= 1;
-      gains[attr] = (gains[attr] || 0) + 1;
-    }
-    p.growth[attr] = current;
-  }
-  if (Object.keys(gains).length) {
-    const parts = Object.keys(gains)
-      .map(a => `${D.ATTRIBUTE_NAMES_HE[a]} ל-${p.attributes[a]}`);
-    messages.push({ icon: "📈", text: parts.join(", ") + "." });
-  }
   const injuryChance = 0.022 * intensity * injuryRisk(p) * (1 - fitnessCoach / 260);
   if (intensity > 1.15 && rng.random() < injuryChance) {
     const weeks = rng.randint(1, 3);
@@ -921,8 +1005,9 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
   p.age += 1;
   const curve = ageFactor(p.age);
   const exposure = 0.45 + minutesShare * 1.1;
-  for (const attr of D.ATTRIBUTES) {
-    const sensitivity = D.DECLINE_SENSITIVITY[attr];
+  // הרגליים הולכות ראשונות, הראש נשאר — ולכן ותיק מפצה בקריאת משחק
+  for (const attr of attrsFor(p.position)) {
+    const sensitivity = D.DETAIL_DECLINE[attr] ?? 0.6;
     let delta;
     if (curve > 0) {
       // קפיצת הקיץ אמיתית אבל לא דרמטית — רוב ההתפתחות היא באימונים
@@ -931,7 +1016,7 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
     } else {
       delta = curve * Math.max(0.2, sensitivity) * rng.uniform(0.5, 1.5);
     }
-    addGrowth(p, attr, delta);
+    addDetail(p, attr, delta / 5);
   }
   const s = p.season;
   if (s.apps) {

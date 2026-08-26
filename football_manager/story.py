@@ -79,12 +79,13 @@ def _rep(game, delta: float) -> None:
 
 
 def _attr(game, attr: str, delta: float) -> None:
-    me = game.me
-    me.growth[attr] = me.growth.get(attr, 0.0) + delta
-    whole = int(me.growth[attr])
-    if whole:
-        me.attributes[attr] = int(clamp(me.attributes.get(attr, 50) + whole, 10, 97))
-        me.growth[attr] -= whole
+    """שינוי תכונה מאירוע עלילה.
+
+    האירועים כתובים בשפת שבע הקבוצות, וזה נשאר נכון: הכתיבה מתפזרת
+    על התכונות המפורטות שמרכיבות את הקבוצה. אירוע שאומר "בעיטה +1.6"
+    מזיז בפועל סיום, בעיטות מרחוק, טכניקה וקור רוח.
+    """
+    SE.apply_attr(game.me, attr, delta)
 
 
 # ===========================================================================
@@ -865,13 +866,13 @@ def _scout_body(game) -> str:
 
 def _scout_work(game) -> str:
     ranked = SC.watchers(game, SC.NOTICED)
-    weights = D.POSITION_WEIGHTS[game.me.position]
-    worst = min(D.ATTRIBUTES,
-                key=lambda a: game.me.attributes.get(a, 50) * weights.get(a, 0.1))
-    _attr(game, worst, 1.4)
+    row = D.ROLE_BY_KEY.get(game.me.role)
+    watched = (list(row[4]) + list(row[5])) if row else list(D.attrs_for(game.me.position))
+    worst = min(watched, key=lambda a: game.me.detail.get(a, 10))
+    SE.apply_attr(game.me, worst, 0.9)
     _morale(game, 3)
     club = ranked[0][0].name if ranked else "מי שעוקב אחריך"
-    return (f"לקחת את זה לאימון. {D.ATTRIBUTE_NAMES_HE[worst]} — "
+    return (f"לקחת את זה לאימון. {D.DETAIL_NAMES_HE[worst]} — "
             f"בדיוק מה ש{club} סימנו לך. הצופה הבא יראה משהו אחר.")
 
 

@@ -14,7 +14,8 @@ from football_manager.engine import (pick_lineup, position_fit, simulate_match,
                                      team_strength)
 from football_manager.game import CUP_WEEKS, SEASON_WEEKS, GameState, round_robin
 from football_manager.models import (available_numbers, generate_player,
-                                     generate_world, wage_for_overall)
+                                     generate_world, set_all, set_group,
+                                     wage_for_overall)
 from football_manager import commercial as CM
 from football_manager import story_engine as SE
 from football_manager.story_pack import PACK
@@ -23,6 +24,9 @@ from football_manager import matchstats as MS
 from football_manager import scouting as SC
 from football_manager import development as DEV
 from football_manager import wealth as WL
+from football_manager import models as MDL
+from football_manager import tactics as TA
+from football_manager import knowledge as KN
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -996,9 +1000,9 @@ def test_strength_and_resilience_lower_injury_risk():
     tough = generate_player(random.Random(5), club, "CB", age=24, quality=60)
     frail = generate_player(random.Random(5), club, "CB", age=24, quality=60)
     tough.resilience, tough.sharpness = 92, 85
-    tough.attributes["physical"] = 88
+    set_group(tough, "physical", 88)
     frail.resilience, frail.sharpness = 15, 30
-    frail.attributes["physical"] = 35
+    set_group(frail, "physical", 35)
     assert tough.injury_risk < frail.injury_risk * 0.6
     assert tough.injury_risk < 1.0
 
@@ -1179,12 +1183,11 @@ def test_choice_effects_change_the_state():
 
 def _striker(shooting=60, passing=60, **rest):
     player = generate_player(random.Random(3), None, "ST", 24, 65)
-    for attr in D.ATTRIBUTES:
-        player.attributes[attr] = 60
-    player.attributes["shooting"] = shooting
-    player.attributes["passing"] = passing
+    set_all(player, 60)
+    set_group(player, "shooting", shooting)
+    set_group(player, "passing", passing)
     for key, value in rest.items():
-        player.attributes[key] = value
+        set_group(player, key, value)
     player.fitness, player.sharpness = 90.0, 85.0
     return player
 
@@ -1219,8 +1222,7 @@ def test_area_scores_are_centred_on_the_players_own_level():
     for position in ("ST", "CM", "CB", "LW", "GK"):
         for level in (45, 85):
             player = generate_player(rng, None, position, 24, level)
-            for attr in D.ATTRIBUTES:
-                player.attributes[attr] = level
+            set_all(player, level)
             player.fitness, player.sharpness = 88.0, 80.0
             scores = [MS.performance(MS.match_stat_line(player, 90, 0, 0, rng), position)
                       for _ in range(120)]
@@ -1337,8 +1339,7 @@ def test_scouting_reaches_beyond_israel():
 
 def test_a_small_club_does_not_chase_a_star():
     game = GameState.new_game("בודק", "ST", "maccabi_harel", 26, seed=4)
-    for attr in D.ATTRIBUTES:
-        game.me.attributes[attr] = 88
+    set_all(game.me, 88)
     pool = SC.candidate_clubs(game)
     assert pool, "אין בכלל יעדים"
     assert all(c.reputation >= game.me.overall - 24 for c in pool)
@@ -1369,9 +1370,11 @@ def test_the_plan_tells_you_what_is_missing():
     assert DEV.next_target(game) is None
     DEV.set_plan(game, "poacher")
     target = DEV.next_target(game)
-    assert target and "בעיטה" in target or "קריאת" in target
+    assert target and "חלוץ בור" in target and "🎯" in target
     focus = DEV.recommended_focus(game)
-    assert focus in D.ATTRIBUTES
+    assert focus in D.DETAIL_NAMES_HE
+    # המסלול מדבר בשפת התכונות המפורטות, לא בקטגוריות
+    assert any(D.DETAIL_NAMES_HE[focus] in target for focus in [focus])
 
 
 def test_milestones_pay_out_and_a_full_plan_breaks_through():
@@ -1379,8 +1382,7 @@ def test_milestones_pay_out_and_a_full_plan_breaks_through():
     DEV.set_plan(game, "poacher")
     game.me.ceiling = 99
     game.me.potential = 60
-    for attr in D.ATTRIBUTES:
-        game.me.attributes[attr] = 90
+    set_all(game.me, 99)
     before = game.me.potential
     lines = DEV.claim_milestones(game)
     assert len(lines) >= 5, lines            # ארבע אבני דרך + פריצה
@@ -1395,7 +1397,7 @@ def test_changing_the_plan_resets_progress():
     game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=3)
     DEV.set_plan(game, "poacher")
     game.flags["plan_done"] = [0, 1]
-    DEV.set_plan(game, "target_man")
+    DEV.set_plan(game, "tf")
     assert game.flags["plan_done"] == []
 
 
@@ -1404,8 +1406,7 @@ def test_a_milestone_never_pushes_potential_past_the_ceiling():
     DEV.set_plan(game, "poacher")
     game.me.ceiling = 70
     game.me.potential = 69
-    for attr in D.ATTRIBUTES:
-        game.me.attributes[attr] = 92
+    set_all(game.me, 99)
     DEV.claim_milestones(game)
     assert game.me.potential <= game.me.ceiling
 
@@ -1535,3 +1536,233 @@ def test_tax_leaves_less_than_the_gross():
     low = net_income(2_000) / 2_000
     high = net_income(200_000) / 200_000
     assert low > high
+
+
+# ---------------------------------------------------------------------------
+# המבנה של המקור: תכונות מפורטות, תפקידים, טקטיקה, אישיות וידע
+# ---------------------------------------------------------------------------
+
+def test_the_detailed_attributes_are_the_source_of_truth():
+    """התלונה: 'אתה מקבל את מה שאתה רואה'. שבע קטגוריות זה מה שהיה."""
+    assert len(D.DETAIL_NAMES_HE) >= 45
+    assert len(D.TECHNICAL) == 14 and len(D.MENTAL) == 14
+    assert len(D.PHYSICAL) == 8 and len(D.GOALKEEPING) == 11
+    player = generate_player(random.Random(2), None, "ST", 24, 70)
+    assert len(player.detail) >= 45
+    assert all(1 <= v <= 20 for v in player.detail.values())
+    # הקבוצות נגזרות — כתיבה ישירה אליהן נמחקת בחישוב הבא
+    player.attributes["shooting"] = 5
+    MDL.recompute_groups(player)
+    assert player.attributes["shooting"] > 5
+
+
+def test_a_group_write_lands_on_the_attributes_beneath_it():
+    player = generate_player(random.Random(2), None, "ST", 24, 70)
+    before = dict(player.detail)
+    gains = MDL.add_group(player, "shooting", 12.0)
+    assert gains, "כתיבה לקבוצה לא הזיזה שום תכונה"
+    assert set(gains) <= set(D.GROUP_MAP["shooting"])
+    assert player.detail["finishing"] > before["finishing"]
+    assert player.attributes["shooting"] > 0
+
+
+def test_story_effects_still_speak_the_old_language():
+    """149 שורות בספריית העלילה כתובות בשפת הקבוצות — והן ממשיכות לעבוד."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=4)
+    before = game.me.detail["finishing"]
+    SE.apply_effects(game, {"attr": ["shooting", 9.0]})
+    assert game.me.detail["finishing"] > before
+    # ואפשר גם לכתוב ישירות בשפה המפורטת
+    before = game.me.detail["composure"]
+    SE.apply_effects(game, {"attr": ["composure", 9.0]})
+    assert game.me.detail["composure"] > before
+
+
+def test_every_position_has_real_roles():
+    assert len(D.ROLES) >= 40
+    for position in D.POSITIONS:
+        options = D.roles_for(position)
+        assert len(options) >= 2, position
+        for row in options:
+            assert row[3], row[0]
+            assert len(row[4]) >= 4, row[0]
+
+
+def test_role_suitability_separates_two_players_of_the_same_rating():
+    """שני חלוצים בדירוג זהה הם לא אותו שחקן."""
+    rng = random.Random(5)
+    poacher = generate_player(rng, None, "ST", 26, 75)
+    target = generate_player(rng, None, "ST", 26, 75)
+    for attr in ("finishing", "off_the_ball", "anticipation", "composure"):
+        poacher.detail[attr] = 18
+        target.detail[attr] = 9
+    for attr in ("heading", "jumping_reach", "strength", "bravery"):
+        target.detail[attr] = 18
+        poacher.detail[attr] = 9
+    MDL.recompute_groups(poacher)
+    MDL.recompute_groups(target)
+    assert MDL.role_suitability(poacher, "poacher") > MDL.role_suitability(target, "poacher")
+    assert MDL.role_suitability(target, "tf") > MDL.role_suitability(poacher, "tf")
+    assert MDL.best_role(poacher)[0] != MDL.best_role(target)[0]
+
+
+def test_the_manager_hands_out_a_role_and_can_refuse_to_change_it():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 22, seed=7)
+    assert game.me.role, "לא חולק תפקיד"
+    assert game.me.duty in D.DUTY_NAMES_HE
+    assert game.me.position in D.ROLE_BY_KEY[game.me.role][2]
+    answers = set()
+    for _ in range(40):
+        game.my_club.manager_trust = 50
+        answers.add(TA.request_role(game, "tf" if game.me.role != "tf" else "poacher")[0])
+    assert "✅" in answers and "⛔" in answers, "המאמן תמיד עונה אותו דבר"
+
+
+def test_tactics_change_what_ninety_minutes_look_like():
+    """התלונה: הטקטיקה לא מגיעה לשחקן."""
+    rng = random.Random(4)
+    player = generate_player(rng, None, "CM", 25, 72)
+    player.role, player.duty = "b2b", "support"
+    player.fitness, player.sharpness = 90.0, 85.0
+    club = MDL.Club(cid="x", name="X", nickname="x", league_id="top",
+                    reputation=60, manager_name="", board_confidence=60)
+
+    def sample(style_key, n=250):
+        mods = TA.modifiers_from(D.STYLE_BY_KEY[style_key][2], player)
+        totals = {}
+        for _ in range(n):
+            stats = MS.match_stat_line(player, 90, 0, 0, rng, mods=mods)
+            for key, value in stats.items():
+                if isinstance(value, (int, float)):
+                    totals[key] = totals.get(key, 0) + value
+        return {k: v / n for k, v in totals.items()}
+
+    tiki = sample("tiki_taka")
+    counter = sample("counter")
+    press = sample("gegenpress")
+    block = sample("catenaccio")
+    assert tiki["passes"] > counter["passes"] * 1.5, "משחק קצר לא נותן יותר נגיעות"
+    assert tiki["pass_pct"] > counter["pass_pct"] + 8
+    assert press["distance"] > block["distance"] + 2, "גגנפרסינג לא עולה בריצה"
+    assert press["sprints"] > block["sprints"] * 1.4
+
+
+def test_the_same_player_fits_one_manager_and_not_another():
+    rng = random.Random(6)
+    runner = generate_player(rng, None, "CM", 25, 70)
+    for attr in ("stamina", "work_rate"):
+        runner.detail[attr] = 18
+    for attr in ("technique", "first_touch"):
+        runner.detail[attr] = 7
+    MDL.recompute_groups(runner)
+    club = MDL.Club(cid="x", name="X", nickname="x", league_id="top",
+                    reputation=60, manager_name="", board_confidence=60)
+
+    def score(style_key):
+        return TA.suits_values(D.STYLE_BY_KEY[style_key][2], runner)[0]
+
+    assert score("gegenpress") > score("tiki_taka") + 10
+
+
+def test_personality_is_hidden_and_it_matters():
+    rng = random.Random(3)
+    player = generate_player(rng, None, "CM", 24, 65)
+    assert len(player.hidden) == len(D.HIDDEN_ATTRS)
+    assert all(1 <= v <= 20 for v in player.hidden.values())
+
+    pro = generate_player(rng, None, "CM", 24, 65)
+    pro.hidden.update({"professionalism": 19, "ambition": 15})
+    pro.detail["determination"] = 17
+    lazy = generate_player(rng, None, "CM", 24, 65)
+    lazy.hidden.update({"professionalism": 4})
+    lazy.detail["determination"] = 6
+    assert MDL.personality_key(pro) != MDL.personality_key(lazy)
+    assert MDL.personality_effect(pro)[0] > MDL.personality_effect(lazy)[0]
+
+
+def test_a_professional_develops_faster_than_a_slacker():
+    rng = random.Random(8)
+    club = generate_world(4)[0]["hapoel_carmel"]
+    results = []
+    for professionalism, determination in ((19, 18), (4, 5)):
+        player = generate_player(random.Random(11), club, "ST", 18, 60)
+        player.hidden["professionalism"] = professionalism
+        player.hidden["ambition"] = 15 if professionalism > 10 else 5
+        player.detail["determination"] = determination
+        player.potential, player.ceiling = 90, 95
+        start = player.overall
+        for _ in range(120):
+            player.fitness = 90.0
+            weekly_training(player, "finishing", club, random.Random(3), 1.0)
+        results.append(player.overall - start)
+    assert results[0] > results[1] + 1, f"מקצוען {results[0]} מול מזלזל {results[1]}"
+
+
+def test_you_do_not_see_everything_about_everyone():
+    """זה הלב של 'אתה מקבל את מה שאתה רואה'."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=6)
+    assert KN.knowledge_level(game, game.me) == 3
+    mate = next(game.players[p] for p in game.my_club.squad if p != game.me_id)
+    assert KN.knowledge_level(game, mate) == 3
+
+    far = next(p for p in game.players.values()
+               if p.club_id and game.clubs[p.club_id].league_id == "national"
+               and p.reputation < 55)
+    assert KN.knowledge_level(game, far) < 2
+    shown = KN.shown_detail(game, far)
+    sample = shown[D.attrs_for(far.position)[0]]
+    assert not sample["exact"], "רואים מספר מדויק של שחקן שלא מכירים"
+
+    before = KN.knowledge_level(game, far)
+    game.my_club.balance = 5_000_000
+    assert "הצוות" in KN.scout_player(game, far)
+    assert KN.knowledge_level(game, far) > before
+    shown = KN.shown_detail(game, far)
+    band = shown[D.attrs_for(far.position)[0]]
+    assert band["high"] - band["low"] <= 2, "דוח מלא ועדיין טווח רחב"
+
+
+def test_star_ratings_are_a_range_not_a_number():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=6)
+    far = next(p for p in game.players.values()
+               if p.club_id and game.clubs[p.club_id].league_id == "euro")
+    low, high = KN.potential_stars(game, far)
+    assert high > low, "פוטנציאל של זר מוצג כמספר מדויק"
+    mine_low, mine_high = KN.potential_stars(game, game.me)
+    assert mine_low == mine_high
+    assert 0 <= KN.ability_stars(game, far) <= 5
+    assert KN.star_text(3.5).startswith("★★★")
+
+
+def test_training_a_single_attribute_moves_that_attribute_most():
+    """מתחילים מרצפה שווה, כדי לבודד את מה שהאימון עצמו עושה."""
+    club = generate_world(4)[0]["hapoel_carmel"]
+    player = generate_player(random.Random(9), club, "ST", 19, 62)
+    player.potential, player.ceiling = 92, 95
+    player.is_human = True
+    set_all(player, 45)                 # כל התכונות על 9 מתוך 20
+    before = dict(player.detail)
+    for _ in range(60):
+        player.fitness = 90.0
+        weekly_training(player, "finishing", club, random.Random(5), 1.0)
+    moved = {a: player.detail[a] - before[a] for a in D.attrs_for("ST")}
+    best = max(moved, key=lambda a: moved[a])
+    assert best == "finishing", f"אימון סיום הזיז דווקא את {best}"
+    assert moved["finishing"] > moved["free_kick"] * 2, \
+        "בעיטות חופשיות משתפרות מאימון סיומות"
+
+
+def test_a_specialism_does_not_improve_by_accident():
+    """אף אחד לא נעשה בועט חופשיות טוב יותר מזה שהוא רץ ספרינטים."""
+    club = generate_world(4)[0]["hapoel_carmel"]
+    player = generate_player(random.Random(9), club, "ST", 19, 62)
+    player.potential, player.ceiling = 92, 95
+    player.is_human = True
+    set_all(player, 45)
+    before = dict(player.detail)
+    for _ in range(60):
+        player.fitness = 90.0
+        weekly_training(player, "acceleration", club, random.Random(5), 1.0)
+    assert player.detail["acceleration"] > before["acceleration"]
+    assert player.detail["free_kick"] - before["free_kick"] <= 1
+    assert player.detail["penalty_taking"] - before["penalty_taking"] <= 1

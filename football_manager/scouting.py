@@ -206,13 +206,16 @@ def scout_report(game, club: Club) -> List[str]:
     country = D.club_country(club.cid, club.league_id)
     lines = [f"{club.name} · {country} · מוניטין {club.reputation}",
              f"רמת עניין: {interest_label(score)} ({score:.0f}/100)"]
-    weights = D.POSITION_WEIGHTS[me.position]
-    ranked = sorted(D.ATTRIBUTES,
-                    key=lambda a: -(me.attributes.get(a, 50) * weights.get(a, 0.1)))
+    # הצופה כותב על תכונות אמיתיות, לא על קטגוריות
+    row = D.ROLE_BY_KEY.get(me.role)
+    watched = (list(row[4]) + list(row[5])) if row else list(D.attrs_for(me.position))
+    ranked = sorted(watched, key=lambda a: -me.detail.get(a, 10))
     best, worst = ranked[0], ranked[-1]
-    lines.append(f'"{D.ATTRIBUTE_NAMES_HE[best]} ברמה שאנחנו מחפשים '
-                 f'({me.attributes.get(best, 50)}). '
-                 f'{D.ATTRIBUTE_NAMES_HE[worst]} — עוד לא."')
+    lines.append(f'"{D.DETAIL_NAMES_HE[best]} ברמה שאנחנו מחפשים '
+                 f'({me.detail.get(best, 10)}). '
+                 f'{D.DETAIL_NAMES_HE[worst]} — עוד לא."')
+    if row:
+        lines.append(f"מסומן אצלנו כ{row[1]}.")
     if me.age <= 21:
         lines.append('"בגיל הזה, מה שחסר עוד אפשר ללמד."')
     elif me.age >= 30:

@@ -48,6 +48,15 @@ def style_of(club: Optional[Club]) -> Tuple[str, str, str, float, float, float]:
 # הוראה שבועית
 # ---------------------------------------------------------------------------
 
+# מה המאמן אומר כשהוא מבקש תכונה מפורטת. הטקסט הכללי נשען על הקבוצה
+# שאליה היא שייכת, והמספרים מהמשחק מגיעים מהשורה של אתמול.
+def detail_directive_text(focus: str) -> str:
+    name = D.DETAIL_NAMES_HE.get(focus)
+    if not name:
+        return DIRECTIVE_TEXT.get(focus, "רוצה אותך באימון נוסף.")
+    return f"רוצה שתעבוד השבוע על {name}."
+
+
 DIRECTIVE_TEXT = {
     "pace": "רוצה אותך מהיר יותר בחמישה המטרים הראשונים.",
     "shooting": "אמר שאתה מבזבז מצבים. השבוע — סיומות.",
@@ -78,7 +87,7 @@ def weekly_directive(game, rng: random.Random) -> Optional[str]:
 
     stats = game.flags.get("last_stats")
     if stats:
-        return MS.weakest_area(stats, me.position, me.attributes)
+        return MS.weakest_detail(stats, me)
 
     weights = D.POSITION_WEIGHTS[me.position]
     gaps = sorted(D.ATTRIBUTES,
@@ -93,11 +102,14 @@ def directive_line(club: Optional[Club], focus: str, stats=None) -> str:
     לך את המספרים שלך מיום ראשון, ואומר מה ישתנה אם תעבוד על זה.
     """
     name = club.manager_name if club else "המאמן"
-    head = f"🎙️ {name} {DIRECTIVE_TEXT.get(focus, 'רוצה אותך באימון נוסף.')}"
+    head = f"🎙️ {name} {detail_directive_text(focus)}"
     if not stats:
         return head
-    reason = MS.reason_line(focus, stats)
-    promise = MS.promise_line(focus)
+    # הסיבה וההבטחה כתובות בשפת הקבוצות — מתרגמים חזרה
+    group = D.DETAIL_GROUP.get(focus)
+    area = focus if focus in D.DIRECTIVE_REASON else _area_of(focus)
+    reason = MS.reason_line(area, stats)
+    promise = MS.promise_line(area)
     parts = [head]
     if reason:
         parts.append(f"   \"{reason}\"")
@@ -109,6 +121,20 @@ def directive_line(club: Optional[Club], focus: str, stats=None) -> str:
 # ---------------------------------------------------------------------------
 # תגובה אחרי משחק
 # ---------------------------------------------------------------------------
+
+def _area_of(detail_attr: str) -> str:
+    """לאיזו מבין שבע הקבוצות שייכת תכונה מפורטת."""
+    best, best_share = "physical", -1.0
+    for group, members in D.GROUP_MAP.items():
+        share = members.get(detail_attr, 0.0)
+        if share > best_share:
+            best, best_share = group, share
+    for group, members in D.GROUP_MAP_GK.items():
+        share = members.get(detail_attr, 0.0)
+        if share > best_share:
+            best, best_share = group, share
+    return best
+
 
 def post_match_line(game, rating: Optional[float], outcome: str,
                     played: bool, rng: random.Random) -> Optional[str]:

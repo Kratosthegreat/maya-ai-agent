@@ -13,7 +13,8 @@ from typing import Dict, List, Optional
 
 from . import data as D
 from .engine import medical_care
-from .models import Club, Player, clamp, gain_reputation
+from .models import (Club, Player, add_detail, add_group, clamp,
+                     gain_reputation, personality_effect, recompute_groups)
 
 # מקדם התפתחות לפי גיל — צעירים גדלים מהר, ותיקים דועכים
 # העקומה שטוחה יותר ממה שנדמה: שחקן לא "נסגר" בגיל 18. השיא מגיע
@@ -30,6 +31,26 @@ AGE_CURVE = {
 DECLINE_SENSITIVITY = {
     "pace": 1.7, "physical": 1.4, "dribbling": 1.1, "shooting": 0.7,
     "passing": 0.4, "defending": 0.5, "mental": -0.5,  # שלילי = ממשיך לעלות
+}
+
+# אותו רעיון, ברזולוציה של התכונות המפורטות: הרגליים הולכות ראשונות,
+# הראש נשאר — ולכן ותיק מפצה בקריאת משחק על מה שאיבד במהירות.
+DETAIL_DECLINE = {
+    "acceleration": 1.9, "pace": 1.9, "agility": 1.5, "balance": 1.0,
+    "stamina": 1.4, "jumping_reach": 1.3, "strength": 0.9, "natural_fitness": 1.1,
+    "dribbling": 1.1, "flair": 0.6, "work_rate": 0.9, "aggression": 0.4,
+    "finishing": 0.6, "long_shots": 0.5, "heading": 0.7, "crossing": 0.4,
+    "first_touch": 0.2, "technique": 0.1, "passing": 0.2, "corners": 0.0,
+    "free_kick": 0.0, "penalty_taking": 0.0, "long_throws": 0.5,
+    "tackling": 0.8, "marking": 0.4,
+    "anticipation": -0.6, "composure": -0.6, "concentration": -0.4,
+    "decisions": -0.7, "determination": -0.2, "leadership": -0.9,
+    "off_the_ball": -0.2, "positioning": -0.7, "teamwork": -0.4,
+    "vision": -0.5, "bravery": 0.0,
+    "reflexes": 1.0, "handling": 0.3, "one_on_ones": 0.2, "aerial_reach": 1.1,
+    "command_of_area": -0.4, "communication": -0.6, "kicking": 0.3,
+    "throwing": 0.3, "rushing_out": 0.8, "eccentricity": 0.0,
+    "tendency_to_punch": 0.0,
 }
 
 OFF_PITCH_FOCUS = {"badges", "media", "business", "rest"}
@@ -111,6 +132,9 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     if player.has_trait("workhorse"):
         base *= 1.30
     base *= 0.75 + player.morale / 200.0
+    # אישיות: מקצוענות ונחישות הן ההבדל בין כישרון שהתממש לכזה שלא
+    base *= personality_effect(player)[0]
+    base *= 0.55 + player.detail.get("determination", 10) / 22.0
     base *= rng.uniform(0.7, 1.35)
 
     # ככל שמתקרבים לתקרת הפוטנציאל, ההתקדמות נעצרת כמעט לגמרי
@@ -120,38 +144,15 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
     elif headroom < 6:
         base *= 0.20 + headroom * 0.13
 
-    # האימון מתפזר בשלוש שכבות: התכונה שבחרת, התכונות הקרובות לה,
-    # וכל השאר — כי גוף של בן 17 מתפתח גם בלי שתכוון אליו.
-    gains: Dict[str, int] = {}
-    weights = D.POSITION_WEIGHTS[player.position]
-    shares: Dict[str, float] = {}
-    for attr in D.ATTRIBUTES:
-        shares[attr] = D.GENERAL_SHARE * (0.45 + weights.get(attr, 0.1) * 2.4)
-    for attr in D.TRAINING_SPILL.get(focus, ()):
-        shares[attr] = shares.get(attr, 0.0) + D.SPILL_SHARE
-    shares[focus] = shares.get(focus, 0.0) + 1.0
+    messages.extend(_train_detail(player, focus, base, rng,
+                                  full=player.is_human))
 
     # עבודת כוח בונה גוף שנשבר פחות. זו הידית שמאפשרת לחזק שחקן פציע.
-    if focus == "physical":
+    if focus in ("physical", "strength", "stamina", "natural_fitness", "balance"):
         player.resilience = clamp(player.resilience + 0.22 * intensity, 0, 96)
-    elif focus == "pace":
+    elif focus in ("pace", "acceleration", "agility"):
         player.resilience = clamp(player.resilience + 0.07 * intensity, 0, 96)
     player.sharpness = clamp(player.sharpness - 0.5, 0, 100)
-
-    for attr, share in shares.items():
-        level = player.attributes.get(attr, 50)
-        step = base * share * specialisation_damper(level, player.overall)
-        current = player.growth.get(attr, 0.0) + step
-        while current >= 1.0 and player.attributes.get(attr, 50) < 97:
-            player.attributes[attr] = player.attributes.get(attr, 50) + 1
-            current -= 1.0
-            gains[attr] = gains.get(attr, 0) + 1
-        player.growth[attr] = current
-
-    if gains:
-        parts = [f"{D.ATTRIBUTE_NAMES_HE[a]} ל-{player.attributes[a]}"
-                 for a in gains]
-        messages.append("📈 " + ", ".join(parts) + ".")
 
     # אימון אינטנסיבי מסוכן
     injury_chance = (0.022 * intensity * player.injury_risk
@@ -162,6 +163,101 @@ def weekly_training(player: Player, focus: str, club: Optional[Club],
         player.injury_name = "עומס יתר באימון"
         messages.append(f"🚑 נמתחת באימון — {weeks} שבועות בחוץ.")
     return messages
+
+
+# תכונות מומחיות: משתפרות רק כשמתאמנים עליהן ישירות. אף אחד לא נעשה
+# בועט חופשיות טוב יותר מזה שהוא רץ ספרינטים.
+SET_PIECE_ATTRS = {"corners", "free_kick", "penalty_taking", "long_throws",
+                   "eccentricity", "tendency_to_punch"}
+
+_SHARES_CACHE: Dict[tuple, Dict[str, float]] = {}
+
+
+def training_shares(player: Player, focus: str) -> Dict[str, float]:
+    """כמה מהאימון הולך לכל תכונה מפורטת.
+
+    שלוש שכבות, בדיוק כמו לוח אימונים אמיתי: מה שביקשת לעבוד עליו,
+    מה שנמצא לידו (אותה קבוצה, ובעיקר מה שהתפקיד שלך דורש), וכל השאר —
+    כי גוף של בן שבע־עשרה מתפתח גם בלי שתכוון אליו.
+    """
+    cached = _SHARES_CACHE.get((player.position, player.role, focus))
+    if cached is not None:
+        return cached
+
+    allowed = [a for a in D.attrs_for(player.position)]
+    shares: Dict[str, float] = {}
+    row = D.ROLE_BY_KEY.get(player.role)
+    role_attrs = set(row[4]) | set(row[5]) if row else set()
+
+    for attr in allowed:
+        weight = D.GENERAL_SHARE
+        if attr in role_attrs:
+            weight *= 2.1        # התפקיד מכתיב על מה עובדים גם באימון כללי
+        if attr in SET_PIECE_ATTRS:
+            weight *= 0.18       # בעיטות חופשיות לא משתפרות מריצות
+        shares[attr] = weight
+
+    if focus in D.DETAIL_NAMES_HE:
+        # מיקוד בתכונה אחת: היא מקבלת את רוב העבודה, שכנותיה בקבוצה חלק
+        group = D.DETAIL_GROUP.get(focus)
+        for attr in allowed:
+            if attr != focus and D.DETAIL_GROUP.get(attr) == group:
+                spill = 0.9 if attr in role_attrs else 0.28
+                if attr in SET_PIECE_ATTRS:
+                    spill = 0.08
+                shares[attr] += D.SPILL_SHARE * spill
+        shares[focus] = shares.get(focus, 0.0) + 3.4
+        _SHARES_CACHE[(player.position, player.role, focus)] = shares
+        return shares
+
+    # מיקוד בקבוצה מהשבע הישנות — מתפזר על כל מרכיביה לפי משקלן
+    members = (D.GROUP_MAP_GK if player.position == "GK" else D.GROUP_MAP).get(focus)
+    if members:
+        total = sum(members.values()) or 1.0
+        for attr, share in members.items():
+            if attr in shares:
+                shares[attr] += 1.6 * (share / total) * len(members) / 2.0
+    _SHARES_CACHE[(player.position, player.role, focus)] = shares
+    return shares
+
+
+def _train_detail(player: Player, focus: str, base: float,
+                  rng: random.Random, full: bool = True) -> List[str]:
+    """מריץ שבוע אימון על התכונות המפורטות ומחזיר את מה שהשתפר.
+
+    ``full=False`` מריץ רק את התכונות שבאמת נושאות משקל — מסלול
+    לשחקני המחשב, שרצים 1,400 בשבוע ולא צריכים את הרזולוציה המלאה.
+    """
+    shares = training_shares(player, focus)
+    if not full:
+        shares = dict(sorted(shares.items(), key=lambda kv: -kv[1])[:10])
+    # נקודת הייחוס לבלם ההתמחות היא הרמה הממוצעת שלך בפועל
+    levels = [player.detail.get(a, 10) for a in shares]
+    average = sum(levels) / len(levels) if levels else 10.0
+    gains: Dict[str, int] = {}
+    for attr, share in shares.items():
+        level = player.detail.get(attr, 10)
+        # base מכויל בסולם 1-100 של הקבוצות; התכונות הן 1-20
+        step = base * share * detail_damper(level, average) / 5.0
+        got = add_detail(player, attr, step)
+        if got:
+            gains[attr] = gains.get(attr, 0) + got
+    if not gains:
+        return []
+    parts = [f"{D.DETAIL_NAMES_HE[a]} ל-{player.detail[a]}" for a in gains]
+    return ["📈 " + ", ".join(parts) + "."]
+
+
+def detail_damper(level: float, average: float) -> float:
+    """בולם תכונה מפורטת שרצה הרחק מכל השאר.
+
+    אפשר להיות מצוין בדבר אחד, אבל לא לפתח סיום 20 עם גוף של ילד:
+    ככל שהפער מהרמה הכללית גדל, כל נקודה נוספת נעשית יקרה יותר.
+    """
+    gap = level - average
+    if gap <= 4.0:
+        return 1.0
+    return max(0.25, 1.0 - (gap - 4.0) * 0.14)
 
 
 def specialisation_damper(level: int, overall: int) -> float:
@@ -289,8 +385,8 @@ def end_of_season_development(player: Player, rng: random.Random,
 
     # דקות משחק מאיצות התפתחות של צעירים
     exposure = 0.45 + minutes_share * 1.1
-    for attr in D.ATTRIBUTES:
-        sensitivity = DECLINE_SENSITIVITY[attr]
+    for attr in D.attrs_for(player.position):
+        sensitivity = DETAIL_DECLINE.get(attr, 0.6)
         if curve > 0:
             # קפיצת הקיץ אמיתית אבל לא דרמטית — רוב ההתפתחות היא באימונים
             delta = curve * exposure * rng.uniform(0.4, 1.5) * 0.45
@@ -298,12 +394,7 @@ def end_of_season_development(player: Player, rng: random.Random,
                 delta *= 0.08
         else:
             delta = curve * max(0.2, sensitivity) * rng.uniform(0.5, 1.5)
-        player.growth[attr] = player.growth.get(attr, 0.0) + delta
-        whole = int(player.growth[attr])
-        if whole:
-            player.attributes[attr] = int(clamp(
-                player.attributes.get(attr, 50) + whole, 10, 97))
-            player.growth[attr] -= whole
+        add_detail(player, attr, delta / 5.0)
 
     # מוניטין נגזר מהעונה
     season = player.season

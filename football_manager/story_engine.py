@@ -28,7 +28,7 @@ import random
 from typing import Any, Dict, List, Optional
 
 from . import data as D
-from .models import clamp, gain_reputation
+from .models import add_detail, add_group, clamp, gain_reputation
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +160,19 @@ EFFECT_KEYS = {
 }
 
 
+def apply_attr(me, attr: str, delta: float) -> None:
+    """שינוי תכונה, בשפת הקבוצות או בשפת התכונות המפורטות.
+
+    אירועי העלילה נכתבו בשפת שבע הקבוצות ("shooting"), והם ממשיכים
+    לעבוד: הכתיבה מתפזרת על התכונות שמרכיבות את הקבוצה. אירוע שכתוב
+    בשפה המפורטת ("finishing") פוגע ישירות.
+    """
+    if attr in D.DETAIL_NAMES_HE:
+        add_detail(me, attr, delta / 5.0)
+    else:
+        add_group(me, attr, delta)
+
+
 def apply_effects(game, fx: Optional[Dict[str, Any]]) -> None:
     """מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט."""
     if not fx:
@@ -197,12 +210,7 @@ def apply_effects(game, fx: Optional[Dict[str, Any]]) -> None:
             me.potential = int(clamp(me.potential + value, me.overall, me.ceiling))
         elif key == "attr":
             attr, delta = value
-            me.growth[attr] = me.growth.get(attr, 0.0) + delta
-            whole = int(me.growth[attr])
-            if whole:
-                me.attributes[attr] = int(clamp(
-                    me.attributes.get(attr, 50) + whole, 10, 97))
-                me.growth[attr] -= whole
+            apply_attr(me, attr, delta)
         elif key == "attrs":
             for attr, delta in value:
                 apply_effects(game, {"attr": [attr, delta]})

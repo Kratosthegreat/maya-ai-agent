@@ -8,8 +8,9 @@ const path = require("path");
 const vm = require("vm");
 
 const HERE = __dirname;
-const PARTS = ["data.js", "art.js", "save.js", "engine.js", "matchstats.js", "clubops.js",
-               "commercial.js", "scouting.js", "development.js", "wealth.js", "manager.js",
+const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "matchstats.js",
+               "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
+               "tacticsteam.js", "knowledge.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -40,7 +41,15 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "holdings, assetsAvailable, buyAsset, sellAsset, netWorth, portfolioYield, " +
   "assetsSeasonTick, wealthSummary, " +
   "signDeal, weeklyRetainer, seasonBonuses, tickPortfolio, renewalOffer, " +
-  "dealLines, clauseText, portfolioTotal };", ctx);
+  "dealLines, clauseText, portfolioTotal, " +
+  "recomputeGroups, addDetail, addGroup, setGroup, setAll, attrsFor, groupMapFor, " +
+  "roleRow, rolesFor, roleSuitability, bestRole, roleName, " +
+  "personalityKey, personalityName, personalityEffect, " +
+  "generateDetail, generateHidden, fitDetailToOverall, " +
+  "tacticalStyle, teamInstructions, describeTactics, tacticModifiers, " +
+  "styleSuitsPlayer, suitsValues, modifiersFrom, roleFitNote, assignRole, dutyFor, requestRole, " +
+  "knowledgeLevel, shownDetail, knowledgeSummary, scoutPlayer, " +
+  "abilityStars, potentialStars, starText, weakestDetail, trainingShares };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -1092,8 +1101,8 @@ test("שליש מהעלילה לפחות נורה בקריירות שונות", 
 
 function striker(rng, overrides) {
   const p = A.generatePlayer(rng, null, "ST", { age: 24, quality: 65 });
-  for (const attr of A.D.ATTRIBUTES) p.attributes[attr] = 60;
-  Object.assign(p.attributes, overrides || {});
+  A.setAll(p, 60);
+  for (const key in (overrides || {})) A.setGroup(p, key, overrides[key]);
   p.fitness = 90; p.sharpness = 85;
   return p;
 }
@@ -1126,7 +1135,7 @@ test("ציון המשחק ממורכז על הרמה של השחקן עצמו", 
   for (const position of ["ST", "CM", "CB", "LW", "GK"]) {
     for (const level of [45, 85]) {
       const p = A.generatePlayer(rng, null, position, { age: 24, quality: level });
-      for (const attr of A.D.ATTRIBUTES) p.attributes[attr] = level;
+      A.setAll(p, level);
       p.fitness = 88; p.sharpness = 80;
       let sum = 0;
       for (let i = 0; i < 120; i++)
@@ -1232,7 +1241,7 @@ test("הסקאוטינג מגיע גם מחוץ לישראל", () => {
 
 test("קבוצה קטנה לא רודפת אחרי כוכב", () => {
   const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 26, 4);
-  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 88;
+  A.setAll(g.me, 88);
   const pool = A.candidateClubs(g);
   assert(pool.length, "אין בכלל יעדים");
   for (const club of pool)
@@ -1264,15 +1273,16 @@ test("המסלול אומר מה חסר", () => {
   assert(A.nextTarget(g) === null, "יש יעד בלי מסלול");
   A.setPlan(g, "poacher");
   const target = A.nextTarget(g);
-  assert(target && target.includes("🎯"), "אין יעד אחרי בחירת מסלול");
-  assert(A.D.ATTRIBUTES.includes(A.recommendedFocus(g)), "המלצת אימון לא תקינה");
+  assert(target && target.includes("🎯") && target.includes("חלוץ בור"),
+    "אין יעד אחרי בחירת מסלול");
+  assert(A.recommendedFocus(g) in A.D.DETAIL_NAMES_HE, "המלצת אימון לא תקינה");
 });
 
 test("אבני דרך משלמות, ומסלול מלא נותן פריצה", () => {
   const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 3);
   A.setPlan(g, "poacher");
   g.me.ceiling = 99; g.me.potential = 60;
-  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 90;
+  A.setAll(g.me, 99);
   const before = g.me.potential;
   const lines = A.claimMilestones(g);
   assert(lines.length >= 5, `רק ${lines.length} שורות`);
@@ -1287,7 +1297,7 @@ test("החלפת מסלול מאפסת את ההתקדמות", () => {
   const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 3);
   A.setPlan(g, "poacher");
   g.flags.plan_done = [0, 1];
-  A.setPlan(g, "target_man");
+  A.setPlan(g, "tf");
   assert(g.flags.plan_done.length === 0, "ההתקדמות לא אופסה");
 });
 
@@ -1295,7 +1305,7 @@ test("אבן דרך לא דוחפת פוטנציאל מעל התקרה", () => {
   const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 3);
   A.setPlan(g, "poacher");
   g.me.ceiling = 70; g.me.potential = 69;
-  for (const attr of A.D.ATTRIBUTES) g.me.attributes[attr] = 92;
+  A.setAll(g.me, 99);
   A.claimMilestones(g);
   assert(g.me.potential <= g.me.ceiling, "הפוטנציאל עבר את התקרה");
 });
@@ -1412,6 +1422,198 @@ test("מס משאיר פחות מהברוטו, ובמדרגות", () => {
   assert(A.netIncome(0) === 0, "מס על אפס");
   assert(A.netIncome(2000) < 2000 && A.netIncome(2000) > 0, "נטו לא הגיוני");
   assert(A.netIncome(2000) / 2000 > A.netIncome(200000) / 200000, "המדרגות לא פרוגרסיביות");
+});
+
+
+// ---------------------------------------------------------------------------
+// המבנה של המקור: תכונות מפורטות, תפקידים, טקטיקה, אישיות וידע
+// ---------------------------------------------------------------------------
+
+test("התכונות המפורטות הן מקור האמת", () => {
+  assert(Object.keys(A.D.DETAIL_NAMES_HE).length >= 45, "פחות מ-45 תכונות");
+  assert(A.D.TECHNICAL.length === 14 && A.D.MENTAL.length === 14, "קבוצות טכני/מנטלי");
+  assert(A.D.PHYSICAL.length === 8 && A.D.GOALKEEPING.length === 11, "פיזי/שוערים");
+  const rng = new A.Rng(2);
+  const p = A.generatePlayer(rng, null, "ST", { age: 24, quality: 70 });
+  assert(Object.keys(p.detail).length >= 45, "לשחקן אין תכונות מפורטות");
+  for (const v of Object.values(p.detail)) assert(v >= 1 && v <= 20, `ערך ${v}`);
+  // הקבוצות נגזרות — כתיבה ישירה אליהן נמחקת בחישוב הבא
+  p.attributes.shooting = 5;
+  A.recomputeGroups(p);
+  assert(p.attributes.shooting > 5, "הקבוצה לא חושבה מחדש");
+});
+
+test("כתיבה לקבוצה נוחתת על התכונות שמתחתיה", () => {
+  const rng = new A.Rng(2);
+  const p = A.generatePlayer(rng, null, "ST", { age: 24, quality: 70 });
+  const before = Object.assign({}, p.detail);
+  const gains = A.addGroup(p, "shooting", 12);
+  assert(Object.keys(gains).length, "כתיבה לקבוצה לא הזיזה שום תכונה");
+  for (const key in gains) assert(key in A.D.GROUP_MAP.shooting, `${key} מחוץ לקבוצה`);
+  assert(p.detail.finishing > before.finishing, "סיום לא עלה");
+});
+
+test("אירועי העלילה עדיין מדברים בשפה הישנה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 4);
+  const before = g.me.detail.finishing;
+  A.applyStoryEffects(g, { attr: ["shooting", 9] });
+  assert(g.me.detail.finishing > before, "אפקט קבוצה לא הגיע לתכונה");
+  const calm = g.me.detail.composure;
+  A.applyStoryEffects(g, { attr: ["composure", 9] });
+  assert(g.me.detail.composure > calm, "אפקט מפורט לא עבד");
+});
+
+test("לכל עמדה יש תפקידים אמיתיים", () => {
+  assert(A.D.ROLES.length >= 40, `רק ${A.D.ROLES.length} תפקידים`);
+  for (const position of A.D.POSITIONS) {
+    const options = A.rolesFor(position);
+    assert(options.length >= 2, position);
+    for (const row of options) {
+      assert(row[3].length, row[0]);
+      assert(row[4].length >= 4, row[0]);
+    }
+  }
+});
+
+test("התאמה לתפקיד מפרידה בין שני שחקנים באותו דירוג", () => {
+  const rng = new A.Rng(5);
+  const poacher = A.generatePlayer(rng, null, "ST", { age: 26, quality: 75 });
+  const target = A.generatePlayer(rng, null, "ST", { age: 26, quality: 75 });
+  for (const attr of ["finishing", "off_the_ball", "anticipation", "composure"]) {
+    poacher.detail[attr] = 18; target.detail[attr] = 9;
+  }
+  for (const attr of ["heading", "jumping_reach", "strength", "bravery"]) {
+    target.detail[attr] = 18; poacher.detail[attr] = 9;
+  }
+  A.recomputeGroups(poacher); A.recomputeGroups(target);
+  assert(A.roleSuitability(poacher, "poacher") > A.roleSuitability(target, "poacher"),
+    "חלוץ בור לא בולט בתפקיד שלו");
+  assert(A.roleSuitability(target, "tf") > A.roleSuitability(poacher, "tf"),
+    "חלוץ מטרה לא בולט בתפקיד שלו");
+  assert(A.bestRole(poacher)[0] !== A.bestRole(target)[0], "אותו תפקיד לשניהם");
+});
+
+test("המאמן מחלק תפקיד ויכול לסרב לשנות אותו", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 22, 7);
+  assert(g.me.role, "לא חולק תפקיד");
+  assert(g.me.duty in A.D.DUTY_NAMES_HE, "חובה לא מוכרת");
+  assert(A.roleRow(g.me.role)[2].includes(g.me.position), "תפקיד לא מתאים לעמדה");
+  const answers = new Set();
+  for (let i = 0; i < 40; i++) {
+    g.myClub().managerTrust = 50;
+    answers.add(A.requestRole(g, g.me.role !== "tf" ? "tf" : "poacher")[0]);
+  }
+  assert(answers.has("✅") && answers.has("⛔"), "המאמן תמיד עונה אותו דבר");
+});
+
+test("הטקטיקה משנה איך נראות תשעים דקות", () => {
+  const rng = new A.Rng(4);
+  const p = A.generatePlayer(rng, null, "CM", { age: 25, quality: 72 });
+  p.role = "b2b"; p.duty = "support"; p.fitness = 90; p.sharpness = 85;
+  const club = { cid: "x", name: "X", nickname: "x", leagueId: "top",
+                 reputation: 60, managerName: "", boardConfidence: 60 };
+
+  function sample(styleKey, n = 250) {
+    const values = A.D.TACTICAL_STYLES.find(r => r[0] === styleKey)[2];
+    const mods = A.modifiersFrom(values, p);
+    const totals = {};
+    for (let i = 0; i < n; i++) {
+      const stats = A.matchStatLine(p, 90, 0, 0, rng, 0.5, null, mods);
+      for (const key in stats)
+        if (typeof stats[key] === "number") totals[key] = (totals[key] || 0) + stats[key];
+    }
+    for (const key in totals) totals[key] /= n;
+    return totals;
+  }
+
+  const tiki = sample("tiki_taka");
+  const counter = sample("counter");
+  const press = sample("gegenpress");
+  const block = sample("catenaccio");
+  assert(tiki.passes > counter.passes * 1.5, "משחק קצר לא נותן יותר נגיעות");
+  assert(tiki.pass_pct > counter.pass_pct + 8, "אחוז המסירה לא הגיב");
+  assert(press.distance > block.distance + 2, "גגנפרסינג לא עולה בריצה");
+  assert(press.sprints > block.sprints * 1.4, "הספרינטים לא הגיבו ללחיצה");
+});
+
+test("אישיות נסתרת, ומשנה", () => {
+  const rng = new A.Rng(3);
+  const p = A.generatePlayer(rng, null, "CM", { age: 24, quality: 65 });
+  assert(Object.keys(p.hidden).length === A.D.HIDDEN_ATTRS.length, "אין תכונות נסתרות");
+  for (const v of Object.values(p.hidden)) assert(v >= 1 && v <= 20, `ערך ${v}`);
+  const pro = A.generatePlayer(rng, null, "CM", { age: 24, quality: 65 });
+  Object.assign(pro.hidden, { professionalism: 19, ambition: 15 });
+  pro.detail.determination = 17;
+  const lazy = A.generatePlayer(rng, null, "CM", { age: 24, quality: 65 });
+  lazy.hidden.professionalism = 4;
+  lazy.detail.determination = 6;
+  assert(A.personalityKey(pro) !== A.personalityKey(lazy), "אותה אישיות לשניהם");
+  assert(A.personalityEffect(pro)[0] > A.personalityEffect(lazy)[0], "אין השפעה על התפתחות");
+});
+
+test("אתה לא רואה הכול על כולם", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 6);
+  assert(A.knowledgeLevel(g, g.me) === 3, "לא מכיר את עצמך");
+  const mate = g.players[g.myClub().squad.find(p => p !== g.meId)];
+  assert(A.knowledgeLevel(g, mate) === 3, "לא מכיר חבר לקבוצה");
+
+  const far = Object.values(g.players).find(p =>
+    p.clubId && g.clubs[p.clubId].leagueId === "national" && p.reputation < 55);
+  assert(A.knowledgeLevel(g, far) < 2, "מכיר יותר מדי שחקן רחוק");
+  const shown = A.shownDetail(g, far);
+  const first = A.attrsFor(far.position)[0];
+  assert(!shown[first].exact, "רואים מספר מדויק של שחקן שלא מכירים");
+
+  const before = A.knowledgeLevel(g, far);
+  g.myClub().balance = 5000000;
+  assert(A.scoutPlayer(g, far).includes("הצוות"), "הסריקה לא רצה");
+  assert(A.knowledgeLevel(g, far) > before, "הסריקה לא הוסיפה ידע");
+  const band = A.shownDetail(g, far)[first];
+  assert(band.high - band.low <= 2, "דוח מלא ועדיין טווח רחב");
+});
+
+test("דירוג בכוכבים הוא טווח ולא מספר", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 6);
+  const far = Object.values(g.players).find(p =>
+    p.clubId && g.clubs[p.clubId].leagueId === "euro");
+  const [low, high] = A.potentialStars(g, far);
+  assert(high > low, "פוטנציאל של זר מוצג כמספר מדויק");
+  const [mineLow, mineHigh] = A.potentialStars(g, g.me);
+  assert(mineLow === mineHigh, "הפוטנציאל שלך אמור להיות ידוע");
+  assert(A.starText(3.5).startsWith("★★★"), "טקסט הכוכבים");
+});
+
+test("אימון תכונה אחת מזיז אותה הכי הרבה", () => {
+  const world = A.generateWorld(4);
+  const club = world.clubs.hapoel_carmel;
+  const p = A.generatePlayer(new A.Rng(9), club, "ST", { age: 19, quality: 62 });
+  p.potential = 92; p.ceiling = 95; p.isHuman = true;
+  A.setAll(p, 45);
+  const before = Object.assign({}, p.detail);
+  for (let i = 0; i < 60; i++) {
+    p.fitness = 90;
+    A.weeklyTraining(p, "finishing", club, new A.Rng(5), 1.0);
+  }
+  const moved = {};
+  for (const attr of A.attrsFor("ST")) moved[attr] = p.detail[attr] - before[attr];
+  const best = Object.keys(moved).reduce((a, b) => moved[a] >= moved[b] ? a : b);
+  assert(best === "finishing", `אימון סיום הזיז דווקא את ${best}`);
+});
+
+test("תכונת מומחיות לא משתפרת בטעות", () => {
+  const world = A.generateWorld(4);
+  const club = world.clubs.hapoel_carmel;
+  const p = A.generatePlayer(new A.Rng(9), club, "ST", { age: 19, quality: 62 });
+  p.potential = 92; p.ceiling = 95; p.isHuman = true;
+  A.setAll(p, 45);
+  const before = Object.assign({}, p.detail);
+  for (let i = 0; i < 60; i++) {
+    p.fitness = 90;
+    A.weeklyTraining(p, "acceleration", club, new A.Rng(5), 1.0);
+  }
+  assert(p.detail.acceleration > before.acceleration, "האצה לא עלתה");
+  assert(p.detail.free_kick - before.free_kick <= 1, "בעיטות חופשיות עלו בטעות");
+  assert(p.detail.penalty_taking - before.penalty_taking <= 1, "פנדלים עלו בטעות");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

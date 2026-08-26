@@ -487,97 +487,6 @@ DIRECTIVE_REASON = {
              "שבוע קליל עכשיו מחזיר אותך שלם למשחק הבא."),
 }
 
-# ---------------------------------------------------------------------------
-# מסלולי פיתוח — איך הופכים ילד ליהלום
-# ---------------------------------------------------------------------------
-# ארכיטיפ = דגם שחקן אמיתי, עם ספי תכונות לפי גיל. זה מה שהיה חסר:
-# הכוונה מדויקת. במקום "תתאמן על משהו", המסלול אומר בדיוק מה צריך
-# להיות לך ומתי, ומה תקבל אם תגיע לשם.
-# (מפתח, שם, עמדות, [(תכונה, משקל)], [(גיל, {תכונה: סף})], תכונת אופי, תיאור)
-
-ARCHETYPES = [
-    ("poacher", "חלוץ בור", ["ST"],
-     [("shooting", 1.0), ("mental", 0.6), ("pace", 0.4)],
-     [(17, {"shooting": 62, "mental": 55}),
-      (19, {"shooting": 72, "mental": 63, "pace": 62}),
-      (21, {"shooting": 80, "mental": 70, "pace": 68}),
-      (24, {"shooting": 88, "mental": 78, "pace": 72})],
-     "clutch",
-     "עומד במקום הנכון ברגע הנכון. לא נוגע בכדור תשעים דקות, ומכריע."),
-
-    ("target_man", "חלוץ מטרה", ["ST"],
-     [("physical", 1.0), ("shooting", 0.7), ("mental", 0.5)],
-     [(17, {"physical": 64, "shooting": 56}),
-      (19, {"physical": 74, "shooting": 66, "passing": 55}),
-      (21, {"physical": 82, "shooting": 74, "passing": 62}),
-      (24, {"physical": 88, "shooting": 82, "mental": 74})],
-     "leader",
-     "מחזיק את הכדור עם הגב לשער עד שכל הקבוצה עולה. עליו נשען המערך."),
-
-    ("winger", "כנף מתפרצת", ["LW", "RW"],
-     [("pace", 1.0), ("dribbling", 0.9), ("shooting", 0.4)],
-     [(17, {"pace": 68, "dribbling": 62}),
-      (19, {"pace": 78, "dribbling": 72, "physical": 52}),
-      (21, {"pace": 86, "dribbling": 80, "shooting": 66}),
-      (24, {"pace": 90, "dribbling": 87, "shooting": 74})],
-     "clutch",
-     "אחד על אחד, כל פעם מחדש. הקהל קם כשהכדור מגיע אליך."),
-
-    ("playmaker", "מנצח משחק", ["AM", "CM"],
-     [("passing", 1.0), ("mental", 0.8), ("dribbling", 0.5)],
-     [(17, {"passing": 64, "mental": 60}),
-      (19, {"passing": 74, "mental": 70, "dribbling": 62}),
-      (21, {"passing": 83, "mental": 78, "dribbling": 70}),
-      (24, {"passing": 90, "mental": 85, "dribbling": 76})],
-     "leader",
-     "רואה את המסירה שלושה מהלכים לפני כולם. המשחק עובר דרכך."),
-
-    ("box_to_box", "קשר ריאות", ["CM", "DM"],
-     [("physical", 0.9), ("passing", 0.8), ("defending", 0.7)],
-     [(17, {"physical": 62, "passing": 60}),
-      (19, {"physical": 72, "passing": 70, "defending": 62}),
-      (21, {"physical": 80, "passing": 78, "defending": 70}),
-      (24, {"physical": 86, "passing": 84, "defending": 76})],
-     "workhorse",
-     "רץ שנים־עשר קילומטר וגם מוסר. הקבוצה מרגישה כשאתה לא שם."),
-
-    ("anchor", "עוגן", ["DM", "CB"],
-     [("defending", 1.0), ("mental", 0.7), ("physical", 0.7)],
-     [(17, {"defending": 64, "physical": 58}),
-      (19, {"defending": 74, "physical": 68, "mental": 62}),
-      (21, {"defending": 82, "physical": 76, "mental": 72}),
-      (24, {"defending": 89, "physical": 82, "mental": 80})],
-     "leader",
-     "לפני ההגנה, אחרי הקישור. השקט של הקבוצה."),
-
-    ("ball_cb", "בלם שמוציא", ["CB"],
-     [("defending", 1.0), ("passing", 0.7), ("mental", 0.6)],
-     [(17, {"defending": 64, "passing": 55}),
-      (19, {"defending": 74, "passing": 66, "mental": 62}),
-      (21, {"defending": 83, "passing": 74, "mental": 72}),
-      (24, {"defending": 90, "passing": 80, "mental": 80})],
-     "leader",
-     "לא רק הורס — פותח. המסירה הראשונה שלך היא ההתקפה."),
-
-    ("full_back", "מגן מודרני", ["LB", "RB"],
-     [("pace", 0.9), ("defending", 0.9), ("physical", 0.6)],
-     [(17, {"pace": 66, "defending": 60}),
-      (19, {"pace": 76, "defending": 70, "physical": 60}),
-      (21, {"pace": 84, "defending": 78, "passing": 68}),
-      (24, {"pace": 88, "defending": 85, "passing": 74})],
-     "workhorse",
-     "עולה ויורד תשעים דקות בקו. שני תפקידים בגוף אחד."),
-
-    ("sweeper_gk", "שוער־מנקה", ["GK"],
-     [("defending", 1.0), ("mental", 0.8), ("passing", 0.6)],
-     [(17, {"defending": 62, "mental": 58}),
-      (19, {"defending": 72, "mental": 68, "passing": 58}),
-      (21, {"defending": 82, "mental": 76, "passing": 66}),
-      (24, {"defending": 89, "mental": 84, "passing": 72})],
-     "leader",
-     "יוצא מהרחבה, מוסר ראשונה, ומציל כשצריך."),
-]
-
 # מה מקבלים על כל אבן דרך שנעברת בזמן
 MILESTONE_REWARD = {"potential": 2.2, "rep": 1.6, "morale": 8, "trust": 5}
 
@@ -634,3 +543,517 @@ BONUS_CLAUSES = [
     ("caps", "בונוס על משחקי נבחרת", "caps", 0.055),
     ("rating", "בונוס על ציון עונה מעל 7.0", "rating", 0.240),
 ]
+
+# ---------------------------------------------------------------------------
+# תכונות מפורטות — המבנה של המשחק המקורי
+# ---------------------------------------------------------------------------
+# שבע התכונות שהיו כאן קודם הן קיבוץ גס. במקור יש ארבע קבוצות ועשרות
+# תכונות, כל אחת בסולם 1-20, וזה מה שהופך שחקן לשחקן ולא למספר אחד.
+# מכאן ואילך: התכונות המפורטות הן האמת, ושבע הקבוצות נגזרות מהן.
+
+TECHNICAL = [
+    ("corners", "קרנות"),
+    ("crossing", "הרמות"),
+    ("dribbling", "כדרור"),
+    ("finishing", "סיום"),
+    ("first_touch", "נגיעה ראשונה"),
+    ("free_kick", "בעיטות חופשיות"),
+    ("heading", "נגיחות"),
+    ("long_shots", "בעיטות מרחוק"),
+    ("long_throws", "זריקות ארוכות"),
+    ("marking", "צמידות"),
+    ("passing", "מסירה"),
+    ("penalty_taking", "פנדלים"),
+    ("tackling", "חטיפה"),
+    ("technique", "טכניקה"),
+]
+
+MENTAL = [
+    ("aggression", "אגרסיביות"),
+    ("anticipation", "חיזוי"),
+    ("bravery", "אומץ"),
+    ("composure", "קור רוח"),
+    ("concentration", "ריכוז"),
+    ("decisions", "קבלת החלטות"),
+    ("determination", "נחישות"),
+    ("flair", "ברק"),
+    ("leadership", "מנהיגות"),
+    ("off_the_ball", "תנועה בלי כדור"),
+    ("positioning", "מיקום"),
+    ("teamwork", "עבודת צוות"),
+    ("vision", "ראיית משחק"),
+    ("work_rate", "קצב עבודה"),
+]
+
+PHYSICAL = [
+    ("acceleration", "האצה"),
+    ("agility", "זריזות"),
+    ("balance", "שיווי משקל"),
+    ("jumping_reach", "קפיצה"),
+    ("natural_fitness", "כושר טבעי"),
+    ("pace", "מהירות"),
+    ("stamina", "סיבולת"),
+    ("strength", "כוח"),
+]
+
+GOALKEEPING = [
+    ("aerial_reach", "הגעה באוויר"),
+    ("command_of_area", "שליטה ברחבה"),
+    ("communication", "תקשורת"),
+    ("eccentricity", "אקסצנטריות"),
+    ("handling", "אחיזה"),
+    ("kicking", "בעיטה"),
+    ("one_on_ones", "אחד על אחד"),
+    ("reflexes", "רפלקסים"),
+    ("rushing_out", "יציאה מהשער"),
+    ("tendency_to_punch", "נטייה לאגרוף"),
+    ("throwing", "זריקה"),
+]
+
+ATTR_GROUPS = [
+    ("technical", "טכניות", TECHNICAL),
+    ("mental", "מנטליות", MENTAL),
+    ("physical", "פיזיות", PHYSICAL),
+    ("goalkeeping", "שוערים", GOALKEEPING),
+]
+
+DETAIL_NAMES_HE = {}
+DETAIL_GROUP = {}
+for _key, _label, _rows in ATTR_GROUPS:
+    for _attr, _he in _rows:
+        DETAIL_NAMES_HE[_attr] = _he
+        DETAIL_GROUP[_attr] = _key
+
+OUTFIELD_ATTRS = [a for a, _ in TECHNICAL] + [a for a, _ in MENTAL] + [a for a, _ in PHYSICAL]
+KEEPER_ATTRS = [a for a, _ in GOALKEEPING] + [a for a, _ in MENTAL] + [a for a, _ in PHYSICAL] + [
+    "first_touch", "passing", "technique"]
+
+# תכונות שאין להן משמעות אמיתית לשחקן שדה או לשוער — לא מוצגות ולא מתאמנות
+def attrs_for(position: str):
+    return KEEPER_ATTRS if position == "GK" else OUTFIELD_ATTRS
+
+
+# ---------------------------------------------------------------------------
+# הגזירה: שבע הקבוצות מתוך התכונות המפורטות
+# ---------------------------------------------------------------------------
+# כל קבוצה היא ממוצע משוקלל של התכונות שבאמת מרכיבות אותה. ככה אימון
+# על "סיום" מזיז את קבוצת הבעיטה, ומנוע המשחקים הקיים ממשיך לעבוד
+# בדיוק כמו קודם — רק שמתחתיו יש עכשיו עולם שלם.
+
+GROUP_MAP = {
+    "pace": {"acceleration": 1.0, "pace": 1.0, "agility": 0.45, "balance": 0.30},
+    "shooting": {"finishing": 1.0, "long_shots": 0.55, "technique": 0.45,
+                 "composure": 0.45, "heading": 0.30},
+    "passing": {"passing": 1.0, "vision": 0.70, "technique": 0.45,
+                "first_touch": 0.40, "crossing": 0.30},
+    "dribbling": {"dribbling": 1.0, "first_touch": 0.50, "agility": 0.45,
+                  "flair": 0.40, "balance": 0.30, "technique": 0.35},
+    "defending": {"tackling": 1.0, "marking": 0.95, "positioning": 0.70,
+                  "anticipation": 0.45, "concentration": 0.35, "aggression": 0.20},
+    "physical": {"strength": 1.0, "stamina": 0.80, "jumping_reach": 0.55,
+                 "natural_fitness": 0.45, "work_rate": 0.55, "bravery": 0.30},
+    "mental": {"decisions": 1.0, "anticipation": 0.70, "off_the_ball": 0.60,
+               "teamwork": 0.55, "concentration": 0.55, "composure": 0.50,
+               "vision": 0.45, "determination": 0.40, "positioning": 0.35},
+}
+
+GROUP_MAP_GK = {
+    "pace": {"acceleration": 1.0, "agility": 0.80, "pace": 0.55},
+    "shooting": {"kicking": 1.0, "technique": 0.45, "throwing": 0.35},
+    "passing": {"kicking": 1.0, "passing": 0.70, "vision": 0.55, "throwing": 0.45},
+    "dribbling": {"first_touch": 1.0, "technique": 0.65, "rushing_out": 0.45,
+                  "composure": 0.40},
+    "defending": {"reflexes": 1.0, "handling": 0.95, "one_on_ones": 0.75,
+                  "positioning": 0.70, "command_of_area": 0.60, "aerial_reach": 0.55},
+    "physical": {"strength": 1.0, "jumping_reach": 0.85, "natural_fitness": 0.55,
+                 "agility": 0.55, "stamina": 0.30},
+    "mental": {"decisions": 1.0, "concentration": 0.85, "communication": 0.65,
+               "anticipation": 0.60, "composure": 0.55},
+}
+
+# ---------------------------------------------------------------------------
+# תכונות נסתרות ואישיות
+# ---------------------------------------------------------------------------
+# האישיות במקור אינה שדה — היא נגזרת מתכונות שאתה לא רואה. שחקן עם
+# מקצוענות 18 ונחישות 17 יתפתח אחרת מזה שיש לו 6, ואף מספר במסך לא
+# יסביר לך למה.
+
+HIDDEN_ATTRS = [
+    ("ambition", "שאפתנות"),
+    ("loyalty", "נאמנות"),
+    ("pressure", "עמידות בלחץ"),
+    ("professionalism", "מקצוענות"),
+    ("sportsmanship", "רוח ספורטיבית"),
+    ("temperament", "מזג"),
+    ("controversy", "נטייה לסערות"),
+]
+
+# (שם, תיאור, תנאים) — נבדק לפי הסדר, הראשון שמתאים זוכה
+PERSONALITIES = [
+    ("model_citizen", "אזרח מופת",
+     "מקצוען עד הסוף, בלי רעש, ומרים את כל מי שסביבו.",
+     {"professionalism": 18, "determination": 15, "sportsmanship": 15, "temperament": 15}),
+    ("model_professional", "מקצוען מודל",
+     "ראשון באימון, אחרון בחדר הכושר. מתפתח מהר יותר מכולם.",
+     {"professionalism": 18, "determination": 15, "ambition": 12}),
+    ("perfectionist", "פרפקציוניסט",
+     "לא מרוצה גם אחרי שער. זה מה שדוחף אותו, וזה גם מה ששוחק אותו.",
+     {"professionalism": 17, "determination": 18, "ambition": 17}),
+    ("resolute", "נחוש",
+     "לא נשבר. משחקים גדולים הם המקום שלו.",
+     {"determination": 18, "pressure": 15}),
+    ("driven", "מונע מבפנים",
+     "רוצה להגיע רחוק, ומוכן לשלם על זה.",
+     {"ambition": 17, "determination": 14, "professionalism": 12}),
+    ("professional", "מקצוען",
+     "עושה את העבודה, בלי דרמות.",
+     {"professionalism": 15, "determination": 12}),
+    ("fairly_professional", "מקצוען למדי",
+     "לרוב עושה את הדבר הנכון.",
+     {"professionalism": 12, "determination": 10}),
+    ("loyal", "נאמן",
+     "המועדון שגידל אותו הוא הבית, וקשה לו לעזוב.",
+     {"loyalty": 17, "professionalism": 10}),
+    ("temperamental", "מזגזג",
+     "יום אחד הוא מכריע, יום אחר הוא לא שם.",
+     {"temperament": -7}),
+    ("casual", "מזלזל",
+     "כישרון יש. את השעה הנוספת באימון אין.",
+     {"professionalism": -7}),
+    ("unambitious", "חסר שאיפה",
+     "מרוצה ממה שיש. זה לא בהכרח רע — זה פשוט לא ייקח אותו רחוק.",
+     {"ambition": -6}),
+    ("balanced", "מאוזן",
+     "בלי קצוות. עובד, משחק, הולך הביתה.",
+     {}),
+]
+
+# ערך שלילי בתנאי פירושו "לכל היותר": {"temperament": -7} = מזג 7 ומטה
+
+PERSONALITY_EFFECT = {
+    # (מכפיל התפתחות, תנודתיות מורל, השפעה על אמון המאמן)
+    "model_citizen": (1.30, 0.70, 1.25),
+    "model_professional": (1.28, 0.72, 1.20),
+    "perfectionist": (1.26, 1.15, 1.05),
+    "resolute": (1.18, 0.80, 1.10),
+    "driven": (1.16, 0.95, 1.05),
+    "professional": (1.10, 0.90, 1.10),
+    "fairly_professional": (1.02, 1.00, 1.00),
+    "loyal": (1.00, 0.90, 1.15),
+    "balanced": (0.96, 1.00, 1.00),
+    "temperamental": (0.82, 1.45, 0.80),
+    "casual": (0.80, 1.10, 0.85),
+    "unambitious": (0.88, 0.95, 1.00),
+}
+
+# ---------------------------------------------------------------------------
+# תפקידים וחובות
+# ---------------------------------------------------------------------------
+# עמדה היא לא תפקיד. "חלוץ" אומר איפה אתה עומד; "חלוץ בור" אומר מה
+# העבודה שלך, אילו תכונות באמת נמדדות אצלך, ומה המאמן יצפה לראות.
+# (מפתח, שם, עמדות, חובות, תכונות מפתח, תכונות משניות, תיאור)
+
+ROLES = [
+    # --- שוער ---
+    ("gk", "שוער", ["GK"], ["defend"],
+     ["reflexes", "handling", "one_on_ones", "positioning", "concentration"],
+     ["aerial_reach", "command_of_area", "communication", "decisions"],
+     "נשאר על הקו, שומר על הרחבה, ולא מחפש הרפתקאות."),
+    ("sweeper_keeper", "שוער־מנקה", ["GK"], ["defend", "support", "attack"],
+     ["rushing_out", "one_on_ones", "first_touch", "passing", "decisions"],
+     ["reflexes", "handling", "composure", "anticipation", "acceleration"],
+     "יוצא מהרחבה, מוסר ראשונה, ומשחק כמו שחקן אחד־עשר."),
+
+    # --- בלמים ---
+    ("cd_defend", "בלם", ["CB"], ["defend", "stopper", "cover"],
+     ["marking", "tackling", "positioning", "heading", "jumping_reach"],
+     ["strength", "concentration", "bravery", "anticipation"],
+     "לא נותן לכדור לעבור. פשוט, ובלי סיבוכים."),
+    ("bpd", "בלם שמוציא", ["CB"], ["defend", "stopper", "cover"],
+     ["passing", "vision", "first_touch", "composure", "technique"],
+     ["marking", "tackling", "positioning", "decisions"],
+     "לא רק הורס — פותח. המסירה הראשונה שלו היא ההתקפה."),
+    ("ncb", "בלם בלי שטויות", ["CB"], ["defend", "stopper", "cover"],
+     ["heading", "jumping_reach", "strength", "bravery", "marking"],
+     ["tackling", "aggression", "positioning"],
+     "כדור באוויר, כדור לצד השני. אין בעיות."),
+    ("libero", "ליברו", ["CB"], ["defend", "support"],
+     ["passing", "vision", "technique", "decisions", "off_the_ball"],
+     ["marking", "tackling", "first_touch", "composure", "stamina"],
+     "יוצא מהקו האחורי עם הכדור ומייצר עודף במרכז."),
+
+    # --- מגנים ---
+    ("fb", "מגן", ["LB", "RB"], ["defend", "support", "automatic"],
+     ["marking", "tackling", "positioning", "anticipation", "concentration"],
+     ["crossing", "stamina", "teamwork", "work_rate"],
+     "מגן קודם כול. עולה רק כשבטוח."),
+    ("wb", "מגן מתקדם", ["LB", "RB"], ["defend", "support", "attack", "automatic"],
+     ["crossing", "dribbling", "stamina", "work_rate", "acceleration"],
+     ["marking", "tackling", "teamwork", "off_the_ball"],
+     "עולה ויורד תשעים דקות בקו. שני תפקידים בגוף אחד."),
+    ("cwb", "מגן מתקדם מלא", ["LB", "RB"], ["support", "attack"],
+     ["crossing", "dribbling", "flair", "stamina", "acceleration", "technique"],
+     ["off_the_ball", "work_rate", "agility", "passing"],
+     "כמעט כנף. הקו כולו שלו, וההגנה תסתדר."),
+    ("iwb", "מגן מתהפך", ["LB", "RB"], ["defend", "support", "attack"],
+     ["passing", "vision", "first_touch", "decisions", "positioning"],
+     ["tackling", "marking", "composure", "teamwork"],
+     "נכנס פנימה לקו הקישור ומייצר עודף במרכז, לא בקו."),
+    ("nfb", "מגן בלי שטויות", ["LB", "RB"], ["defend"],
+     ["marking", "tackling", "positioning", "strength", "bravery"],
+     ["concentration", "anticipation", "aggression"],
+     "לא מרים ראש. מרחיק, וממשיך לעבוד."),
+
+    # --- קשרים הגנתיים ---
+    ("dm", "קשר הגנתי", ["DM"], ["defend", "support"],
+     ["positioning", "tackling", "anticipation", "concentration", "teamwork"],
+     ["marking", "strength", "decisions", "passing"],
+     "לפני ההגנה, אחרי הקישור. השקט של הקבוצה."),
+    ("anchor", "עוגן", ["DM"], ["defend"],
+     ["positioning", "marking", "tackling", "concentration", "decisions"],
+     ["anticipation", "strength", "teamwork"],
+     "לא זז מהמקום. סותם את החור שבין הקווים."),
+    ("half_back", "מגן־קשר", ["DM"], ["defend"],
+     ["positioning", "marking", "tackling", "anticipation", "teamwork"],
+     ["passing", "first_touch", "composure", "stamina"],
+     "יורד בין הבלמים בבנייה, ועולה בהגנה. שלושה נגד שניים, תמיד."),
+    ("bwm", "קשר חוטף", ["DM", "CM"], ["defend", "support"],
+     ["tackling", "aggression", "work_rate", "stamina", "bravery"],
+     ["anticipation", "positioning", "teamwork", "determination"],
+     "רודף את הכדור עד שהוא מקבל אותו. או עד שהשופט שורק."),
+    ("dlp", "קשר בונה עמוק", ["DM", "CM"], ["defend", "support"],
+     ["passing", "vision", "technique", "composure", "decisions"],
+     ["first_touch", "teamwork", "anticipation", "positioning"],
+     "המשחק עובר דרכו. רואה את המסירה שלושה מהלכים לפני כולם."),
+    ("regista", "רג'יסטה", ["DM"], ["support"],
+     ["vision", "passing", "flair", "technique", "composure", "decisions"],
+     ["first_touch", "off_the_ball", "dribbling", "anticipation"],
+     "בונה עמוק אבל בלי רסן — מחפש את המסירה שתשבור את הכל."),
+    ("volante", "סגונדו וולנטה", ["DM"], ["support", "attack"],
+     ["stamina", "work_rate", "long_shots", "off_the_ball", "tackling"],
+     ["passing", "positioning", "strength", "acceleration"],
+     "מתחיל אחורה ומסיים ברחבה. ריאות של שניים."),
+
+    # --- קשרים מרכזיים ---
+    ("cm", "קשר מרכזי", ["CM"], ["defend", "support", "attack", "automatic"],
+     ["passing", "teamwork", "decisions", "work_rate", "positioning"],
+     ["first_touch", "tackling", "stamina", "composure"],
+     "הדבק. עושה את מה שהמשחק צריך באותו רגע."),
+    ("b2b", "קשר ריאות", ["CM"], ["support"],
+     ["stamina", "work_rate", "teamwork", "off_the_ball", "passing"],
+     ["tackling", "long_shots", "strength", "determination"],
+     "רץ שנים־עשר קילומטר וגם מוסר. מרגישים כשהוא לא שם."),
+    ("mezzala", "מצאלה", ["CM"], ["support", "attack"],
+     ["dribbling", "passing", "off_the_ball", "flair", "vision"],
+     ["technique", "acceleration", "long_shots", "work_rate"],
+     "נפתח לחצי־חלל בין המגן לבלם, ומשם שובר."),
+    ("carrilero", "קארילרו", ["CM"], ["support"],
+     ["teamwork", "work_rate", "positioning", "stamina", "passing"],
+     ["tackling", "decisions", "anticipation"],
+     "מכסה את הרצועה שבין המרכז לקו. עבודה שאף אחד לא מריע לה."),
+    ("rpm", "בונה נודד", ["CM"], ["support"],
+     ["passing", "vision", "technique", "off_the_ball", "stamina"],
+     ["dribbling", "first_touch", "work_rate", "composure"],
+     "אין לו עמדה. הוא הולך לאן שהכדור, והכדור הולך אליו."),
+    ("ap", "בונה מתקדם", ["CM", "AM"], ["support", "attack"],
+     ["passing", "vision", "technique", "flair", "first_touch"],
+     ["dribbling", "composure", "off_the_ball", "decisions"],
+     "עובד גבוה, בין הקווים, ומחפש את הכדור האחרון."),
+
+    # --- קשרים התקפיים ---
+    ("am", "קשר התקפי", ["AM"], ["support", "attack"],
+     ["passing", "off_the_ball", "technique", "vision", "long_shots"],
+     ["first_touch", "dribbling", "composure", "flair"],
+     "בין הקישור להתקפה, במקום שקשה לשמור עליו."),
+    ("enganche", "אנגנצ'ה",  ["AM"], ["support"],
+     ["vision", "passing", "technique", "composure", "flair"],
+     ["first_touch", "decisions", "anticipation"],
+     "העשר הקלאסי. לא רץ אחורה, ולא צריך — הכדור מגיע אליו."),
+    ("shadow", "חלוץ צל", ["AM"], ["attack"],
+     ["off_the_ball", "finishing", "acceleration", "anticipation", "composure"],
+     ["dribbling", "first_touch", "long_shots", "work_rate"],
+     "נכנס מאחורי החלוץ בדיוק כשההגנה מסתכלת עליו."),
+    ("trequartista", "טרקוורטיסטה", ["AM", "ST"], ["attack"],
+     ["flair", "vision", "technique", "dribbling", "off_the_ball"],
+     ["passing", "finishing", "first_touch", "composure"],
+     "משוחרר מכל חובה הגנתית. או שהוא מכריע, או שהוא נעלם."),
+
+    # --- כנפיים ---
+    ("winger", "כנף", ["LW", "RW"], ["support", "attack"],
+     ["crossing", "dribbling", "acceleration", "pace", "technique"],
+     ["agility", "flair", "off_the_ball", "balance"],
+     "אחד על אחד, ואז הרמה. הקהל קם כשהכדור מגיע אליו."),
+    ("if", "חלוץ פנימי", ["LW", "RW"], ["support", "attack"],
+     ["dribbling", "finishing", "off_the_ball", "acceleration", "first_touch"],
+     ["long_shots", "agility", "flair", "composure"],
+     "חותך פנימה מהקו על הרגל החזקה ומחפש שער."),
+    ("iw", "כנף מתהפכת", ["LW", "RW"], ["support", "attack"],
+     ["passing", "crossing", "dribbling", "vision", "technique"],
+     ["off_the_ball", "agility", "first_touch", "decisions"],
+     "חותך פנימה, אבל כדי לבשל — לא כדי לבעוט."),
+    ("wp", "בונה מהקו", ["LW", "RW"], ["support", "attack"],
+     ["passing", "vision", "technique", "crossing", "first_touch"],
+     ["dribbling", "composure", "decisions", "flair"],
+     "מקבל את הכדור בקו ומנהל ממנו את ההתקפה."),
+    ("raumdeuter", "ראומדויטר", ["LW", "RW"], ["attack"],
+     ["off_the_ball", "anticipation", "finishing", "concentration", "composure"],
+     ["decisions", "acceleration", "first_touch", "teamwork"],
+     "לא מכדרר ולא מרים. פשוט נמצא במקום שאף אחד לא שמר עליו."),
+    ("wtf", "כנף מטרה", ["LW", "RW"], ["support", "attack"],
+     ["heading", "jumping_reach", "strength", "bravery", "first_touch"],
+     ["crossing", "teamwork", "off_the_ball"],
+     "מחזיק את הכדור בקו ומושך אליו את המגן."),
+    ("dw", "כנף הגנתית", ["LW", "RW"], ["defend", "support"],
+     ["work_rate", "stamina", "teamwork", "tackling", "positioning"],
+     ["crossing", "dribbling", "anticipation", "marking"],
+     "רץ אחורה עם המגן שלהם. לא זוהר, אבל בלעדיו הקו נשבר."),
+
+    # --- חלוצים ---
+    ("af", "חלוץ מתקדם", ["ST"], ["attack"],
+     ["finishing", "off_the_ball", "acceleration", "composure", "dribbling"],
+     ["first_touch", "anticipation", "pace", "technique"],
+     "רץ לעומק בכל הזדמנות, ומחפש את הכדור מאחורי ההגנה."),
+    ("poacher", "חלוץ בור", ["ST"], ["attack"],
+     ["finishing", "off_the_ball", "anticipation", "composure", "concentration"],
+     ["first_touch", "acceleration", "heading", "decisions"],
+     "לא נוגע בכדור תשעים דקות, ומכריע ברגע הנכון."),
+    ("tf", "חלוץ מטרה", ["ST"], ["support", "attack"],
+     ["heading", "jumping_reach", "strength", "bravery", "first_touch"],
+     ["finishing", "teamwork", "balance", "composure"],
+     "מחזיק עם הגב לשער עד שכל הקבוצה עולה."),
+    ("cf", "חלוץ מושלם", ["ST"], ["support", "attack"],
+     ["finishing", "dribbling", "passing", "first_touch", "technique", "off_the_ball"],
+     ["composure", "vision", "strength", "acceleration", "flair"],
+     "כובש, מבשל, מחזיק, פותח. עושה הכול, וטוב בהכול."),
+    ("dlf", "חלוץ נסוג", ["ST"], ["support", "attack"],
+     ["first_touch", "passing", "technique", "composure", "vision"],
+     ["finishing", "off_the_ball", "strength", "teamwork"],
+     "יורד לקבל בין הקווים ומושך את הבלם אחריו."),
+    ("pf", "חלוץ לוחץ", ["ST"], ["defend", "support", "attack"],
+     ["work_rate", "stamina", "aggression", "bravery", "teamwork"],
+     ["finishing", "off_the_ball", "anticipation", "acceleration"],
+     "הלחיצה מתחילה ממנו. ההגנה שלהם לא נחה רגע."),
+    ("f9", "תשע מדומה", ["ST"], ["support"],
+     ["passing", "vision", "first_touch", "technique", "off_the_ball", "flair"],
+     ["dribbling", "finishing", "composure", "decisions"],
+     "יורד לקישור ומשאיר את הרחבה ריקה — למישהו אחר."),
+]
+
+DUTY_NAMES_HE = {
+    "defend": "הגנה", "support": "תמיכה", "attack": "התקפה",
+    "stopper": "בולם", "cover": "מכסה", "automatic": "אוטומטי",
+}
+
+ROLE_BY_KEY = {row[0]: row for row in ROLES}
+
+
+def roles_for(position: str):
+    """התפקידים שאפשר למלא בעמדה נתונה."""
+    return [row for row in ROLES if position in row[2]]
+
+
+# כמה כל חובה מזיזה את אופי התפקיד: (נטייה הגנתית, נטייה התקפית, ריצה)
+DUTY_SHIFT = {
+    "defend": (0.28, -0.22, -0.05),
+    "cover": (0.30, -0.24, -0.02),
+    "stopper": (0.24, -0.16, 0.06),
+    "support": (0.0, 0.0, 0.08),
+    "automatic": (0.05, 0.05, 0.04),
+    "attack": (-0.22, 0.30, 0.05),
+}
+
+# ---------------------------------------------------------------------------
+# הוראות קבוצתיות
+# ---------------------------------------------------------------------------
+# עד עכשיו הטקטיקה הייתה משהו שקרה מעליך. במקור היא מה שקובע מה אתה
+# עושה תשעים דקות: כמה תיגע בכדור, כמה תרוץ, כמה תאבד. המאמן בוחר,
+# ואתה מרגיש. (מפתח, שם, ערך -2..2)
+
+TEAM_INSTRUCTIONS = {
+    "mentality": ("מנטליות", [
+        ("very_defensive", "הגנתית מאוד", -2), ("defensive", "הגנתית", -1),
+        ("balanced", "מאוזנת", 0),
+        ("positive", "חיובית", 1), ("attacking", "התקפית", 2),
+    ]),
+    "tempo": ("קצב", [
+        ("much_lower", "איטי מאוד", -2), ("lower", "איטי", -1),
+        ("standard", "רגיל", 0),
+        ("higher", "מהיר", 1), ("much_higher", "מהיר מאוד", 2),
+    ]),
+    "width": ("רוחב", [
+        ("very_narrow", "צר מאוד", -2), ("narrow", "צר", -1),
+        ("standard", "רגיל", 0),
+        ("wide", "רחב", 1), ("very_wide", "רחב מאוד", 2),
+    ]),
+    "passing": ("אורך מסירה", [
+        ("much_shorter", "קצר מאוד", -2), ("shorter", "קצר", -1),
+        ("standard", "רגיל", 0),
+        ("direct", "ישיר", 1), ("much_direct", "ישיר מאוד", 2),
+    ]),
+    "pressing": ("עוצמת לחיצה", [
+        ("much_less", "נמוכה מאוד", -2), ("less", "נמוכה", -1),
+        ("standard", "רגילה", 0),
+        ("more", "גבוהה", 1), ("much_more", "גבוהה מאוד", 2),
+    ]),
+    "engagement": ("קו לחיצה", [
+        ("much_deeper", "עמוק מאוד", -2), ("deeper", "עמוק", -1),
+        ("standard", "רגיל", 0),
+        ("higher", "גבוה", 1), ("much_higher", "גבוה מאוד", 2),
+    ]),
+    "d_line": ("קו הגנה", [
+        ("much_deeper", "עמוק מאוד", -2), ("deeper", "עמוק", -1),
+        ("standard", "רגיל", 0),
+        ("higher", "גבוה", 1), ("much_higher", "גבוה מאוד", 2),
+    ]),
+}
+
+INSTRUCTION_KEYS = list(TEAM_INSTRUCTIONS)
+
+# סגנונות מוכנים — כל מאמן משחק לפי אחד מהם, ואתה יכול לקרוא אותו
+TACTICAL_STYLES = [
+    ("gegenpress", "גגנפרסינג",
+     {"mentality": 2, "tempo": 2, "width": 1, "passing": 0,
+      "pressing": 2, "engagement": 2, "d_line": 2},
+     "מאבדים את הכדור? מחזירים אותו תוך שש שניות. תשעים דקות של ריצה."),
+    ("tiki_taka", "טיקי־טאקה",
+     {"mentality": 1, "tempo": -1, "width": -1, "passing": -2,
+      "pressing": 1, "engagement": 1, "d_line": 1},
+     "החזקה כשיטת הגנה. מאות מסירות, וסבלנות עד שנפתח חור."),
+    ("counter", "מעברים מהירים",
+     {"mentality": -1, "tempo": 2, "width": 0, "passing": 2,
+      "pressing": -1, "engagement": -1, "d_line": -1},
+     "נותנים להם את הכדור, ואז רצים שישים מטר בשלוש מסירות."),
+    ("control", "שליטה",
+     {"mentality": 1, "tempo": 0, "width": 1, "passing": -1,
+      "pressing": 0, "engagement": 0, "d_line": 1},
+     "מנהלים את הקצב, מחזיקים גבוה, ולא ממהרים לשום מקום."),
+    ("direct", "כדורגל ישיר",
+     {"mentality": 1, "tempo": 1, "width": 1, "passing": 2,
+      "pressing": 0, "engagement": 0, "d_line": 0},
+     "קדימה מהר, שנייה, ולחפש את הראש של החלוץ."),
+    ("catenaccio", "בטון",
+     {"mentality": -2, "tempo": -1, "width": -2, "passing": -1,
+      "pressing": -2, "engagement": -2, "d_line": -2},
+     "אחד־אפס זה ניצחון מושלם. שני קווים של ארבעה, ובהצלחה."),
+    ("wing_play", "משחק קו",
+     {"mentality": 1, "tempo": 1, "width": 2, "passing": 1,
+      "pressing": 0, "engagement": 0, "d_line": 0},
+     "הכול דרך הקווים. הרמות, קרנות, ועוד הרמות."),
+    ("balanced_style", "מאוזן",
+     {"mentality": 0, "tempo": 0, "width": 0, "passing": 0,
+      "pressing": 0, "engagement": 0, "d_line": 0},
+     "בלי אג'נדה. מגיבים למה שהמשחק נותן."),
+]
+
+STYLE_BY_KEY = {row[0]: row for row in TACTICAL_STYLES}
+
+
+def instruction_label(key: str, value: int) -> str:
+    """השם בעברית של ערך ההוראה."""
+    rows = TEAM_INSTRUCTIONS.get(key)
+    if not rows:
+        return ""
+    for _slug, label, level in rows[1]:
+        if level == value:
+            return label
+    return ""

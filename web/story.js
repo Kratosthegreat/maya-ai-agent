@@ -497,15 +497,15 @@ ev({
   choices: [
     { label: "לעבוד על מה שחסר", hint: "מקצועי", apply: g => {
       const ranked = watchers(g, SCOUT_NOTICED);
-      const weights = D.POSITION_WEIGHTS[g.me.position];
-      let worst = D.ATTRIBUTES[0];
-      for (const a of D.ATTRIBUTES)
-        if ((g.me.attributes[a] ?? 50) * (weights[a] || 0.1)
-            < (g.me.attributes[worst] ?? 50) * (weights[worst] || 0.1)) worst = a;
-      att(g, worst, 1.4);
+      const row = roleRow(g.me.role);
+      const watched = row ? row[4].concat(row[5]) : attrsFor(g.me.position);
+      let worst = watched[0];
+      for (const a of watched)
+        if ((g.me.detail[a] ?? 10) < (g.me.detail[worst] ?? 10)) worst = a;
+      addDetail(g.me, worst, 0.9);
       mor(g, 3);
       const club = ranked.length ? ranked[0][0].name : "מי שעוקב אחריך";
-      return `לקחת את זה לאימון. ${D.ATTRIBUTE_NAMES_HE[worst]} — `
+      return `לקחת את זה לאימון. ${D.DETAIL_NAMES_HE[worst]} — `
            + `בדיוק מה ש${club} סימנו לך. הצופה הבא יראה משהו אחר.`;
     } },
     { label: "לא לתת לזה להיכנס לראש", apply: g => {

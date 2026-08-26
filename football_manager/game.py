@@ -20,11 +20,12 @@ from . import data as D
 from . import story as ST
 from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
                      build_commentary, simulate_match)
-from .models import (assign_number, available_numbers, gain_reputation, Club, Contract, Player, TableRow, clamp,
+from .models import (add_detail, add_group, assign_number, available_numbers, gain_reputation, Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from . import club_ops as CO
 from . import manager as MG
 from . import matchstats as MS
+from . import tactics as TA
 from . import commercial as CM
 from . import development as DEV
 from . import scouting as SC
@@ -341,6 +342,10 @@ class GameState:
             self.fixtures[lid] = round_robin(clubs, self.rng)
             self.tables[lid] = {cid: TableRow(club_id=cid) for cid in clubs}
         self._build_cup()
+        if not first:
+            note = self.refresh_role()
+            if note:
+                self.log(note)
         for club in self.clubs.values():
             club.season_expectation = self._expectation(club)
 
@@ -408,12 +413,18 @@ class GameState:
 
     def available_actions(self) -> List[Tuple[str, str]]:
         """פעולות אפשריות לשבוע, לפי שלב הקריירה."""
-        if self.stage == "youth":
-            keys = list(D.ATTRIBUTES) + ["street", "school", "rest"]
-            return [(k, D.TRAINING_FOCUS_HE[k]) for k in keys]
-        if self.stage in ("academy", "player", "veteran"):
-            keys = list(D.ATTRIBUTES) + ["rest", "badges", "media", "business"]
-            return [(k, D.TRAINING_FOCUS_HE[k]) for k in keys]
+        if self.stage in ("youth", "academy", "player", "veteran"):
+            out = self._training_options()
+            if self.stage == "youth":
+                out += [("street", D.TRAINING_FOCUS_HE["street"]),
+                        ("school", D.TRAINING_FOCUS_HE["school"]),
+                        ("rest", D.TRAINING_FOCUS_HE["rest"])]
+            else:
+                out += [("rest", D.TRAINING_FOCUS_HE["rest"]),
+                        ("badges", D.TRAINING_FOCUS_HE["badges"]),
+                        ("media", D.TRAINING_FOCUS_HE["media"]),
+                        ("business", D.TRAINING_FOCUS_HE["business"])]
+            return out
         if self.stage in ("coach", "manager"):
             return [("tactics", "עבודה טקטית עם הקבוצה"),
                     ("individual", "אימון אישי לשחקנים צעירים"),
@@ -431,6 +442,35 @@ class GameState:
             return [("squad", "בניית סגל"), ("finance", "ניהול פיננסי"),
                     ("academy", "השקעה בנוער"), ("rest", "חופש")]
         return [("rest", "מנוחה")]
+
+    def _training_options(self) -> List[Tuple[str, str]]:
+        """על מה אפשר להתאמן — תכונות אמיתיות, לא קטגוריות.
+
+        הרשימה אינה כל 36 התכונות, כי זה תפריט בלתי קריא בטלפון. היא
+        בדיוק מה שרלוונטי לך עכשיו: מה שהתפקיד שלך דורש, מה שהמאמן ביקש,
+        מה שהמסלול צריך, ומה שהכי חלש אצלך.
+        """
+        me = self.me
+        allowed = D.attrs_for(me.position)
+        picked: List[str] = []
+
+        def add(attr):
+            if attr and attr in allowed and attr not in picked:
+                picked.append(attr)
+
+        add(self.flag("directive"))
+        add(DEV.recommended_focus(self))
+        row = D.ROLE_BY_KEY.get(me.role)
+        if row:
+            for attr in row[4]:
+                add(attr)
+            for attr in row[5][:2]:
+                add(attr)
+        # החולשות הגדולות ביותר ביחס לרמה הכללית
+        weakest = sorted(allowed, key=lambda a: me.detail.get(a, 10))
+        for attr in weakest[:3]:
+            add(attr)
+        return [(a, D.DETAIL_NAMES_HE[a]) for a in picked[:12]]
 
     def set_action(self, key: str) -> None:
         self.training_focus = key
@@ -512,8 +552,7 @@ class GameState:
         if self.stage == "youth":
             if focus == "school":
                 if self.rng.random() < 0.35:
-                    me.attributes["mental"] = int(clamp(
-                        me.attributes.get("mental", 50) + 1, 10, 97))
+                    add_group(me, "mental", 1.0)
                 self.flags["school"] = self.flag("school", 0) + 1
                 me.fitness = clamp(me.fitness + 14, 0, 100)
                 return ["📚 שבוע של בית ספר. ההורים מרוצים, המאמן פחות."]
@@ -711,9 +750,10 @@ class GameState:
                 away_tac = mine
         focus = self.me_id if (is_mine and self.stage in
                                ("academy", "player", "veteran")) else None
+        mods = TA.match_modifiers(self.my_club, self.me) if focus else None
         result = simulate_match(home, away, self.players, self.rng,
                                 home_tac, away_tac, competition, neutral,
-                                focus_pid=focus)
+                                focus_pid=focus, focus_mods=mods)
         # הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
         # כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
         my_club = self.my_club
@@ -1372,7 +1412,7 @@ class GameState:
             return "חזרת חודש לפני הזמן והחזקת. המאמן לא שכח את זה."
         extra = self.rng.randint(6, 14)
         self.me.injury_weeks += extra
-        self.me.attributes["pace"] = int(clamp(self.me.attributes.get("pace", 50) - 3, 10, 97))
+        add_group(self.me, "pace", -3.0)
         self.me.morale = clamp(self.me.morale - 12, 5, 99)
         return (f"נכנסת מוקדם מדי. הפציעה חזרה, ועוד {extra} שבועות. "
                 f"המהירות שלך לא תחזור לגמרי.")
@@ -1441,7 +1481,7 @@ class GameState:
         new_pos = moves.get(me.position, "CM")
         old = me.position_he
         me.position = new_pos
-        me.attributes["mental"] = int(clamp(me.attributes.get("mental", 50) + 4, 10, 97))
+        add_group(me, "mental", 4.0)
         return (f"עברת מ{old} ל{me.position_he}. פחות ריצה, יותר ראש — "
                 f"ועוד כמה שנים בקריירה.")
 
@@ -1451,8 +1491,7 @@ class GameState:
             return "הזריקות עובדות. שיחקת עונה שלמה כאילו אתה בן 26."
         weeks = self.rng.randint(8, 16)
         self.me.injury_weeks = weeks
-        self.me.attributes["physical"] = int(
-            clamp(self.me.attributes.get("physical", 50) - 4, 10, 97))
+        add_group(self.me, "physical", -4.0)
         return f"הגוף אמר די. {weeks} שבועות, והפעם זה כואב גם כשאתה יושב."
 
     def announce_retirement(self) -> str:
@@ -1653,6 +1692,23 @@ class GameState:
         return (f"קנית את {club.name}. הילד שהתאמן פה בגיל 12 "
                 f"מחזיק עכשיו את המפתחות.")
 
+    def refresh_role(self) -> Optional[str]:
+        """המאמן מחלק תפקידים מחדש — בהעברה, בתחילת עונה, ובהחלפת מאמן."""
+        me = self.me
+        if self.stage not in ("academy", "player", "veteran"):
+            return None
+        club = self.my_club
+        before = me.role
+        me.role = TA.assign_role(me, club, self.rng)
+        me.duty = TA.duty_for(me.role, club, self.rng)
+        if me.role == before or not me.role:
+            return None
+        row = D.ROLE_BY_KEY.get(me.role)
+        if not row:
+            return None
+        duty = D.DUTY_NAMES_HE.get(me.duty, "")
+        return f"📋 התפקיד שלך: {row[1]} ({duty}). {row[6]}"
+
     def transfer_me(self, club_id: str, wage: int, years: int,
                     loan: bool = False) -> str:
         """מעביר את השחקן האנושי למועדון אחר."""
@@ -1668,6 +1724,10 @@ class GameState:
         new.manager_trust = 55.0 if not loan else 65.0
         self.last_club_id = club_id
         self.no_start_streak = 0
+        # מאמן חדש, מערכת חדשה — התפקיד שלך נקבע מאפס
+        note = self.refresh_role()
+        if note:
+            self.log(note)
         self.log(f"{'הושאלת ל' if loan else 'עברת ל'}{new.name}.")
         return new.name
 

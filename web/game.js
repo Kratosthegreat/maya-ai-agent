@@ -147,6 +147,7 @@ class Game {
     g.stage = Game.stageForAge(age);
     club.managerTrust = age <= 17 ? 45 : clamp(35 + (overall(me) - 55) * 1.4, 25, 78);
 
+    g.startYear = g.year;
     g.startSeason();
     g.log(`התחלת את הדרך ב${club.name}.`);
     return g;
@@ -185,6 +186,7 @@ class Game {
     club.boardConfidence = 58;
     this.tactics.formation = club.formation;
     this.trainingFocus = "tactics";
+    this.startYear = this.year;
     this.startSeason();
     this.log(`מונית למנג'ר של ${club.name}.`);
     return this;
@@ -209,6 +211,10 @@ class Game {
         this.tables[lid][cid] = { clubId: cid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0 };
     }
     this.buildCup();
+    if (this.year > (this.startYear || 0)) {
+      const note = this.refreshRole();
+      if (note) this.log(note);
+    }
     for (const club of Object.values(this.clubs)) club.seasonExpectation = this.expectation(club);
   }
 
@@ -284,14 +290,36 @@ class Game {
   // התקדמות שבועית
   // ==================================================================
 
-  availableActions() {
-    if (this.stage === "youth") {
-      return D.ATTRIBUTES.concat(["street", "school", "rest"])
-        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+  /**
+   * על מה אפשר להתאמן — תכונות אמיתיות, לא קטגוריות.
+   * לא כל 36, כי זה תפריט בלתי קריא בטלפון: בדיוק מה שרלוונטי עכשיו.
+   */
+  trainingOptions() {
+    const me = this.me;
+    const allowed = new Set(attrsFor(me.position));
+    const picked = [];
+    const add = attr => {
+      if (attr && allowed.has(attr) && !picked.includes(attr)) picked.push(attr);
+    };
+    add(this.flag("directive"));
+    add(recommendedFocus(this));
+    const row = roleRow(me.role);
+    if (row) {
+      for (const attr of row[4]) add(attr);
+      for (const attr of row[5].slice(0, 2)) add(attr);
     }
-    if (["academy", "player", "veteran"].includes(this.stage)) {
-      return D.ATTRIBUTES.concat(["rest", "badges", "media", "business"])
-        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+    const weakest = [...allowed].sort((a, b) => (me.detail[a] ?? 10) - (me.detail[b] ?? 10));
+    for (const attr of weakest.slice(0, 3)) add(attr);
+    return picked.slice(0, 12).map(a => [a, D.DETAIL_NAMES_HE[a]]);
+  }
+
+  availableActions() {
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
+      const extra = this.stage === "youth"
+        ? ["street", "school", "rest"]
+        : ["rest", "badges", "media", "business"];
+      return this.trainingOptions()
+        .concat(extra.map(k => [k, D.TRAINING_FOCUS_HE[k]]));
     }
     if (["coach", "manager"].includes(this.stage)) {
       return [["tactics", "עבודה טקטית עם הקבוצה"], ["individual", "אימון אישי לצעירים"],
@@ -569,8 +597,10 @@ class Game {
     }
     const focusPid = (isMine && ["academy", "player", "veteran"].includes(this.stage))
       ? this.meId : null;
+    const focusMods = focusPid ? tacticModifiers(this.myClub(), this.me) : null;
     const result = simulateMatch(home, away, this.players, this.rng,
-      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral, focusPid });
+      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral,
+        focusPid, focusMods });
     // הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
     // כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
     const myHomeClub = this.myClub();
@@ -1466,6 +1496,20 @@ class Game {
     return `קנית את ${club.name}. הילד שהתאמן פה בגיל 12 מחזיק עכשיו את המפתחות.`;
   }
 
+  /** המאמן מחלק תפקידים מחדש — בהעברה, בתחילת עונה, ובהחלפת מאמן. */
+  refreshRole() {
+    const me = this.me;
+    if (!["academy", "player", "veteran"].includes(this.stage)) return null;
+    const club = this.myClub();
+    const before = me.role;
+    me.role = assignRole(me, club, this.rng);
+    me.duty = dutyFor(me.role, club, this.rng);
+    if (me.role === before || !me.role) return null;
+    const row = roleRow(me.role);
+    if (!row) return null;
+    return `📋 התפקיד שלך: ${row[1]} (${D.DUTY_NAMES_HE[me.duty] || ""}). ${row[6]}`;
+  }
+
   transferMe(clubId, wage, years, loan = false) {
     const me = this.me;
     const old = this.clubs[me.clubId];
@@ -1478,6 +1522,9 @@ class Game {
     next.managerTrust = loan ? 65 : 55;
     this.lastClubId = clubId;
     this.noStartStreak = 0;
+    // מאמן חדש, מערכת חדשה — התפקיד שלך נקבע מאפס
+    const note = this.refreshRole();
+    if (note) this.log(note);
     this.log(`${loan ? "הושאלת ל" : "עברת ל"}${next.name}.`);
     return next.name;
   }
@@ -1767,7 +1814,7 @@ class Game {
       firstClubId: this.firstClubId, lastClubId: this.lastClubId,
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
-      positionLog: this.positionLog,
+      positionLog: this.positionLog, startYear: this.startYear,
       staffMarket: this.staffMarket, finances: this.finances,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
@@ -1786,7 +1833,7 @@ class Game {
       firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
-      positionLog: raw.positionLog || [],
+      positionLog: raw.positionLog || [], startYear: raw.startYear,
       staffMarket: raw.staffMarket || {}, finances: raw.finances || null,
     });
     g.rng = Rng.fromState(raw.rngState);

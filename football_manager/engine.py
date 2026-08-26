@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple
 
 from . import data as D
 from . import matchstats as MS
-from .models import Club, Player, clamp
+from .models import Club, Player, clamp, role_suitability
 
 # מנטליות טקטית: (מכפיל התקפה, מכפיל הגנה, תוספת סיכון)
 MENTALITIES = {
@@ -163,6 +163,15 @@ def pick_lineup(club: Club, players: Dict[str, Player],
     return [pid for pid in lineup if pid]
 
 
+def role_factor(player: Player) -> float:
+    """0.88-1.10 — כמה התפקיד שנתנו לך מוציא ממך את מה שיש בך."""
+    if not player.role:
+        return 1.0
+    fit = role_suitability(player, player.role)
+    reference = float(player.overall)
+    return clamp(1.0 + (fit - reference) / 260.0, 0.88, 1.10)
+
+
 def team_strength(lineup: List[str], players: Dict[str, Player],
                   formation: str) -> Tuple[float, float, float]:
     """מחזיר (הגנה, קישור, התקפה) לקבוצה, בסולם אחיד של דירוגי שחקנים.
@@ -179,7 +188,9 @@ def team_strength(lineup: List[str], players: Dict[str, Player],
             continue
         slot = slots[idx] if idx < len(slots) else player.position
         fit = position_fit(player.position, slot)
-        power = player.effective * (0.62 + 0.38 * fit)
+        # ההתאמה לתפקיד היא חלק מהעוצמה: חלוץ מטרה בתפקיד של חלוץ בור
+        # יביא פחות ממה שהדירוג שלו מבטיח
+        power = player.effective * (0.62 + 0.38 * fit) * role_factor(player)
         share = D.POSITION_ROLE_SHARE[slot]
         for line in sums:
             sums[line] += power * share[line]
@@ -223,7 +234,8 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
                    away_tactics: Optional[dict] = None,
                    competition: str = "ליגה",
                    neutral: bool = False,
-                   focus_pid: Optional[str] = None) -> MatchResult:
+                   focus_pid: Optional[str] = None,
+                   focus_mods: Optional[Dict[str, float]] = None) -> MatchResult:
     """מדמה משחק שלם בין שתי קבוצות ומחזיר תוצאה מלאה."""
     home_tactics = home_tactics or {}
     away_tactics = away_tactics or {}
@@ -308,9 +320,9 @@ def simulate_match(home: Club, away: Club, players: Dict[str, Player],
     _apply_injuries(result, away_lineup, away.cid, players, rng, away)
 
     _rate_players(result, home_lineup, home.cid, players, rng,
-                  focus_pid=focus_pid, possession=h_control)
+                  focus_pid=focus_pid, possession=h_control, focus_mods=focus_mods)
     _rate_players(result, away_lineup, away.cid, players, rng,
-                  focus_pid=focus_pid, possession=a_control)
+                  focus_pid=focus_pid, possession=a_control, focus_mods=focus_mods)
 
     if result.ratings:
         result.motm = max(result.ratings, key=lambda pid: result.ratings[pid])
@@ -430,7 +442,8 @@ def _apply_injuries(result: MatchResult, lineup: List[str], club_id: str,
 def _rate_players(result: MatchResult, lineup: List[str], club_id: str,
                   players: Dict[str, Player], rng: random.Random,
                   focus_pid: Optional[str] = None,
-                  possession: float = 0.5) -> None:
+                  possession: float = 0.5,
+                  focus_mods: Optional[Dict[str, float]] = None) -> None:
     """נותן ציון לכל שחקן בהרכב ומעדכן סטטיסטיקה.
 
     לשחקן שאתה משחק בו נבנית גם שורת סטטיסטיקה מלאה, והציון שלו נגזר
@@ -473,7 +486,7 @@ def _rate_players(result: MatchResult, lineup: List[str], club_id: str,
 
         if pid == focus_pid:
             stats = MS.match_stat_line(p, minutes, goals, assists, rng,
-                                       possession=possession)
+                                       possession=possession, mods=focus_mods)
             result.stat_lines[pid] = stats
             # הציון שלך נגזר ממה שבאמת עשית במגרש הערב, ולא רק ממי שאתה:
             # 65 זה ערב ממוצע שלך, ומשם למעלה או למטה

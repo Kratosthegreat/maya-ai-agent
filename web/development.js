@@ -1,26 +1,23 @@
 // ---------------------------------------------------------------------------
 // מסלול הפיתוח — תאום JS של development.py
 //
-// במקום "תתאמן על משהו", המסלול אומר בדיוק מה צריך להיות לך ומתי,
-// ומה תקבל אם תגיע לשם. מי שמשלים את כל המסלול עובר פריצה אמיתית.
+// בוחרים **תפקיד** — אותם תפקידים שהמאמן מחלק — והמסלול נגזר ממנו:
+// התכונות שהתפקיד באמת דורש, בסולם 1-20, עם סף לכל גיל.
 // ---------------------------------------------------------------------------
 
-const ARCHETYPE_BY_KEY = {};
-for (const row of D.ARCHETYPES) ARCHETYPE_BY_KEY[row[0]] = row;
+// רמת הסף לכל אבן דרך, בסולם 1-20 של התכונות המפורטות
+const MILESTONE_AGES = [[17, 11], [19, 14], [21, 16], [24, 18]];
 
-function planOptionsFor(position) {
-  const fits = D.ARCHETYPES.filter(row => row[2].includes(position));
-  return fits.length ? fits : D.ARCHETYPES.slice();
-}
+function planOptionsFor(position) { return rolesFor(position); }
 
 function planKey(game) { return game.flags.plan || null; }
 function planRow(game) {
   const key = planKey(game);
-  return key ? (ARCHETYPE_BY_KEY[key] || null) : null;
+  return key ? roleRow(key) : null;
 }
 
 function setPlan(game, key) {
-  const row = ARCHETYPE_BY_KEY[key];
+  const row = roleRow(key);
   if (!row) return "אין מסלול כזה.";
   const previous = planKey(game);
   game.flags.plan = key;
@@ -37,19 +34,29 @@ function planDone(game) {
   return game.flags.plan_done;
 }
 
+/** מה נדרש באבן דרך: תכונות המפתח של התפקיד ברמה נתונה. */
+function milestoneNeeds(row, level) {
+  const needs = {};
+  row[4].slice(0, 4).forEach((attr, index) => {
+    needs[attr] = Math.min(20, level + (index === 0 ? 1 : 0));
+  });
+  return needs;
+}
+
 /** כל אבני הדרך במסלול, עם המצב הנוכחי מול הדרישה. */
 function milestoneRows(game) {
   const row = planRow(game);
   if (!row) return [];
   const me = game.me;
   const done = planDone(game);
-  return row[4].map(([age, needs], index) => {
+  return MILESTONE_AGES.map(([age, level], index) => {
+    const needs = milestoneNeeds(row, level);
     const parts = [];
     let met = true;
     for (const attr of Object.keys(needs).sort()) {
-      const have = me.attributes[attr] ?? 50;
+      const have = me.detail[attr] ?? 10;
       if (have < needs[attr]) met = false;
-      parts.push({ attr, name: D.ATTRIBUTE_NAMES_HE[attr], have, need: needs[attr] });
+      parts.push({ attr, name: D.DETAIL_NAMES_HE[attr], have, need: needs[attr] });
     }
     return { index, age, needs: parts, met, claimed: done.includes(index),
              late: me.age > age && !met };
@@ -65,19 +72,17 @@ function nextTarget(game) {
   for (const entry of rows) {
     if (entry.claimed) continue;
     const gaps = entry.needs.filter(p => p.have < p.need);
-    if (!gaps.length)
-      return `🎯 עמדת בדרישות של גיל ${entry.age} — זה ייחתם בסוף העונה.`;
+    if (!gaps.length) return `🎯 עמדת בדרישות של גיל ${entry.age} — זה ייחתם בסוף העונה.`;
     let worst = gaps[0];
     for (const p of gaps) if (p.have - p.need < worst.have - worst.need) worst = p;
     const when = me.age <= entry.age ? `עד גיל ${entry.age}`
                                      : `(היעד של גיל ${entry.age} כבר מאחוריך)`;
     return `🎯 ${row[1]}: ${worst.name} ${worst.have} → ${worst.need} ${when}. `
-           + `חסרות ${worst.need - worst.have} נקודות.`;
+         + `חסרות ${worst.need - worst.have} נקודות.`;
   }
   return `🎯 השלמת את כל מסלול "${row[1]}".`;
 }
 
-/** על מה כדאי להתאמן השבוע כדי להתקדם במסלול. */
 function recommendedFocus(game) {
   for (const entry of milestoneRows(game)) {
     if (entry.claimed) continue;
@@ -89,7 +94,16 @@ function recommendedFocus(game) {
     }
   }
   const row = planRow(game);
-  return row ? row[3][0][0] : null;
+  return row ? row[4][0] : null;
+}
+
+/** תכונת האופי שמתאימה לתפקיד שהשלמת. */
+function planTraitFor(row) {
+  const keys = new Set(row[4].concat(row[5]));
+  if (keys.has("leadership") || keys.has("communication")) return "leader";
+  if (keys.has("stamina") || keys.has("work_rate")) return "workhorse";
+  if (keys.has("composure") || keys.has("finishing") || keys.has("flair")) return "clutch";
+  return "student";
 }
 
 /** נקרא בסוף עונה: חותם על מה שהושג ומחלק את הפרסים. */
@@ -114,8 +128,7 @@ function claimMilestones(game) {
     lines.push(`✅ אבן דרך במסלול "${row[1]}" (גיל ${entry.age}) — `
                + (onTime ? "בזמן" : "באיחור") + ".");
   }
-
-  if (done.length >= row[4].length && !game.flag("breakthrough"))
+  if (done.length >= MILESTONE_AGES.length && !game.flag("breakthrough"))
     lines.push(...planBreakthrough(game, row));
   return lines;
 }
@@ -128,7 +141,7 @@ function planBreakthrough(game, row) {
   gainReputation(me, 7);
   me.morale = clamp(me.morale + 14, 5, 99);
   const lines = [`💎 פריצה. השלמת את מסלול "${row[1]}" במלואו.`, `   ${row[6]}`];
-  const trait = row[5];
+  const trait = planTraitFor(row);
   if (trait && !me.traits.includes(trait)) {
     me.traits.push(trait);
     lines.push(`   נוספה לך תכונת אופי: ${D.TRAITS[trait].name}.`);
@@ -147,12 +160,12 @@ function planSummary(game) {
   if (!row) {
     return { chosen: false, options: planOptionsFor(game.me.position).map(r => ({
       key: r[0], name: r[1], desc: r[6],
-      attrs: r[3].map(([a]) => D.ATTRIBUTE_NAMES_HE[a]) })) };
+      attrs: r[4].slice(0, 4).map(a => D.DETAIL_NAMES_HE[a]) })) };
   }
   const rows = milestoneRows(game);
   return {
     chosen: true, key: row[0], name: row[1], desc: row[6],
-    trait: D.TRAITS[row[5]].name, milestones: rows,
+    trait: D.TRAITS[planTraitFor(row)].name, milestones: rows,
     done: rows.filter(r => r.claimed).length, total: rows.length,
     next: nextTarget(game), focus: recommendedFocus(game),
     breakthrough: !!game.flag("breakthrough"),

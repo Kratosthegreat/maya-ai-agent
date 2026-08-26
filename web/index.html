@@ -829,6 +829,47 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   font-size: 12.5px; line-height: 1.4;
 }
 
+/* לוח התכונות המלא — ארבע קבוצות, בסולם 1-20 כמו במקור */
+.attr-board {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+.attr-col { min-width: 0; }
+.attr-head {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--muted); padding-block-end: 4px;
+  border-block-end: 1px solid var(--line); margin-block-end: 4px;
+}
+.attr-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; line-height: 1.75;
+}
+.attr-row .n { flex: 1; min-width: 0; color: var(--ink-2); }
+.attr-row .v {
+  unicode-bidi: isolate; font-variant-numeric: tabular-nums;
+  min-width: 34px; text-align: end; font-weight: 700;
+}
+.attr-row .v.q { font-weight: 600; opacity: .7; font-size: 11.5px; }
+.attr-row.hi .v { color: var(--good, #4ade80); }
+.attr-row.mid .v { color: var(--ink); }
+.attr-row.lo .v { color: var(--muted); }
+.attr-row.unk .v { color: var(--muted); opacity: .5; }
+.val.stars { letter-spacing: .06em; unicode-bidi: isolate; }
+
+/* ההוראות הטקטיות — סרגל שמראה איפה המאמן עומד בכל ציר */
+.instr { display: grid; gap: 7px; margin-block-start: 8px; }
+.instr-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.instr-row .n { min-width: 78px; color: var(--ink-2); }
+.instr-row .track {
+  position: relative; flex: 1; height: 4px; border-radius: 3px;
+  background: var(--line);
+}
+.instr-row .track i {
+  position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); transform: translate(50%, -50%);
+}
+.instr-row .v { min-width: 74px; text-align: end; font-weight: 600; }
+
 /* שורת הסטטיסטיקה אחרי משחק — המספרים שהאימון של השבוע ייצר */
 .statline { display: grid; gap: 3px; }
 .statline .muted {
@@ -2272,7 +2313,1812 @@ const D = {
    "שבוע קליל עכשיו מחזיר אותך שלם למשחק הבא."
   ]
  },
- "ARCHETYPES": [
+ "MILESTONE_REWARD": {
+  "potential": 2.2,
+  "rep": 1.6,
+  "morale": 8,
+  "trust": 5
+ },
+ "TECHNICAL": [
+  [
+   "corners",
+   "קרנות"
+  ],
+  [
+   "crossing",
+   "הרמות"
+  ],
+  [
+   "dribbling",
+   "כדרור"
+  ],
+  [
+   "finishing",
+   "סיום"
+  ],
+  [
+   "first_touch",
+   "נגיעה ראשונה"
+  ],
+  [
+   "free_kick",
+   "בעיטות חופשיות"
+  ],
+  [
+   "heading",
+   "נגיחות"
+  ],
+  [
+   "long_shots",
+   "בעיטות מרחוק"
+  ],
+  [
+   "long_throws",
+   "זריקות ארוכות"
+  ],
+  [
+   "marking",
+   "צמידות"
+  ],
+  [
+   "passing",
+   "מסירה"
+  ],
+  [
+   "penalty_taking",
+   "פנדלים"
+  ],
+  [
+   "tackling",
+   "חטיפה"
+  ],
+  [
+   "technique",
+   "טכניקה"
+  ]
+ ],
+ "MENTAL": [
+  [
+   "aggression",
+   "אגרסיביות"
+  ],
+  [
+   "anticipation",
+   "חיזוי"
+  ],
+  [
+   "bravery",
+   "אומץ"
+  ],
+  [
+   "composure",
+   "קור רוח"
+  ],
+  [
+   "concentration",
+   "ריכוז"
+  ],
+  [
+   "decisions",
+   "קבלת החלטות"
+  ],
+  [
+   "determination",
+   "נחישות"
+  ],
+  [
+   "flair",
+   "ברק"
+  ],
+  [
+   "leadership",
+   "מנהיגות"
+  ],
+  [
+   "off_the_ball",
+   "תנועה בלי כדור"
+  ],
+  [
+   "positioning",
+   "מיקום"
+  ],
+  [
+   "teamwork",
+   "עבודת צוות"
+  ],
+  [
+   "vision",
+   "ראיית משחק"
+  ],
+  [
+   "work_rate",
+   "קצב עבודה"
+  ]
+ ],
+ "PHYSICAL": [
+  [
+   "acceleration",
+   "האצה"
+  ],
+  [
+   "agility",
+   "זריזות"
+  ],
+  [
+   "balance",
+   "שיווי משקל"
+  ],
+  [
+   "jumping_reach",
+   "קפיצה"
+  ],
+  [
+   "natural_fitness",
+   "כושר טבעי"
+  ],
+  [
+   "pace",
+   "מהירות"
+  ],
+  [
+   "stamina",
+   "סיבולת"
+  ],
+  [
+   "strength",
+   "כוח"
+  ]
+ ],
+ "GOALKEEPING": [
+  [
+   "aerial_reach",
+   "הגעה באוויר"
+  ],
+  [
+   "command_of_area",
+   "שליטה ברחבה"
+  ],
+  [
+   "communication",
+   "תקשורת"
+  ],
+  [
+   "eccentricity",
+   "אקסצנטריות"
+  ],
+  [
+   "handling",
+   "אחיזה"
+  ],
+  [
+   "kicking",
+   "בעיטה"
+  ],
+  [
+   "one_on_ones",
+   "אחד על אחד"
+  ],
+  [
+   "reflexes",
+   "רפלקסים"
+  ],
+  [
+   "rushing_out",
+   "יציאה מהשער"
+  ],
+  [
+   "tendency_to_punch",
+   "נטייה לאגרוף"
+  ],
+  [
+   "throwing",
+   "זריקה"
+  ]
+ ],
+ "ATTR_GROUPS": [
+  [
+   "technical",
+   "טכניות",
+   [
+    [
+     "corners",
+     "קרנות"
+    ],
+    [
+     "crossing",
+     "הרמות"
+    ],
+    [
+     "dribbling",
+     "כדרור"
+    ],
+    [
+     "finishing",
+     "סיום"
+    ],
+    [
+     "first_touch",
+     "נגיעה ראשונה"
+    ],
+    [
+     "free_kick",
+     "בעיטות חופשיות"
+    ],
+    [
+     "heading",
+     "נגיחות"
+    ],
+    [
+     "long_shots",
+     "בעיטות מרחוק"
+    ],
+    [
+     "long_throws",
+     "זריקות ארוכות"
+    ],
+    [
+     "marking",
+     "צמידות"
+    ],
+    [
+     "passing",
+     "מסירה"
+    ],
+    [
+     "penalty_taking",
+     "פנדלים"
+    ],
+    [
+     "tackling",
+     "חטיפה"
+    ],
+    [
+     "technique",
+     "טכניקה"
+    ]
+   ]
+  ],
+  [
+   "mental",
+   "מנטליות",
+   [
+    [
+     "aggression",
+     "אגרסיביות"
+    ],
+    [
+     "anticipation",
+     "חיזוי"
+    ],
+    [
+     "bravery",
+     "אומץ"
+    ],
+    [
+     "composure",
+     "קור רוח"
+    ],
+    [
+     "concentration",
+     "ריכוז"
+    ],
+    [
+     "decisions",
+     "קבלת החלטות"
+    ],
+    [
+     "determination",
+     "נחישות"
+    ],
+    [
+     "flair",
+     "ברק"
+    ],
+    [
+     "leadership",
+     "מנהיגות"
+    ],
+    [
+     "off_the_ball",
+     "תנועה בלי כדור"
+    ],
+    [
+     "positioning",
+     "מיקום"
+    ],
+    [
+     "teamwork",
+     "עבודת צוות"
+    ],
+    [
+     "vision",
+     "ראיית משחק"
+    ],
+    [
+     "work_rate",
+     "קצב עבודה"
+    ]
+   ]
+  ],
+  [
+   "physical",
+   "פיזיות",
+   [
+    [
+     "acceleration",
+     "האצה"
+    ],
+    [
+     "agility",
+     "זריזות"
+    ],
+    [
+     "balance",
+     "שיווי משקל"
+    ],
+    [
+     "jumping_reach",
+     "קפיצה"
+    ],
+    [
+     "natural_fitness",
+     "כושר טבעי"
+    ],
+    [
+     "pace",
+     "מהירות"
+    ],
+    [
+     "stamina",
+     "סיבולת"
+    ],
+    [
+     "strength",
+     "כוח"
+    ]
+   ]
+  ],
+  [
+   "goalkeeping",
+   "שוערים",
+   [
+    [
+     "aerial_reach",
+     "הגעה באוויר"
+    ],
+    [
+     "command_of_area",
+     "שליטה ברחבה"
+    ],
+    [
+     "communication",
+     "תקשורת"
+    ],
+    [
+     "eccentricity",
+     "אקסצנטריות"
+    ],
+    [
+     "handling",
+     "אחיזה"
+    ],
+    [
+     "kicking",
+     "בעיטה"
+    ],
+    [
+     "one_on_ones",
+     "אחד על אחד"
+    ],
+    [
+     "reflexes",
+     "רפלקסים"
+    ],
+    [
+     "rushing_out",
+     "יציאה מהשער"
+    ],
+    [
+     "tendency_to_punch",
+     "נטייה לאגרוף"
+    ],
+    [
+     "throwing",
+     "זריקה"
+    ]
+   ]
+  ]
+ ],
+ "DETAIL_NAMES_HE": {
+  "corners": "קרנות",
+  "crossing": "הרמות",
+  "dribbling": "כדרור",
+  "finishing": "סיום",
+  "first_touch": "נגיעה ראשונה",
+  "free_kick": "בעיטות חופשיות",
+  "heading": "נגיחות",
+  "long_shots": "בעיטות מרחוק",
+  "long_throws": "זריקות ארוכות",
+  "marking": "צמידות",
+  "passing": "מסירה",
+  "penalty_taking": "פנדלים",
+  "tackling": "חטיפה",
+  "technique": "טכניקה",
+  "aggression": "אגרסיביות",
+  "anticipation": "חיזוי",
+  "bravery": "אומץ",
+  "composure": "קור רוח",
+  "concentration": "ריכוז",
+  "decisions": "קבלת החלטות",
+  "determination": "נחישות",
+  "flair": "ברק",
+  "leadership": "מנהיגות",
+  "off_the_ball": "תנועה בלי כדור",
+  "positioning": "מיקום",
+  "teamwork": "עבודת צוות",
+  "vision": "ראיית משחק",
+  "work_rate": "קצב עבודה",
+  "acceleration": "האצה",
+  "agility": "זריזות",
+  "balance": "שיווי משקל",
+  "jumping_reach": "קפיצה",
+  "natural_fitness": "כושר טבעי",
+  "pace": "מהירות",
+  "stamina": "סיבולת",
+  "strength": "כוח",
+  "aerial_reach": "הגעה באוויר",
+  "command_of_area": "שליטה ברחבה",
+  "communication": "תקשורת",
+  "eccentricity": "אקסצנטריות",
+  "handling": "אחיזה",
+  "kicking": "בעיטה",
+  "one_on_ones": "אחד על אחד",
+  "reflexes": "רפלקסים",
+  "rushing_out": "יציאה מהשער",
+  "tendency_to_punch": "נטייה לאגרוף",
+  "throwing": "זריקה"
+ },
+ "DETAIL_GROUP": {
+  "corners": "technical",
+  "crossing": "technical",
+  "dribbling": "technical",
+  "finishing": "technical",
+  "first_touch": "technical",
+  "free_kick": "technical",
+  "heading": "technical",
+  "long_shots": "technical",
+  "long_throws": "technical",
+  "marking": "technical",
+  "passing": "technical",
+  "penalty_taking": "technical",
+  "tackling": "technical",
+  "technique": "technical",
+  "aggression": "mental",
+  "anticipation": "mental",
+  "bravery": "mental",
+  "composure": "mental",
+  "concentration": "mental",
+  "decisions": "mental",
+  "determination": "mental",
+  "flair": "mental",
+  "leadership": "mental",
+  "off_the_ball": "mental",
+  "positioning": "mental",
+  "teamwork": "mental",
+  "vision": "mental",
+  "work_rate": "mental",
+  "acceleration": "physical",
+  "agility": "physical",
+  "balance": "physical",
+  "jumping_reach": "physical",
+  "natural_fitness": "physical",
+  "pace": "physical",
+  "stamina": "physical",
+  "strength": "physical",
+  "aerial_reach": "goalkeeping",
+  "command_of_area": "goalkeeping",
+  "communication": "goalkeeping",
+  "eccentricity": "goalkeeping",
+  "handling": "goalkeeping",
+  "kicking": "goalkeeping",
+  "one_on_ones": "goalkeeping",
+  "reflexes": "goalkeeping",
+  "rushing_out": "goalkeeping",
+  "tendency_to_punch": "goalkeeping",
+  "throwing": "goalkeeping"
+ },
+ "OUTFIELD_ATTRS": [
+  "corners",
+  "crossing",
+  "dribbling",
+  "finishing",
+  "first_touch",
+  "free_kick",
+  "heading",
+  "long_shots",
+  "long_throws",
+  "marking",
+  "passing",
+  "penalty_taking",
+  "tackling",
+  "technique",
+  "aggression",
+  "anticipation",
+  "bravery",
+  "composure",
+  "concentration",
+  "decisions",
+  "determination",
+  "flair",
+  "leadership",
+  "off_the_ball",
+  "positioning",
+  "teamwork",
+  "vision",
+  "work_rate",
+  "acceleration",
+  "agility",
+  "balance",
+  "jumping_reach",
+  "natural_fitness",
+  "pace",
+  "stamina",
+  "strength"
+ ],
+ "KEEPER_ATTRS": [
+  "aerial_reach",
+  "command_of_area",
+  "communication",
+  "eccentricity",
+  "handling",
+  "kicking",
+  "one_on_ones",
+  "reflexes",
+  "rushing_out",
+  "tendency_to_punch",
+  "throwing",
+  "aggression",
+  "anticipation",
+  "bravery",
+  "composure",
+  "concentration",
+  "decisions",
+  "determination",
+  "flair",
+  "leadership",
+  "off_the_ball",
+  "positioning",
+  "teamwork",
+  "vision",
+  "work_rate",
+  "acceleration",
+  "agility",
+  "balance",
+  "jumping_reach",
+  "natural_fitness",
+  "pace",
+  "stamina",
+  "strength",
+  "first_touch",
+  "passing",
+  "technique"
+ ],
+ "GROUP_MAP": {
+  "pace": {
+   "acceleration": 1.0,
+   "pace": 1.0,
+   "agility": 0.45,
+   "balance": 0.3
+  },
+  "shooting": {
+   "finishing": 1.0,
+   "long_shots": 0.55,
+   "technique": 0.45,
+   "composure": 0.45,
+   "heading": 0.3
+  },
+  "passing": {
+   "passing": 1.0,
+   "vision": 0.7,
+   "technique": 0.45,
+   "first_touch": 0.4,
+   "crossing": 0.3
+  },
+  "dribbling": {
+   "dribbling": 1.0,
+   "first_touch": 0.5,
+   "agility": 0.45,
+   "flair": 0.4,
+   "balance": 0.3,
+   "technique": 0.35
+  },
+  "defending": {
+   "tackling": 1.0,
+   "marking": 0.95,
+   "positioning": 0.7,
+   "anticipation": 0.45,
+   "concentration": 0.35,
+   "aggression": 0.2
+  },
+  "physical": {
+   "strength": 1.0,
+   "stamina": 0.8,
+   "jumping_reach": 0.55,
+   "natural_fitness": 0.45,
+   "work_rate": 0.55,
+   "bravery": 0.3
+  },
+  "mental": {
+   "decisions": 1.0,
+   "anticipation": 0.7,
+   "off_the_ball": 0.6,
+   "teamwork": 0.55,
+   "concentration": 0.55,
+   "composure": 0.5,
+   "vision": 0.45,
+   "determination": 0.4,
+   "positioning": 0.35
+  }
+ },
+ "GROUP_MAP_GK": {
+  "pace": {
+   "acceleration": 1.0,
+   "agility": 0.8,
+   "pace": 0.55
+  },
+  "shooting": {
+   "kicking": 1.0,
+   "technique": 0.45,
+   "throwing": 0.35
+  },
+  "passing": {
+   "kicking": 1.0,
+   "passing": 0.7,
+   "vision": 0.55,
+   "throwing": 0.45
+  },
+  "dribbling": {
+   "first_touch": 1.0,
+   "technique": 0.65,
+   "rushing_out": 0.45,
+   "composure": 0.4
+  },
+  "defending": {
+   "reflexes": 1.0,
+   "handling": 0.95,
+   "one_on_ones": 0.75,
+   "positioning": 0.7,
+   "command_of_area": 0.6,
+   "aerial_reach": 0.55
+  },
+  "physical": {
+   "strength": 1.0,
+   "jumping_reach": 0.85,
+   "natural_fitness": 0.55,
+   "agility": 0.55,
+   "stamina": 0.3
+  },
+  "mental": {
+   "decisions": 1.0,
+   "concentration": 0.85,
+   "communication": 0.65,
+   "anticipation": 0.6,
+   "composure": 0.55
+  }
+ },
+ "HIDDEN_ATTRS": [
+  [
+   "ambition",
+   "שאפתנות"
+  ],
+  [
+   "loyalty",
+   "נאמנות"
+  ],
+  [
+   "pressure",
+   "עמידות בלחץ"
+  ],
+  [
+   "professionalism",
+   "מקצוענות"
+  ],
+  [
+   "sportsmanship",
+   "רוח ספורטיבית"
+  ],
+  [
+   "temperament",
+   "מזג"
+  ],
+  [
+   "controversy",
+   "נטייה לסערות"
+  ]
+ ],
+ "PERSONALITIES": [
+  [
+   "model_citizen",
+   "אזרח מופת",
+   "מקצוען עד הסוף, בלי רעש, ומרים את כל מי שסביבו.",
+   {
+    "professionalism": 18,
+    "determination": 15,
+    "sportsmanship": 15,
+    "temperament": 15
+   }
+  ],
+  [
+   "model_professional",
+   "מקצוען מודל",
+   "ראשון באימון, אחרון בחדר הכושר. מתפתח מהר יותר מכולם.",
+   {
+    "professionalism": 18,
+    "determination": 15,
+    "ambition": 12
+   }
+  ],
+  [
+   "perfectionist",
+   "פרפקציוניסט",
+   "לא מרוצה גם אחרי שער. זה מה שדוחף אותו, וזה גם מה ששוחק אותו.",
+   {
+    "professionalism": 17,
+    "determination": 18,
+    "ambition": 17
+   }
+  ],
+  [
+   "resolute",
+   "נחוש",
+   "לא נשבר. משחקים גדולים הם המקום שלו.",
+   {
+    "determination": 18,
+    "pressure": 15
+   }
+  ],
+  [
+   "driven",
+   "מונע מבפנים",
+   "רוצה להגיע רחוק, ומוכן לשלם על זה.",
+   {
+    "ambition": 17,
+    "determination": 14,
+    "professionalism": 12
+   }
+  ],
+  [
+   "professional",
+   "מקצוען",
+   "עושה את העבודה, בלי דרמות.",
+   {
+    "professionalism": 15,
+    "determination": 12
+   }
+  ],
+  [
+   "fairly_professional",
+   "מקצוען למדי",
+   "לרוב עושה את הדבר הנכון.",
+   {
+    "professionalism": 12,
+    "determination": 10
+   }
+  ],
+  [
+   "loyal",
+   "נאמן",
+   "המועדון שגידל אותו הוא הבית, וקשה לו לעזוב.",
+   {
+    "loyalty": 17,
+    "professionalism": 10
+   }
+  ],
+  [
+   "temperamental",
+   "מזגזג",
+   "יום אחד הוא מכריע, יום אחר הוא לא שם.",
+   {
+    "temperament": -7
+   }
+  ],
+  [
+   "casual",
+   "מזלזל",
+   "כישרון יש. את השעה הנוספת באימון אין.",
+   {
+    "professionalism": -7
+   }
+  ],
+  [
+   "unambitious",
+   "חסר שאיפה",
+   "מרוצה ממה שיש. זה לא בהכרח רע — זה פשוט לא ייקח אותו רחוק.",
+   {
+    "ambition": -6
+   }
+  ],
+  [
+   "balanced",
+   "מאוזן",
+   "בלי קצוות. עובד, משחק, הולך הביתה.",
+   {}
+  ]
+ ],
+ "PERSONALITY_EFFECT": {
+  "model_citizen": [
+   1.3,
+   0.7,
+   1.25
+  ],
+  "model_professional": [
+   1.28,
+   0.72,
+   1.2
+  ],
+  "perfectionist": [
+   1.26,
+   1.15,
+   1.05
+  ],
+  "resolute": [
+   1.18,
+   0.8,
+   1.1
+  ],
+  "driven": [
+   1.16,
+   0.95,
+   1.05
+  ],
+  "professional": [
+   1.1,
+   0.9,
+   1.1
+  ],
+  "fairly_professional": [
+   1.02,
+   1.0,
+   1.0
+  ],
+  "loyal": [
+   1.0,
+   0.9,
+   1.15
+  ],
+  "balanced": [
+   0.96,
+   1.0,
+   1.0
+  ],
+  "temperamental": [
+   0.82,
+   1.45,
+   0.8
+  ],
+  "casual": [
+   0.8,
+   1.1,
+   0.85
+  ],
+  "unambitious": [
+   0.88,
+   0.95,
+   1.0
+  ]
+ },
+ "ROLES": [
+  [
+   "gk",
+   "שוער",
+   [
+    "GK"
+   ],
+   [
+    "defend"
+   ],
+   [
+    "reflexes",
+    "handling",
+    "one_on_ones",
+    "positioning",
+    "concentration"
+   ],
+   [
+    "aerial_reach",
+    "command_of_area",
+    "communication",
+    "decisions"
+   ],
+   "נשאר על הקו, שומר על הרחבה, ולא מחפש הרפתקאות."
+  ],
+  [
+   "sweeper_keeper",
+   "שוער־מנקה",
+   [
+    "GK"
+   ],
+   [
+    "defend",
+    "support",
+    "attack"
+   ],
+   [
+    "rushing_out",
+    "one_on_ones",
+    "first_touch",
+    "passing",
+    "decisions"
+   ],
+   [
+    "reflexes",
+    "handling",
+    "composure",
+    "anticipation",
+    "acceleration"
+   ],
+   "יוצא מהרחבה, מוסר ראשונה, ומשחק כמו שחקן אחד־עשר."
+  ],
+  [
+   "cd_defend",
+   "בלם",
+   [
+    "CB"
+   ],
+   [
+    "defend",
+    "stopper",
+    "cover"
+   ],
+   [
+    "marking",
+    "tackling",
+    "positioning",
+    "heading",
+    "jumping_reach"
+   ],
+   [
+    "strength",
+    "concentration",
+    "bravery",
+    "anticipation"
+   ],
+   "לא נותן לכדור לעבור. פשוט, ובלי סיבוכים."
+  ],
+  [
+   "bpd",
+   "בלם שמוציא",
+   [
+    "CB"
+   ],
+   [
+    "defend",
+    "stopper",
+    "cover"
+   ],
+   [
+    "passing",
+    "vision",
+    "first_touch",
+    "composure",
+    "technique"
+   ],
+   [
+    "marking",
+    "tackling",
+    "positioning",
+    "decisions"
+   ],
+   "לא רק הורס — פותח. המסירה הראשונה שלו היא ההתקפה."
+  ],
+  [
+   "ncb",
+   "בלם בלי שטויות",
+   [
+    "CB"
+   ],
+   [
+    "defend",
+    "stopper",
+    "cover"
+   ],
+   [
+    "heading",
+    "jumping_reach",
+    "strength",
+    "bravery",
+    "marking"
+   ],
+   [
+    "tackling",
+    "aggression",
+    "positioning"
+   ],
+   "כדור באוויר, כדור לצד השני. אין בעיות."
+  ],
+  [
+   "libero",
+   "ליברו",
+   [
+    "CB"
+   ],
+   [
+    "defend",
+    "support"
+   ],
+   [
+    "passing",
+    "vision",
+    "technique",
+    "decisions",
+    "off_the_ball"
+   ],
+   [
+    "marking",
+    "tackling",
+    "first_touch",
+    "composure",
+    "stamina"
+   ],
+   "יוצא מהקו האחורי עם הכדור ומייצר עודף במרכז."
+  ],
+  [
+   "fb",
+   "מגן",
+   [
+    "LB",
+    "RB"
+   ],
+   [
+    "defend",
+    "support",
+    "automatic"
+   ],
+   [
+    "marking",
+    "tackling",
+    "positioning",
+    "anticipation",
+    "concentration"
+   ],
+   [
+    "crossing",
+    "stamina",
+    "teamwork",
+    "work_rate"
+   ],
+   "מגן קודם כול. עולה רק כשבטוח."
+  ],
+  [
+   "wb",
+   "מגן מתקדם",
+   [
+    "LB",
+    "RB"
+   ],
+   [
+    "defend",
+    "support",
+    "attack",
+    "automatic"
+   ],
+   [
+    "crossing",
+    "dribbling",
+    "stamina",
+    "work_rate",
+    "acceleration"
+   ],
+   [
+    "marking",
+    "tackling",
+    "teamwork",
+    "off_the_ball"
+   ],
+   "עולה ויורד תשעים דקות בקו. שני תפקידים בגוף אחד."
+  ],
+  [
+   "cwb",
+   "מגן מתקדם מלא",
+   [
+    "LB",
+    "RB"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "crossing",
+    "dribbling",
+    "flair",
+    "stamina",
+    "acceleration",
+    "technique"
+   ],
+   [
+    "off_the_ball",
+    "work_rate",
+    "agility",
+    "passing"
+   ],
+   "כמעט כנף. הקו כולו שלו, וההגנה תסתדר."
+  ],
+  [
+   "iwb",
+   "מגן מתהפך",
+   [
+    "LB",
+    "RB"
+   ],
+   [
+    "defend",
+    "support",
+    "attack"
+   ],
+   [
+    "passing",
+    "vision",
+    "first_touch",
+    "decisions",
+    "positioning"
+   ],
+   [
+    "tackling",
+    "marking",
+    "composure",
+    "teamwork"
+   ],
+   "נכנס פנימה לקו הקישור ומייצר עודף במרכז, לא בקו."
+  ],
+  [
+   "nfb",
+   "מגן בלי שטויות",
+   [
+    "LB",
+    "RB"
+   ],
+   [
+    "defend"
+   ],
+   [
+    "marking",
+    "tackling",
+    "positioning",
+    "strength",
+    "bravery"
+   ],
+   [
+    "concentration",
+    "anticipation",
+    "aggression"
+   ],
+   "לא מרים ראש. מרחיק, וממשיך לעבוד."
+  ],
+  [
+   "dm",
+   "קשר הגנתי",
+   [
+    "DM"
+   ],
+   [
+    "defend",
+    "support"
+   ],
+   [
+    "positioning",
+    "tackling",
+    "anticipation",
+    "concentration",
+    "teamwork"
+   ],
+   [
+    "marking",
+    "strength",
+    "decisions",
+    "passing"
+   ],
+   "לפני ההגנה, אחרי הקישור. השקט של הקבוצה."
+  ],
+  [
+   "anchor",
+   "עוגן",
+   [
+    "DM"
+   ],
+   [
+    "defend"
+   ],
+   [
+    "positioning",
+    "marking",
+    "tackling",
+    "concentration",
+    "decisions"
+   ],
+   [
+    "anticipation",
+    "strength",
+    "teamwork"
+   ],
+   "לא זז מהמקום. סותם את החור שבין הקווים."
+  ],
+  [
+   "half_back",
+   "מגן־קשר",
+   [
+    "DM"
+   ],
+   [
+    "defend"
+   ],
+   [
+    "positioning",
+    "marking",
+    "tackling",
+    "anticipation",
+    "teamwork"
+   ],
+   [
+    "passing",
+    "first_touch",
+    "composure",
+    "stamina"
+   ],
+   "יורד בין הבלמים בבנייה, ועולה בהגנה. שלושה נגד שניים, תמיד."
+  ],
+  [
+   "bwm",
+   "קשר חוטף",
+   [
+    "DM",
+    "CM"
+   ],
+   [
+    "defend",
+    "support"
+   ],
+   [
+    "tackling",
+    "aggression",
+    "work_rate",
+    "stamina",
+    "bravery"
+   ],
+   [
+    "anticipation",
+    "positioning",
+    "teamwork",
+    "determination"
+   ],
+   "רודף את הכדור עד שהוא מקבל אותו. או עד שהשופט שורק."
+  ],
+  [
+   "dlp",
+   "קשר בונה עמוק",
+   [
+    "DM",
+    "CM"
+   ],
+   [
+    "defend",
+    "support"
+   ],
+   [
+    "passing",
+    "vision",
+    "technique",
+    "composure",
+    "decisions"
+   ],
+   [
+    "first_touch",
+    "teamwork",
+    "anticipation",
+    "positioning"
+   ],
+   "המשחק עובר דרכו. רואה את המסירה שלושה מהלכים לפני כולם."
+  ],
+  [
+   "regista",
+   "רג'יסטה",
+   [
+    "DM"
+   ],
+   [
+    "support"
+   ],
+   [
+    "vision",
+    "passing",
+    "flair",
+    "technique",
+    "composure",
+    "decisions"
+   ],
+   [
+    "first_touch",
+    "off_the_ball",
+    "dribbling",
+    "anticipation"
+   ],
+   "בונה עמוק אבל בלי רסן — מחפש את המסירה שתשבור את הכל."
+  ],
+  [
+   "volante",
+   "סגונדו וולנטה",
+   [
+    "DM"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "stamina",
+    "work_rate",
+    "long_shots",
+    "off_the_ball",
+    "tackling"
+   ],
+   [
+    "passing",
+    "positioning",
+    "strength",
+    "acceleration"
+   ],
+   "מתחיל אחורה ומסיים ברחבה. ריאות של שניים."
+  ],
+  [
+   "cm",
+   "קשר מרכזי",
+   [
+    "CM"
+   ],
+   [
+    "defend",
+    "support",
+    "attack",
+    "automatic"
+   ],
+   [
+    "passing",
+    "teamwork",
+    "decisions",
+    "work_rate",
+    "positioning"
+   ],
+   [
+    "first_touch",
+    "tackling",
+    "stamina",
+    "composure"
+   ],
+   "הדבק. עושה את מה שהמשחק צריך באותו רגע."
+  ],
+  [
+   "b2b",
+   "קשר ריאות",
+   [
+    "CM"
+   ],
+   [
+    "support"
+   ],
+   [
+    "stamina",
+    "work_rate",
+    "teamwork",
+    "off_the_ball",
+    "passing"
+   ],
+   [
+    "tackling",
+    "long_shots",
+    "strength",
+    "determination"
+   ],
+   "רץ שנים־עשר קילומטר וגם מוסר. מרגישים כשהוא לא שם."
+  ],
+  [
+   "mezzala",
+   "מצאלה",
+   [
+    "CM"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "dribbling",
+    "passing",
+    "off_the_ball",
+    "flair",
+    "vision"
+   ],
+   [
+    "technique",
+    "acceleration",
+    "long_shots",
+    "work_rate"
+   ],
+   "נפתח לחצי־חלל בין המגן לבלם, ומשם שובר."
+  ],
+  [
+   "carrilero",
+   "קארילרו",
+   [
+    "CM"
+   ],
+   [
+    "support"
+   ],
+   [
+    "teamwork",
+    "work_rate",
+    "positioning",
+    "stamina",
+    "passing"
+   ],
+   [
+    "tackling",
+    "decisions",
+    "anticipation"
+   ],
+   "מכסה את הרצועה שבין המרכז לקו. עבודה שאף אחד לא מריע לה."
+  ],
+  [
+   "rpm",
+   "בונה נודד",
+   [
+    "CM"
+   ],
+   [
+    "support"
+   ],
+   [
+    "passing",
+    "vision",
+    "technique",
+    "off_the_ball",
+    "stamina"
+   ],
+   [
+    "dribbling",
+    "first_touch",
+    "work_rate",
+    "composure"
+   ],
+   "אין לו עמדה. הוא הולך לאן שהכדור, והכדור הולך אליו."
+  ],
+  [
+   "ap",
+   "בונה מתקדם",
+   [
+    "CM",
+    "AM"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "passing",
+    "vision",
+    "technique",
+    "flair",
+    "first_touch"
+   ],
+   [
+    "dribbling",
+    "composure",
+    "off_the_ball",
+    "decisions"
+   ],
+   "עובד גבוה, בין הקווים, ומחפש את הכדור האחרון."
+  ],
+  [
+   "am",
+   "קשר התקפי",
+   [
+    "AM"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "passing",
+    "off_the_ball",
+    "technique",
+    "vision",
+    "long_shots"
+   ],
+   [
+    "first_touch",
+    "dribbling",
+    "composure",
+    "flair"
+   ],
+   "בין הקישור להתקפה, במקום שקשה לשמור עליו."
+  ],
+  [
+   "enganche",
+   "אנגנצ'ה",
+   [
+    "AM"
+   ],
+   [
+    "support"
+   ],
+   [
+    "vision",
+    "passing",
+    "technique",
+    "composure",
+    "flair"
+   ],
+   [
+    "first_touch",
+    "decisions",
+    "anticipation"
+   ],
+   "העשר הקלאסי. לא רץ אחורה, ולא צריך — הכדור מגיע אליו."
+  ],
+  [
+   "shadow",
+   "חלוץ צל",
+   [
+    "AM"
+   ],
+   [
+    "attack"
+   ],
+   [
+    "off_the_ball",
+    "finishing",
+    "acceleration",
+    "anticipation",
+    "composure"
+   ],
+   [
+    "dribbling",
+    "first_touch",
+    "long_shots",
+    "work_rate"
+   ],
+   "נכנס מאחורי החלוץ בדיוק כשההגנה מסתכלת עליו."
+  ],
+  [
+   "trequartista",
+   "טרקוורטיסטה",
+   [
+    "AM",
+    "ST"
+   ],
+   [
+    "attack"
+   ],
+   [
+    "flair",
+    "vision",
+    "technique",
+    "dribbling",
+    "off_the_ball"
+   ],
+   [
+    "passing",
+    "finishing",
+    "first_touch",
+    "composure"
+   ],
+   "משוחרר מכל חובה הגנתית. או שהוא מכריע, או שהוא נעלם."
+  ],
+  [
+   "winger",
+   "כנף",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "crossing",
+    "dribbling",
+    "acceleration",
+    "pace",
+    "technique"
+   ],
+   [
+    "agility",
+    "flair",
+    "off_the_ball",
+    "balance"
+   ],
+   "אחד על אחד, ואז הרמה. הקהל קם כשהכדור מגיע אליו."
+  ],
+  [
+   "if",
+   "חלוץ פנימי",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "dribbling",
+    "finishing",
+    "off_the_ball",
+    "acceleration",
+    "first_touch"
+   ],
+   [
+    "long_shots",
+    "agility",
+    "flair",
+    "composure"
+   ],
+   "חותך פנימה מהקו על הרגל החזקה ומחפש שער."
+  ],
+  [
+   "iw",
+   "כנף מתהפכת",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "passing",
+    "crossing",
+    "dribbling",
+    "vision",
+    "technique"
+   ],
+   [
+    "off_the_ball",
+    "agility",
+    "first_touch",
+    "decisions"
+   ],
+   "חותך פנימה, אבל כדי לבשל — לא כדי לבעוט."
+  ],
+  [
+   "wp",
+   "בונה מהקו",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "passing",
+    "vision",
+    "technique",
+    "crossing",
+    "first_touch"
+   ],
+   [
+    "dribbling",
+    "composure",
+    "decisions",
+    "flair"
+   ],
+   "מקבל את הכדור בקו ומנהל ממנו את ההתקפה."
+  ],
+  [
+   "raumdeuter",
+   "ראומדויטר",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "attack"
+   ],
+   [
+    "off_the_ball",
+    "anticipation",
+    "finishing",
+    "concentration",
+    "composure"
+   ],
+   [
+    "decisions",
+    "acceleration",
+    "first_touch",
+    "teamwork"
+   ],
+   "לא מכדרר ולא מרים. פשוט נמצא במקום שאף אחד לא שמר עליו."
+  ],
+  [
+   "wtf",
+   "כנף מטרה",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "support",
+    "attack"
+   ],
+   [
+    "heading",
+    "jumping_reach",
+    "strength",
+    "bravery",
+    "first_touch"
+   ],
+   [
+    "crossing",
+    "teamwork",
+    "off_the_ball"
+   ],
+   "מחזיק את הכדור בקו ומושך אליו את המגן."
+  ],
+  [
+   "dw",
+   "כנף הגנתית",
+   [
+    "LW",
+    "RW"
+   ],
+   [
+    "defend",
+    "support"
+   ],
+   [
+    "work_rate",
+    "stamina",
+    "teamwork",
+    "tackling",
+    "positioning"
+   ],
+   [
+    "crossing",
+    "dribbling",
+    "anticipation",
+    "marking"
+   ],
+   "רץ אחורה עם המגן שלהם. לא זוהר, אבל בלעדיו הקו נשבר."
+  ],
+  [
+   "af",
+   "חלוץ מתקדם",
+   [
+    "ST"
+   ],
+   [
+    "attack"
+   ],
+   [
+    "finishing",
+    "off_the_ball",
+    "acceleration",
+    "composure",
+    "dribbling"
+   ],
+   [
+    "first_touch",
+    "anticipation",
+    "pace",
+    "technique"
+   ],
+   "רץ לעומק בכל הזדמנות, ומחפש את הכדור מאחורי ההגנה."
+  ],
   [
    "poacher",
    "חלוץ בור",
@@ -2280,514 +4126,575 @@ const D = {
     "ST"
    ],
    [
-    [
-     "shooting",
-     1.0
-    ],
-    [
-     "mental",
-     0.6
-    ],
-    [
-     "pace",
-     0.4
-    ]
+    "attack"
    ],
    [
-    [
-     17,
-     {
-      "shooting": 62,
-      "mental": 55
-     }
-    ],
-    [
-     19,
-     {
-      "shooting": 72,
-      "mental": 63,
-      "pace": 62
-     }
-    ],
-    [
-     21,
-     {
-      "shooting": 80,
-      "mental": 70,
-      "pace": 68
-     }
-    ],
-    [
-     24,
-     {
-      "shooting": 88,
-      "mental": 78,
-      "pace": 72
-     }
-    ]
+    "finishing",
+    "off_the_ball",
+    "anticipation",
+    "composure",
+    "concentration"
    ],
-   "clutch",
-   "עומד במקום הנכון ברגע הנכון. לא נוגע בכדור תשעים דקות, ומכריע."
+   [
+    "first_touch",
+    "acceleration",
+    "heading",
+    "decisions"
+   ],
+   "לא נוגע בכדור תשעים דקות, ומכריע ברגע הנכון."
   ],
   [
-   "target_man",
+   "tf",
    "חלוץ מטרה",
    [
     "ST"
    ],
    [
-    [
-     "physical",
-     1.0
-    ],
-    [
-     "shooting",
-     0.7
-    ],
-    [
-     "mental",
-     0.5
-    ]
+    "support",
+    "attack"
    ],
    [
-    [
-     17,
-     {
-      "physical": 64,
-      "shooting": 56
-     }
-    ],
-    [
-     19,
-     {
-      "physical": 74,
-      "shooting": 66,
-      "passing": 55
-     }
-    ],
-    [
-     21,
-     {
-      "physical": 82,
-      "shooting": 74,
-      "passing": 62
-     }
-    ],
-    [
-     24,
-     {
-      "physical": 88,
-      "shooting": 82,
-      "mental": 74
-     }
-    ]
+    "heading",
+    "jumping_reach",
+    "strength",
+    "bravery",
+    "first_touch"
    ],
-   "leader",
-   "מחזיק את הכדור עם הגב לשער עד שכל הקבוצה עולה. עליו נשען המערך."
+   [
+    "finishing",
+    "teamwork",
+    "balance",
+    "composure"
+   ],
+   "מחזיק עם הגב לשער עד שכל הקבוצה עולה."
   ],
   [
-   "winger",
-   "כנף מתפרצת",
+   "cf",
+   "חלוץ מושלם",
    [
-    "LW",
-    "RW"
+    "ST"
    ],
    [
-    [
-     "pace",
-     1.0
-    ],
-    [
-     "dribbling",
-     0.9
-    ],
-    [
-     "shooting",
-     0.4
-    ]
+    "support",
+    "attack"
    ],
    [
-    [
-     17,
-     {
-      "pace": 68,
-      "dribbling": 62
-     }
-    ],
-    [
-     19,
-     {
-      "pace": 78,
-      "dribbling": 72,
-      "physical": 52
-     }
-    ],
-    [
-     21,
-     {
-      "pace": 86,
-      "dribbling": 80,
-      "shooting": 66
-     }
-    ],
-    [
-     24,
-     {
-      "pace": 90,
-      "dribbling": 87,
-      "shooting": 74
-     }
-    ]
+    "finishing",
+    "dribbling",
+    "passing",
+    "first_touch",
+    "technique",
+    "off_the_ball"
    ],
-   "clutch",
-   "אחד על אחד, כל פעם מחדש. הקהל קם כשהכדור מגיע אליך."
+   [
+    "composure",
+    "vision",
+    "strength",
+    "acceleration",
+    "flair"
+   ],
+   "כובש, מבשל, מחזיק, פותח. עושה הכול, וטוב בהכול."
   ],
   [
-   "playmaker",
-   "מנצח משחק",
+   "dlf",
+   "חלוץ נסוג",
    [
-    "AM",
-    "CM"
+    "ST"
    ],
    [
-    [
-     "passing",
-     1.0
-    ],
-    [
-     "mental",
-     0.8
-    ],
-    [
-     "dribbling",
-     0.5
-    ]
+    "support",
+    "attack"
    ],
    [
-    [
-     17,
-     {
-      "passing": 64,
-      "mental": 60
-     }
-    ],
-    [
-     19,
-     {
-      "passing": 74,
-      "mental": 70,
-      "dribbling": 62
-     }
-    ],
-    [
-     21,
-     {
-      "passing": 83,
-      "mental": 78,
-      "dribbling": 70
-     }
-    ],
-    [
-     24,
-     {
-      "passing": 90,
-      "mental": 85,
-      "dribbling": 76
-     }
-    ]
+    "first_touch",
+    "passing",
+    "technique",
+    "composure",
+    "vision"
    ],
-   "leader",
-   "רואה את המסירה שלושה מהלכים לפני כולם. המשחק עובר דרכך."
+   [
+    "finishing",
+    "off_the_ball",
+    "strength",
+    "teamwork"
+   ],
+   "יורד לקבל בין הקווים ומושך את הבלם אחריו."
   ],
   [
-   "box_to_box",
-   "קשר ריאות",
+   "pf",
+   "חלוץ לוחץ",
    [
-    "CM",
-    "DM"
+    "ST"
    ],
    [
-    [
-     "physical",
-     0.9
-    ],
-    [
-     "passing",
-     0.8
-    ],
-    [
-     "defending",
-     0.7
-    ]
+    "defend",
+    "support",
+    "attack"
    ],
    [
-    [
-     17,
-     {
-      "physical": 62,
-      "passing": 60
-     }
-    ],
-    [
-     19,
-     {
-      "physical": 72,
-      "passing": 70,
-      "defending": 62
-     }
-    ],
-    [
-     21,
-     {
-      "physical": 80,
-      "passing": 78,
-      "defending": 70
-     }
-    ],
-    [
-     24,
-     {
-      "physical": 86,
-      "passing": 84,
-      "defending": 76
-     }
-    ]
+    "work_rate",
+    "stamina",
+    "aggression",
+    "bravery",
+    "teamwork"
    ],
-   "workhorse",
-   "רץ שנים־עשר קילומטר וגם מוסר. הקבוצה מרגישה כשאתה לא שם."
+   [
+    "finishing",
+    "off_the_ball",
+    "anticipation",
+    "acceleration"
+   ],
+   "הלחיצה מתחילה ממנו. ההגנה שלהם לא נחה רגע."
   ],
   [
-   "anchor",
-   "עוגן",
+   "f9",
+   "תשע מדומה",
    [
-    "DM",
-    "CB"
+    "ST"
    ],
    [
-    [
-     "defending",
-     1.0
-    ],
-    [
-     "mental",
-     0.7
-    ],
-    [
-     "physical",
-     0.7
-    ]
+    "support"
    ],
    [
-    [
-     17,
-     {
-      "defending": 64,
-      "physical": 58
-     }
-    ],
-    [
-     19,
-     {
-      "defending": 74,
-      "physical": 68,
-      "mental": 62
-     }
-    ],
-    [
-     21,
-     {
-      "defending": 82,
-      "physical": 76,
-      "mental": 72
-     }
-    ],
-    [
-     24,
-     {
-      "defending": 89,
-      "physical": 82,
-      "mental": 80
-     }
-    ]
-   ],
-   "leader",
-   "לפני ההגנה, אחרי הקישור. השקט של הקבוצה."
-  ],
-  [
-   "ball_cb",
-   "בלם שמוציא",
-   [
-    "CB"
+    "passing",
+    "vision",
+    "first_touch",
+    "technique",
+    "off_the_ball",
+    "flair"
    ],
    [
-    [
-     "defending",
-     1.0
-    ],
-    [
-     "passing",
-     0.7
-    ],
-    [
-     "mental",
-     0.6
-    ]
+    "dribbling",
+    "finishing",
+    "composure",
+    "decisions"
    ],
-   [
-    [
-     17,
-     {
-      "defending": 64,
-      "passing": 55
-     }
-    ],
-    [
-     19,
-     {
-      "defending": 74,
-      "passing": 66,
-      "mental": 62
-     }
-    ],
-    [
-     21,
-     {
-      "defending": 83,
-      "passing": 74,
-      "mental": 72
-     }
-    ],
-    [
-     24,
-     {
-      "defending": 90,
-      "passing": 80,
-      "mental": 80
-     }
-    ]
-   ],
-   "leader",
-   "לא רק הורס — פותח. המסירה הראשונה שלך היא ההתקפה."
-  ],
-  [
-   "full_back",
-   "מגן מודרני",
-   [
-    "LB",
-    "RB"
-   ],
-   [
-    [
-     "pace",
-     0.9
-    ],
-    [
-     "defending",
-     0.9
-    ],
-    [
-     "physical",
-     0.6
-    ]
-   ],
-   [
-    [
-     17,
-     {
-      "pace": 66,
-      "defending": 60
-     }
-    ],
-    [
-     19,
-     {
-      "pace": 76,
-      "defending": 70,
-      "physical": 60
-     }
-    ],
-    [
-     21,
-     {
-      "pace": 84,
-      "defending": 78,
-      "passing": 68
-     }
-    ],
-    [
-     24,
-     {
-      "pace": 88,
-      "defending": 85,
-      "passing": 74
-     }
-    ]
-   ],
-   "workhorse",
-   "עולה ויורד תשעים דקות בקו. שני תפקידים בגוף אחד."
-  ],
-  [
-   "sweeper_gk",
-   "שוער־מנקה",
-   [
-    "GK"
-   ],
-   [
-    [
-     "defending",
-     1.0
-    ],
-    [
-     "mental",
-     0.8
-    ],
-    [
-     "passing",
-     0.6
-    ]
-   ],
-   [
-    [
-     17,
-     {
-      "defending": 62,
-      "mental": 58
-     }
-    ],
-    [
-     19,
-     {
-      "defending": 72,
-      "mental": 68,
-      "passing": 58
-     }
-    ],
-    [
-     21,
-     {
-      "defending": 82,
-      "mental": 76,
-      "passing": 66
-     }
-    ],
-    [
-     24,
-     {
-      "defending": 89,
-      "mental": 84,
-      "passing": 72
-     }
-    ]
-   ],
-   "leader",
-   "יוצא מהרחבה, מוסר ראשונה, ומציל כשצריך."
+   "יורד לקישור ומשאיר את הרחבה ריקה — למישהו אחר."
   ]
  ],
- "MILESTONE_REWARD": {
-  "potential": 2.2,
-  "rep": 1.6,
-  "morale": 8,
-  "trust": 5
+ "DUTY_NAMES_HE": {
+  "defend": "הגנה",
+  "support": "תמיכה",
+  "attack": "התקפה",
+  "stopper": "בולם",
+  "cover": "מכסה",
+  "automatic": "אוטומטי"
+ },
+ "DUTY_SHIFT": {
+  "defend": [
+   0.28,
+   -0.22,
+   -0.05
+  ],
+  "cover": [
+   0.3,
+   -0.24,
+   -0.02
+  ],
+  "stopper": [
+   0.24,
+   -0.16,
+   0.06
+  ],
+  "support": [
+   0.0,
+   0.0,
+   0.08
+  ],
+  "automatic": [
+   0.05,
+   0.05,
+   0.04
+  ],
+  "attack": [
+   -0.22,
+   0.3,
+   0.05
+  ]
+ },
+ "TEAM_INSTRUCTIONS": {
+  "mentality": [
+   "מנטליות",
+   [
+    [
+     "very_defensive",
+     "הגנתית מאוד",
+     -2
+    ],
+    [
+     "defensive",
+     "הגנתית",
+     -1
+    ],
+    [
+     "balanced",
+     "מאוזנת",
+     0
+    ],
+    [
+     "positive",
+     "חיובית",
+     1
+    ],
+    [
+     "attacking",
+     "התקפית",
+     2
+    ]
+   ]
+  ],
+  "tempo": [
+   "קצב",
+   [
+    [
+     "much_lower",
+     "איטי מאוד",
+     -2
+    ],
+    [
+     "lower",
+     "איטי",
+     -1
+    ],
+    [
+     "standard",
+     "רגיל",
+     0
+    ],
+    [
+     "higher",
+     "מהיר",
+     1
+    ],
+    [
+     "much_higher",
+     "מהיר מאוד",
+     2
+    ]
+   ]
+  ],
+  "width": [
+   "רוחב",
+   [
+    [
+     "very_narrow",
+     "צר מאוד",
+     -2
+    ],
+    [
+     "narrow",
+     "צר",
+     -1
+    ],
+    [
+     "standard",
+     "רגיל",
+     0
+    ],
+    [
+     "wide",
+     "רחב",
+     1
+    ],
+    [
+     "very_wide",
+     "רחב מאוד",
+     2
+    ]
+   ]
+  ],
+  "passing": [
+   "אורך מסירה",
+   [
+    [
+     "much_shorter",
+     "קצר מאוד",
+     -2
+    ],
+    [
+     "shorter",
+     "קצר",
+     -1
+    ],
+    [
+     "standard",
+     "רגיל",
+     0
+    ],
+    [
+     "direct",
+     "ישיר",
+     1
+    ],
+    [
+     "much_direct",
+     "ישיר מאוד",
+     2
+    ]
+   ]
+  ],
+  "pressing": [
+   "עוצמת לחיצה",
+   [
+    [
+     "much_less",
+     "נמוכה מאוד",
+     -2
+    ],
+    [
+     "less",
+     "נמוכה",
+     -1
+    ],
+    [
+     "standard",
+     "רגילה",
+     0
+    ],
+    [
+     "more",
+     "גבוהה",
+     1
+    ],
+    [
+     "much_more",
+     "גבוהה מאוד",
+     2
+    ]
+   ]
+  ],
+  "engagement": [
+   "קו לחיצה",
+   [
+    [
+     "much_deeper",
+     "עמוק מאוד",
+     -2
+    ],
+    [
+     "deeper",
+     "עמוק",
+     -1
+    ],
+    [
+     "standard",
+     "רגיל",
+     0
+    ],
+    [
+     "higher",
+     "גבוה",
+     1
+    ],
+    [
+     "much_higher",
+     "גבוה מאוד",
+     2
+    ]
+   ]
+  ],
+  "d_line": [
+   "קו הגנה",
+   [
+    [
+     "much_deeper",
+     "עמוק מאוד",
+     -2
+    ],
+    [
+     "deeper",
+     "עמוק",
+     -1
+    ],
+    [
+     "standard",
+     "רגיל",
+     0
+    ],
+    [
+     "higher",
+     "גבוה",
+     1
+    ],
+    [
+     "much_higher",
+     "גבוה מאוד",
+     2
+    ]
+   ]
+  ]
+ },
+ "INSTRUCTION_KEYS": [
+  "mentality",
+  "tempo",
+  "width",
+  "passing",
+  "pressing",
+  "engagement",
+  "d_line"
+ ],
+ "TACTICAL_STYLES": [
+  [
+   "gegenpress",
+   "גגנפרסינג",
+   {
+    "mentality": 2,
+    "tempo": 2,
+    "width": 1,
+    "passing": 0,
+    "pressing": 2,
+    "engagement": 2,
+    "d_line": 2
+   },
+   "מאבדים את הכדור? מחזירים אותו תוך שש שניות. תשעים דקות של ריצה."
+  ],
+  [
+   "tiki_taka",
+   "טיקי־טאקה",
+   {
+    "mentality": 1,
+    "tempo": -1,
+    "width": -1,
+    "passing": -2,
+    "pressing": 1,
+    "engagement": 1,
+    "d_line": 1
+   },
+   "החזקה כשיטת הגנה. מאות מסירות, וסבלנות עד שנפתח חור."
+  ],
+  [
+   "counter",
+   "מעברים מהירים",
+   {
+    "mentality": -1,
+    "tempo": 2,
+    "width": 0,
+    "passing": 2,
+    "pressing": -1,
+    "engagement": -1,
+    "d_line": -1
+   },
+   "נותנים להם את הכדור, ואז רצים שישים מטר בשלוש מסירות."
+  ],
+  [
+   "control",
+   "שליטה",
+   {
+    "mentality": 1,
+    "tempo": 0,
+    "width": 1,
+    "passing": -1,
+    "pressing": 0,
+    "engagement": 0,
+    "d_line": 1
+   },
+   "מנהלים את הקצב, מחזיקים גבוה, ולא ממהרים לשום מקום."
+  ],
+  [
+   "direct",
+   "כדורגל ישיר",
+   {
+    "mentality": 1,
+    "tempo": 1,
+    "width": 1,
+    "passing": 2,
+    "pressing": 0,
+    "engagement": 0,
+    "d_line": 0
+   },
+   "קדימה מהר, שנייה, ולחפש את הראש של החלוץ."
+  ],
+  [
+   "catenaccio",
+   "בטון",
+   {
+    "mentality": -2,
+    "tempo": -1,
+    "width": -2,
+    "passing": -1,
+    "pressing": -2,
+    "engagement": -2,
+    "d_line": -2
+   },
+   "אחד־אפס זה ניצחון מושלם. שני קווים של ארבעה, ובהצלחה."
+  ],
+  [
+   "wing_play",
+   "משחק קו",
+   {
+    "mentality": 1,
+    "tempo": 1,
+    "width": 2,
+    "passing": 1,
+    "pressing": 0,
+    "engagement": 0,
+    "d_line": 0
+   },
+   "הכול דרך הקווים. הרמות, קרנות, ועוד הרמות."
+  ],
+  [
+   "balanced_style",
+   "מאוזן",
+   {
+    "mentality": 0,
+    "tempo": 0,
+    "width": 0,
+    "passing": 0,
+    "pressing": 0,
+    "engagement": 0,
+    "d_line": 0
+   },
+   "בלי אג'נדה. מגיבים למה שהמשחק נותן."
+  ]
+ ],
+ "DETAIL_DECLINE": {
+  "acceleration": 1.9,
+  "pace": 1.9,
+  "agility": 1.5,
+  "balance": 1.0,
+  "stamina": 1.4,
+  "jumping_reach": 1.3,
+  "strength": 0.9,
+  "natural_fitness": 1.1,
+  "dribbling": 1.1,
+  "flair": 0.6,
+  "work_rate": 0.9,
+  "aggression": 0.4,
+  "finishing": 0.6,
+  "long_shots": 0.5,
+  "heading": 0.7,
+  "crossing": 0.4,
+  "first_touch": 0.2,
+  "technique": 0.1,
+  "passing": 0.2,
+  "corners": 0.0,
+  "free_kick": 0.0,
+  "penalty_taking": 0.0,
+  "long_throws": 0.5,
+  "tackling": 0.8,
+  "marking": 0.4,
+  "anticipation": -0.6,
+  "composure": -0.6,
+  "concentration": -0.4,
+  "decisions": -0.7,
+  "determination": -0.2,
+  "leadership": -0.9,
+  "off_the_ball": -0.2,
+  "positioning": -0.7,
+  "teamwork": -0.4,
+  "vision": -0.5,
+  "bravery": 0.0,
+  "reflexes": 1.0,
+  "handling": 0.3,
+  "one_on_ones": 0.2,
+  "aerial_reach": 1.1,
+  "command_of_area": -0.4,
+  "communication": -0.6,
+  "kicking": 0.3,
+  "throwing": 0.3,
+  "rushing_out": 0.8,
+  "eccentricity": 0.0,
+  "tendency_to_punch": 0.0
  },
  "ASSETS": [
   [
@@ -9244,6 +11151,239 @@ async function writeSaveFile(handle, text) {
 }
 
 // ---------------------------------------------------------------------------
+// התכונות המפורטות — תאום JS של החלק הזה ב-models.py
+//
+// הכלל: detail הוא האמת, attributes נגזר. כל כתיבה עוברת דרך addDetail
+// או addGroup, ושתיהן מסתיימות ב-recomputeGroups. אין דרך אחרת לשנות
+// תכונה — וזה מה שמונע מהשניים להתפצל.
+// ---------------------------------------------------------------------------
+
+function groupMapFor(position) {
+  return position === "GK" ? D.GROUP_MAP_GK : D.GROUP_MAP;
+}
+
+function attrsFor(position) {
+  return position === "GK" ? D.KEEPER_ATTRS : D.OUTFIELD_ATTRS;
+}
+
+/** מחשב מחדש את שבע הקבוצות (1-100) מתוך התכונות המפורטות (1-20). */
+function recomputeGroups(p) {
+  const mapping = groupMapFor(p.position);
+  for (const group in mapping) {
+    let total = 0, weight = 0;
+    const members = mapping[group];
+    for (const attr in members) {
+      total += (p.detail[attr] ?? 10) * members[attr];
+      weight += members[attr];
+    }
+    p.attributes[group] = Math.round(clamp(weight ? (total / weight) * 5 : 50, 1, 99));
+  }
+}
+
+/** מוסיף שבר לתכונה מפורטת. מחזיר כמה נקודות שלמות נוספו. */
+function addDetail(p, attr, delta) {
+  if (!(attr in D.DETAIL_NAMES_HE)) return 0;
+  let current = (p.detailGrowth[attr] || 0) + delta;
+  let gained = 0;
+  while (current >= 1 && (p.detail[attr] ?? 10) < 20) {
+    p.detail[attr] = (p.detail[attr] ?? 10) + 1;
+    current -= 1; gained += 1;
+  }
+  while (current <= -1 && (p.detail[attr] ?? 10) > 1) {
+    p.detail[attr] = (p.detail[attr] ?? 10) - 1;
+    current += 1; gained -= 1;
+  }
+  // אין טעם לצבור שברים על תכונה שכבר בתקרה או ברצפה
+  if ((p.detail[attr] ?? 10) >= 20) current = Math.min(current, 0);
+  else if ((p.detail[attr] ?? 10) <= 1) current = Math.max(current, 0);
+  p.detailGrowth[attr] = current;
+  if (gained) recomputeGroups(p);
+  return gained;
+}
+
+/**
+ * מפזר שינוי בקבוצה על התכונות המפורטות שמרכיבות אותה.
+ * ככה אירועי עלילה שכתובים בשפת הקבוצות ממשיכים לעבוד בלי שינוי.
+ */
+function addGroup(p, group, delta) {
+  const members = groupMapFor(p.position)[group];
+  if (!members) return {};
+  const allowed = new Set(attrsFor(p.position));
+  const usable = {};
+  for (const attr in members) if (allowed.has(attr)) usable[attr] = members[attr];
+  const keys = Object.keys(usable);
+  if (!keys.length) return {};
+  const total = keys.reduce((a, k) => a + usable[k], 0);
+  const step = delta / 5;
+  const gains = {};
+  for (const attr of keys) {
+    const got = addDetail(p, attr, step * (usable[attr] / total) * keys.length);
+    if (got) gains[attr] = got;
+  }
+  return gains;
+}
+
+/** מציב קבוצה שלמה על ערך נתון, דרך התכונות שמרכיבות אותה. */
+function setGroup(p, group, value) {
+  const members = groupMapFor(p.position)[group];
+  if (!members) return;
+  const level = Math.round(clamp(value / 5, 1, 20));
+  for (const attr in members) p.detail[attr] = level;
+  recomputeGroups(p);
+}
+
+function setAll(p, value) {
+  const level = Math.round(clamp(value / 5, 1, 20));
+  for (const attr in D.DETAIL_NAMES_HE) p.detail[attr] = level;
+  recomputeGroups(p);
+}
+
+// ---------------------------------------------------------------------------
+// תפקידים
+// ---------------------------------------------------------------------------
+
+const ROLE_BY_KEY = {};
+for (const row of D.ROLES) ROLE_BY_KEY[row[0]] = row;
+
+function rolesFor(position) {
+  return D.ROLES.filter(row => row[2].includes(position));
+}
+
+function roleRow(key) { return ROLE_BY_KEY[key] || null; }
+
+/** 0-100: כמה השחקן מתאים לתפקיד, לפי מה שהתפקיד באמת דורש. */
+function roleSuitability(p, roleKey) {
+  const row = roleRow(roleKey);
+  if (!row) return 0;
+  let total = 0, weight = 0;
+  for (const attr of row[4]) { total += (p.detail[attr] ?? 10) * 2; weight += 2; }
+  for (const attr of row[5]) { total += (p.detail[attr] ?? 10) * 1; weight += 1; }
+  let score = weight ? (total / weight) * 5 : 0;
+  if (!row[2].includes(p.position)) score *= 0.72;
+  return clamp(score, 0, 100);
+}
+
+function bestRole(p) {
+  const options = rolesFor(p.position);
+  if (!options.length) return ["", 0];
+  let bestKey = "", best = -1;
+  for (const row of options) {
+    const score = roleSuitability(p, row[0]);
+    if (score > best) { best = score; bestKey = row[0]; }
+  }
+  return [bestKey, best];
+}
+
+function roleName(p) {
+  const row = roleRow(p.role);
+  if (!row) return D.POSITION_NAMES_HE[p.position];
+  const duty = D.DUTY_NAMES_HE[p.duty] || "";
+  return duty ? `${row[1]} (${duty})` : row[1];
+}
+
+// ---------------------------------------------------------------------------
+// אישיות
+// ---------------------------------------------------------------------------
+
+/** האישיות נגזרת מהתכונות הנסתרות ומהנחישות — בדיוק כמו במקור. */
+function personalityKey(p) {
+  const values = Object.assign({}, p.hidden);
+  values.determination = p.detail.determination ?? 10;
+  for (const [key, , , needs] of D.PERSONALITIES) {
+    let ok = true;
+    for (const attr in needs) {
+      const level = needs[attr];
+      const value = values[attr] ?? 10;
+      // ערך שלילי בתנאי פירושו "לכל היותר"
+      if (level < 0 ? value <= -level : value >= level) continue;
+      ok = false; break;
+    }
+    if (ok) return key;
+  }
+  return "balanced";
+}
+
+function personalityName(p) {
+  const key = personalityKey(p);
+  const row = D.PERSONALITIES.find(r => r[0] === key);
+  return row ? row[1] : "מאוזן";
+}
+
+function personalityEffect(p) {
+  return D.PERSONALITY_EFFECT[personalityKey(p)] || [1, 1, 1];
+}
+
+// ---------------------------------------------------------------------------
+// ייצור
+// ---------------------------------------------------------------------------
+
+/**
+ * מייצר את התכונות המפורטות (1-20) סביב רמה מבוקשת.
+ * התפקיד קובע את הפרופיל — זה מה שהופך שני חלוצים באותו דירוג
+ * לשני שחקנים שונים לגמרי.
+ */
+function generateDetail(rng, position, targetOverall, roleKey = "") {
+  let row = roleKey ? roleRow(roleKey) : null;
+  if (!row) {
+    const options = rolesFor(position);
+    row = options.length ? rng.choice(options) : null;
+  }
+  const keyAttrs = new Set(row ? row[4] : []);
+  const extra = new Set(row ? row[5] : []);
+  const allowed = new Set(attrsFor(position));
+  const centre = clamp(targetOverall / 5, 1, 19.5);
+  const detail = {};
+  for (const attr in D.DETAIL_NAMES_HE) {
+    if (!allowed.has(attr)) {
+      detail[attr] = Math.round(clamp(rng.gauss(6, 2.5), 1, 14));
+      continue;
+    }
+    let base;
+    if (keyAttrs.has(attr)) base = centre + rng.gauss(2.2, 1.3);
+    else if (extra.has(attr)) base = centre + rng.gauss(0.8, 1.4);
+    else base = centre + rng.gauss(-1.6, 2.0);
+    detail[attr] = Math.round(clamp(base, 1, 20));
+  }
+  // נחישות אינה תלויה ברמה — יש נערים נחושים וכוכבים עצלים
+  detail.determination = Math.round(clamp(rng.gauss(11, 3.6), 1, 20));
+  return detail;
+}
+
+function generateHidden(rng) {
+  const out = {};
+  for (const [key] of D.HIDDEN_ATTRS) out[key] = Math.round(clamp(rng.gauss(10.5, 3.8), 1, 20));
+  return out;
+}
+
+/** מזיז את התכונות המפורטות עד שהדירוג הכללי קולע ליעד. */
+function fitDetailToOverall(p, target) {
+  const allowed = attrsFor(p.position).slice();
+  const row = roleRow(p.role);
+  if (row) {
+    const priority = {};
+    for (const a of row[5]) priority[a] = 1;
+    for (const a of row[4]) priority[a] = 2;
+    allowed.sort((a, b) => (priority[b] || 0) - (priority[a] || 0));
+  }
+  for (let pass = 0; pass < 14; pass++) {
+    recomputeGroups(p);
+    const diff = target - overall(p);
+    if (Math.abs(diff) < 1) return;
+    const steps = Math.max(1, Math.round(Math.abs(diff) / 5 * allowed.length));
+    const step = diff > 0 ? 1 : -1;
+    const pool = diff > 0 ? allowed : allowed.slice().reverse();
+    let moved = 0;
+    for (const attr of pool) {
+      if (moved >= steps) break;
+      const value = p.detail[attr] ?? 10;
+      if (value + step >= 1 && value + step <= 20) { p.detail[attr] = value + step; moved += 1; }
+    }
+    if (!moved) break;
+  }
+  recomputeGroups(p);
+}
+
+// ---------------------------------------------------------------------------
 // מנוע המשחק — פורט מ-football_manager (פייתון). ללא תלות ב-DOM.
 // ---------------------------------------------------------------------------
 
@@ -9389,11 +11529,20 @@ function generatePlayer(rng, club, position, opts = {}) {
   }
   if (name === null) name = `${rng.choice(D.FIRST_NAMES)} ${rng.choice(D.LAST_NAMES)} ${rng.randint(2, 99)}`;
 
+  // התפקיד נבחר קודם, כי הוא זה שקובע איך ייראה פרופיל התכונות
+  const roleOptions = rolesFor(position);
+  const role = roleOptions.length ? rng.choice(roleOptions) : null;
+
   const p = {
     pid: "p" + (++PID_COUNTER),
     name, age, position,
     nationality: rng.weighted(D.NATIONALITIES),
-    attributes: generateAttributes(rng, position, quality),
+    attributes: {},
+    detail: generateDetail(rng, position, quality, role ? role[0] : ""),
+    detailGrowth: {},
+    hidden: generateHidden(rng),
+    role: role ? role[0] : "",
+    duty: role ? rng.choice(role[3]) : "support",
     growth: {},
     potential,
     clubId: club ? club.cid : null,
@@ -9420,6 +11569,7 @@ function generatePlayer(rng, club, position, opts = {}) {
     career: newStats(),
     retired: false,
   };
+  fitDetailToOverall(p, quality);
   p.contract.wage = wageForOverall(overall(p));
   if (rng.random() < 0.35) p.traits.push(rng.choice(Object.keys(D.TRAITS)));
   applyPhysique(p, rng);
@@ -9653,6 +11803,12 @@ function pickLineup(club, players, formation, forced) {
   return lineup.filter(Boolean);
 }
 
+/** 0.88-1.10 — כמה התפקיד שנתנו לך מוציא ממך את מה שיש בך. */
+function roleFactor(p) {
+  if (!p.role) return 1;
+  return clamp(1 + (roleSuitability(p, p.role) - overall(p)) / 260, 0.88, 1.10);
+}
+
 function teamStrength(lineup, players, formation) {
   const slots = D.FORMATIONS[formation] || D.FORMATIONS["4-3-3"];
   const sums = { def: 0, mid: 0, att: 0 };
@@ -9662,7 +11818,9 @@ function teamStrength(lineup, players, formation) {
     if (!p) return;
     const slot = idx < slots.length ? slots[idx] : p.position;
     const fit = positionFit(p.position, slot);
-    const power = effective(p) * (0.62 + 0.38 * fit);
+    // ההתאמה לתפקיד היא חלק מהעוצמה: חלוץ מטרה בתפקיד של חלוץ בור
+    // יביא פחות ממה שהדירוג שלו מבטיח
+    const power = effective(p) * (0.62 + 0.38 * fit) * roleFactor(p);
     const share = D.POSITION_ROLE_SHARE[slot];
     for (const line of ["def", "mid", "att"]) {
       sums[line] += power * share[line];
@@ -9781,8 +11939,9 @@ function simulateMatch(home, away, players, rng, opts = {}) {
   applyInjuries(result, homeLineup, home.cid, players, rng, home);
   applyInjuries(result, awayLineup, away.cid, players, rng, away);
   const focusPid = opts.focusPid || null;
-  ratePlayers(result, homeLineup, home.cid, players, rng, focusPid, hControl);
-  ratePlayers(result, awayLineup, away.cid, players, rng, focusPid, aControl);
+  const focusMods = opts.focusMods || null;
+  ratePlayers(result, homeLineup, home.cid, players, rng, focusPid, hControl, focusMods);
+  ratePlayers(result, awayLineup, away.cid, players, rng, focusPid, aControl, focusMods);
 
   const rated = Object.keys(result.ratings);
   if (rated.length) {
@@ -9879,7 +12038,7 @@ function applyInjuries(result, lineup, clubId, players, rng, club = null) {
  * ממה שקרה בשורה הזאת — לא מדירוג כללי.
  */
 function ratePlayers(result, lineup, clubId, players, rng,
-                     focusPid = null, possession = 0.5) {
+                     focusPid = null, possession = 0.5, focusMods = null) {
   const conceded = goalsAgainst(result, clubId);
   const outcome = resultFor(result, clubId);
   const teamMod = { W: 0.45, D: 0, L: -0.35 }[outcome];
@@ -9907,7 +12066,8 @@ function ratePlayers(result, lineup, clubId, players, rng,
     rating -= Math.max(0, 90 - p.fitness) * 0.009;
 
     if (pid === focusPid) {
-      const stats = matchStatLine(p, minutes, goals, assists, rng, possession);
+      const stats = matchStatLine(p, minutes, goals, assists, rng, possession,
+                                  null, focusMods);
       result.statLines[pid] = stats;
       // 65 זה ערב ממוצע שלך, ומשם למעלה או למטה
       rating += (matchPerformance(stats, p.position) - 65) * 0.022;
@@ -9957,20 +12117,103 @@ function ageFactor(age) {
   return D.AGE_CURVE[String(age)];
 }
 
+/**
+ * שינוי תכונה, בשפת הקבוצות או בשפת התכונות המפורטות.
+ * אירועי העלילה כתובים בשפת שבע הקבוצות והם ממשיכים לעבוד: הכתיבה
+ * מתפזרת על התכונות שמרכיבות את הקבוצה.
+ */
 function addGrowth(p, attr, delta) {
-  p.growth[attr] = (p.growth[attr] || 0) + delta;
-  const whole = Math.trunc(p.growth[attr]);
-  if (whole) {
-    p.attributes[attr] = Math.round(clamp((p.attributes[attr] ?? 50) + whole, 10, 97));
-    p.growth[attr] -= whole;
-  }
+  if (attr in D.DETAIL_NAMES_HE) addDetail(p, attr, delta / 5);
+  else addGroup(p, attr, delta);
 }
 
-/** בולם תכונה שרצה הרחק מכל השאר — אי אפשר בעיטה 95 עם גוף של ילד. */
+/** בולם תכונה שרצה הרחק מכל השאר — אי אפשר סיום 20 עם גוף של ילד. */
 function specialisationDamper(level, ovr) {
   const gap = level - ovr;
   if (gap <= 12) return 1;
   return Math.max(0.18, 1 - (gap - 12) * 0.055);
+}
+
+/** אותו רעיון, ברזולוציה של התכונות המפורטות (1-20). */
+function detailDamper(level, average) {
+  const gap = level - average;
+  if (gap <= 4) return 1;
+  return Math.max(0.25, 1 - (gap - 4) * 0.14);
+}
+
+// תכונות מומחיות: משתפרות רק כשמתאמנים עליהן ישירות
+const SET_PIECE_ATTRS = new Set(["corners", "free_kick", "penalty_taking",
+                                 "long_throws", "eccentricity", "tendency_to_punch"]);
+
+const SHARES_CACHE = new Map();
+
+/**
+ * כמה מהאימון הולך לכל תכונה מפורטת — שלוש שכבות, כמו לוח אימונים
+ * אמיתי: מה שביקשת, מה שלידו, וכל השאר.
+ */
+function trainingShares(p, focus) {
+  const cacheKey = `${p.position}|${p.role}|${focus}`;
+  const cached = SHARES_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const allowed = attrsFor(p.position);
+  const shares = {};
+  const row = roleRow(p.role);
+  const roleAttrs = new Set(row ? row[4].concat(row[5]) : []);
+
+  for (const attr of allowed) {
+    let weight = D.GENERAL_SHARE;
+    if (roleAttrs.has(attr)) weight *= 2.1;
+    if (SET_PIECE_ATTRS.has(attr)) weight *= 0.18;
+    shares[attr] = weight;
+  }
+
+  if (focus in D.DETAIL_NAMES_HE) {
+    const group = D.DETAIL_GROUP[focus];
+    for (const attr of allowed) {
+      if (attr === focus || D.DETAIL_GROUP[attr] !== group) continue;
+      let spill = roleAttrs.has(attr) ? 0.9 : 0.28;
+      if (SET_PIECE_ATTRS.has(attr)) spill = 0.08;
+      shares[attr] += D.SPILL_SHARE * spill;
+    }
+    shares[focus] = (shares[focus] || 0) + 3.4;
+    SHARES_CACHE.set(cacheKey, shares);
+    return shares;
+  }
+
+  const members = groupMapFor(p.position)[focus];
+  if (members) {
+    const keys = Object.keys(members);
+    const total = keys.reduce((a, k) => a + members[k], 0) || 1;
+    for (const attr of keys)
+      if (attr in shares) shares[attr] += 1.6 * (members[attr] / total) * keys.length / 2;
+  }
+  SHARES_CACHE.set(cacheKey, shares);
+  return shares;
+}
+
+/** מריץ שבוע אימון על התכונות המפורטות ומחזיר את מה שהשתפר. */
+function trainDetail(p, focus, base, full = true) {
+  let shares = trainingShares(p, focus);
+  if (!full) {
+    const top = Object.entries(shares).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    shares = Object.fromEntries(top);
+  }
+  const keys = Object.keys(shares);
+  const average = keys.length
+    ? keys.reduce((a, k) => a + (p.detail[k] ?? 10), 0) / keys.length : 10;
+  const gains = {};
+  for (const attr of keys) {
+    const level = p.detail[attr] ?? 10;
+    // base מכויל בסולם 1-100 של הקבוצות; התכונות הן 1-20
+    const step = base * shares[attr] * detailDamper(level, average) / 5;
+    const got = addDetail(p, attr, step);
+    if (got) gains[attr] = (gains[attr] || 0) + got;
+  }
+  const moved = Object.keys(gains);
+  if (!moved.length) return [];
+  return [{ icon: "📈",
+            text: moved.map(a => `${D.DETAIL_NAMES_HE[a]} ל-${p.detail[a]}`).join(", ") + "." }];
 }
 
 function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
@@ -10038,43 +12281,24 @@ function weeklyTraining(p, focus, club, rng, intensity = 1.0) {
   base *= 1 + clamp(gap, -10, 18) * 0.032;
   if (hasTrait(p, "workhorse")) base *= 1.30;
   base *= 0.75 + p.morale / 200;
+  // אישיות: מקצוענות ונחישות הן ההבדל בין כישרון שהתממש לכזה שלא
+  base *= personalityEffect(p)[0];
+  base *= 0.55 + (p.detail.determination ?? 10) / 22;
   base *= rng.uniform(0.7, 1.35);
 
   const headroom = p.potential - overall(p);
   if (headroom <= 0) base *= 0.06;
   else if (headroom < 6) base *= 0.20 + headroom * 0.13;
 
+  messages.push(...trainDetail(p, focus, base, p.isHuman));
+
   // עבודת כוח בונה גוף שנשבר פחות — זו הידית לחיזוק שחקן פציע
-  if (focus === "physical") p.resilience = clamp(p.resilience + 0.22 * intensity, 0, 96);
-  else if (focus === "pace") p.resilience = clamp(p.resilience + 0.07 * intensity, 0, 96);
+  if (["physical", "strength", "stamina", "natural_fitness", "balance"].includes(focus))
+    p.resilience = clamp(p.resilience + 0.22 * intensity, 0, 96);
+  else if (["pace", "acceleration", "agility"].includes(focus))
+    p.resilience = clamp(p.resilience + 0.07 * intensity, 0, 96);
   p.sharpness = clamp(p.sharpness - 0.5, 0, 100);
 
-  // האימון מתפזר בשלוש שכבות: מה שבחרת, מה שקרוב לזה, וכל השאר
-  const ovr = overall(p);
-  const weights = D.POSITION_WEIGHTS[p.position];
-  const shares = {};
-  for (const attr of D.ATTRIBUTES)
-    shares[attr] = D.GENERAL_SHARE * (0.45 + (weights[attr] ?? 0.1) * 2.4);
-  for (const attr of (D.TRAINING_SPILL[focus] || []))
-    shares[attr] = (shares[attr] || 0) + D.SPILL_SHARE;
-  shares[focus] = (shares[focus] || 0) + 1;
-
-  const gains = {};
-  for (const [attr, share] of Object.entries(shares)) {
-    const level = p.attributes[attr] ?? 50;
-    let current = (p.growth[attr] || 0) + base * share * specialisationDamper(level, ovr);
-    while (current >= 1.0 && (p.attributes[attr] ?? 50) < 97) {
-      p.attributes[attr] = (p.attributes[attr] ?? 50) + 1;
-      current -= 1;
-      gains[attr] = (gains[attr] || 0) + 1;
-    }
-    p.growth[attr] = current;
-  }
-  if (Object.keys(gains).length) {
-    const parts = Object.keys(gains)
-      .map(a => `${D.ATTRIBUTE_NAMES_HE[a]} ל-${p.attributes[a]}`);
-    messages.push({ icon: "📈", text: parts.join(", ") + "." });
-  }
   const injuryChance = 0.022 * intensity * injuryRisk(p) * (1 - fitnessCoach / 260);
   if (intensity > 1.15 && rng.random() < injuryChance) {
     const weeks = rng.randint(1, 3);
@@ -10166,8 +12390,9 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
   p.age += 1;
   const curve = ageFactor(p.age);
   const exposure = 0.45 + minutesShare * 1.1;
-  for (const attr of D.ATTRIBUTES) {
-    const sensitivity = D.DECLINE_SENSITIVITY[attr];
+  // הרגליים הולכות ראשונות, הראש נשאר — ולכן ותיק מפצה בקריאת משחק
+  for (const attr of attrsFor(p.position)) {
+    const sensitivity = D.DETAIL_DECLINE[attr] ?? 0.6;
     let delta;
     if (curve > 0) {
       // קפיצת הקיץ אמיתית אבל לא דרמטית — רוב ההתפתחות היא באימונים
@@ -10176,7 +12401,7 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
     } else {
       delta = curve * Math.max(0.2, sensitivity) * rng.uniform(0.5, 1.5);
     }
-    addGrowth(p, attr, delta);
+    addDetail(p, attr, delta / 5);
   }
   const s = p.season;
   if (s.apps) {
@@ -10258,7 +12483,7 @@ function statDraw(rng, mean) {
 }
 
 function matchStatLine(player, minutes, goals, assists, rng,
-                       possession = 0.5, fitnessAtKickoff = null) {
+                       possession = 0.5, fitnessAtKickoff = null, mods = null) {
   const attrs = player.attributes;
   const share = D.POSITION_ROLE_SHARE[player.position];
   const load = (minutes / 90) * (0.72 + possession * 0.56);
@@ -10266,15 +12491,23 @@ function matchStatLine(player, minutes, goals, assists, rng,
   const stamina = 0.80 + 0.20 * clamp(fit, 0, 100) / 100;
   const sharp = 0.86 + 0.28 * clamp(player.sharpness, 0, 100) / 100;
 
-  const shooting = attrs.shooting ?? 50, passing = attrs.passing ?? 50;
-  const dribbling = attrs.dribbling ?? 50, defending = attrs.defending ?? 50;
-  const physical = attrs.physical ?? 50, pace = attrs.pace ?? 50;
-  const mental = attrs.mental ?? 50;
+  // קוראים מהתכונות המפורטות כשהן קיימות: "בעיטות למסגרת" נגזרות
+  // מסיום ולא מקבוצה שלמה, ולכן אימון ממוקד נראה מיד
+  const detail = player.detail || {};
+  const fine = (name, fallback) =>
+    detail[name] ? detail[name] * 5 : (attrs[fallback] ?? 50);
+  const shooting = fine("finishing", "shooting"), passing = fine("passing", "passing");
+  const dribbling = fine("dribbling", "dribbling"), defending = fine("tackling", "defending");
+  const physical = fine("strength", "physical"), pace = fine("acceleration", "pace");
+  const mental = fine("decisions", "mental");
   const exp = {};
+  // הטקטיקה של המאמן והתפקיד שנתן לך
+  const M = mods || {};
+  const mod = key => (M[key] === undefined ? 1 : M[key]);
 
   let shotRate = share.att * 3.4 + share.mid * 1.0 + share.def * 0.25;
   shotRate *= statRate(shooting, 0.45, 1.5) * statRate(mental, 0.7, 1.25);
-  exp.shots = shotRate * load * sharp;
+  exp.shots = shotRate * load * sharp * mod("shots");
   const shots = statDraw(rng, exp.shots);
   const accuracy = statRate(shooting, 0.22, 0.66) * sharp;
   exp.on_target = exp.shots * accuracy;
@@ -10283,18 +12516,18 @@ function matchStatLine(player, minutes, goals, assists, rng,
   onTarget = Math.max(onTarget, Math.min(shots, goals));
 
   const passVolume = share.mid * 62 + share.def * 46 + share.att * 26;
-  exp.passes = passVolume * load * (0.75 + passing / 260);
+  exp.passes = passVolume * load * (0.75 + passing / 260) * mod("passes");
   const passes = Math.max(3, statDraw(rng, exp.passes));
-  exp.pass_pct = clamp(58 + passing * 0.30 - (1 - stamina) * 22, 35, 96);
+  exp.pass_pct = clamp((58 + passing * 0.30 - (1 - stamina) * 22) * mod("pass_pct"), 35, 96);
   const passPct = clamp(exp.pass_pct + rng.gauss(0, 3.4), 35, 96);
   const completed = Math.round(passes * passPct / 100);
   const keyRate = share.att * 1.5 + share.mid * 1.3 + share.def * 0.3;
-  exp.key_passes = keyRate * statRate(passing, 0.25, 1.35) * load;
+  exp.key_passes = keyRate * statRate(passing, 0.25, 1.35) * load * mod("key_passes");
   let keyPasses = statDraw(rng, exp.key_passes);
   keyPasses = Math.max(keyPasses, assists);
 
   exp.dribble_tries = (share.att * 2.6 + share.mid * 1.4 + share.def * 0.5)
-                      * statRate(dribbling, 0.4, 1.5) * load;
+                      * statRate(dribbling, 0.4, 1.5) * load * mod("dribbles");
   const dribbleTries = statDraw(rng, exp.dribble_tries);
   exp.dribble_pct = clamp(24 + dribbling * 0.44, 8, 92);
   const dribblePct = clamp(exp.dribble_pct + rng.gauss(0, 5), 8, 92);
@@ -10302,29 +12535,29 @@ function matchStatLine(player, minutes, goals, assists, rng,
   let dribbles = 0;
   for (let i = 0; i < dribbleTries; i++) if (rng.random() * 100 < dribblePct) dribbles += 1;
 
-  exp.duels = (5.5 + share.def * 5.0 + share.mid * 2.5) * load;
+  exp.duels = (5.5 + share.def * 5.0 + share.mid * 2.5) * load * mod("duels");
   const duels = Math.max(2, statDraw(rng, exp.duels));
   exp.duels_pct = clamp(28 + physical * 0.34 + mental * 0.10 - (1 - stamina) * 26, 10, 92);
   const duelsPct = clamp(exp.duels_pct + rng.gauss(0, 4.5), 10, 92);
   const duelsWon = Math.round(duels * duelsPct / 100);
   const tackleRate = share.def * 4.6 + share.mid * 2.4 + share.att * 0.6;
-  exp.tackles = tackleRate * statRate(defending, 0.35, 1.4) * load;
+  exp.tackles = tackleRate * statRate(defending, 0.35, 1.4) * load * mod("tackles");
   const tackles = statDraw(rng, exp.tackles);
 
-  exp.losses = exp.passes * (1 - exp.pass_pct / 100) * 0.55
-               + (exp.dribble_tries - exp.dribbles) * 0.7;
+  exp.losses = (exp.passes * (1 - exp.pass_pct / 100) * 0.55
+                + (exp.dribble_tries - exp.dribbles) * 0.7) * mod("losses");
   const lossBase = passes * (1 - passPct / 100) * 0.55 + (dribbleTries - dribbles) * 0.7;
   const losses = Math.max(0, Math.round(lossBase + rng.gauss(0, 1.1)));
 
   exp.sprints = (11 + share.att * 9 + share.mid * 7)
-                * statRate(pace, 0.45, 1.4) * load * stamina;
+                * statRate(pace, 0.45, 1.4) * load * stamina * mod("sprints");
   const sprints = statDraw(rng, exp.sprints);
   const distance = Math.round(clamp((7.4 + share.mid * 3.4 + share.def * 1.2
                                      + physical * 0.022) * (minutes / 90) * stamina
-                                    + rng.gauss(0, 0.35), 2.0, 14.5) * 10) / 10;
+                                    * mod("distance") + rng.gauss(0, 0.35), 2.0, 16.5) * 10) / 10;
 
   exp.reads = (4.0 + share.def * 2.4 + share.mid * 2.0)
-              * statRate(mental, 0.4, 1.55) * load;
+              * statRate(mental, 0.4, 1.55) * load * mod("reads");
   const reads = statDraw(rng, exp.reads);
 
   const rounded = {};
@@ -10444,6 +12677,29 @@ function reasonLine(area, stats) {
 function promiseLine(area) {
   const pair = D.DIRECTIVE_REASON[area];
   return pair ? pair[1] : "";
+}
+
+
+/**
+ * התכונה המפורטת שהמאמן יבקש ממך לעבוד עליה.
+ * קודם התחום שנפל במשחק, ואז — בתוכו — התכונה הנמוכה מבין אלה
+ * שהתפקיד שלך באמת דורש.
+ */
+function weakestDetail(stats, player) {
+  const area = weakestArea(stats, player.position, player.attributes);
+  if (area === "rest") return "rest";
+  const members = groupMapFor(player.position)[area] || {};
+  const allowed = new Set(attrsFor(player.position));
+  const row = roleRow(player.role || "");
+  const roleAttrs = new Set(row ? row[4].concat(row[5]) : []);
+  let best = null, bestKey = area;
+  for (const attr in members) {
+    if (!allowed.has(attr)) continue;
+    let score = (player.detail[attr] ?? 10) - members[attr] * 2.4;
+    if (roleAttrs.has(attr)) score -= 3.5;
+    if (best === null || score < best) { best = score; bestKey = attr; }
+  }
+  return bestKey;
 }
 
 // ---------------------------------------------------------------------------
@@ -10978,13 +13234,14 @@ function scoutReport(game, club) {
   const country = clubCountry(club.cid);
   const lines = [`${club.name} · ${country} · מוניטין ${club.reputation}`,
                  `רמת עניין: ${interestLabel(score)} (${Math.round(score)}/100)`];
-  const weights = D.POSITION_WEIGHTS[me.position];
-  const ranked = [...D.ATTRIBUTES].sort((a, b) =>
-    (me.attributes[b] ?? 50) * (weights[b] || 0.1)
-    - (me.attributes[a] ?? 50) * (weights[a] || 0.1));
+  // הצופה כותב על תכונות אמיתיות, לא על קטגוריות
+  const row = roleRow(me.role);
+  const watched = row ? row[4].concat(row[5]) : attrsFor(me.position);
+  const ranked = watched.slice().sort((a, b) => (me.detail[b] ?? 10) - (me.detail[a] ?? 10));
   const best = ranked[0], worst = ranked[ranked.length - 1];
-  lines.push(`"${D.ATTRIBUTE_NAMES_HE[best]} ברמה שאנחנו מחפשים `
-             + `(${me.attributes[best] ?? 50}). ${D.ATTRIBUTE_NAMES_HE[worst]} — עוד לא."`);
+  lines.push(`"${D.DETAIL_NAMES_HE[best]} ברמה שאנחנו מחפשים `
+             + `(${me.detail[best] ?? 10}). ${D.DETAIL_NAMES_HE[worst]} — עוד לא."`);
+  if (row) lines.push(`מסומן אצלנו כ${row[1]}.`);
   if (me.age <= 21) lines.push('"בגיל הזה, מה שחסר עוד אפשר ללמד."');
   else if (me.age >= 30) lines.push('"הגיל אצלנו הוא שיקול. חוזה קצר, לא יותר."');
   if (score < SCOUT_NOTICED) lines.push("עוד לא פתחו עליך תיק אמיתי.");
@@ -10994,26 +13251,23 @@ function scoutReport(game, club) {
 // ---------------------------------------------------------------------------
 // מסלול הפיתוח — תאום JS של development.py
 //
-// במקום "תתאמן על משהו", המסלול אומר בדיוק מה צריך להיות לך ומתי,
-// ומה תקבל אם תגיע לשם. מי שמשלים את כל המסלול עובר פריצה אמיתית.
+// בוחרים **תפקיד** — אותם תפקידים שהמאמן מחלק — והמסלול נגזר ממנו:
+// התכונות שהתפקיד באמת דורש, בסולם 1-20, עם סף לכל גיל.
 // ---------------------------------------------------------------------------
 
-const ARCHETYPE_BY_KEY = {};
-for (const row of D.ARCHETYPES) ARCHETYPE_BY_KEY[row[0]] = row;
+// רמת הסף לכל אבן דרך, בסולם 1-20 של התכונות המפורטות
+const MILESTONE_AGES = [[17, 11], [19, 14], [21, 16], [24, 18]];
 
-function planOptionsFor(position) {
-  const fits = D.ARCHETYPES.filter(row => row[2].includes(position));
-  return fits.length ? fits : D.ARCHETYPES.slice();
-}
+function planOptionsFor(position) { return rolesFor(position); }
 
 function planKey(game) { return game.flags.plan || null; }
 function planRow(game) {
   const key = planKey(game);
-  return key ? (ARCHETYPE_BY_KEY[key] || null) : null;
+  return key ? roleRow(key) : null;
 }
 
 function setPlan(game, key) {
-  const row = ARCHETYPE_BY_KEY[key];
+  const row = roleRow(key);
   if (!row) return "אין מסלול כזה.";
   const previous = planKey(game);
   game.flags.plan = key;
@@ -11030,19 +13284,29 @@ function planDone(game) {
   return game.flags.plan_done;
 }
 
+/** מה נדרש באבן דרך: תכונות המפתח של התפקיד ברמה נתונה. */
+function milestoneNeeds(row, level) {
+  const needs = {};
+  row[4].slice(0, 4).forEach((attr, index) => {
+    needs[attr] = Math.min(20, level + (index === 0 ? 1 : 0));
+  });
+  return needs;
+}
+
 /** כל אבני הדרך במסלול, עם המצב הנוכחי מול הדרישה. */
 function milestoneRows(game) {
   const row = planRow(game);
   if (!row) return [];
   const me = game.me;
   const done = planDone(game);
-  return row[4].map(([age, needs], index) => {
+  return MILESTONE_AGES.map(([age, level], index) => {
+    const needs = milestoneNeeds(row, level);
     const parts = [];
     let met = true;
     for (const attr of Object.keys(needs).sort()) {
-      const have = me.attributes[attr] ?? 50;
+      const have = me.detail[attr] ?? 10;
       if (have < needs[attr]) met = false;
-      parts.push({ attr, name: D.ATTRIBUTE_NAMES_HE[attr], have, need: needs[attr] });
+      parts.push({ attr, name: D.DETAIL_NAMES_HE[attr], have, need: needs[attr] });
     }
     return { index, age, needs: parts, met, claimed: done.includes(index),
              late: me.age > age && !met };
@@ -11058,19 +13322,17 @@ function nextTarget(game) {
   for (const entry of rows) {
     if (entry.claimed) continue;
     const gaps = entry.needs.filter(p => p.have < p.need);
-    if (!gaps.length)
-      return `🎯 עמדת בדרישות של גיל ${entry.age} — זה ייחתם בסוף העונה.`;
+    if (!gaps.length) return `🎯 עמדת בדרישות של גיל ${entry.age} — זה ייחתם בסוף העונה.`;
     let worst = gaps[0];
     for (const p of gaps) if (p.have - p.need < worst.have - worst.need) worst = p;
     const when = me.age <= entry.age ? `עד גיל ${entry.age}`
                                      : `(היעד של גיל ${entry.age} כבר מאחוריך)`;
     return `🎯 ${row[1]}: ${worst.name} ${worst.have} → ${worst.need} ${when}. `
-           + `חסרות ${worst.need - worst.have} נקודות.`;
+         + `חסרות ${worst.need - worst.have} נקודות.`;
   }
   return `🎯 השלמת את כל מסלול "${row[1]}".`;
 }
 
-/** על מה כדאי להתאמן השבוע כדי להתקדם במסלול. */
 function recommendedFocus(game) {
   for (const entry of milestoneRows(game)) {
     if (entry.claimed) continue;
@@ -11082,7 +13344,16 @@ function recommendedFocus(game) {
     }
   }
   const row = planRow(game);
-  return row ? row[3][0][0] : null;
+  return row ? row[4][0] : null;
+}
+
+/** תכונת האופי שמתאימה לתפקיד שהשלמת. */
+function planTraitFor(row) {
+  const keys = new Set(row[4].concat(row[5]));
+  if (keys.has("leadership") || keys.has("communication")) return "leader";
+  if (keys.has("stamina") || keys.has("work_rate")) return "workhorse";
+  if (keys.has("composure") || keys.has("finishing") || keys.has("flair")) return "clutch";
+  return "student";
 }
 
 /** נקרא בסוף עונה: חותם על מה שהושג ומחלק את הפרסים. */
@@ -11107,8 +13378,7 @@ function claimMilestones(game) {
     lines.push(`✅ אבן דרך במסלול "${row[1]}" (גיל ${entry.age}) — `
                + (onTime ? "בזמן" : "באיחור") + ".");
   }
-
-  if (done.length >= row[4].length && !game.flag("breakthrough"))
+  if (done.length >= MILESTONE_AGES.length && !game.flag("breakthrough"))
     lines.push(...planBreakthrough(game, row));
   return lines;
 }
@@ -11121,7 +13391,7 @@ function planBreakthrough(game, row) {
   gainReputation(me, 7);
   me.morale = clamp(me.morale + 14, 5, 99);
   const lines = [`💎 פריצה. השלמת את מסלול "${row[1]}" במלואו.`, `   ${row[6]}`];
-  const trait = row[5];
+  const trait = planTraitFor(row);
   if (trait && !me.traits.includes(trait)) {
     me.traits.push(trait);
     lines.push(`   נוספה לך תכונת אופי: ${D.TRAITS[trait].name}.`);
@@ -11140,12 +13410,12 @@ function planSummary(game) {
   if (!row) {
     return { chosen: false, options: planOptionsFor(game.me.position).map(r => ({
       key: r[0], name: r[1], desc: r[6],
-      attrs: r[3].map(([a]) => D.ATTRIBUTE_NAMES_HE[a]) })) };
+      attrs: r[4].slice(0, 4).map(a => D.DETAIL_NAMES_HE[a]) })) };
   }
   const rows = milestoneRows(game);
   return {
     chosen: true, key: row[0], name: row[1], desc: row[6],
-    trait: D.TRAITS[row[5]].name, milestones: rows,
+    trait: D.TRAITS[planTraitFor(row)].name, milestones: rows,
     done: rows.filter(r => r.claimed).length, total: rows.length,
     next: nextTarget(game), focus: recommendedFocus(game),
     breakthrough: !!game.flag("breakthrough"),
@@ -11269,6 +13539,344 @@ function wealthSummary(game) {
 }
 
 // ---------------------------------------------------------------------------
+// הטקטיקה של המאמן, ומה היא עושה לך — תאום JS של tactics.py
+//
+// עד עכשיו הטקטיקה הייתה משהו שקרה מעליך. במקור היא מה שקובע איך
+// נראות תשעים הדקות שלך: כמה תיגע בכדור, כמה תרוץ, כמה תאבד.
+// ---------------------------------------------------------------------------
+
+function tacticHash(text) {
+  let value = 2166136261;
+  for (const ch of text) {
+    value ^= ch.codePointAt(0);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value;
+}
+
+/** הסגנון הטקטי של המועדון — נגזר משם המאמן, ולכן קבוע. */
+function tacticalStyle(club) {
+  if (!club || !club.managerName) return D.TACTICAL_STYLES.find(r => r[0] === "balanced_style");
+  const index = tacticHash(club.managerName + "tactics") % D.TACTICAL_STYLES.length;
+  return D.TACTICAL_STYLES[index];
+}
+
+/** שבע ההוראות שהמאמן משחק איתן השבוע. */
+function teamInstructions(club) {
+  const style = tacticalStyle(club);
+  const values = Object.assign({}, style[2]);
+  if (club) {
+    if (club.boardConfidence < 35) {
+      values.mentality = clamp(values.mentality - 1, -2, 2);
+      values.d_line = clamp(values.d_line - 1, -2, 2);
+    } else if (club.boardConfidence > 75) {
+      values.mentality = clamp(values.mentality + 1, -2, 2);
+    }
+    if (club.reputation < 40) {
+      values.passing = clamp(values.passing + 1, -2, 2);
+      values.pressing = clamp(values.pressing - 1, -2, 2);
+    }
+  }
+  return values;
+}
+
+function instructionLabel(key, value) {
+  const rows = D.TEAM_INSTRUCTIONS[key];
+  if (!rows) return "";
+  const row = rows[1].find(r => r[2] === value);
+  return row ? row[1] : "";
+}
+
+function describeTactics(club) {
+  const style = tacticalStyle(club);
+  const values = teamInstructions(club);
+  const lines = [`${style[1]} — ${style[3]}`];
+  for (const key of D.INSTRUCTION_KEYS)
+    lines.push(`${D.TEAM_INSTRUCTIONS[key][0]}: ${instructionLabel(key, values[key])}`);
+  return lines;
+}
+
+/**
+ * מכפילים לשורת הסטטיסטיקה שלך, לפי הטקטיקה והתפקיד.
+ * זה הלב: אתה מרגיש את הטקטיקה בגוף.
+ */
+function tacticModifiers(club, player) {
+  return modifiersFrom(teamInstructions(club), player);
+}
+
+/** מכפילים לשורת הסטטיסטיקה, מתוך ערכי הוראות מפורשים. */
+function modifiersFrom(values, player) {
+  const row = roleRow(player.role);
+  const [dutyDef, dutyAtt, dutyRun] = D.DUTY_SHIFT[player.duty] || [0, 0, 0];
+
+  const tempo = values.tempo / 2, width = values.width / 2;
+  const directness = values.passing / 2, press = values.pressing / 2;
+  const line = values.d_line / 2, mentality = values.mentality / 2;
+
+  const mods = {
+    passes: 1 - directness * 0.26 - tempo * 0.10,
+    pass_pct: 1 - directness * 0.09 - tempo * 0.04,
+    losses: 1 + directness * 0.22 + tempo * 0.14 - press * 0.05,
+    shots: 1 + mentality * 0.20 + dutyAtt * 0.9,
+    key_passes: 1 + mentality * 0.14 + width * 0.10 + dutyAtt * 0.6,
+    dribbles: 1 + width * 0.12 - directness * 0.14,
+    tackles: 1 + press * 0.30 + line * 0.10 + dutyDef * 1.0,
+    duels: 1 + press * 0.18 + directness * 0.12,
+    sprints: 1 + tempo * 0.22 + press * 0.24 + dutyRun * 1.2,
+    distance: 1 + tempo * 0.09 + press * 0.13 + dutyRun * 0.5,
+    reads: 1 + (1 - Math.abs(mentality)) * 0.05 - press * 0.04,
+  };
+  if (row) {
+    const keyAttrs = new Set(row[4]);
+    if (keyAttrs.has("crossing")) mods.key_passes *= 1.25;
+    if (keyAttrs.has("finishing")) mods.shots *= 1.30;
+    if (keyAttrs.has("tackling") || keyAttrs.has("marking")) mods.tackles *= 1.28;
+    if (keyAttrs.has("passing") || keyAttrs.has("vision")) { mods.passes *= 1.22; mods.key_passes *= 1.15; }
+    if (keyAttrs.has("dribbling")) mods.dribbles *= 1.30;
+    if (keyAttrs.has("stamina") || keyAttrs.has("work_rate")) { mods.distance *= 1.12; mods.sprints *= 1.12; }
+    if (keyAttrs.has("off_the_ball")) { mods.shots *= 1.12; mods.sprints *= 1.08; }
+  }
+  for (const key in mods) mods[key] = clamp(mods[key], 0.35, 2.4);
+  return mods;
+}
+
+/** כמה הסגנון הזה מתאים לך, ולמה. */
+function styleSuitsPlayer(club, player) {
+  return suitsValues(teamInstructions(club), player);
+}
+
+/** כמה סגנון נתון מתאים לשחקן. */
+function suitsValues(values, player) {
+  const d = player.detail;
+  let score = 50;
+  const notes = [];
+  const pace = ((d.acceleration ?? 10) + (d.pace ?? 10)) / 2;
+  const tech = ((d.technique ?? 10) + (d.first_touch ?? 10)) / 2;
+  const engine = ((d.stamina ?? 10) + (d.work_rate ?? 10)) / 2;
+  const brain = ((d.decisions ?? 10) + (d.vision ?? 10)) / 2;
+
+  if (values.tempo >= 1 || values.pressing >= 1) {
+    score += (engine - 11) * 4.4;
+    notes.push(engine < 11 ? "קצב ולחיצה — צריך ריאות" : "הקצב הזה בנוי בשבילך");
+  }
+  if (values.passing <= -1) {
+    score += (tech - 11) * 4.2;
+    notes.push(tech >= 11 ? "משחק קצר — הכול עובר בנגיעה"
+                          : "משחק קצר, והנגיעה שלך עוד לא שם");
+  }
+  if (values.passing >= 1) {
+    score += (pace - 11) * 3.8;
+    notes.push(pace >= 11 ? "כדורים לעומק — בשביל זה צריך רגליים"
+                          : "הם משחקים ארוך, ואתה לא הכי מהיר");
+  }
+  if (values.mentality <= -1) {
+    score += (brain - 11) * 3.0;
+    notes.push("קבוצה שמחכה — הסבלנות שלך נמדדת");
+  }
+  return [clamp(score, 0, 100), notes.length ? notes[0] : "סגנון שלא מושך לשום קיצון"];
+}
+
+/** האם התפקיד שנתנו לך הוא באמת שלך. */
+function roleFitNote(player) {
+  if (!player.role) return null;
+  const mine = roleSuitability(player, player.role);
+  const [bestKey, bestScore] = bestRole(player);
+  const row = roleRow(player.role);
+  if (!row) return null;
+  if (bestKey === player.role || bestScore - mine < 5)
+    return `✅ ${row[1]} — זה התפקיד שמוציא ממך את המקסימום.`;
+  const bestRow = roleRow(bestKey);
+  return `↔️ אתה משחק ${row[1]} (${Math.round(mine)}), אבל התכונות שלך אומרות `
+       + `${bestRow[1]} (${Math.round(bestScore)}).`;
+}
+
+// ---------------------------------------------------------------------------
+// מי מחלק את התפקידים
+// ---------------------------------------------------------------------------
+
+/** המאמן נותן לך תפקיד. לרוב הנכון — לא תמיד. */
+function assignRole(player, club, rng) {
+  const options = rolesFor(player.position);
+  if (!options.length) return "";
+  const style = tacticalStyle(club);
+  const bonus = {
+    gegenpress: ["work_rate", "stamina", "aggression"],
+    tiki_taka: ["passing", "vision", "technique"],
+    counter: ["acceleration", "pace", "off_the_ball"],
+    wing_play: ["crossing", "heading"],
+    catenaccio: ["marking", "positioning", "tackling"],
+  }[style[0]] || [];
+  let best = null, bestScore = -1e9;
+  for (const row of options) {
+    let score = roleSuitability(player, row[0]);
+    const keyAttrs = new Set(row[4]);
+    if (bonus.some(a => keyAttrs.has(a))) score += 9;
+    score += rng.uniform(-4, 4);
+    if (score > bestScore) { bestScore = score; best = row; }
+  }
+  return best ? best[0] : "";
+}
+
+function dutyFor(roleKey, club, rng) {
+  const row = roleRow(roleKey);
+  if (!row) return "support";
+  const duties = row[3];
+  if (duties.length === 1) return duties[0];
+  const mentality = teamInstructions(club).mentality;
+  const order = { attack: 2, support: 0, automatic: 0, defend: -2, cover: -2, stopper: -1 };
+  const wanted = clamp(mentality, -2, 2);
+  const ranked = duties.slice().sort((a, b) =>
+    Math.abs((order[a] || 0) - wanted) - Math.abs((order[b] || 0) - wanted));
+  return rng.random() < 0.75 ? ranked[0] : rng.choice(duties);
+}
+
+/** לבקש מהמאמן תפקיד אחר. הוא לא חייב להסכים. */
+function requestRole(game, roleKey) {
+  const me = game.me;
+  const club = game.myClub();
+  const row = roleRow(roleKey);
+  if (!row || !row[2].includes(me.position)) return "זה לא תפקיד שאפשר למלא בעמדה שלך.";
+  if (roleKey === me.role) return `אתה כבר משחק ${row[1]}.`;
+  if (!club) { me.role = roleKey; return `מהיום אתה ${row[1]}.`; }
+
+  const fit = roleSuitability(me, roleKey);
+  const current = me.role ? roleSuitability(me, me.role) : 0;
+  const trust = club.managerTrust;
+  const chance = 0.16 + trust / 190 + Math.max(0, fit - current) / 90;
+  if (game.rng.random() < clamp(chance, 0.05, 0.9)) {
+    me.role = roleKey;
+    me.duty = dutyFor(roleKey, club, game.rng);
+    club.managerTrust = clamp(trust - 3, 0, 100);
+    return `✅ ${club.managerName} הסכים. מהשבוע אתה ${row[1]} `
+         + `(${D.DUTY_NAMES_HE[me.duty] || ""}).`;
+  }
+  club.managerTrust = clamp(trust - 5, 0, 100);
+  return `⛔ ${club.managerName} שמע ואמר שהוא לא משנה מערכת בשביל `
+       + "שחקן אחד. השיחה הזאת לא עזרה לך.";
+}
+
+/** כמה הטקטיקה הזאת שוחקת אותך. גגנפרסינג עולה בגוף. */
+function tacticFitnessCost(club, player) {
+  const values = teamInstructions(club);
+  const run = (D.DUTY_SHIFT[player.duty] || [0, 0, 0])[2];
+  let load = 1 + values.pressing * 0.09 + values.tempo * 0.06 + run * 0.8;
+  const stamina = player.detail.stamina ?? 10;
+  const natural = player.detail.natural_fitness ?? 10;
+  load *= 1.24 - ((stamina + natural) / 2) * 0.024;
+  return clamp(load, 0.6, 1.7);
+}
+
+// ---------------------------------------------------------------------------
+// מה אתה באמת יודע על שחקן אחר — תאום JS של knowledge.py
+//
+// "אתה מקבל את מה שאתה רואה": במשחק היה אפשר לפתוח כל שחקן בעולם
+// ולראות את כל המספרים שלו במדויק. במקור ידע הוא משאב.
+// ---------------------------------------------------------------------------
+
+const KNOW_LEVEL_NAMES = {
+  0: "שמועות בלבד", 1: "דוח ראשוני", 2: "דוח מלא", 3: "ידיעה מוחלטת",
+};
+
+function knowledgeLevel(game, player) {
+  if (player.pid === game.meId) return 3;
+  const myClub = game.myClub();
+  if (myClub && player.clubId === myClub.cid) return 3;
+  if (game.flag(`scouted_${player.pid}`)) return 2;
+  const scouted = game.flag("scouted");
+  if (!player.clubId) return scouted ? 1 : 0;
+  const club = game.clubs[player.clubId];
+  if (!club) return 0;
+
+  let level = 0;
+  if (myClub && club.leagueId === myClub.leagueId) level = 1;
+  if (player.reputation >= 62) level = Math.max(level, 1);
+  if (player.reputation >= 80) level = Math.max(level, 2);
+  if (scouted) level = Math.min(3, level + 1);
+  if (myClub && club.reputation >= 70 && myClub.reputation >= 70) level = Math.max(level, 1);
+  return level;
+}
+
+/** התכונות כפי שאתה רואה אותן — מדויקות, בטווח, או בכלל לא. */
+function shownDetail(game, player) {
+  const level = knowledgeLevel(game, player);
+  const width = { 3: 0, 2: 1, 1: 3, 0: 5 }[level];
+  const out = {};
+  for (const attr of attrsFor(player.position)) {
+    const value = player.detail[attr] ?? 10;
+    if (level >= 3) out[attr] = { value, low: value, high: value, exact: true };
+    else if (level === 0) out[attr] = { value: null, low: 0, high: 0, exact: false };
+    else out[attr] = { value: null, low: Math.max(1, value - width),
+                       high: Math.min(20, value + width), exact: false };
+  }
+  return out;
+}
+
+function knowStars(value, scale = 100) {
+  return Math.round(clamp(value / scale * 5, 0, 5) * 2) / 2;
+}
+
+function starText(count) {
+  const full = Math.trunc(count);
+  const half = count - full >= 0.5 ? 1 : 0;
+  return "★".repeat(full) + (half ? "½" : "") + "☆".repeat(5 - full - half);
+}
+
+/** FNV-1a — אותו מספר בפייתון וב-JS, ואותו מספר בכל הרצה. */
+function stableHash(text) {
+  let value = 2166136261;
+  for (const ch of text) {
+    value ^= ch.codePointAt(0);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value;
+}
+
+function abilityStars(game, player) {
+  const level = knowledgeLevel(game, player);
+  let value = overall(player);
+  if (level < 3) {
+    // ההערכה גסה יותר ככל שאתה יודע פחות — וקבועה לשחקן, לא מהבהבת
+    const noise = (stableHash(player.pid) % 11 - 5) * (3 - level) * 0.9;
+    value = clamp(value + noise, 1, 99);
+  }
+  return knowStars(value);
+}
+
+/** טווח הפוטנציאל בכוכבים. אף אחד לא באמת יודע — גם לא אתה. */
+function potentialStars(game, player) {
+  const level = knowledgeLevel(game, player);
+  if (player.pid === game.meId) return [knowStars(player.potential), knowStars(player.potential)];
+  const spread = { 3: 6, 2: 11, 1: 18, 0: 26 }[level];
+  return [knowStars(clamp(player.potential - spread, 1, 99)),
+          knowStars(clamp(player.potential + spread * 0.6, 1, 99))];
+}
+
+function knowledgeSummary(game, player) {
+  const level = knowledgeLevel(game, player);
+  const [low, high] = potentialStars(game, player);
+  return {
+    level, level_he: KNOW_LEVEL_NAMES[level],
+    ability: abilityStars(game, player),
+    potential_low: low, potential_high: high,
+    exact: level >= 3, detail: shownDetail(game, player),
+    role: player.role, personality: level >= 2,
+  };
+}
+
+/** לשלוח את הצוות לבדוק שחקן מסוים. עולה כסף למועדון. */
+function scoutPlayer(game, player) {
+  const club = game.myClub();
+  if (!club) return "אין לך מועדון שישלח צופה.";
+  if (game.flag(`scouted_${player.pid}`)) return `כבר יש לך דוח מלא על ${player.name}.`;
+  const cost = Math.trunc(18000 + player.reputation * 900);
+  if (club.balance < cost) return `הסריקה עולה ₪${fmt(cost)} והקופה לא עומדת בזה.`;
+  club.balance -= cost;
+  game.setFlag(`scouted_${player.pid}`, true);
+  return `🔍 הצוות נסע לראות את ${player.name}. ₪${fmt(cost)} מהקופה — `
+       + "ועכשיו יש עליו דוח מלא.";
+}
+
+// ---------------------------------------------------------------------------
 // המאמן של הקבוצה — פורט מ-football_manager/manager.py.
 // דמות שמדברת אליך אחרי כל משחק, דורשת ממך דברים בשבוע, ומסבירה
 // למה אתה בהרכב או מחוצה לו. לכל מאמן אופי, והאופי קובע מה מרגיז אותו.
@@ -11316,7 +13924,7 @@ function weeklyDirective(game, rng) {
   // מנוחה נדרשת רק כשהגוף באמת על הקצה — לא כברירת מחדל
   if (me.fitness < 34 || (me.fitness < 46 && me.sharpness < 45)) return "rest";
   const stats = game.flags.last_stats;
-  if (stats) return weakestArea(stats, me.position, me.attributes);
+  if (stats) return weakestDetail(stats, me);
   const weights = D.POSITION_WEIGHTS[me.position];
   const gaps = D.ATTRIBUTES.slice().sort((a, b) =>
     ((me.attributes[a] ?? 50) - (weights[a] ?? 0.1) * 120)
@@ -11328,12 +13936,31 @@ function weeklyDirective(game, rng) {
  * ההוראה, עם הסיבה מהמשחק האחרון וההבטחה מה זה ייתן.
  * בלי הסיבה זו שורת טקסט אקראית. עם הסיבה זו שיחה.
  */
+/** לאיזו מבין שבע הקבוצות שייכת תכונה מפורטת. */
+function areaOf(detailAttr) {
+  let best = "physical", bestShare = -1;
+  for (const map of [D.GROUP_MAP, D.GROUP_MAP_GK])
+    for (const group in map) {
+      const share = map[group][detailAttr] || 0;
+      if (share > bestShare) { best = group; bestShare = share; }
+    }
+  return best;
+}
+
+function detailDirectiveText(focus) {
+  const name = D.DETAIL_NAMES_HE[focus];
+  if (!name) return DIRECTIVE_TEXT[focus] || "רוצה אותך באימון נוסף.";
+  return `רוצה שתעבוד השבוע על ${name}.`;
+}
+
 function directiveLine(club, focus, stats = null) {
   const name = club ? club.managerName : "המאמן";
-  const head = `${name} ${DIRECTIVE_TEXT[focus] || "רוצה אותך באימון נוסף."}`;
+  const head = `${name} ${detailDirectiveText(focus)}`;
   if (!stats) return head;
-  const reason = reasonLine(focus, stats);
-  const promise = promiseLine(focus);
+  // הסיבה וההבטחה כתובות בשפת הקבוצות — מתרגמים חזרה
+  const area = (focus in D.DIRECTIVE_REASON) ? focus : areaOf(focus);
+  const reason = reasonLine(area, stats);
+  const promise = promiseLine(area);
   const parts = [head];
   if (reason) parts.push(`"${reason}"`);
   if (promise) parts.push(`← ${promise}`);
@@ -11905,15 +14532,15 @@ ev({
   choices: [
     { label: "לעבוד על מה שחסר", hint: "מקצועי", apply: g => {
       const ranked = watchers(g, SCOUT_NOTICED);
-      const weights = D.POSITION_WEIGHTS[g.me.position];
-      let worst = D.ATTRIBUTES[0];
-      for (const a of D.ATTRIBUTES)
-        if ((g.me.attributes[a] ?? 50) * (weights[a] || 0.1)
-            < (g.me.attributes[worst] ?? 50) * (weights[worst] || 0.1)) worst = a;
-      att(g, worst, 1.4);
+      const row = roleRow(g.me.role);
+      const watched = row ? row[4].concat(row[5]) : attrsFor(g.me.position);
+      let worst = watched[0];
+      for (const a of watched)
+        if ((g.me.detail[a] ?? 10) < (g.me.detail[worst] ?? 10)) worst = a;
+      addDetail(g.me, worst, 0.9);
       mor(g, 3);
       const club = ranked.length ? ranked[0][0].name : "מי שעוקב אחריך";
-      return `לקחת את זה לאימון. ${D.ATTRIBUTE_NAMES_HE[worst]} — `
+      return `לקחת את זה לאימון. ${D.DETAIL_NAMES_HE[worst]} — `
            + `בדיוק מה ש${club} סימנו לך. הצופה הבא יראה משהו אחר.`;
     } },
     { label: "לא לתת לזה להיכנס לראש", apply: g => {
@@ -12574,6 +15201,7 @@ class Game {
     g.stage = Game.stageForAge(age);
     club.managerTrust = age <= 17 ? 45 : clamp(35 + (overall(me) - 55) * 1.4, 25, 78);
 
+    g.startYear = g.year;
     g.startSeason();
     g.log(`התחלת את הדרך ב${club.name}.`);
     return g;
@@ -12612,6 +15240,7 @@ class Game {
     club.boardConfidence = 58;
     this.tactics.formation = club.formation;
     this.trainingFocus = "tactics";
+    this.startYear = this.year;
     this.startSeason();
     this.log(`מונית למנג'ר של ${club.name}.`);
     return this;
@@ -12636,6 +15265,10 @@ class Game {
         this.tables[lid][cid] = { clubId: cid, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0 };
     }
     this.buildCup();
+    if (this.year > (this.startYear || 0)) {
+      const note = this.refreshRole();
+      if (note) this.log(note);
+    }
     for (const club of Object.values(this.clubs)) club.seasonExpectation = this.expectation(club);
   }
 
@@ -12711,14 +15344,36 @@ class Game {
   // התקדמות שבועית
   // ==================================================================
 
-  availableActions() {
-    if (this.stage === "youth") {
-      return D.ATTRIBUTES.concat(["street", "school", "rest"])
-        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+  /**
+   * על מה אפשר להתאמן — תכונות אמיתיות, לא קטגוריות.
+   * לא כל 36, כי זה תפריט בלתי קריא בטלפון: בדיוק מה שרלוונטי עכשיו.
+   */
+  trainingOptions() {
+    const me = this.me;
+    const allowed = new Set(attrsFor(me.position));
+    const picked = [];
+    const add = attr => {
+      if (attr && allowed.has(attr) && !picked.includes(attr)) picked.push(attr);
+    };
+    add(this.flag("directive"));
+    add(recommendedFocus(this));
+    const row = roleRow(me.role);
+    if (row) {
+      for (const attr of row[4]) add(attr);
+      for (const attr of row[5].slice(0, 2)) add(attr);
     }
-    if (["academy", "player", "veteran"].includes(this.stage)) {
-      return D.ATTRIBUTES.concat(["rest", "badges", "media", "business"])
-        .map(k => [k, D.TRAINING_FOCUS_HE[k]]);
+    const weakest = [...allowed].sort((a, b) => (me.detail[a] ?? 10) - (me.detail[b] ?? 10));
+    for (const attr of weakest.slice(0, 3)) add(attr);
+    return picked.slice(0, 12).map(a => [a, D.DETAIL_NAMES_HE[a]]);
+  }
+
+  availableActions() {
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
+      const extra = this.stage === "youth"
+        ? ["street", "school", "rest"]
+        : ["rest", "badges", "media", "business"];
+      return this.trainingOptions()
+        .concat(extra.map(k => [k, D.TRAINING_FOCUS_HE[k]]));
     }
     if (["coach", "manager"].includes(this.stage)) {
       return [["tactics", "עבודה טקטית עם הקבוצה"], ["individual", "אימון אישי לצעירים"],
@@ -12996,8 +15651,10 @@ class Game {
     }
     const focusPid = (isMine && ["academy", "player", "veteran"].includes(this.stage))
       ? this.meId : null;
+    const focusMods = focusPid ? tacticModifiers(this.myClub(), this.me) : null;
     const result = simulateMatch(home, away, this.players, this.rng,
-      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral, focusPid });
+      { homeTactics: homeTac, awayTactics: awayTac, competition, neutral,
+        focusPid, focusMods });
     // הקהל נספר בכל משחק בית של המועדון שלי — גם בשנות הנוער,
     // כשאתה צופה בקבוצה הבוגרת מהיציע ולא משחק בה
     const myHomeClub = this.myClub();
@@ -13893,6 +16550,20 @@ class Game {
     return `קנית את ${club.name}. הילד שהתאמן פה בגיל 12 מחזיק עכשיו את המפתחות.`;
   }
 
+  /** המאמן מחלק תפקידים מחדש — בהעברה, בתחילת עונה, ובהחלפת מאמן. */
+  refreshRole() {
+    const me = this.me;
+    if (!["academy", "player", "veteran"].includes(this.stage)) return null;
+    const club = this.myClub();
+    const before = me.role;
+    me.role = assignRole(me, club, this.rng);
+    me.duty = dutyFor(me.role, club, this.rng);
+    if (me.role === before || !me.role) return null;
+    const row = roleRow(me.role);
+    if (!row) return null;
+    return `📋 התפקיד שלך: ${row[1]} (${D.DUTY_NAMES_HE[me.duty] || ""}). ${row[6]}`;
+  }
+
   transferMe(clubId, wage, years, loan = false) {
     const me = this.me;
     const old = this.clubs[me.clubId];
@@ -13905,6 +16576,9 @@ class Game {
     next.managerTrust = loan ? 65 : 55;
     this.lastClubId = clubId;
     this.noStartStreak = 0;
+    // מאמן חדש, מערכת חדשה — התפקיד שלך נקבע מאפס
+    const note = this.refreshRole();
+    if (note) this.log(note);
     this.log(`${loan ? "הושאלת ל" : "עברת ל"}${next.name}.`);
     return next.name;
   }
@@ -14194,7 +16868,7 @@ class Game {
       firstClubId: this.firstClubId, lastClubId: this.lastClubId,
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
-      positionLog: this.positionLog,
+      positionLog: this.positionLog, startYear: this.startYear,
       staffMarket: this.staffMarket, finances: this.finances,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
@@ -14213,7 +16887,7 @@ class Game {
       firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
-      positionLog: raw.positionLog || [],
+      positionLog: raw.positionLog || [], startYear: raw.startYear,
       staffMarket: raw.staffMarket || {}, finances: raw.finances || null,
     });
     g.rng = Rng.fromState(raw.rngState);
@@ -15451,6 +18125,8 @@ function tabsBar() {
     items.splice(1, 0, ["plan", "מסלול"]);
   items.splice(items.length - 1, 0, ["money", "כסף"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
+  else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
+    items.splice(2, 0, ["system", "מערכת"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
     `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
@@ -15477,6 +18153,7 @@ function screenMain() {
   if (view === "plan") return appbar() + screenPlan();
   if (view === "money") return appbar() + screenMoney();
   if (view === "scouts") return appbar() + screenScouts();
+  if (view === "system") return appbar() + screenSystem();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -15488,6 +18165,43 @@ function bandLabel(value, labels) {
 
 const RESILIENCE_WORDS = ["זכוכית", "שביר", "רגיל", "חסון", "ברזל"];
 const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בשיא"];
+
+
+/**
+ * לוח התכונות המלא, בארבע קבוצות — כמו במקור.
+ * מציג רק את מה שאתה באמת יודע: מספר מדויק, טווח, או קו.
+ */
+function attributeBoard(game, player) {
+  const know = knowledgeSummary(game, player);
+  const allowed = new Set(attrsFor(player.position));
+  const cell = attr => {
+    const info = know.detail[attr];
+    if (!info) return "";
+    if (info.exact) return `<span class="v">${info.value}</span>`;
+    if (!info.high) return `<span class="v q">?</span>`;
+    return `<span class="v q">${info.low}-${info.high}</span>`;
+  };
+  const groups = D.ATTR_GROUPS.filter(([, , rows]) =>
+    rows.some(([attr]) => allowed.has(attr)));
+  return `
+    <div class="attr-board">
+      ${groups.map(([, label, rows]) => `
+      <div class="attr-col">
+        <div class="attr-head">${esc(label)}</div>
+        ${rows.filter(([attr]) => allowed.has(attr)).map(([attr, he]) => {
+          const info = know.detail[attr];
+          const level = info && info.exact ? info.value
+                      : info && info.high ? (info.low + info.high) / 2 : 0;
+          const tone = level >= 15 ? "hi" : level >= 11 ? "mid" : level ? "lo" : "unk";
+          return `<div class="attr-row ${tone}">
+            <span class="n">${esc(he)}</span>${cell(attr)}
+          </div>`;
+        }).join("")}
+      </div>`).join("")}
+    </div>
+    ${know.level < 3 ? `<div class="muted">${esc(know.level_he)} — `
+      + `כדי לראות מספרים מדויקים צריך דוח מלא.</div>` : ""}`;
+}
 
 /** תעודת זהות מלאה של שחקן — מה שחסר כשרואים רק גיל ורגל. */
 function screenPlayer() {
@@ -15549,19 +18263,44 @@ function screenPlayer() {
       </div>
     </div>
 
+    ${(() => {
+      const know = knowledgeSummary(game, p);
+      const row = roleRow(p.role);
+      return `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${mine ? "מי אתה" : "מה ידוע"}</span>
+        <span class="r">${esc(know.level_he)}</span></div>
+      <div class="panel-body tight">
+        <div class="row">
+          <span class="grow"><span class="nm">יכולת</span></span>
+          <span class="val stars">${starText(know.ability)}</span>
+        </div>
+        <div class="row">
+          <span class="grow"><span class="nm">פוטנציאל</span></span>
+          <span class="val stars">${know.potential_low === know.potential_high
+            ? starText(know.potential_low)
+            : starText(know.potential_low) + " → " + starText(know.potential_high)}</span>
+        </div>
+        ${row ? `<div class="row">
+          <span class="grow"><span class="nm">תפקיד</span>
+            <span class="sub">${esc(row[6])}</span></span>
+          <span class="val">${esc(roleName(p))}</span>
+        </div>` : ""}
+        ${know.level >= 2 ? `<div class="row">
+          <span class="grow"><span class="nm">אישיות</span></span>
+          <span class="val">${esc(personalityName(p))}</span>
+        </div>` : ""}
+        ${!mine && know.level < 2 ? `<button class="mini-btn wide"
+          data-scout="${p.pid}">לשלוח צופה (דוח מלא)</button>` : ""}
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><span class="t">תכונות</span>
         <span class="r num">${overall(p)}${mine ? ` · תקרה ${p.potential}` : ""}</span></div>
-      <div class="panel-body">
-        <div class="attrs">
-          ${D.ATTRIBUTES.map(a => `<div class="attr">
-            <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
-            <span class="val">${p.attributes[a]}</span>
-            <span class="bar"><i style="width:${p.attributes[a]}%"></i></span>
-          </div>`).join("")}
-        </div>
-      </div>
-    </div>
+      <div class="panel-body">${attributeBoard(game, p)}</div>
+    </div>`;
+    })()}
 
     ${p.traits.length ? `<div class="panel">
       <div class="panel-head"><span class="t">אופי</span></div>
@@ -16057,6 +18796,7 @@ function screenHub() {
       </div>
     </div>
 
+    ${systemSnip()}
     ${scoutSnip()}
     ${clubSnip()}
     ${tableSnip}
@@ -16144,6 +18884,78 @@ function screenPlan() {
             `<button class="chip" data-plan="${row[0]}"
               aria-pressed="${row[0] === info.key}">${esc(row[1])}</button>`).join("")}
         </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * מסך הטקטיקה של השחקן: מה המאמן משחק, מה התפקיד שלך בתוך זה,
+ * וכמה הסגנון הזה בכלל מתאים לך.
+ */
+function screenSystem() {
+  const club = game.myClub();
+  const me = game.me;
+  if (!club) return `<div class="screen"><div class="card">אין לך מועדון.</div></div>`;
+  const style = tacticalStyle(club);
+  const values = teamInstructions(club);
+  const [fit, note] = styleSuitsPlayer(club, me);
+  const row = roleRow(me.role);
+  const options = rolesFor(me.position);
+  const cost = tacticFitnessCost(club, me);
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(style[1])}</span>
+        <span class="r">${esc(club.managerName)}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(style[3])}</div>
+        <div class="instr">
+          ${D.INSTRUCTION_KEYS.map(key => {
+            const value = values[key];
+            const pct = (value + 2) / 4 * 100;
+            return `<div class="instr-row">
+              <span class="n">${esc(D.TEAM_INSTRUCTIONS[key][0])}</span>
+              <span class="track"><i style="inset-inline-start:${pct}%"></i></span>
+              <span class="v">${esc(instructionLabel(key, value))}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">אתה בתוך המערכת</span>
+        <span class="r">${Math.round(fit)}/100</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(note)}</div>
+        ${row ? `<div class="directive">${esc(roleName(me))} — ${esc(row[6])}</div>` : ""}
+        ${(() => { const n = roleFitNote(me);
+          return n ? `<div class="muted selection">${esc(n)}</div>` : ""; })()}
+        <div class="attr"><span>עומס הסגנון על הגוף</span>
+          <span class="val">${cost.toFixed(2)}×</span>
+          <span class="bar"><i style="width:${Math.round((cost - 0.6) / 1.1 * 100)}%"></i></span></div>
+        <div class="muted">התפקיד קובע גם מה תעשה בפועל: כמה תיגע בכדור,
+          כמה תרוץ, וכמה כדורים תחטוף.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">לבקש תפקיד אחר</span></div>
+      <div class="panel-body tight">
+        <div class="muted">בקשה עולה לך באמון, גם כשהיא מתקבלת.</div>
+        ${options.map(option => {
+          const score = Math.round(roleSuitability(me, option[0]));
+          const mine = option[0] === me.role;
+          return `<div class="row">
+            <span class="grow"><span class="nm">${esc(option[1])}</span>
+              <span class="sub">${esc(option[6])}</span></span>
+            <span class="val num">${score}</span>
+            ${mine ? `<span class="mini-btn" style="opacity:.45">שלך</span>`
+                   : `<button class="mini-btn" data-role="${option[0]}">לבקש</button>`}
+          </div>`;
+        }).join("")}
       </div>
     </div>
   </div>`;
@@ -16265,6 +19077,31 @@ function screenMoney() {
             : `<button class="mini-btn" data-buy="${row.key}">לקנות</button>`}
         </div>
         <div class="muted" style="padding-inline-start:8px">${esc(row.desc)}</div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
+function systemSnip() {
+  if (!["academy", "player", "veteran"].includes(game.stage)) return "";
+  const club = game.myClub();
+  if (!club) return "";
+  const style = tacticalStyle(club);
+  const [fit] = styleSuitsPlayer(club, game.me);
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">המערכת</span>
+      <span class="r"><button class="mini-btn" data-go="system">לפרטים</button></span></div>
+    <div class="panel-body tight">
+      <div class="row">
+        <span class="grow"><span class="nm">${esc(style[1])}</span>
+          <span class="sub">${esc(club.managerName)}</span></span>
+      </div>
+      <div class="row">
+        <span class="grow"><span class="nm">${esc(roleName(game.me))}</span>
+          <span class="sub">התפקיד שלך במערכת</span></span>
+        <span class="val num">${Math.round(fit)}</span>
       </div>
     </div>
   </div>`;
@@ -16600,14 +19437,9 @@ function screenProfile() {
 
     ${isPlayer ? `
     <div class="card">
-      <div class="eyebrow">דירוג ${overall(me)} · פוטנציאל ${me.potential}</div>
-      <div class="attrs">
-        ${D.ATTRIBUTES.map(a => `<div class="attr">
-          <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
-          <span class="val">${me.attributes[a]}</span>
-          <span class="bar"><i style="width:${me.attributes[a]}%"></i></span>
-        </div>`).join("")}
-      </div>
+      <div class="eyebrow">דירוג ${overall(me)} · פוטנציאל ${me.potential} ·
+        ${esc(roleName(me))} · ${esc(personalityName(me))}</div>
+      ${attributeBoard(game, me)}
       <hr class="rule">
       <div class="attr"><span>מורל</span><span class="val">${Math.round(me.morale)}</span>
         <span class="bar soft"><i style="width:${Math.round(me.morale)}%"></i></span></div>
@@ -16975,6 +19807,20 @@ function bind() {
     el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
   app.querySelectorAll("[data-player]:not(input)").forEach(el =>
     el.addEventListener("click", () => goDeep("player", { pid: el.dataset.player })));
+  app.querySelectorAll("[data-role]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = requestRole(game, el.dataset.role);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-scout]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = scoutPlayer(game, game.players[el.dataset.scout]);
+      saveGame();
+      toast(message);
+      render();
+    }));
   app.querySelectorAll("[data-plan]").forEach(el =>
     el.addEventListener("click", () => {
       const message = setPlan(game, el.dataset.plan);

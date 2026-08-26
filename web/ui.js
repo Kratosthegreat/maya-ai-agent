@@ -592,6 +592,8 @@ function tabsBar() {
     items.splice(1, 0, ["plan", "מסלול"]);
   items.splice(items.length - 1, 0, ["money", "כסף"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
+  else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
+    items.splice(2, 0, ["system", "מערכת"]);
   const offers = game.flag("pending_offer") ? 1 : 0;
   return `<nav class="tabs">${items.map(([k, l]) =>
     `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
@@ -618,6 +620,7 @@ function screenMain() {
   if (view === "plan") return appbar() + screenPlan();
   if (view === "money") return appbar() + screenMoney();
   if (view === "scouts") return appbar() + screenScouts();
+  if (view === "system") return appbar() + screenSystem();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -629,6 +632,43 @@ function bandLabel(value, labels) {
 
 const RESILIENCE_WORDS = ["זכוכית", "שביר", "רגיל", "חסון", "ברזל"];
 const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בשיא"];
+
+
+/**
+ * לוח התכונות המלא, בארבע קבוצות — כמו במקור.
+ * מציג רק את מה שאתה באמת יודע: מספר מדויק, טווח, או קו.
+ */
+function attributeBoard(game, player) {
+  const know = knowledgeSummary(game, player);
+  const allowed = new Set(attrsFor(player.position));
+  const cell = attr => {
+    const info = know.detail[attr];
+    if (!info) return "";
+    if (info.exact) return `<span class="v">${info.value}</span>`;
+    if (!info.high) return `<span class="v q">?</span>`;
+    return `<span class="v q">${info.low}-${info.high}</span>`;
+  };
+  const groups = D.ATTR_GROUPS.filter(([, , rows]) =>
+    rows.some(([attr]) => allowed.has(attr)));
+  return `
+    <div class="attr-board">
+      ${groups.map(([, label, rows]) => `
+      <div class="attr-col">
+        <div class="attr-head">${esc(label)}</div>
+        ${rows.filter(([attr]) => allowed.has(attr)).map(([attr, he]) => {
+          const info = know.detail[attr];
+          const level = info && info.exact ? info.value
+                      : info && info.high ? (info.low + info.high) / 2 : 0;
+          const tone = level >= 15 ? "hi" : level >= 11 ? "mid" : level ? "lo" : "unk";
+          return `<div class="attr-row ${tone}">
+            <span class="n">${esc(he)}</span>${cell(attr)}
+          </div>`;
+        }).join("")}
+      </div>`).join("")}
+    </div>
+    ${know.level < 3 ? `<div class="muted">${esc(know.level_he)} — `
+      + `כדי לראות מספרים מדויקים צריך דוח מלא.</div>` : ""}`;
+}
 
 /** תעודת זהות מלאה של שחקן — מה שחסר כשרואים רק גיל ורגל. */
 function screenPlayer() {
@@ -690,19 +730,44 @@ function screenPlayer() {
       </div>
     </div>
 
+    ${(() => {
+      const know = knowledgeSummary(game, p);
+      const row = roleRow(p.role);
+      return `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${mine ? "מי אתה" : "מה ידוע"}</span>
+        <span class="r">${esc(know.level_he)}</span></div>
+      <div class="panel-body tight">
+        <div class="row">
+          <span class="grow"><span class="nm">יכולת</span></span>
+          <span class="val stars">${starText(know.ability)}</span>
+        </div>
+        <div class="row">
+          <span class="grow"><span class="nm">פוטנציאל</span></span>
+          <span class="val stars">${know.potential_low === know.potential_high
+            ? starText(know.potential_low)
+            : starText(know.potential_low) + " → " + starText(know.potential_high)}</span>
+        </div>
+        ${row ? `<div class="row">
+          <span class="grow"><span class="nm">תפקיד</span>
+            <span class="sub">${esc(row[6])}</span></span>
+          <span class="val">${esc(roleName(p))}</span>
+        </div>` : ""}
+        ${know.level >= 2 ? `<div class="row">
+          <span class="grow"><span class="nm">אישיות</span></span>
+          <span class="val">${esc(personalityName(p))}</span>
+        </div>` : ""}
+        ${!mine && know.level < 2 ? `<button class="mini-btn wide"
+          data-scout="${p.pid}">לשלוח צופה (דוח מלא)</button>` : ""}
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><span class="t">תכונות</span>
         <span class="r num">${overall(p)}${mine ? ` · תקרה ${p.potential}` : ""}</span></div>
-      <div class="panel-body">
-        <div class="attrs">
-          ${D.ATTRIBUTES.map(a => `<div class="attr">
-            <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
-            <span class="val">${p.attributes[a]}</span>
-            <span class="bar"><i style="width:${p.attributes[a]}%"></i></span>
-          </div>`).join("")}
-        </div>
-      </div>
-    </div>
+      <div class="panel-body">${attributeBoard(game, p)}</div>
+    </div>`;
+    })()}
 
     ${p.traits.length ? `<div class="panel">
       <div class="panel-head"><span class="t">אופי</span></div>
@@ -1198,6 +1263,7 @@ function screenHub() {
       </div>
     </div>
 
+    ${systemSnip()}
     ${scoutSnip()}
     ${clubSnip()}
     ${tableSnip}
@@ -1285,6 +1351,78 @@ function screenPlan() {
             `<button class="chip" data-plan="${row[0]}"
               aria-pressed="${row[0] === info.key}">${esc(row[1])}</button>`).join("")}
         </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * מסך הטקטיקה של השחקן: מה המאמן משחק, מה התפקיד שלך בתוך זה,
+ * וכמה הסגנון הזה בכלל מתאים לך.
+ */
+function screenSystem() {
+  const club = game.myClub();
+  const me = game.me;
+  if (!club) return `<div class="screen"><div class="card">אין לך מועדון.</div></div>`;
+  const style = tacticalStyle(club);
+  const values = teamInstructions(club);
+  const [fit, note] = styleSuitsPlayer(club, me);
+  const row = roleRow(me.role);
+  const options = rolesFor(me.position);
+  const cost = tacticFitnessCost(club, me);
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(style[1])}</span>
+        <span class="r">${esc(club.managerName)}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(style[3])}</div>
+        <div class="instr">
+          ${D.INSTRUCTION_KEYS.map(key => {
+            const value = values[key];
+            const pct = (value + 2) / 4 * 100;
+            return `<div class="instr-row">
+              <span class="n">${esc(D.TEAM_INSTRUCTIONS[key][0])}</span>
+              <span class="track"><i style="inset-inline-start:${pct}%"></i></span>
+              <span class="v">${esc(instructionLabel(key, value))}</span>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">אתה בתוך המערכת</span>
+        <span class="r">${Math.round(fit)}/100</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(note)}</div>
+        ${row ? `<div class="directive">${esc(roleName(me))} — ${esc(row[6])}</div>` : ""}
+        ${(() => { const n = roleFitNote(me);
+          return n ? `<div class="muted selection">${esc(n)}</div>` : ""; })()}
+        <div class="attr"><span>עומס הסגנון על הגוף</span>
+          <span class="val">${cost.toFixed(2)}×</span>
+          <span class="bar"><i style="width:${Math.round((cost - 0.6) / 1.1 * 100)}%"></i></span></div>
+        <div class="muted">התפקיד קובע גם מה תעשה בפועל: כמה תיגע בכדור,
+          כמה תרוץ, וכמה כדורים תחטוף.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">לבקש תפקיד אחר</span></div>
+      <div class="panel-body tight">
+        <div class="muted">בקשה עולה לך באמון, גם כשהיא מתקבלת.</div>
+        ${options.map(option => {
+          const score = Math.round(roleSuitability(me, option[0]));
+          const mine = option[0] === me.role;
+          return `<div class="row">
+            <span class="grow"><span class="nm">${esc(option[1])}</span>
+              <span class="sub">${esc(option[6])}</span></span>
+            <span class="val num">${score}</span>
+            ${mine ? `<span class="mini-btn" style="opacity:.45">שלך</span>`
+                   : `<button class="mini-btn" data-role="${option[0]}">לבקש</button>`}
+          </div>`;
+        }).join("")}
       </div>
     </div>
   </div>`;
@@ -1406,6 +1544,31 @@ function screenMoney() {
             : `<button class="mini-btn" data-buy="${row.key}">לקנות</button>`}
         </div>
         <div class="muted" style="padding-inline-start:8px">${esc(row.desc)}</div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
+function systemSnip() {
+  if (!["academy", "player", "veteran"].includes(game.stage)) return "";
+  const club = game.myClub();
+  if (!club) return "";
+  const style = tacticalStyle(club);
+  const [fit] = styleSuitsPlayer(club, game.me);
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">המערכת</span>
+      <span class="r"><button class="mini-btn" data-go="system">לפרטים</button></span></div>
+    <div class="panel-body tight">
+      <div class="row">
+        <span class="grow"><span class="nm">${esc(style[1])}</span>
+          <span class="sub">${esc(club.managerName)}</span></span>
+      </div>
+      <div class="row">
+        <span class="grow"><span class="nm">${esc(roleName(game.me))}</span>
+          <span class="sub">התפקיד שלך במערכת</span></span>
+        <span class="val num">${Math.round(fit)}</span>
       </div>
     </div>
   </div>`;
@@ -1741,14 +1904,9 @@ function screenProfile() {
 
     ${isPlayer ? `
     <div class="card">
-      <div class="eyebrow">דירוג ${overall(me)} · פוטנציאל ${me.potential}</div>
-      <div class="attrs">
-        ${D.ATTRIBUTES.map(a => `<div class="attr">
-          <span>${D.ATTRIBUTE_NAMES_HE[a]}</span>
-          <span class="val">${me.attributes[a]}</span>
-          <span class="bar"><i style="width:${me.attributes[a]}%"></i></span>
-        </div>`).join("")}
-      </div>
+      <div class="eyebrow">דירוג ${overall(me)} · פוטנציאל ${me.potential} ·
+        ${esc(roleName(me))} · ${esc(personalityName(me))}</div>
+      ${attributeBoard(game, me)}
       <hr class="rule">
       <div class="attr"><span>מורל</span><span class="val">${Math.round(me.morale)}</span>
         <span class="bar soft"><i style="width:${Math.round(me.morale)}%"></i></span></div>
@@ -2116,6 +2274,20 @@ function bind() {
     el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
   app.querySelectorAll("[data-player]:not(input)").forEach(el =>
     el.addEventListener("click", () => goDeep("player", { pid: el.dataset.player })));
+  app.querySelectorAll("[data-role]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = requestRole(game, el.dataset.role);
+      saveGame();
+      toast(message);
+      render();
+    }));
+  app.querySelectorAll("[data-scout]").forEach(el =>
+    el.addEventListener("click", () => {
+      const message = scoutPlayer(game, game.players[el.dataset.scout]);
+      saveGame();
+      toast(message);
+      render();
+    }));
   app.querySelectorAll("[data-plan]").forEach(el =>
     el.addEventListener("click", () => {
       const message = setPlan(game, el.dataset.plan);

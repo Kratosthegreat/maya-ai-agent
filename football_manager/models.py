@@ -131,6 +131,14 @@ class Player:
     injury_name: str = ""
     reputation: float = 20.0     # 0-100, מוניטין עולמי
 
+    # התכונות המפורטות (1-20) הן האמת; שבע הקבוצות ב-attributes נגזרות
+    # מהן ומתעדכנות בכל שינוי. ראה recompute_groups().
+    detail: Dict[str, int] = field(default_factory=dict)
+    detail_growth: Dict[str, float] = field(default_factory=dict)
+    hidden: Dict[str, int] = field(default_factory=dict)   # תכונות נסתרות
+    role: str = ""               # מפתח התפקיד שהמאמן נותן לך
+    duty: str = "support"        # חובה בתוך התפקיד
+
     traits: List[str] = field(default_factory=list)
     foot: str = "right"
     number: int = 0             # מספר חולצה במועדון הנוכחי
@@ -389,6 +397,86 @@ def generate_attributes(rng: random.Random, position: str, target_overall: int) 
     return attrs
 
 
+def generate_detail(rng: random.Random, position: str, target_overall: int,
+                    role_key: str = "") -> Dict[str, int]:
+    """מייצר את 47 התכונות המפורטות (1-20) סביב רמה מבוקשת.
+
+    התפקיד קובע את הפרופיל: חלוץ בור יקבל סיום ותנועה גבוהים וכדרור
+    בינוני; קשר חוטף יקבל חטיפה וקצב עבודה. זה מה שהופך שני חלוצים
+    באותו דירוג לשני שחקנים שונים לגמרי.
+    """
+    row = role_row(role_key) if role_key else None
+    if row is None:
+        options = D.roles_for(position)
+        row = rng.choice(options) if options else None
+    key_attrs = set(row[4]) if row else set()
+    extra = set(row[5]) if row else set()
+
+    allowed = D.attrs_for(position)
+    centre = clamp(target_overall / 5.0, 1.0, 19.5)     # 1-100 → 1-20
+    detail: Dict[str, int] = {}
+    for attr in D.DETAIL_NAMES_HE:
+        if attr not in allowed:
+            # תכונה שלא רלוונטית לעמדה עדיין קיימת, אבל נמוכה ולא מאומנת
+            detail[attr] = int(clamp(rng.gauss(6, 2.5), 1, 14))
+            continue
+        if attr in key_attrs:
+            base = centre + rng.gauss(2.2, 1.3)
+        elif attr in extra:
+            base = centre + rng.gauss(0.8, 1.4)
+        else:
+            base = centre + rng.gauss(-1.6, 2.0)
+        detail[attr] = int(round(clamp(base, 1, 20)))
+
+    # נחישות ומקצוענות אינן תלויות ברמה — יש נערים נחושים וכוכבים עצלים
+    detail["determination"] = int(round(clamp(rng.gauss(11, 3.6), 1, 20)))
+    return detail
+
+
+def generate_hidden(rng: random.Random) -> Dict[str, int]:
+    """התכונות שאף מסך לא יראה לך, ושבכל זאת קובעות הכול."""
+    return {key: int(round(clamp(rng.gauss(10.5, 3.8), 1, 20)))
+            for key, _name in D.HIDDEN_ATTRS}
+
+
+def fit_detail_to_overall(player: "Player", target: int,
+                          rng: random.Random) -> None:
+    """מזיז את התכונות המפורטות עד שהדירוג הכללי קולע ליעד.
+
+    הכיוון חשוב: מרימים קודם את מה שהתפקיד באמת דורש, ומורידים קודם
+    את מה שפחות רלוונטי — כדי שהפרופיל יישאר הגיוני ולא ישתטח.
+    התיקון נעשה בקבוצות ולא נקודה־נקודה, כי זה רץ 1,400 פעם בכל
+    יצירת עולם.
+    """
+    allowed = list(D.attrs_for(player.position))
+    row = role_row(player.role)
+    if row:
+        priority = {a: 2 for a in row[4]}
+        priority.update({a: 1 for a in row[5]})
+        allowed.sort(key=lambda a: -priority.get(a, 0))
+
+    for _ in range(14):
+        recompute_groups(player)
+        diff = target - player.overall
+        if abs(diff) < 1:
+            return
+        # העלאת כל התכונות בנקודה אחת מרימה את הכללי בכ-5
+        steps = max(1, int(round(abs(diff) / 5.0 * len(allowed))))
+        step = 1 if diff > 0 else -1
+        pool = allowed if diff > 0 else list(reversed(allowed))
+        moved = 0
+        for attr in pool:
+            if moved >= steps:
+                break
+            value = player.detail.get(attr, 10)
+            if 1 <= value + step <= 20:
+                player.detail[attr] = value + step
+                moved += 1
+        if not moved:
+            break
+    recompute_groups(player)
+
+
 def generate_player(rng: random.Random, club: Optional[Club], position: str,
                     age: Optional[int] = None, quality: Optional[int] = None,
                     used_names: Optional[set] = None) -> Player:
@@ -410,13 +498,21 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
     potential = int(clamp(quality + (ceiling - quality) * rng.uniform(0.35, 0.75),
                           quality, ceiling))
 
+    # התפקיד נבחר קודם, כי הוא זה שקובע איך ייראה פרופיל התכונות
+    role_options = D.roles_for(position)
+    role = rng.choice(role_options) if role_options else None
+
     player = Player(
         pid=f"p{rng.randrange(10 ** 9):09d}",
         name=_rand_name(rng, used_names),
         age=age,
         position=position,
         nationality=weighted_choice(rng, D.NATIONALITIES),
-        attributes=generate_attributes(rng, position, quality),
+        attributes={},
+        detail=generate_detail(rng, position, quality, role[0] if role else ""),
+        hidden=generate_hidden(rng),
+        role=role[0] if role else "",
+        duty=rng.choice(role[3]) if role else "support",
         potential=potential,
         ceiling=ceiling,
         club_id=club.cid if club else None,
@@ -424,6 +520,7 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
         form=rng.uniform(40, 60),
         morale=rng.uniform(45, 75),
     )
+    fit_detail_to_overall(player, quality, rng)
     wage = wage_for_overall(player.overall)
     player.contract = Contract(wage=wage, years_left=rng.randint(1, 4))
     player.foot = "right" if rng.random() < 0.72 else ("left" if rng.random() < 0.78 else "both")
@@ -434,6 +531,180 @@ def generate_player(rng: random.Random, club: Optional[Club], position: str,
     player.media_skill = clamp(rng.gauss(10, 6), 0, 40)
     player.business = clamp(rng.gauss(8, 5), 0, 40)
     return player
+
+
+# ---------------------------------------------------------------------------
+# התכונות המפורטות: גזירה, כתיבה והתאמה לתפקיד
+# ---------------------------------------------------------------------------
+# הכלל: detail הוא האמת, attributes נגזר. כל כתיבה עוברת דרך add_detail
+# או add_group, ושתיהן מסתיימות ב-recompute_groups. אין דרך אחרת לשנות
+# תכונה — וזה מה שמונע מהשניים להתפצל.
+
+def group_map_for(position: str) -> Dict[str, Dict[str, float]]:
+    return D.GROUP_MAP_GK if position == "GK" else D.GROUP_MAP
+
+
+def recompute_groups(player: "Player") -> None:
+    """מחשב מחדש את שבע הקבוצות (1-100) מתוך התכונות המפורטות (1-20)."""
+    mapping = group_map_for(player.position)
+    for group, members in mapping.items():
+        total = 0.0
+        weight = 0.0
+        for attr, share in members.items():
+            total += player.detail.get(attr, 10) * share
+            weight += share
+        value = (total / weight) * 5.0 if weight else 50.0
+        player.attributes[group] = int(round(clamp(value, 1, 99)))
+
+
+def add_detail(player: "Player", attr: str, delta: float) -> int:
+    """מוסיף שבר לתכונה מפורטת. מחזיר כמה נקודות שלמות נוספו."""
+    if attr not in D.DETAIL_NAMES_HE:
+        return 0
+    current = player.detail_growth.get(attr, 0.0) + delta
+    gained = 0
+    while current >= 1.0 and player.detail.get(attr, 10) < 20:
+        player.detail[attr] = player.detail.get(attr, 10) + 1
+        current -= 1.0
+        gained += 1
+    while current <= -1.0 and player.detail.get(attr, 10) > 1:
+        player.detail[attr] = player.detail.get(attr, 10) - 1
+        current += 1.0
+        gained -= 1
+    # אין טעם לצבור שברים על תכונה שכבר בתקרה או ברצפה — אחרת
+    # שבועות של אימון "נשמרים" ומשתחררים בבת אחת אחרי ירידה
+    if player.detail.get(attr, 10) >= 20:
+        current = min(current, 0.0)
+    elif player.detail.get(attr, 10) <= 1:
+        current = max(current, 0.0)
+    player.detail_growth[attr] = current
+    if gained:
+        recompute_groups(player)
+    return gained
+
+
+def add_group(player: "Player", group: str, delta: float) -> Dict[str, int]:
+    """מפזר שינוי בקבוצה על התכונות המפורטות שמרכיבות אותה.
+
+    ככה "אימון בעיטות" הופך בפועל לסיום, בעיטות מרחוק, טכניקה וקור רוח —
+    ואירועי עלילה שכתובים בשפת הקבוצות ממשיכים לעבוד בלי שינוי.
+    """
+    members = group_map_for(player.position).get(group)
+    if not members:
+        return {}
+    allowed = set(D.attrs_for(player.position))
+    usable = {a: w for a, w in members.items() if a in allowed}
+    if not usable:
+        return {}
+    total = sum(usable.values())
+    # השינוי בקבוצה הוא בסולם 1-100; התכונות בסולם 1-20
+    step = delta / 5.0
+    gains: Dict[str, int] = {}
+    for attr, share in usable.items():
+        got = add_detail(player, attr, step * (share / total) * len(usable))
+        if got:
+            gains[attr] = got
+    return gains
+
+
+def set_group(player: "Player", group: str, value: float) -> None:
+    """מציב קבוצה שלמה על ערך נתון, דרך התכונות שמרכיבות אותה.
+
+    ``attributes`` נגזר ולכן כתיבה ישירה אליו נמחקת בחישוב הבא. זו
+    הדרך הנכונה להגיד "תן לשחקן הזה בעיטה 90".
+    """
+    members = group_map_for(player.position).get(group)
+    if not members:
+        return
+    level = int(round(clamp(value / 5.0, 1, 20)))
+    for attr in members:
+        player.detail[attr] = level
+    recompute_groups(player)
+
+
+def set_all(player: "Player", value: float) -> None:
+    """מציב את כל התכונות המפורטות על אותה רמה (1-100)."""
+    level = int(round(clamp(value / 5.0, 1, 20)))
+    for attr in D.DETAIL_NAMES_HE:
+        player.detail[attr] = level
+    recompute_groups(player)
+
+
+def role_row(key: str):
+    return D.ROLE_BY_KEY.get(key)
+
+
+def role_suitability(player: "Player", role_key: str) -> float:
+    """0-100: כמה השחקן מתאים לתפקיד הזה, לפי התכונות שהתפקיד באמת דורש."""
+    row = role_row(role_key)
+    if not row:
+        return 0.0
+    key_attrs, extra = row[4], row[5]
+    total = 0.0
+    weight = 0.0
+    for attr in key_attrs:
+        total += player.detail.get(attr, 10) * 2.0
+        weight += 2.0
+    for attr in extra:
+        total += player.detail.get(attr, 10) * 1.0
+        weight += 1.0
+    score = (total / weight) * 5.0 if weight else 0.0
+    if player.position not in row[2]:
+        score *= 0.72          # תפקיד שהוא לא באמת שלך
+    return clamp(score, 0.0, 100.0)
+
+
+def best_role(player: "Player") -> tuple:
+    """התפקיד שהשחקן הכי מתאים לו בעמדה שלו, והציון."""
+    options = D.roles_for(player.position)
+    if not options:
+        return ("", 0.0)
+    ranked = [(row[0], role_suitability(player, row[0])) for row in options]
+    ranked.sort(key=lambda pair: -pair[1])
+    return ranked[0]
+
+
+def role_name(player: "Player") -> str:
+    row = role_row(player.role)
+    if not row:
+        return D.POSITION_NAMES_HE[player.position]
+    duty = D.DUTY_NAMES_HE.get(player.duty, "")
+    return f"{row[1]} ({duty})" if duty else row[1]
+
+
+# ---------------------------------------------------------------------------
+# אישיות
+# ---------------------------------------------------------------------------
+
+def personality_key(player: "Player") -> str:
+    """האישיות נגזרת מהתכונות הנסתרות ומהנחישות — בדיוק כמו במקור."""
+    values = dict(player.hidden)
+    values["determination"] = player.detail.get("determination", 10)
+    for key, _name, _desc, needs in D.PERSONALITIES:
+        ok = True
+        for attr, level in needs.items():
+            value = values.get(attr, 10)
+            # ערך שלילי בתנאי פירושו "לכל היותר"
+            if (value <= -level) if level < 0 else (value >= level):
+                continue
+            ok = False
+            break
+        if ok:
+            return key
+    return "balanced"
+
+
+def personality_name(player: "Player") -> str:
+    key = personality_key(player)
+    for row in D.PERSONALITIES:
+        if row[0] == key:
+            return row[1]
+    return "מאוזן"
+
+
+def personality_effect(player: "Player") -> tuple:
+    """(מכפיל התפתחות, תנודתיות מורל, השפעה על אמון המאמן)."""
+    return D.PERSONALITY_EFFECT.get(personality_key(player), (1.0, 1.0, 1.0))
 
 
 def wage_for_overall(overall: int) -> int:

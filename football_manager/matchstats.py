@@ -29,7 +29,8 @@ def _rate(value: float, low: float, high: float) -> float:
 
 def match_stat_line(player: Player, minutes: int, goals: int, assists: int,
                     rng: random.Random, possession: float = 0.5,
-                    fitness_at_kickoff: Optional[float] = None) -> Dict[str, Any]:
+                    fitness_at_kickoff: Optional[float] = None,
+                    mods: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
     """מייצר שורת סטטיסטיקה למשחק אחד, נגזרת מהתכונות בפועל.
 
     ``possession`` הוא נתח השליטה של הקבוצה שלך — שחקן בקבוצה ששולטת
@@ -46,20 +47,33 @@ def match_stat_line(player: Player, minutes: int, goals: int, assists: int,
     stamina = 0.80 + 0.20 * clamp(fit, 0, 100) / 100.0
     sharp = 0.86 + 0.28 * clamp(player.sharpness, 0, 100) / 100.0
 
-    shooting = attrs.get("shooting", 50)
-    passing = attrs.get("passing", 50)
-    dribbling = attrs.get("dribbling", 50)
-    defending = attrs.get("defending", 50)
-    physical = attrs.get("physical", 50)
-    pace = attrs.get("pace", 50)
-    mental = attrs.get("mental", 50)
+    # קוראים מהתכונות המפורטות כשהן קיימות: "בעיטות למסגרת" נגזרות
+    # מסיום ולא מקבוצה שלמה, ולכן אימון ממוקד נראה מיד
+    detail = player.detail
+
+    def fine(name: str, fallback: str) -> float:
+        value = detail.get(name)
+        return value * 5.0 if value else float(attrs.get(fallback, 50))
+
+    shooting = fine("finishing", "shooting")
+    passing = fine("passing", "passing")
+    dribbling = fine("dribbling", "dribbling")
+    defending = fine("tackling", "defending")
+    physical = fine("strength", "physical")
+    pace = fine("acceleration", "pace")
+    mental = fine("decisions", "mental")
 
     exp: Dict[str, float] = {}
+    # הטקטיקה של המאמן והתפקיד שנתן לך — זה מה שהופך את התשעים דקות
+    # שלך אצל מאמן אחד לשונות לגמרי מאותן תשעים דקות אצל אחר
+    mods = mods or {}
+    def mod(key: str) -> float:
+        return float(mods.get(key, 1.0))
 
     # בעיטות — כמה אתה בכלל מגיע למצב, וכמה מזה נוגע במסגרת
     shot_rate = (share["att"] * 3.4 + share["mid"] * 1.0 + share["def"] * 0.25)
     shot_rate *= _rate(shooting, 0.45, 1.5) * _rate(mental, 0.7, 1.25)
-    exp["shots"] = shot_rate * load * sharp
+    exp["shots"] = shot_rate * load * sharp * mod("shots")
     shots = _draw(rng, exp["shots"])
     accuracy = _rate(shooting, 0.22, 0.66) * sharp
     exp["on_target"] = exp["shots"] * accuracy
@@ -68,19 +82,21 @@ def match_stat_line(player: Player, minutes: int, goals: int, assists: int,
 
     # מסירות — הנפח נקבע בעמדה, האחוז נקבע בתכונה
     pass_volume = (share["mid"] * 62 + share["def"] * 46 + share["att"] * 26)
-    exp["passes"] = pass_volume * load * (0.75 + passing / 260.0)
+    exp["passes"] = pass_volume * load * (0.75 + passing / 260.0) * mod("passes")
     passes = max(3, _draw(rng, exp["passes"]))
-    exp["pass_pct"] = clamp(58 + passing * 0.30 - (1 - stamina) * 22, 35, 96)
+    exp["pass_pct"] = clamp((58 + passing * 0.30 - (1 - stamina) * 22)
+                            * mod("pass_pct"), 35, 96)
     pass_pct = clamp(exp["pass_pct"] + rng.gauss(0, 3.4), 35, 96)
     completed = int(round(passes * pass_pct / 100.0))
     key_rate = (share["att"] * 1.5 + share["mid"] * 1.3 + share["def"] * 0.3)
-    exp["key_passes"] = key_rate * _rate(passing, 0.25, 1.35) * load
+    exp["key_passes"] = key_rate * _rate(passing, 0.25, 1.35) * load * mod("key_passes")
     key_passes = _draw(rng, exp["key_passes"])
     key_passes = max(key_passes, assists)
 
     # כדרור
     exp["dribble_tries"] = ((share["att"] * 2.6 + share["mid"] * 1.4 +
-                             share["def"] * 0.5) * _rate(dribbling, 0.4, 1.5) * load)
+                             share["def"] * 0.5) * _rate(dribbling, 0.4, 1.5)
+                            * load * mod("dribbles"))
     dribble_tries = _draw(rng, exp["dribble_tries"])
     exp["dribble_pct"] = clamp(24 + dribbling * 0.44, 8, 92)
     dribble_pct = clamp(exp["dribble_pct"] + rng.gauss(0, 5), 8, 92)
@@ -88,34 +104,34 @@ def match_stat_line(player: Player, minutes: int, goals: int, assists: int,
     dribbles = sum(1 for _ in range(dribble_tries) if rng.random() * 100 < dribble_pct)
 
     # דו־קרבים וחטיפות
-    exp["duels"] = (5.5 + share["def"] * 5.0 + share["mid"] * 2.5) * load
+    exp["duels"] = (5.5 + share["def"] * 5.0 + share["mid"] * 2.5) * load * mod("duels")
     duels = max(2, _draw(rng, exp["duels"]))
     exp["duels_pct"] = clamp(28 + physical * 0.34 + mental * 0.10
                              - (1 - stamina) * 26, 10, 92)
     duels_pct = clamp(exp["duels_pct"] + rng.gauss(0, 4.5), 10, 92)
     duels_won = int(round(duels * duels_pct / 100.0))
     tackle_rate = (share["def"] * 4.6 + share["mid"] * 2.4 + share["att"] * 0.6)
-    exp["tackles"] = tackle_rate * _rate(defending, 0.35, 1.4) * load
+    exp["tackles"] = tackle_rate * _rate(defending, 0.35, 1.4) * load * mod("tackles")
     tackles = _draw(rng, exp["tackles"])
 
     # איבודי כדור — הדבר היחיד שבו נמוך זה טוב
     exp["losses"] = (exp["passes"] * (1 - exp["pass_pct"] / 100.0) * 0.55 +
-                     (exp["dribble_tries"] - exp["dribbles"]) * 0.7)
+                     (exp["dribble_tries"] - exp["dribbles"]) * 0.7) * mod("losses")
     loss_base = (passes * (1 - pass_pct / 100.0) * 0.55 +
                  (dribble_tries - dribbles) * 0.7)
     losses = max(0, int(round(loss_base + rng.gauss(0, 1.1))))
 
     # ריצה
     exp["sprints"] = ((11 + share["att"] * 9 + share["mid"] * 7) *
-                      _rate(pace, 0.45, 1.4) * load * stamina)
+                      _rate(pace, 0.45, 1.4) * load * stamina * mod("sprints"))
     sprints = _draw(rng, exp["sprints"])
     distance = round(clamp((7.4 + share["mid"] * 3.4 + share["def"] * 1.2 +
                             physical * 0.022) * (minutes / 90.0) * stamina
-                           + rng.gauss(0, 0.35), 2.0, 14.5), 1)
+                           * mod("distance") + rng.gauss(0, 0.35), 2.0, 16.5), 1)
 
     # קריאת משחק — כמה פעמים היית במקום הנכון
     exp["reads"] = ((4.0 + share["def"] * 2.4 + share["mid"] * 2.0) *
-                    _rate(mental, 0.4, 1.55) * load)
+                    _rate(mental, 0.4, 1.55) * load * mod("reads"))
     reads = _draw(rng, exp["reads"])
 
     return {
@@ -284,3 +300,34 @@ def promise_line(area: str) -> str:
     """מה המאמן מבטיח שיקרה אם תעבוד על זה."""
     pair = D.DIRECTIVE_REASON.get(area)
     return pair[1] if pair else ""
+
+
+def weakest_detail(stats: Dict[str, Any], player) -> str:
+    """התכונה המפורטת שהמאמן יבקש ממך לעבוד עליה.
+
+    קודם התחום שנפל במשחק, ואז — בתוך התחום — התכונה הנמוכה ביותר
+    מבין אלה שהתפקיד שלך באמת דורש. ככה "השבוע סיומות" הופך ל"השבוע
+    קור רוח", כי זה מה שבאמת חסר לך.
+    """
+    area = weakest_area(stats, player.position, player.attributes)
+    if area == "rest":
+        return "rest"
+    members = (D.GROUP_MAP_GK if player.position == "GK"
+               else D.GROUP_MAP).get(area, {})
+    allowed = set(D.attrs_for(player.position))
+    row = D.ROLE_BY_KEY.get(getattr(player, "role", "") or "")
+    role_attrs = (set(row[4]) | set(row[5])) if row else set()
+
+    best = None
+    best_key = area
+    for attr, share in members.items():
+        if attr not in allowed:
+            continue
+        # ככל שהתכונה נמוכה יותר, וככל שהתפקיד דורש אותה יותר — היא עולה
+        score = player.detail.get(attr, 10) - share * 2.4
+        if attr in role_attrs:
+            score -= 3.5
+        if best is None or score < best:
+            best = score
+            best_key = attr
+    return best_key

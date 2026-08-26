@@ -17,6 +17,9 @@ from .game import CUP_WEEKS, SAVE_DIR, SEASON_WEEKS, GameState
 from . import development as DEV
 from . import scouting as SC
 from . import wealth as WL
+from . import tactics as TA
+from . import models as MDL
+from . import knowledge as KN
 from . import commercial as CM
 from .engine import MENTALITIES, PRESSING
 
@@ -78,11 +81,19 @@ def show_profile(game: GameState) -> None:
         out(f"מועדון: {club.name} ({club.nickname})")
     if game.stage in ("academy", "player", "veteran"):
         out(f"דירוג כללי: {me.overall}  (פוטנציאל {me.potential})")
+        out(f"תפקיד: {MDL.role_name(me)} | אישיות: {MDL.personality_name(me)}")
         out(LINE)
-        for attr in D.ATTRIBUTES:
-            value = me.attributes.get(attr, 50)
-            bar = "█" * int(value / 5) + "░" * (20 - int(value / 5))
-            out(f"{D.ATTRIBUTE_NAMES_HE[attr]:<12} {value:>3} {bar}")
+        # לוח התכונות המלא, בארבע קבוצות — כמו במקור
+        allowed = set(D.attrs_for(me.position))
+        for _key, label, rows in D.ATTR_GROUPS:
+            visible = [(a, he) for a, he in rows if a in allowed]
+            if not visible:
+                continue
+            out(f"— {label} —")
+            for attr, he in visible:
+                value = me.detail.get(attr, 10)
+                bar = "█" * value + "░" * (20 - value)
+                out(f"  {he:<16} {value:>2} {bar}")
         out(LINE)
         out(f"כושר: {int(me.form)} | מורל: {int(me.morale)} | "
             f"רעננות: {int(me.fitness)} | מוניטין: {int(me.reputation)}")
@@ -308,6 +319,8 @@ def game_loop(game: GameState) -> None:
             keys.append("plan")
             options.append("👀 מי עוקב אחריי")
             keys.append("scouts")
+            options.append("🧠 המערכת והתפקיד שלי")
+            keys.append("system")
         options.append("💼 חסויות ונכסים")
         keys.append("money")
         if game.stage in ("manager", "coach"):
@@ -342,6 +355,8 @@ def game_loop(game: GameState) -> None:
         elif key == "scouts":
             show_scouts(game)
             ask("\n[Enter]")
+        elif key == "system":
+            show_system(game)
         elif key == "money":
             show_money(game)
         elif key == "tactics":
@@ -549,6 +564,36 @@ def show_plan(game: GameState) -> None:
         if idx < len(rows):
             out("\n" + DEV.set_plan(game, rows[idx][0]))
             ask("\n[Enter]")
+
+
+def show_system(game: GameState) -> None:
+    """הטקטיקה של המאמן, ומה התפקיד שלך בתוכה."""
+    club = game.my_club
+    me = game.me
+    if not club:
+        out("\nאין לך מועדון.")
+        return
+    out("")
+    for line in TA.describe(club):
+        out("  " + line)
+    fit, note = TA.suits_player(club, me)
+    out("")
+    out(f"  התאמה לסגנון: {fit:.0f}/100 — {note}")
+    fit_note = TA.role_fit_note(me)
+    if fit_note:
+        out("  " + fit_note)
+    out(f"  עומס הסגנון על הגוף: {TA.fitness_cost(club, me):.2f}×")
+    options = D.roles_for(me.position)
+    out("")
+    out("  תפקידים אפשריים בעמדה שלך:")
+    for row in options:
+        mark = "★" if row[0] == me.role else " "
+        out(f"   {mark} {row[1]:<18} {MDL.role_suitability(me, row[0]):>3.0f}  {row[6]}")
+    idx = choose("לבקש תפקיד אחר?", [r[1] for r in options] + ["לא עכשיו"],
+                 default=len(options))
+    if idx < len(options):
+        out("\n" + TA.request_role(game, options[idx][0]))
+        ask("\n[Enter]")
 
 
 def show_scouts(game: GameState) -> None:

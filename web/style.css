@@ -824,6 +824,47 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   font-size: 12.5px; line-height: 1.4;
 }
 
+/* לוח התכונות המלא — ארבע קבוצות, בסולם 1-20 כמו במקור */
+.attr-board {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+}
+.attr-col { min-width: 0; }
+.attr-head {
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  color: var(--muted); padding-block-end: 4px;
+  border-block-end: 1px solid var(--line); margin-block-end: 4px;
+}
+.attr-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; line-height: 1.75;
+}
+.attr-row .n { flex: 1; min-width: 0; color: var(--ink-2); }
+.attr-row .v {
+  unicode-bidi: isolate; font-variant-numeric: tabular-nums;
+  min-width: 34px; text-align: end; font-weight: 700;
+}
+.attr-row .v.q { font-weight: 600; opacity: .7; font-size: 11.5px; }
+.attr-row.hi .v { color: var(--good, #4ade80); }
+.attr-row.mid .v { color: var(--ink); }
+.attr-row.lo .v { color: var(--muted); }
+.attr-row.unk .v { color: var(--muted); opacity: .5; }
+.val.stars { letter-spacing: .06em; unicode-bidi: isolate; }
+
+/* ההוראות הטקטיות — סרגל שמראה איפה המאמן עומד בכל ציר */
+.instr { display: grid; gap: 7px; margin-block-start: 8px; }
+.instr-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.instr-row .n { min-width: 78px; color: var(--ink-2); }
+.instr-row .track {
+  position: relative; flex: 1; height: 4px; border-radius: 3px;
+  background: var(--line);
+}
+.instr-row .track i {
+  position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); transform: translate(50%, -50%);
+}
+.instr-row .v { min-width: 74px; text-align: end; font-weight: 600; }
+
 /* שורת הסטטיסטיקה אחרי משחק — המספרים שהאימון של השבוע ייצר */
 .statline { display: grid; gap: 3px; }
 .statline .muted {
