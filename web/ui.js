@@ -588,8 +588,9 @@ function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
   if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
-  if (["youth", "academy", "player", "veteran"].includes(game.stage))
-    items.splice(1, 0, ["plan", "מסלול"]);
+  if (["youth", "academy", "player", "veteran"].includes(game.stage)) {
+    items.splice(1, 0, ["mentor", "מנטור"], ["plan", "מסלול"], ["growth", "התפתחות"]);
+  }
   items.splice(items.length - 1, 0, ["money", "כסף"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
@@ -621,6 +622,9 @@ function screenMain() {
   if (view === "money") return appbar() + screenMoney();
   if (view === "scouts") return appbar() + screenScouts();
   if (view === "system") return appbar() + screenSystem();
+  if (view === "mentor") return appbar() + screenMentor();
+  if (view === "growth") return appbar() + screenGrowth();
+  if (view === "attr") return appbar() + screenAttr();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -660,7 +664,8 @@ function attributeBoard(game, player) {
           const level = info && info.exact ? info.value
                       : info && info.high ? (info.low + info.high) / 2 : 0;
           const tone = level >= 15 ? "hi" : level >= 11 ? "mid" : level ? "lo" : "unk";
-          return `<div class="attr-row ${tone}">
+          const tap = player.pid === game.meId ? ` data-attr="${attr}"` : "";
+          return `<div class="attr-row ${tone}${tap ? " tappable" : ""}"${tap}>
             <span class="n">${esc(he)}</span>${cell(attr)}
           </div>`;
         }).join("")}
@@ -907,6 +912,46 @@ function moneyRow(label, amount, kind) {
  * מסך המועדון: אצטדיון, קופה, מתקנים וצוות מקצועי.
  * כשאתה שחקן אתה רואה הכל אבל לא נוגע; כמנג'ר, מנהל או בעלים — אתה מחליט.
  */
+/**
+ * עומק הסגל לפי עמדה, ומי בדיוק עומד לפניך בתור.
+ * זה הפרט שהיה חסר כדי להבין למה אתה משחק או לא.
+ */
+function squadDepthPanel() {
+  const report = squadReport(game);
+  if (!report.has_club) return "";
+  const me = game.me;
+  const order = D.POSITIONS.filter(p => (report.by_position[p] || []).length);
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">עומק הסגל</span>
+      <span class="r">${report.squad_size} · גיל ${report.average_age} ·
+        ממוצע ${report.average_overall}</span></div>
+    <div class="panel-body tight">
+      ${report.ahead_of_me.length ? `<div class="muted selection">
+        ${report.ahead_of_me.length} שחקנים לפניך בעמדה:
+        ${esc(report.ahead_of_me.map(r => r.name).join(", "))}</div>`
+        : `<div class="muted selection">אף אחד בסגל לא חזק ממך בעמדה שלך.</div>`}
+      ${order.map(position => {
+        const rows = report.by_position[position];
+        const mine = position === me.position;
+        return `<div class="depth ${mine ? "mine" : ""}">
+          <div class="depth-head">${esc(D.POSITION_NAMES_HE[position])}
+            <span class="muted">${rows.length}</span></div>
+          ${rows.map(row => `<div class="row ${row.is_me ? "me" : ""}"
+              ${row.is_me ? "" : `data-player="${row.pid}"`}>
+            <span class="val" style="min-width:26px">${row.number || "-"}</span>
+            <span class="grow"><span class="nm">${esc(row.name)}</span>
+              <span class="sub">בן ${row.age}${
+                row.role && roleRow(row.role) ? " · " + esc(roleRow(row.role)[1]) : ""}${
+                row.available ? "" : " · 🚑"}</span></span>
+            <span class="val num">${row.overall}</span>
+          </div>`).join("")}
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
 function screenClub() {
   const club = game.myClub();
   if (!club) return `<div class="screen"><div class="card">אתה לא משויך למועדון כרגע.</div></div>`;
@@ -937,6 +982,8 @@ function screenClub() {
         </div>
       </div>
     </div>
+
+    ${squadDepthPanel()}
 
     <div class="panel">
       <div class="panel-head"><span class="t">הקופה</span>
@@ -1254,6 +1301,7 @@ function screenHub() {
           ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
             aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
         </div>
+        ${isPlayer ? trainingBrief(game.trainingFocus) : ""}
         ${isPlayer ? `<hr class="rule">
         <div class="muted">עצימות</div>
         <div class="chips">
@@ -1351,6 +1399,207 @@ function screenPlan() {
             `<button class="chip" data-plan="${row[0]}"
               aria-pressed="${row[0] === info.key}">${esc(row[1])}</button>`).join("")}
         </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * המנטור — מי שמלווה אותך ואומר לך מה לעשות עכשיו.
+ * כל שורה כאן היא מצב אמיתי במשחק, לא טקסט קבוע.
+ */
+function screenMentor() {
+  const info = mentorBoard(game);
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(info.name)}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(info.blurb)}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה הוא רואה עכשיו</span>
+        <span class="r">${info.items.length}</span></div>
+      <div class="panel-body">
+        ${info.items.length ? info.items.map(item => `
+        <div class="tip ${item.said ? "said" : ""}">
+          <div class="tip-head">
+            <span class="t">${esc(item.title)}</span>
+            <span class="u">${item.urgency}</span>
+          </div>
+          <div class="muted">${esc(item.body)}</div>
+          ${item.action && D.DETAIL_NAMES_HE[item.action] ? `
+          <button class="mini-btn" data-focus="${item.action}">
+            להתאמן על ${esc(D.DETAIL_NAMES_HE[item.action])}</button>` : ""}
+          ${item.action === "rest" ? `
+          <button class="mini-btn" data-focus="rest">לקחת שבוע מנוחה</button>` : ""}
+        </div>`).join("")
+        : `<div class="muted">אין לו מה להגיד לך עכשיו. זה סימן טוב.</div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה הכי שווה לך לעבוד עליו</span></div>
+      <div class="panel-body tight">
+        ${info.needs.map(need => `
+        <div class="row" data-attr="${need.attr}">
+          <span class="val" style="min-width:30px">#${need.rank}</span>
+          <span class="grow"><span class="nm">${esc(D.DETAIL_NAMES_HE[need.attr])}</span>
+            <span class="sub">${esc(need.reasons.join(" · ") || need.verdict)}</span></span>
+          <span class="val num">${need.level}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** איך התפתחתי, ובכמה — התשובה ל"הכול כאילו מתפתח". */
+function screenGrowth() {
+  const info = growthSummary(game);
+  const me = game.me;
+  if (!info.seasons.length) {
+    return `<div class="screen"><div class="panel">
+      <div class="panel-head"><span class="t">ההתפתחות שלך</span></div>
+      <div class="panel-body"><div class="muted">עוד לא נרשמה עונה שלמה.
+        התמונה תיבנה בסוף העונה הראשונה.</div></div></div></div>`;
+  }
+  const phys = info.physical;
+  const best = info.moved.filter(r => r.delta > 0);
+  const worst = info.moved.filter(r => r.delta < 0);
+  const peak = Math.max(1, ...info.moved.map(r => Math.abs(r.delta)));
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">מאז ${info.since}</span>
+        <span class="r">גיל ${info.since_age} → ${me.age}</span></div>
+      <div class="panel-body">
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${info.overall_from} → ${info.overall_to}</div>
+            <div class="l">דירוג כללי</div></div>
+          <div class="stat"><div class="n">+${info.total_points}</div>
+            <div class="l">נקודות תכונה</div></div>
+          <div class="stat"><div class="n">${info.seasons.length}</div>
+            <div class="l">עונות</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הגוף</span>
+        <span class="r">${phys.left ? `נותרו ${phys.left} ס"מ` : "סיימת לגדול"}</span></div>
+      <div class="panel-body tight">
+        <div class="row">
+          <span class="grow"><span class="nm">גובה</span></span>
+          <span class="val num">${phys.height_from} → ${phys.height_to} ס"מ</span>
+        </div>
+        <div class="row">
+          <span class="grow"><span class="nm">משקל</span></span>
+          <span class="val num">${phys.weight_from} → ${phys.weight_to} ק"ג</span>
+        </div>
+        ${phys.adult_height ? `<div class="attr">
+          <span>לקראת ${phys.adult_height} ס"מ</span>
+          <span class="val">${Math.round(phys.height_to / phys.adult_height * 100)}%</span>
+          <span class="bar"><i style="width:${
+            Math.round(phys.height_to / phys.adult_height * 100)}%"></i></span>
+        </div>` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">עונה אחרי עונה</span></div>
+      <div class="panel-body tight">
+        ${info.seasons.slice().reverse().map(row => `
+        <div class="row">
+          <span class="val" style="min-width:38px">${row.year}</span>
+          <span class="grow"><span class="nm">${esc(row.club || "-")}</span>
+            <span class="sub">גיל ${row.age} · ${row.apps} משחקים ·
+              ${row.goals} שערים · ציון ${row.rating ? row.rating.toFixed(1) : "-"}</span></span>
+          <span class="val num ${row.d_overall > 0 ? "good" : row.d_overall < 0 ? "bad" : ""}">
+            ${row.overall}${row.d_overall ? ` (${row.d_overall > 0 ? "+" : ""}${row.d_overall})` : ""}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">במה התפתחת</span>
+        <span class="r">${best.length} תכונות</span></div>
+      <div class="panel-body tight">
+        ${best.map(row => `
+        <div class="growth-row">
+          <span class="n">${esc(row.name)}</span>
+          <span class="v num">${row.from} → ${row.to}</span>
+          <span class="bar"><i class="up" style="width:${
+            Math.round(row.delta / peak * 100)}%"></i></span>
+          <span class="d num">+${row.delta}</span>
+        </div>`).join("")}
+        ${worst.length ? `<hr class="rule">` + worst.map(row => `
+        <div class="growth-row">
+          <span class="n">${esc(row.name)}</span>
+          <span class="v num">${row.from} → ${row.to}</span>
+          <span class="bar"><i class="down" style="width:${
+            Math.round(Math.abs(row.delta) / peak * 100)}%"></i></span>
+          <span class="d num bad">${row.delta}</span>
+        </div>`).join("") : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** מה זו התכונה הזאת, ולמה שיהיה לי אכפת. */
+function screenAttr() {
+  const attr = (viewData && viewData.attr) || "finishing";
+  const [what, does, who] = explainAttr(attr);
+  const info = relevanceOf(game, attr);
+  const plan = forecast(game, attr);
+  const me = game.me;
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(D.DETAIL_NAMES_HE[attr] || attr)}</span>
+        <span class="r num">${me.detail[attr] ?? 10}/20</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(what)}</div>
+        <hr class="rule">
+        <div class="row"><span class="grow"><span class="nm">מה זה עושה במשחק</span>
+          <span class="sub">${esc(does)}</span></span></div>
+        <div class="row"><span class="grow"><span class="nm">מי צריך את זה</span>
+          <span class="sub">${esc(who)}</span></span></div>
+      </div>
+    </div>
+
+    <div class="panel" ${info.rank <= 3 ? 'style="border-color:var(--accent)"' : ""}>
+      <div class="panel-head"><span class="t">ואתה?</span>
+        <span class="r">#${info.rank} מתוך ${info.of}</span></div>
+      <div class="panel-body">
+        <div class="directive">${esc(info.verdict)}</div>
+        ${info.reasons.length ? `<div class="muted">${
+          esc(info.reasons.join(" · "))}</div>` : ""}
+        <div class="attr"><span>הרמה שלך</span>
+          <span class="val">${info.level}</span>
+          <span class="bar"><i style="width:${info.level / 20 * 100}%"></i></span></div>
+        <div class="attr"><span>ממוצע התכונות שלך</span>
+          <span class="val">${info.average}</span>
+          <span class="bar soft"><i style="width:${info.average / 20 * 100}%"></i></span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">אם תתאמן על זה</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(forecastLine(game, attr))}</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${plan.weeks_per_point
+            ? plan.weeks_per_point + " שב'" : "—"}</div><div class="l">לנקודה</div></div>
+          <div class="stat"><div class="n">−${plan.fitness_cost}</div>
+            <div class="l">רעננות לשבוע</div></div>
+          <div class="stat"><div class="n">${plan.injury_pct}%</div>
+            <div class="l">סיכון פציעה</div></div>
+        </div>
+        <button class="btn primary wide" data-focus="${attr}">
+          להתאמן על זה השבוע</button>
       </div>
     </div>
   </div>`;
@@ -1547,6 +1796,30 @@ function screenMoney() {
       </div>
     </div>
   </div>`;
+}
+
+/**
+ * מה האימון שבחרת באמת עושה — הסבר, דירוג רלוונטיות ותחזית.
+ * בלי זה בחירת אימון היא ניחוש בין שמות.
+ */
+function trainingBrief(focus) {
+  const [what, does] = explainAttr(focus);
+  if (!(focus in D.DETAIL_NAMES_HE)) {
+    return what ? `<div class="brief"><strong>${esc(what)}</strong>
+      <span class="muted">${esc(does)}</span></div>` : "";
+  }
+  const info = relevanceOf(game, focus);
+  const tone = info.rank <= 3 ? "good" : info.rank > info.of * 0.7 ? "bad" : "";
+  return `
+    <div class="brief">
+      <div class="brief-head">
+        <strong>${esc(D.DETAIL_NAMES_HE[focus])}</strong>
+        <span class="pill ${tone}">#${info.rank}/${info.of} · ${esc(info.verdict)}</span>
+      </div>
+      <span class="muted">${esc(does)}</span>
+      <span class="muted">${esc(forecastLine(game, focus))}</span>
+      <button class="mini-btn" data-attr="${focus}">להסבר מלא</button>
+    </div>`;
 }
 
 /** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
@@ -2234,6 +2507,8 @@ function bind() {
       }
       render();
     }));
+  app.querySelectorAll("[data-attr]").forEach(el =>
+    el.addEventListener("click", () => goDeep("attr", { attr: el.dataset.attr })));
   app.querySelectorAll("[data-role]").forEach(el =>
     el.addEventListener("click", () => {
       viewData.role = el.dataset.role;

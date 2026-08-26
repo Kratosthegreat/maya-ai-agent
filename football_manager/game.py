@@ -20,12 +20,14 @@ from . import data as D
 from . import story as ST
 from .engine import (MENTALITIES, MatchEvent, MatchResult, _poisson,
                      build_commentary, simulate_match)
-from .models import (add_detail, add_group, assign_number, available_numbers, gain_reputation, Club, Contract, Player, TableRow, clamp,
+from .models import (add_detail, add_group, assign_number, snapshot, available_numbers, gain_reputation, Club, Contract, Player, TableRow, clamp,
                      generate_player, generate_world, wage_for_overall)
 from . import club_ops as CO
 from . import manager as MG
 from . import matchstats as MS
 from . import tactics as TA
+from . import coaching as CO2
+from . import mentor as MN
 from . import commercial as CM
 from . import development as DEV
 from . import scouting as SC
@@ -475,6 +477,16 @@ class GameState:
     def set_action(self, key: str) -> None:
         self.training_focus = key
 
+    def _note_focus(self) -> None:
+        """רושם על מה התאמנת. המנטור קורא את זה כדי לזהות שגרה."""
+        log = self.flags.get("focus_log")
+        if not isinstance(log, list):
+            log = []
+            self.flags["focus_log"] = log
+        log.append(self.training_focus)
+        if len(log) > 60:
+            del log[:-60]
+
     def advance_week(self) -> WeekReport:
         """מריץ שבוע שלם ומחזיר דוח."""
         report = WeekReport(week=self.week)
@@ -497,6 +509,7 @@ class GameState:
             elif self.stage in ("academy", "player", "veteran"):
                 MG.trust_move(club, -0.9)
                 report.add(f"↩️ התאמנת על משהו אחר ממה ש{club.manager_name} ביקש.")
+        self._note_focus()
         report.lines.extend(self._do_weekly_action())
 
         # 2. משחקים — הליגה הבוגרת רצה גם כשאתה עוד בקבוצת הנוער
@@ -532,9 +545,10 @@ class GameState:
             target = DEV.next_target(self)
             if target and self.week % 4 == 0:
                 report.add(target)
-            elif not target and self.week % 8 == 0:
-                report.add("🧭 עוד לא בחרת מסלול פיתוח. בלי מסלול אתה מתאמן "
-                           "בלי יעד. (בתפריט: 'מסלול')")
+            # המנטור מדבר רק כשיש לו משהו חדש להגיד
+            if self.week % 3 == 0:
+                for line in MN.advice_lines(self, self.rng):
+                    report.add(line)
 
         # 8. קידום השבוע
         self.week += 1
@@ -1767,7 +1781,9 @@ class GameState:
         lines.extend(self._promotion_relegation())
 
         # התפתחות שחקנים והזדקנות
-        self._develop_everyone()
+        before = dict(self.me.detail)
+        lines.extend(self._develop_everyone())
+        lines.extend(self._growth_report(before))
 
         # פרישות של שחקני מחשב + נוער חדש
         self._process_retirements()
@@ -1786,6 +1802,17 @@ class GameState:
 
         # מעבר שלב קריירה
         lines.extend(self._advance_career_stage())
+
+        # תמונת מצב שנתית של השחקן — הבסיס למסך "איך התפתחתי"
+        if self.stage in ("youth", "academy", "player", "veteran"):
+            shots = self.flags.get("growth_log")
+            if not isinstance(shots, list):
+                shots = []
+                self.flags["growth_log"] = shots
+            shots.append(snapshot(self.me, self.year,
+                                  my_club.name if my_club else ""))
+            if len(shots) > 30:
+                del shots[:-30]
 
         self.history.append({
             "year": self.year, "stage": self.stage,
@@ -1868,7 +1895,9 @@ class GameState:
             self.record_honour("עלייה לליגת העל")
         return lines
 
-    def _develop_everyone(self) -> None:
+    def _develop_everyone(self) -> List[str]:
+        """מפתח את כל העולם, ומחזיר את מה שקרה *לך* — כי זה מה שרצית לדעת."""
+        mine: List[str] = []
         for player in list(self.players.values()):
             if player.retired:
                 # פורשים לא מתפתחים — אבל הגיל שלי ממשיך לרוץ
@@ -1876,8 +1905,38 @@ class GameState:
                     player.age += 1
                 continue
             share = clamp(player.season.minutes / (SEASON_WEEKS * 90.0), 0, 1)
-            end_of_season_development(player, self.rng, share,
-                                      self.clubs.get(player.club_id))
+            notes = end_of_season_development(player, self.rng, share,
+                                              self.clubs.get(player.club_id))
+            if player.pid == self.me_id:
+                mine.extend(notes)
+        return mine
+
+    def _growth_report(self, before: Dict[str, int]) -> List[str]:
+        """מה בדיוק השתנה בך העונה, תכונה־תכונה.
+
+        זו הייתה התלונה המדויקת: "הכול כאילו מתפתח אבל לא ברור איך
+        ולא מובן עד כמה". עכשיו כתוב.
+        """
+        if self.stage not in ("youth", "academy", "player", "veteran"):
+            return []
+        moved = []
+        for attr in D.attrs_for(self.me.position):
+            delta = self.me.detail.get(attr, 10) - before.get(attr, 10)
+            if delta:
+                moved.append((delta, attr))
+        if not moved:
+            return ["", "— ההתפתחות שלך העונה —", "שום תכונה לא זזה. שנה תקועה."]
+        moved.sort(key=lambda pair: -pair[0])
+        ups = [f"{D.DETAIL_NAMES_HE[a]} {before[a]}→{self.me.detail[a]}"
+               for d, a in moved if d > 0]
+        downs = [f"{D.DETAIL_NAMES_HE[a]} {before[a]}→{self.me.detail[a]}"
+                 for d, a in moved if d < 0]
+        out = ["", "— ההתפתחות שלך העונה —"]
+        if ups:
+            out.append("📈 עלו: " + ", ".join(ups))
+        if downs:
+            out.append("📉 ירדו: " + ", ".join(downs))
+        return out
 
     def _process_retirements(self) -> None:
         """שחקני מחשב פורשים, מועדונים מגדלים נוער חדש."""

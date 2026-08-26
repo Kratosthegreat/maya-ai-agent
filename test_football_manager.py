@@ -27,6 +27,8 @@ from football_manager import wealth as WL
 from football_manager import models as MDL
 from football_manager import tactics as TA
 from football_manager import knowledge as KN
+from football_manager import coaching as COACH
+from football_manager import mentor as MN
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -1766,3 +1768,188 @@ def test_a_specialism_does_not_improve_by_accident():
     assert player.detail["acceleration"] > before["acceleration"]
     assert player.detail["free_kick"] - before["free_kick"] <= 1
     assert player.detail["penalty_taking"] - before["penalty_taking"] <= 1
+
+
+# ---------------------------------------------------------------------------
+# להבין את המשחק: הסברים, התפתחות נראית ומנטור
+# ---------------------------------------------------------------------------
+
+def test_every_attribute_explains_itself():
+    """התלונה: 'מה זה צמידות? במה הוא מועיל?'"""
+    for attr in D.DETAIL_NAMES_HE:
+        what, does, who = COACH.explain(attr)
+        assert what and does and who, attr
+        assert len(does) > 15, attr
+    for focus in ("rest", "badges", "media", "business", "school", "street"):
+        assert COACH.explain(focus)[0], focus
+
+
+def test_relevance_answers_whether_you_need_it_now():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=4)
+    marking = COACH.relevance_of(game, "marking")
+    finishing = COACH.relevance_of(game, "finishing")
+    assert marking["rank"] > finishing["rank"], "צמידות דורגה מעל סיום אצל חלוץ"
+    assert marking["rank"] > marking["of"] * 0.6, \
+        f"צמידות במקום {marking['rank']} מתוך {marking['of']} אצל חלוץ"
+    assert marking["score"] < finishing["score"] * 0.5
+    assert finishing["rank"] <= 8
+    assert marking["of"] == len(D.attrs_for("ST"))
+
+    keeper = GameState.new_game("שוער", "GK", "hapoel_carmel", 20, seed=4)
+    reflexes = COACH.relevance_of(keeper, "reflexes")
+    assert reflexes["rank"] <= 6, "רפלקסים לא בראש הרשימה של שוער"
+
+
+def test_the_forecast_matches_what_training_actually_does():
+    """תחזית שלא מתממשת גרועה מאין תחזית."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 19, seed=6)
+    game.me.potential, game.me.ceiling = 92, 95
+    attr = "finishing"
+    assert COACH.weekly_rate(game, attr) > 0
+    for weeks in (6, 20, 40):
+        probe = GameState.new_game("בודק", "ST", "hapoel_carmel", 19, seed=6)
+        probe.me.potential, probe.me.ceiling = 92, 95
+        predicted = COACH.projected_gain(probe, attr, weeks)
+        before = probe.me.detail[attr]
+        for _ in range(weeks):
+            probe.me.fitness = 90.0
+            weekly_training(probe.me, attr, probe.my_club, random.Random(3), 1.0)
+        actual = probe.me.detail[attr] - before
+        assert abs(actual - predicted) <= max(1.5, predicted * 0.35), \
+            f"{weeks} שבועות: התחזית אמרה {predicted:.1f} והתקבל {actual}"
+
+
+def test_the_body_actually_grows():
+    """התלונה: 'הכול כאילו מתפתח'. הגובה פשוט לא זז."""
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 13, seed=8)
+    start_height, start_weight = game.me.height, game.me.weight
+    assert game.me.adult_height > start_height, "אין יעד גובה בוגר"
+    for _ in range(700):
+        if game.game_over or game.me.age > 21:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+    assert game.me.height > start_height + 6, \
+        f"גדל רק {game.me.height - start_height} ס\"מ בשמונה שנים"
+    assert game.me.height <= game.me.adult_height
+    assert game.me.weight > start_weight
+
+
+def test_the_season_report_says_what_changed():
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 16, seed=8)
+    lines = []
+    for _ in range(200):
+        if game.game_over:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        report = game.advance_week()
+        if report.season_ended:
+            lines = report.lines
+            break
+    assert any("ההתפתחות שלך העונה" in line for line in lines), "אין דוח התפתחות"
+    assert any("📏" in line for line in lines), "אין דוח גוף"
+
+
+def test_growth_history_answers_by_how_much():
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 15, seed=8)
+    for _ in range(500):
+        if game.game_over or game.me.age > 20:
+            break
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+    info = COACH.growth_summary(game)
+    assert len(info["seasons"]) >= 3
+    assert info["overall_to"] > info["overall_from"]
+    assert info["total_points"] > 0
+    assert info["physical"]["height_to"] > info["physical"]["height_from"]
+    assert info["moved"], "אף תכונה לא נרשמה כזזה"
+    top = info["moved"][0]
+    assert top["to"] - top["from"] == top["delta"]
+
+
+def test_the_mentor_says_something_useful_and_specific():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=5)
+    game.me.fitness = 20.0
+    tip = MN.advise(game, random.Random(1))
+    assert tip, "המנטור שתק כשהרעננות ב-20"
+    assert tip["mentor"]
+    assert "20" in tip["body"] or "רעננות" in tip["body"]
+    assert "{" not in tip["body"]
+
+
+def test_the_mentor_does_not_repeat_himself():
+    """התלונה המדויקת: 'לא כל פעם אותם טיפים'."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 17, seed=13)
+    rng = random.Random(3)
+    seen = []
+    for _ in range(600):
+        if game.game_over or game.me.age > 25:
+            break
+        if game.pending_event_id:
+            game.resolve_event(rng.randrange(2))
+            continue
+        report = game.advance_week()
+        for line in report.lines:
+            if line.startswith("🧭"):
+                seen.append(line)
+    assert len(seen) >= 6, f"רק {len(seen)} טיפים בשמונה שנים"
+    distinct = len(set(seen))
+    assert distinct >= len(seen) * 0.55, \
+        f"{len(seen)} טיפים אבל רק {distinct} שונים"
+    # אף טיפ בודד לא נאמר יותר משלוש פעמים
+    for line in set(seen):
+        assert seen.count(line) <= 3, f"נאמר {seen.count(line)} פעמים: {line[:50]}"
+
+
+def test_a_lasting_problem_escalates_instead_of_repeating():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=5)
+    bodies = []
+    for _ in range(6):
+        game.me.fitness = 18.0
+        tip = MN.advise(game, random.Random(1))
+        if tip and "רעננות" in tip["body"]:
+            bodies.append(tip["body"])
+        game.week += 12
+        if game.week > 43:
+            game.week -= 43
+            game.year += 1
+    assert len(bodies) >= 2, "המנטור אמר את זה רק פעם אחת"
+    assert len(set(bodies)) == len(bodies), "אותו משפט בדיוק חזר"
+    assert "פעם השלישית" in bodies[-1] or "שוב" in bodies[-1] or \
+        "כבר לא מקרה" in bodies[-1], "אין הסלמה"
+
+
+def test_the_mentor_reacts_to_the_actual_state():
+    quiet = GameState.new_game("בודק", "ST", "hapoel_carmel", 24, seed=9)
+    quiet.me.fitness = 95.0
+    quiet.me.morale = 80.0
+    keys = {row["key"] for row in MN.observations(quiet)}
+    assert "fitness" not in keys
+    quiet.me.fitness = 20.0
+    assert "fitness" in {row["key"] for row in MN.observations(quiet)}
+
+    quiet.no_start_streak = 12
+    assert "no_minutes" in {row["key"] for row in MN.observations(quiet)}
+    quiet.no_start_streak = 0
+    assert "no_minutes" not in {row["key"] for row in MN.observations(quiet)}
+
+
+def test_the_squad_report_tells_you_who_is_ahead():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, seed=7)
+    report = COACH.squad_report(game)
+    assert report["has_club"]
+    assert report["squad_size"] >= 16
+    assert 1 <= report["rep_rank"] <= report["rep_of"]
+    assert game.me.position in report["by_position"]
+    mine = [row for row in report["by_position"][game.me.position] if row["is_me"]]
+    assert len(mine) == 1
+    for row in report["ahead_of_me"]:
+        assert row["overall"] > game.me.overall
+    assert len(report["facilities"]) == len(D.FACILITIES)
+    assert len(report["staff"]) == len(D.STAFF_ROLES)

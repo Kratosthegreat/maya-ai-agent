@@ -10,7 +10,7 @@ const vm = require("vm");
 const HERE = __dirname;
 const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "matchstats.js",
                "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
-               "tacticsteam.js", "knowledge.js", "manager.js",
+               "tacticsteam.js", "knowledge.js", "coaching.js", "mentor.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -42,6 +42,11 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "assetsSeasonTick, wealthSummary, " +
   "signDeal, weeklyRetainer, seasonBonuses, tickPortfolio, renewalOffer, " +
   "dealLines, clauseText, portfolioTotal, " +
+  "explainAttr, attrRelevance, needsTable, relevanceOf, rankedNeeds, " +
+  "weeklyRate, projectedGain, forecast, forecastLine, " +
+  "growthSummary, growthLog, squadReport, " +
+  "mentorOf, mentorObservations, mentorAdvise, mentorLines, mentorBoard, " +
+  "growBody, playerSnapshot, grownHeight, " +
   "recomputeGroups, addDetail, addGroup, setGroup, setAll, attrsFor, groupMapFor, " +
   "roleRow, rolesFor, roleSuitability, bestRole, roleName, " +
   "personalityKey, personalityName, personalityEffect, " +
@@ -1614,6 +1619,156 @@ test("תכונת מומחיות לא משתפרת בטעות", () => {
   assert(p.detail.acceleration > before.acceleration, "האצה לא עלתה");
   assert(p.detail.free_kick - before.free_kick <= 1, "בעיטות חופשיות עלו בטעות");
   assert(p.detail.penalty_taking - before.penalty_taking <= 1, "פנדלים עלו בטעות");
+});
+
+
+// ---------------------------------------------------------------------------
+// להבין את המשחק: הסברים, התפתחות נראית ומנטור
+// ---------------------------------------------------------------------------
+
+test("כל תכונה מסבירה את עצמה", () => {
+  for (const attr in A.D.DETAIL_NAMES_HE) {
+    const [what, does, who] = A.explainAttr(attr);
+    assert(what && does && who, `אין הסבר ל-${attr}`);
+    assert(does.length > 15, `הסבר קצר מדי ל-${attr}`);
+  }
+  for (const focus of ["rest", "badges", "media", "business", "school", "street"])
+    assert(A.explainAttr(focus)[0], `אין הסבר ל-${focus}`);
+});
+
+test("הרלוונטיות עונה אם אתה צריך את זה עכשיו", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 4);
+  const marking = A.relevanceOf(g, "marking");
+  const finishing = A.relevanceOf(g, "finishing");
+  assert(marking.rank > finishing.rank, "צמידות דורגה מעל סיום אצל חלוץ");
+  assert(marking.rank > marking.of * 0.6,
+    `צמידות במקום ${marking.rank} מתוך ${marking.of} אצל חלוץ`);
+  assert(marking.score < finishing.score * 0.5, "צמידות קרובה מדי לסיום");
+  assert(finishing.rank <= 8, `סיום במקום ${finishing.rank}`);
+  assert(marking.of === A.attrsFor("ST").length, "ספירה לא נכונה");
+
+  const keeper = A.Game.newGame("שוער", "GK", "hapoel_carmel", 20, 4);
+  assert(A.relevanceOf(keeper, "reflexes").rank <= 6, "רפלקסים לא בראש אצל שוער");
+});
+
+test("התחזית מתאימה למה שהאימון באמת עושה", () => {
+  for (const weeks of [6, 20, 40]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 19, 6);
+    g.me.potential = 92; g.me.ceiling = 95;
+    const predicted = A.projectedGain(g, "finishing", weeks);
+    const before = g.me.detail.finishing;
+    for (let i = 0; i < weeks; i++) {
+      g.me.fitness = 90;
+      A.weeklyTraining(g.me, "finishing", g.myClub(), new A.Rng(3), 1.0);
+    }
+    const actual = g.me.detail.finishing - before;
+    assert(Math.abs(actual - predicted) <= Math.max(1.5, predicted * 0.35),
+      `${weeks} שבועות: התחזית ${predicted.toFixed(1)} והתקבל ${actual}`);
+  }
+});
+
+test("הגוף באמת גדל", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 13, 8);
+  const startH = g.me.height, startW = g.me.weight;
+  assert(g.me.adultHeight > startH, "אין יעד גובה בוגר");
+  for (let i = 0; i < 700; i++) {
+    if (g.gameOver || g.me.age > 21) break;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+  }
+  assert(g.me.height > startH + 6, `גדל רק ${g.me.height - startH} ס"מ`);
+  assert(g.me.height <= g.me.adultHeight, "עבר את הגובה הבוגר");
+  assert(g.me.weight > startW, "המשקל לא זז");
+});
+
+test("היסטוריית ההתפתחות עונה על 'עד כמה'", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 15, 8);
+  for (let i = 0; i < 500; i++) {
+    if (g.gameOver || g.me.age > 20) break;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+  }
+  const info = A.growthSummary(g);
+  assert(info.seasons.length >= 3, `רק ${info.seasons.length} עונות`);
+  assert(info.overall_to > info.overall_from, "הדירוג לא עלה");
+  assert(info.total_points > 0, "אפס נקודות תכונה");
+  assert(info.physical.height_to > info.physical.height_from, "הגובה לא נרשם");
+  assert(info.moved.length, "אף תכונה לא נרשמה כזזה");
+  const top = info.moved[0];
+  assert(top.to - top.from === top.delta, "החשבון לא מסתדר");
+});
+
+test("המנטור אומר משהו ספציפי ושימושי", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 5);
+  g.me.fitness = 20;
+  const tip = A.mentorAdvise(g, new A.Rng(1));
+  assert(tip, "המנטור שתק כשהרעננות ב-20");
+  assert(tip.mentor, "אין שם למנטור");
+  assert(tip.body.includes("20") || tip.body.includes("רעננות"), tip.body);
+  assert(!tip.body.includes("{"), "מקום שלא מולא");
+});
+
+test("המנטור לא חוזר על עצמו", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 17, 13);
+  const rng = new A.Rng(3);
+  const seen = [];
+  for (let i = 0; i < 600; i++) {
+    if (g.gameOver || g.me.age > 25) break;
+    if (g.pendingEventId) { g.resolveEvent(rng.randint(0, 1)); continue; }
+    const r = g.advanceWeek();
+    for (const note of r.notes) if (note.icon === "🧭") seen.push(note.text);
+  }
+  assert(seen.length >= 6, `רק ${seen.length} טיפים בשמונה שנים`);
+  const distinct = new Set(seen).size;
+  assert(distinct >= seen.length * 0.55, `${seen.length} טיפים אבל ${distinct} שונים`);
+  for (const line of new Set(seen)) {
+    const times = seen.filter(x => x === line).length;
+    assert(times <= 3, `נאמר ${times} פעמים: ${line.slice(0, 40)}`);
+  }
+});
+
+test("בעיה שנמשכת מסלימה ולא חוזרת", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 5);
+  const bodies = [];
+  for (let i = 0; i < 6; i++) {
+    g.me.fitness = 18;
+    const tip = A.mentorAdvise(g, new A.Rng(1));
+    if (tip && tip.body.includes("רעננות")) bodies.push(tip.body);
+    g.week += 12;
+    if (g.week > 43) { g.week -= 43; g.year += 1; }
+  }
+  assert(bodies.length >= 2, "המנטור אמר את זה רק פעם אחת");
+  assert(new Set(bodies).size === bodies.length, "אותו משפט בדיוק חזר");
+  const last = bodies[bodies.length - 1];
+  assert(last.includes("פעם השלישית") || last.includes("שוב")
+         || last.includes("כבר לא מקרה"), "אין הסלמה");
+});
+
+test("המנטור מגיב למצב האמיתי", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 24, 9);
+  g.me.fitness = 95; g.me.morale = 80;
+  const keys = () => new Set(A.mentorObservations(g).map(r => r.key));
+  assert(!keys().has("fitness"), "התלונן על כושר תקין");
+  g.me.fitness = 20;
+  assert(keys().has("fitness"), "לא זיהה כושר נמוך");
+  g.noStartStreak = 12;
+  assert(keys().has("no_minutes"), "לא זיהה שאתה לא משחק");
+  g.noStartStreak = 0;
+  assert(!keys().has("no_minutes"), "התלונן על דקות כשאתה משחק");
+});
+
+test("דוח הסגל אומר מי לפניך", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 18, 7);
+  const r = A.squadReport(g);
+  assert(r.has_club, "אין מועדון");
+  assert(r.squad_size >= 16, `סגל של ${r.squad_size}`);
+  assert(r.rep_rank >= 1 && r.rep_rank <= r.rep_of, "דירוג מוניטין");
+  assert(g.me.position in r.by_position, "העמדה שלך חסרה");
+  assert(r.by_position[g.me.position].filter(x => x.is_me).length === 1, "אתה לא ברשימה");
+  for (const row of r.ahead_of_me)
+    assert(row.overall > A.overall(g.me), "מישהו חלש נרשם כלפניך");
+  assert(r.facilities.length === Object.keys(A.D.FACILITIES).length, "מתקנים");
+  assert(r.staff.length === Object.keys(A.D.STAFF_ROLES).length, "צוות");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

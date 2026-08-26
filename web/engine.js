@@ -171,7 +171,9 @@ function generatePlayer(rng, club, position, opts = {}) {
     traits: [],
     foot: rng.random() < 0.72 ? "right" : rng.random() < 0.78 ? "left" : "both",
     height: 178,
+    adultHeight: 178,
     weight: 74,
+    history: [],
     resilience: 50,
     sharpness: 60,
     ceiling,
@@ -253,9 +255,55 @@ function grownHeight(adultHeight, age) {
 }
 
 /** גובה, משקל ועמידות — לפי העמדה, עם רעש אישי. */
+/**
+ * מקדם את הגוף בשנה. נקרא בסוף כל עונה.
+ * זה היה חסר לגמרי: הגובה נקבע פעם אחת בלידה ולא זז יותר, ולכן נער
+ * בן 13 סיים את הקריירה באותו גובה שבו התחיל.
+ */
+function growBody(p, rng) {
+  if (!p.adultHeight) p.adultHeight = p.height;
+  const beforeH = p.height, beforeW = p.weight;
+
+  if (p.age < 20) {
+    const target = grownHeight(p.adultHeight, p.age);
+    const step = (target - p.height) * rng.uniform(0.75, 1.35);
+    p.height = Math.round(clamp(p.height + step, p.height, p.adultHeight));
+  }
+
+  const strength = p.detail.strength ?? 10;
+  const stamina = p.detail.stamina ?? 10;
+  let bmiTarget = 21.4 + strength * 0.115 - stamina * 0.035;
+  if (p.age >= 31) bmiTarget += (p.age - 30) * 0.10;
+  bmiTarget = clamp(bmiTarget + rng.gauss(0, 0.18), 20.2, 26.5);
+  const targetWeight = bmiTarget * Math.pow(p.height / 100, 2);
+  p.weight = Math.round(p.weight + (targetWeight - p.weight) * rng.uniform(0.45, 0.85));
+
+  const dh = p.height - beforeH, dw = p.weight - beforeW;
+  if (!dh && !dw) return null;
+  const parts = [];
+  if (dh) parts.push(`גבהת ${dh} ס"מ (${p.height})`);
+  if (dw) parts.push(`${dw > 0 ? "עלית" : "ירדת"} ${Math.abs(dw)} ק"ג (${p.weight})`);
+  return { icon: "📏", text: parts.join(" · ") + "." };
+}
+
+/** תמונת מצב שנתית — הבסיס למסך ההתפתחות. */
+function playerSnapshot(p, year, clubName = "") {
+  return {
+    year, age: p.age, club: clubName,
+    overall: overall(p), potential: Math.trunc(p.potential),
+    height: p.height, weight: p.weight,
+    reputation: Math.trunc(p.reputation),
+    resilience: Math.trunc(p.resilience),
+    detail: Object.assign({}, p.detail),
+    apps: p.season.apps, goals: p.season.goals, assists: p.season.assists,
+    rating: avgRating(p.season),
+  };
+}
+
 function applyPhysique(p, rng) {
   const [mean, spread] = D.PHYSIQUE[p.position] || [180, 5];
   const adult = Math.round(clamp(rng.gauss(mean, spread), 158, 205));
+  p.adultHeight = adult;
   p.height = grownHeight(adult, p.age);
   const bmi = rng.uniform(D.BMI_RANGE[0], D.BMI_RANGE[1]);
   p.weight = Math.round(bmi * Math.pow(p.height / 100, 2));
@@ -1003,6 +1051,9 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
   const note = updatePotential(p, rng, minutesShare, club);
   if (note && p.isHuman) messages.push(note);
   p.age += 1;
+  // הגוף גדל באמת, ולא רק "כאילו"
+  const body = growBody(p, rng);
+  if (body && p.isHuman) messages.push(body);
   const curve = ageFactor(p.age);
   const exposure = 0.45 + minutesShare * 1.1;
   // הרגליים הולכות ראשונות, הראש נשאר — ולכן ותיק מפצה בקריאת משחק

@@ -142,8 +142,10 @@ class Player:
     traits: List[str] = field(default_factory=list)
     foot: str = "right"
     number: int = 0             # מספר חולצה במועדון הנוכחי
-    height: int = 178            # ס"מ
+    height: int = 178            # ס"מ, בהווה
+    adult_height: int = 178      # הגובה שאליו הגוף הזה גדל
     weight: int = 74             # ק"ג
+    history: List[Dict[str, Any]] = field(default_factory=list)  # תמונת מצב לעונה
     resilience: float = 50.0     # 0-100, עמידות לפציעות
     sharpness: float = 60.0      # 0-100, חדות משחק — נבנית מדקות במגרש
     is_human: bool = False
@@ -735,6 +737,7 @@ def apply_physique(player: Player, rng: random.Random) -> None:
     """
     mean, spread = D.PHYSIQUE.get(player.position, (180, 5.0))
     adult_height = int(round(clamp(rng.gauss(mean, spread), 158, 205)))
+    player.adult_height = adult_height
     player.height = grown_height(adult_height, player.age)
     bmi = rng.uniform(*D.BMI_RANGE)
     player.weight = int(round(bmi * (player.height / 100.0) ** 2))
@@ -751,6 +754,61 @@ def grown_height(adult_height: int, age: int) -> int:
         return adult_height
     share = {13: 0.895, 14: 0.925, 15: 0.952, 16: 0.973, 17: 0.988, 18: 0.996}
     return int(round(adult_height * share.get(age, 1.0)))
+
+
+def grow_body(player: "Player", rng: random.Random) -> Optional[str]:
+    """מקדם את הגוף בשנה. נקרא בסוף כל עונה.
+
+    זה היה חסר לגמרי: הגובה נקבע פעם אחת בלידה ולא זז יותר, ולכן
+    נער בן 13 סיים את הקריירה באותו גובה שבו התחיל. עכשיו הוא גדל
+    באמת — וגם רואים בכמה.
+    """
+    if not player.adult_height:
+        player.adult_height = player.height
+    before_h, before_w = player.height, player.weight
+
+    if player.age < 20:
+        target = grown_height(player.adult_height, player.age)
+        # קפיצת גדילה אמיתית: לפעמים שנה שקטה, לפעמים שמונה סנטימטר
+        step = (target - player.height) * rng.uniform(0.75, 1.35)
+        player.height = int(round(clamp(player.height + step,
+                                        player.height, player.adult_height)))
+
+    # המשקל נגזר ממבנה הגוף ומהעבודה בחדר הכושר, ומטפס עם הגיל
+    strength = player.detail.get("strength", 10)
+    stamina = player.detail.get("stamina", 10)
+    bmi_target = 21.4 + strength * 0.115 - stamina * 0.035
+    if player.age >= 31:
+        bmi_target += (player.age - 30) * 0.10
+    bmi_target = clamp(bmi_target + rng.gauss(0, 0.18), 20.2, 26.5)
+    target_weight = bmi_target * (player.height / 100.0) ** 2
+    player.weight = int(round(player.weight + (target_weight - player.weight)
+                              * rng.uniform(0.45, 0.85)))
+
+    dh, dw = player.height - before_h, player.weight - before_w
+    if not dh and not dw:
+        return None
+    parts = []
+    if dh:
+        parts.append(f"גבהת {dh} ס\"מ ({player.height})")
+    if dw:
+        parts.append(f"{'עלית' if dw > 0 else 'ירדת'} {abs(dw)} ק\"ג ({player.weight})")
+    return "📏 " + " · ".join(parts) + "."
+
+
+def snapshot(player: "Player", year: int, club_name: str = "") -> Dict[str, Any]:
+    """תמונת מצב שנתית — הבסיס למסך ההתפתחות."""
+    return {
+        "year": year, "age": player.age, "club": club_name,
+        "overall": player.overall, "potential": int(player.potential),
+        "height": player.height, "weight": player.weight,
+        "reputation": int(player.reputation),
+        "resilience": int(player.resilience),
+        "detail": dict(player.detail),
+        "apps": player.season.apps, "goals": player.season.goals,
+        "assists": player.season.assists,
+        "rating": player.season.avg_rating,
+    }
 
 
 # המספרים המסורתיים של כל עמדה

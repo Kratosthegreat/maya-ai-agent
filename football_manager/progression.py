@@ -14,7 +14,8 @@ from typing import Dict, List, Optional
 from . import data as D
 from .engine import medical_care
 from .models import (Club, Player, add_detail, add_group, clamp,
-                     gain_reputation, personality_effect, recompute_groups)
+                     gain_reputation, grow_body, personality_effect,
+                     recompute_groups)
 
 # מקדם התפתחות לפי גיל — צעירים גדלים מהר, ותיקים דועכים
 # העקומה שטוחה יותר ממה שנדמה: שחקן לא "נסגר" בגיל 18. השיא מגיע
@@ -381,6 +382,10 @@ def end_of_season_development(player: Player, rng: random.Random,
     if note and player.is_human:
         messages.append(note)
     player.age += 1
+    # הגוף גדל באמת, ולא רק "כאילו"
+    body = grow_body(player, rng)
+    if body and player.is_human:
+        messages.append(body)
     curve = age_factor(player.age)
 
     # דקות משחק מאיצות התפתחות של צעירים

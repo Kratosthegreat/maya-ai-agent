@@ -829,6 +829,56 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   font-size: 12.5px; line-height: 1.4;
 }
 
+/* המנטור — כרטיס לכל דבר שהוא רואה */
+.tip {
+  padding: 9px 10px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel-2);
+  display: grid; gap: 5px; margin-block-end: 8px;
+}
+.tip.said { opacity: .55; }
+.tip-head { display: flex; align-items: baseline; gap: 8px; }
+.tip-head .t { font-weight: 700; flex: 1; }
+.tip-head .u {
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.tip .mini-btn { justify-self: start; }
+
+/* תקציר האימון שנבחר */
+.brief {
+  margin-block-start: 9px; padding: 9px 10px; border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line));
+  display: grid; gap: 5px; font-size: 12.5px; line-height: 1.5;
+}
+.brief-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.brief .mini-btn { justify-self: start; }
+.pill.good { background: color-mix(in srgb, var(--good) 22%, transparent); }
+.pill.bad { background: color-mix(in srgb, var(--bad, #ef4444) 20%, transparent); }
+
+/* מסך ההתפתחות — כמה זזה כל תכונה */
+.growth-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; line-height: 1.9;
+}
+.growth-row .n { min-width: 96px; color: var(--ink-2); }
+.growth-row .v { min-width: 62px; unicode-bidi: isolate; }
+.growth-row .bar { flex: 1; }
+.growth-row .bar i.up { background: var(--good); }
+.growth-row .bar i.down { background: var(--bad, #ef4444); }
+.growth-row .d { min-width: 34px; text-align: end; font-weight: 700; }
+
+/* עומק הסגל לפי עמדה */
+.depth { margin-block-end: 8px; }
+.depth-head {
+  display: flex; justify-content: space-between; font-size: 11.5px;
+  font-weight: 700; color: var(--muted); padding-block: 4px;
+  border-block-end: 1px solid var(--line);
+}
+.depth.mine .depth-head { color: var(--accent); }
+
+.attr-row.tappable { cursor: pointer; }
+.attr-row.tappable:active { opacity: .6; }
+
 /* לוח התכונות המלא — ארבע קבוצות, בסולם 1-20 כמו במקור */
 .attr-board {
   display: grid; gap: 10px;
@@ -4647,6 +4697,275 @@ const D = {
    "בלי אג'נדה. מגיבים למה שהמשחק נותן."
   ]
  ],
+ "ATTR_INFO": {
+  "corners": [
+   "בעיטת קרן מדויקת.",
+   "קובע כמה מהקרנות שלך מגיעות לראש הנכון ברחבה.",
+   "מי שבועט קרנות — לרוב קשר או כנף עם רגל טובה."
+  ],
+  "crossing": [
+   "הרמה מהאגף לרחבה.",
+   "מעלה את מסירות המפתח שלך כשאתה מגיע לקו הרוחב.",
+   "כנפיים ומגנים מתקדמים. חסר ערך לבלם."
+  ],
+  "dribbling": [
+   "לרוץ עם הכדור בשליטה צמודה.",
+   "קובע כמה יריבים תעבור אחד על אחד, ופחות איבודי כדור.",
+   "כנפיים, קשרים התקפיים וחלוצים שמקבלים עם הפנים לשער."
+  ],
+  "finishing": [
+   "להכניס את הכדור לרשת ממצב.",
+   "הקובע הישיר בכמה מהבעיטות שלך הולכות למסגרת ונכנסות.",
+   "כל מי שנמצא ברחבה. התכונה החשובה ביותר לחלוץ."
+  ],
+  "first_touch": [
+   "הנגיעה הראשונה בכדור.",
+   "נגיעה טובה חוסכת חצי שנייה, וחצי שנייה זה מצב.",
+   "כולם, וקריטית למי שמקבל עם הגב לשער."
+  ],
+  "free_kick": [
+   "בעיטה חופשית מדויקת.",
+   "מכריעה משחקים צמודים. משתפרת רק באימון ישיר.",
+   "בועט הכדורים הנייחים של הקבוצה."
+  ],
+  "heading": [
+   "לכוון נגיחה, לא רק להגיע לכדור.",
+   "שערים מקרנות והרחקות מהרחבה שלך.",
+   "בלמים, חלוצי מטרה, וכל מי שגבוה."
+  ],
+  "long_shots": [
+   "בעיטה מחוץ לרחבה.",
+   "פותחת הגנות שמסתגרות, כשאין דרך פנימה.",
+   "קשרים התקפיים וקשרי ריאות שמגיעים לקצה הרחבה."
+  ],
+  "long_throws": [
+   "זריקת חוץ ארוכה.",
+   "הופכת זריקה לקרן. נישתי, אבל אמיתי.",
+   "מגנים בקבוצות שמשחקות ישיר."
+  ],
+  "marking": [
+   "להישאר צמוד ליריב שלך.",
+   "שומר שהיריב שאתה אחראי עליו לא יקבל כדור בכלל.",
+   "בלמים ומגנים. קשר הגנתי גם צריך."
+  ],
+  "passing": [
+   "להעביר את הכדור למקום הנכון.",
+   "מעלה את אחוז המסירה ומוריד איבודי כדור.",
+   "כולם. הבסיס של כל תפקיד בקישור."
+  ],
+  "penalty_taking": [
+   "לבעוט מ-11 מטר.",
+   "אחד־עשר מטר, ותשעים דקות תלויות בזה.",
+   "בועט הפנדלים. משתפר רק באימון ישיר."
+  ],
+  "tackling": [
+   "לחטוף כדור בלי לעשות עבירה.",
+   "כל חטיפה נקייה היא התקפה שנעצרה ואחת שמתחילה.",
+   "בלמים, מגנים וקשרים הגנתיים."
+  ],
+  "technique": [
+   "האיכות הכללית שלך עם הכדור.",
+   "מכפיל שקט: משפר בעיטה, מסירה, הרמה וכדרור יחד.",
+   "כולם. במיוחד מי שהתפקיד שלו הוא לבנות."
+  ],
+  "aggression": [
+   "כמה אתה נכנס לכל אירוע.",
+   "יותר לחיצה ויותר חטיפות — וגם יותר כרטיסים.",
+   "קשרים חוטפים וחלוצים לוחצים. פחות לבנאים."
+  ],
+  "anticipation": [
+   "לקרוא מה עומד לקרות רגע לפני.",
+   "מגיע ראשון לכדור בלי לרוץ מהר יותר.",
+   "כולם. לחלוץ בור זו התכונה השנייה בחשיבותה."
+  ],
+  "bravery": [
+   "להיכנס למקום שכואב.",
+   "נגיחות בקהל ורגליים בתוך דו־קרב. גם סיכון פציעה.",
+   "בלמים, חלוצי מטרה, שוערים."
+  ],
+  "composure": [
+   "להישאר קר כשהלחץ עולה.",
+   "ההבדל בין בעיטה למסגרת לבין בעיטה ליציע בדקה 89.",
+   "כל מי שמסיים מצבים או מוסר תחת לחץ."
+  ],
+  "concentration": [
+   "להישאר בפוקוס תשעים דקות.",
+   "מונע את הרגע האחד שבו נרדמת ועלה שער.",
+   "בלמים ושוערים בראש הרשימה."
+  ],
+  "decisions": [
+   "לבחור נכון את הפעולה הבאה.",
+   "מוסר או מכדרר, בועט או מחכה — התכונה שקובעת.",
+   "כולם, בלי יוצא מן הכלל."
+  ],
+  "determination": [
+   "כמה אתה מוכן לעבוד בשביל זה.",
+   "מכפיל ישירות את קצב ההתפתחות שלך באימונים.",
+   "כולם. זו התכונה שקובעת אם תממש את הפוטנציאל."
+  ],
+  "flair": [
+   "לעשות את מה שאף אחד לא ציפה.",
+   "פותח מצבים שמערך מסודר לא היה מייצר.",
+   "כנפיים, עשרות ותשע מדומה. מסוכן לבלם."
+  ],
+  "leadership": [
+   "להרים את מי שסביבך.",
+   "משפיע על הקבוצה, על הקפטנות ועל הקריירה שאחרי.",
+   "קפטנים, בלמים, שוערים."
+  ],
+  "off_the_ball": [
+   "לזוז נכון כשהכדור לא אצלך.",
+   "מייצר לך מצבים — יותר בעיטות, יותר ספרינטים.",
+   "חלוצים וכנפיים. אצל חלוץ בור זו התכונה מספר אחת."
+  ],
+  "positioning": [
+   "לעמוד במקום הנכון בהגנה.",
+   "סותם חורים לפני שהם נפתחים.",
+   "בלמים, מגנים, קשרים הגנתיים ושוערים."
+  ],
+  "teamwork": [
+   "לעשות את מה שהמערכת דורשת.",
+   "מאמנים אוהבים את זה, וזה נכנס לאמון שלהם בך.",
+   "כולם, ובעיקר בתפקידי תמיכה."
+  ],
+  "vision": [
+   "לראות את המסירה שאף אחד לא ראה.",
+   "מעלה ישירות את מסירות המפתח שלך.",
+   "בונים, עשרות, ובלמים שמוציאים."
+  ],
+  "work_rate": [
+   "כמה אתה עובד בלי כדור.",
+   "יותר ריצה ויותר לחיצה — הבסיס של כדורגל מודרני.",
+   "קשרי ריאות, חלוצים לוחצים, מגנים מתקדמים."
+  ],
+  "acceleration": [
+   "להגיע למהירות מלאה מעמידה.",
+   "חמישה המטרים הראשונים — ההבדל בין מצב לכלום.",
+   "כנפיים וחלוצים. חשובה יותר ממהירות שיא."
+  ],
+  "agility": [
+   "לשנות כיוון בלי לאבד שליטה.",
+   "לעבור יריב במקום צר, ולהישאר על הרגליים.",
+   "כדררנים, שוערים, ומגנים מול כנף מהירה."
+  ],
+  "balance": [
+   "לא ליפול ממגע.",
+   "מחזיק אותך על הרגליים כשמושכים אותך.",
+   "כדררנים וחלוצים שמחזיקים כדור."
+  ],
+  "jumping_reach": [
+   "כמה גבוה אתה מגיע.",
+   "קובע דו־קרבים באוויר, לא הגובה שלך.",
+   "בלמים, חלוצי מטרה, שוערים."
+  ],
+  "natural_fitness": [
+   "כמה מהר הגוף שלך חוזר לעצמו.",
+   "פחות פציעות, התאוששות מהירה יותר בין משחקים.",
+   "כולם. אצל ותיקים זה מאריך קריירה."
+  ],
+  "pace": [
+   "מהירות השיא שלך.",
+   "עם סיבולת — כמה זמן תחזיק אותה.",
+   "כנפיים, חלוצים ומגנים מתקדמים."
+  ],
+  "stamina": [
+   "להחזיק תשעים דקות באותה רמה.",
+   "מונע את הקריסה בדקה 60 ואת הקנס בציון.",
+   "כולם. קריטית בקבוצה שלוחצת."
+  ],
+  "strength": [
+   "להפעיל כוח על יריב ולנצח בו.",
+   "קובע ישירות את אחוז הדו־קרבים שלך.",
+   "חלוצי מטרה, בלמים, קשרים חוטפים."
+  ],
+  "aerial_reach": [
+   "להגיע לכדורים גבוהים ברחבה.",
+   "קרנות והרמות שנגמרות בידיים שלך ולא בראש שלהם.",
+   "שוערים בלבד."
+  ],
+  "command_of_area": [
+   "לשלוט ברחבה ולארגן את ההגנה.",
+   "ההגנה עומדת נכון כי אתה צועק להם.",
+   "שוערים בלבד."
+  ],
+  "communication": [
+   "לדבר עם ההגנה תשעים דקות.",
+   "מונע בלבול בין הבלמים ברגעים הקשים.",
+   "שוערים בלבד."
+  ],
+  "eccentricity": [
+   "נטייה לעשות דברים לא צפויים.",
+   "לפעמים הצלה מדהימה, לפעמים שער מגוחך.",
+   "שוערים. ככל שנמוך יותר — כך בטוח יותר."
+  ],
+  "handling": [
+   "להחזיק את הכדור ולא לשחרר.",
+   "מונע ריבאונדים ושערים מרשלנות.",
+   "שוערים בלבד."
+  ],
+  "kicking": [
+   "לבעוט מהשער רחוק ומדויק.",
+   "הופך הרחקה להתקפה.",
+   "שוערים, במיוחד שוער־מנקה."
+  ],
+  "one_on_ones": [
+   "לעצור חלוץ שיצא לבד.",
+   "הרגע שבו שוער מרוויח את המשכורת שלו.",
+   "שוערים בלבד."
+  ],
+  "reflexes": [
+   "להגיב לבעיטה מטווח קצר.",
+   "התכונה המרכזית של כל שוער.",
+   "שוערים בלבד."
+  ],
+  "rushing_out": [
+   "לצאת מהשער בזמן הנכון.",
+   "חוסם כדורים לעומק לפני שהם הופכים למצב.",
+   "שוער־מנקה בקבוצה עם קו הגנה גבוה."
+  ],
+  "tendency_to_punch": [
+   "להעדיף אגרוף על תפיסה.",
+   "בטוח יותר בקהל, פחות שליטה על הכדור.",
+   "שוערים. עניין של סגנון, לא של איכות."
+  ],
+  "throwing": [
+   "לזרוק את הכדור מדויק ומהר.",
+   "פותח מעבר מהיר מיד אחרי הצלה.",
+   "שוערים בקבוצות שמשחקות מעברים."
+  ]
+ },
+ "FOCUS_INFO": {
+  "rest": [
+   "שבוע קליל.",
+   "מחזיר רעננות ומקצר שיקום. החדות יורדת קצת.",
+   "מי שנכנס למשחקים שרוף, או שחוזר מפציעה."
+  ],
+  "badges": [
+   "לימודי אימון.",
+   "בונה ידע אימון ותעודות לקראת הקריירה שאחרי.",
+   "ותיקים שחושבים על מה שיהיה בגיל 35."
+  ],
+  "media": [
+   "סדנת תקשורת.",
+   "מעלה כריזמה — וזה מה שפותח חסויות ועבודות אולפן.",
+   "מי שרוצה שהמותגים יתקשרו."
+  ],
+  "business": [
+   "לימודי ניהול.",
+   "ראש עסקי — שימושי בניהול הכסף ובקריירה שאחרי.",
+   "מי שמתכנן לקנות מועדון יום אחד."
+  ],
+  "school": [
+   "בית ספר.",
+   "מעלה קריאת משחק לאט, ומשאיר לך דלת פתוחה.",
+   "נערים. ההורים יהיו מרוצים."
+  ],
+  "street": [
+   "כדורגל במגרש השכונתי.",
+   "כדרור, בעיטה ומהירות — בלי מאמן ובלי חוקים.",
+   "נערים שרוצים לפתח ברק, לא משמעת."
+  ]
+ },
  "DETAIL_DECLINE": {
   "acceleration": 1.9,
   "pace": 1.9,
@@ -11556,7 +11875,9 @@ function generatePlayer(rng, club, position, opts = {}) {
     traits: [],
     foot: rng.random() < 0.72 ? "right" : rng.random() < 0.78 ? "left" : "both",
     height: 178,
+    adultHeight: 178,
     weight: 74,
+    history: [],
     resilience: 50,
     sharpness: 60,
     ceiling,
@@ -11638,9 +11959,55 @@ function grownHeight(adultHeight, age) {
 }
 
 /** גובה, משקל ועמידות — לפי העמדה, עם רעש אישי. */
+/**
+ * מקדם את הגוף בשנה. נקרא בסוף כל עונה.
+ * זה היה חסר לגמרי: הגובה נקבע פעם אחת בלידה ולא זז יותר, ולכן נער
+ * בן 13 סיים את הקריירה באותו גובה שבו התחיל.
+ */
+function growBody(p, rng) {
+  if (!p.adultHeight) p.adultHeight = p.height;
+  const beforeH = p.height, beforeW = p.weight;
+
+  if (p.age < 20) {
+    const target = grownHeight(p.adultHeight, p.age);
+    const step = (target - p.height) * rng.uniform(0.75, 1.35);
+    p.height = Math.round(clamp(p.height + step, p.height, p.adultHeight));
+  }
+
+  const strength = p.detail.strength ?? 10;
+  const stamina = p.detail.stamina ?? 10;
+  let bmiTarget = 21.4 + strength * 0.115 - stamina * 0.035;
+  if (p.age >= 31) bmiTarget += (p.age - 30) * 0.10;
+  bmiTarget = clamp(bmiTarget + rng.gauss(0, 0.18), 20.2, 26.5);
+  const targetWeight = bmiTarget * Math.pow(p.height / 100, 2);
+  p.weight = Math.round(p.weight + (targetWeight - p.weight) * rng.uniform(0.45, 0.85));
+
+  const dh = p.height - beforeH, dw = p.weight - beforeW;
+  if (!dh && !dw) return null;
+  const parts = [];
+  if (dh) parts.push(`גבהת ${dh} ס"מ (${p.height})`);
+  if (dw) parts.push(`${dw > 0 ? "עלית" : "ירדת"} ${Math.abs(dw)} ק"ג (${p.weight})`);
+  return { icon: "📏", text: parts.join(" · ") + "." };
+}
+
+/** תמונת מצב שנתית — הבסיס למסך ההתפתחות. */
+function playerSnapshot(p, year, clubName = "") {
+  return {
+    year, age: p.age, club: clubName,
+    overall: overall(p), potential: Math.trunc(p.potential),
+    height: p.height, weight: p.weight,
+    reputation: Math.trunc(p.reputation),
+    resilience: Math.trunc(p.resilience),
+    detail: Object.assign({}, p.detail),
+    apps: p.season.apps, goals: p.season.goals, assists: p.season.assists,
+    rating: avgRating(p.season),
+  };
+}
+
 function applyPhysique(p, rng) {
   const [mean, spread] = D.PHYSIQUE[p.position] || [180, 5];
   const adult = Math.round(clamp(rng.gauss(mean, spread), 158, 205));
+  p.adultHeight = adult;
   p.height = grownHeight(adult, p.age);
   const bmi = rng.uniform(D.BMI_RANGE[0], D.BMI_RANGE[1]);
   p.weight = Math.round(bmi * Math.pow(p.height / 100, 2));
@@ -12388,6 +12755,9 @@ function endOfSeasonDevelopment(p, rng, minutesShare = 0.5, club = null) {
   const note = updatePotential(p, rng, minutesShare, club);
   if (note && p.isHuman) messages.push(note);
   p.age += 1;
+  // הגוף גדל באמת, ולא רק "כאילו"
+  const body = growBody(p, rng);
+  if (body && p.isHuman) messages.push(body);
   const curve = ageFactor(p.age);
   const exposure = 0.45 + minutesShare * 1.1;
   // הרגליים הולכות ראשונות, הראש נשאר — ולכן ותיק מפצה בקריאת משחק
@@ -13874,6 +14244,612 @@ function scoutPlayer(game, player) {
   game.setFlag(`scouted_${player.pid}`, true);
   return `🔍 הצוות נסע לראות את ${player.name}. ₪${fmt(cost)} מהקופה — `
        + "ועכשיו יש עליו דוח מלא.";
+}
+
+// ---------------------------------------------------------------------------
+// מה כל תכונה עושה, כמה היא שווה *לך*, ומה יקרה אם תתאמן עליה
+// תאום JS של coaching.py
+//
+// "מה זה צמידות? במה הוא מועיל? האם השחקן צריך אותו ברגע זה?" —
+// שלוש שאלות שלא הייתה להן תשובה בשום מקום במשחק.
+// ---------------------------------------------------------------------------
+
+const WEIGHT_ROLE_KEY = 34, WEIGHT_ROLE_EXTRA = 18;
+const WEIGHT_POSITION = 26, WEIGHT_PLAN = 22, WEIGHT_GAP = 30;
+
+function explainAttr(attr) {
+  return D.ATTR_INFO[attr] || D.FOCUS_INFO[attr] || ["", "", ""];
+}
+
+const DEMAND_CACHE = {};
+
+/** כמה כל תכונה נדרשת בעמדה, מנורמל כך שהחשובה ביותר היא 1.0. */
+function demandTable(position) {
+  if (DEMAND_CACHE[position]) return DEMAND_CACHE[position];
+  const weights = D.POSITION_WEIGHTS[position];
+  const mapping = groupMapFor(position);
+  const raw = {};
+  for (const attr of attrsFor(position)) {
+    let total = 0;
+    for (const group in mapping) {
+      const share = mapping[group][attr];
+      if (share) total += share * (weights[group] || 0);
+    }
+    raw[attr] = total;
+  }
+  const top = Math.max(...Object.values(raw)) || 1;
+  const table = {};
+  for (const attr in raw) table[attr] = raw[attr] / top;
+  DEMAND_CACHE[position] = table;
+  return table;
+}
+
+function positionDemand(attr, position) {
+  return demandTable(position)[attr] || 0;
+}
+
+/** כמה התכונה הזאת שווה לך *עכשיו*, ולמה. */
+function attrRelevance(game, attr) {
+  const me = game.me;
+  const row = roleRow(me.role);
+  const reasons = [];
+  let score = 0;
+  let wanted = 0;            // 0-1: כמה בכלל צריך ממך את התכונה הזאת
+
+  if (row && row[4].includes(attr)) {
+    score += WEIGHT_ROLE_KEY;
+    wanted = 1;
+    reasons.push(`תכונת מפתח ב${row[1]}`);
+  } else if (row && row[5].includes(attr)) {
+    score += WEIGHT_ROLE_EXTRA;
+    wanted = 0.65;
+    reasons.push(`נדרשת ב${row[1]}`);
+  }
+
+  const demand = positionDemand(attr, me.position);
+  score += demand * WEIGHT_POSITION;
+  wanted = Math.max(wanted, demand);
+  if (demand >= 0.55 && !reasons.length)
+    reasons.push(`חשובה ל${D.POSITION_NAMES_HE[me.position]}`);
+
+  for (const entry of milestoneRows(game)) {
+    if (entry.claimed) continue;
+    for (const part of entry.needs) {
+      if (part.attr === attr && part.have < part.need) {
+        score += WEIGHT_PLAN;
+        wanted = 1;
+        reasons.push(`חוסמת אבן דרך של גיל ${entry.age}`);
+        break;
+      }
+    }
+    break;
+  }
+
+  // כמה אתה נמוך בה — אבל רק במידה שבכלל צריך אותה. חלוץ עם צמידות 5
+  // הוא לא בעיה: זה בדיוק מה שאמור להיות.
+  const allowed = attrsFor(me.position);
+  const average = allowed.reduce((a, k) => a + (me.detail[k] ?? 10), 0) / allowed.length;
+  const level = me.detail[attr] ?? 10;
+  const gap = average - level;
+  if (gap > 0) {
+    score += Math.min(WEIGHT_GAP, gap * 7) * wanted;
+    if (gap >= 2.5 && wanted >= 0.4) reasons.push("נמוכה ביחס לשאר התכונות שלך");
+  } else if (level >= 17) {
+    reasons.push("כבר ברמה גבוהה");
+  }
+
+  if (SET_PIECE_ATTRS.has(attr)) {
+    score *= 0.55;
+    reasons.push("מומחיות — משתפרת רק באימון ישיר");
+  }
+
+  return { attr, score: Math.round(clamp(score, 0, 100)),
+           reasons: reasons.slice(0, 3), level,
+           average: Math.round(average * 10) / 10 };
+}
+
+/**
+ * כל התכונות שלך, מסודרות לפי כמה הן שוות לך עכשיו.
+ * הפסק ניתן ביחס לעצמך: "מקום 1 מתוך 36" אומר יותר מ"45 מתוך 100".
+ */
+function needsTable(game) {
+  const rows = attrsFor(game.me.position).map(attr => attrRelevance(game, attr));
+  rows.sort((a, b) => b.score - a.score);
+  const total = rows.length;
+  const top = rows.length ? rows[0].score : 1;
+  rows.forEach((row, index) => {
+    row.rank = index + 1;
+    row.of = total;
+    const share = top ? row.score / top : 0;
+    if (index < 3 && share >= 0.75) row.verdict = "כן — זה מה שחסר לך עכשיו";
+    else if (share >= 0.62) row.verdict = "שווה, אבל לא הכי דחוף";
+    else if (share >= 0.35) row.verdict = "לא בראש סדר העדיפויות";
+    else row.verdict = "לא רלוונטי אליך";
+  });
+  return rows;
+}
+
+function relevanceOf(game, attr) {
+  const found = needsTable(game).find(row => row.attr === attr);
+  if (found) return found;
+  const row = attrRelevance(game, attr);
+  return Object.assign(row, { rank: 0, of: 0, verdict: "לא רלוונטי אליך" });
+}
+
+function rankedNeeds(game, limit = 6) { return needsTable(game).slice(0, limit); }
+
+// ---------------------------------------------------------------------------
+// תחזית: מה יקרה אם אתאמן על זה
+// ---------------------------------------------------------------------------
+
+/** כמה נקודות (1-20) תרוויח בשבוע בממוצע. הנוסחה האמיתית, בלי ההגרלה. */
+function weeklyRate(game, attr, intensity = null) {
+  const me = game.me;
+  const club = game.myClub();
+  intensity = intensity === null ? game.intensity : intensity;
+  const facilities = club ? club.trainingFacilities : 45;
+  const assistant = club ? staffQuality(club, "assistant") : 0;
+
+  let base = 0.165 * intensity;
+  base *= 0.55 + facilities / 110;
+  base *= 1 + assistant / 420;
+  base *= Math.max(0.15, ageFactor(me.age));
+  base *= 1 + clamp(me.potential - overall(me), -10, 18) * 0.032;
+  if (hasTrait(me, "workhorse")) base *= 1.30;
+  base *= 0.75 + me.morale / 200;
+  base *= personalityEffect(me)[0];
+  base *= 0.55 + (me.detail.determination ?? 10) / 22;
+  base *= 1.025;                        // תוחלת ההגרלה 0.7-1.35
+
+  const headroom = me.potential - overall(me);
+  if (headroom <= 0) base *= 0.06;
+  else if (headroom < 6) base *= 0.20 + headroom * 0.13;
+
+  const shares = trainingShares(me, attr);
+  const share = shares[attr] || 0;
+  const keys = Object.keys(shares);
+  const average = keys.length
+    ? keys.reduce((a, k) => a + (me.detail[k] ?? 10), 0) / keys.length : 10;
+  const level = me.detail[attr] ?? 10;
+  return base * share * detailDamper(level, average) / 5;
+}
+
+/**
+ * כמה תעלה התכונה בפועל ב-N שבועות.
+ * לא הכפלה של הקצב הנוכחי: ככל שהתכונה עולה, הבלם מאט אותה והתקרה
+ * עוצרת אותה. תחזית קווית הייתה מבטיחה כפול ממה שיקרה.
+ */
+function projectedGain(game, attr, weeks, intensity = null) {
+  const me = game.me;
+  let level = me.detail[attr] ?? 10;
+  if (level >= 20) return 0;
+  const allowed = attrsFor(me.position);
+  const others = allowed.filter(a => a !== attr)
+    .reduce((a, k) => a + (me.detail[k] ?? 10), 0);
+  const count = Math.max(1, allowed.length);
+  const rate = weeklyRate(game, attr, intensity);
+  if (rate <= 0) return 0;
+  const baseLevel = me.detail[attr] ?? 10;
+  let total = 0;
+  for (let i = 0; i < weeks && level < 20; i++) {
+    const average = (others + level) / count;
+    const base = detailDamper(baseLevel, average);
+    const now = detailDamper(level, average);
+    const step = rate * (base > 0 ? now / base : 1);
+    level = Math.min(20, level + step);
+    total += step;
+  }
+  return Math.min(total, 20 - (me.detail[attr] ?? 10));
+}
+
+function forecast(game, attr, weeks = 6, intensity = null) {
+  const me = game.me;
+  const rate = weeklyRate(game, attr, intensity);
+  const level = me.detail[attr] ?? 10;
+  const gain = projectedGain(game, attr, weeks, intensity);
+  intensity = intensity === null ? game.intensity : intensity;
+  const injury = intensity > 1.15 ? 0.022 * intensity * injuryRisk(me) : 0;
+  const shares = trainingShares(me, attr);
+  const side = Object.entries(shares).filter(([a]) => a !== attr)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([a]) => a);
+  return {
+    attr, rate: Math.round(rate * 1000) / 1000,
+    weeks_per_point: rate > 0.001 ? Math.round(10 / rate) / 10 : null,
+    gain: Math.round(gain * 10) / 10, level,
+    target: Math.min(20, Math.round(level + gain)),
+    fitness_cost: Math.round((2.5 + 5 * intensity) * 10) / 10,
+    injury_pct: Math.round(injury * 1000) / 10,
+    side,
+  };
+}
+
+/** שורה אחת שאומרת מה יקרה. זה מה שהיה חסר כדי לבחור אימון. */
+function forecastLine(game, attr) {
+  const data = forecast(game, attr);
+  const name = D.DETAIL_NAMES_HE[attr] || attr;
+  if (data.weeks_per_point === null)
+    return `${name}: כרגע לא תתקדם בזה — הגעת לתקרת הפוטנציאל.`;
+  const weeks = data.weeks_per_point;
+  const pace = weeks >= 1.5 ? `נקודה כל ${Math.round(weeks)} שבועות`
+                            : `כ-${(1 / weeks).toFixed(1)} נקודות בשבוע`;
+  const side = data.side.map(a => D.DETAIL_NAMES_HE[a]).join(", ");
+  return `${name} ${data.level} → ${data.target} בשישה שבועות (${pace}). `
+       + `אגב זה יעלו גם ${side}.`;
+}
+
+// ---------------------------------------------------------------------------
+// איך התפתחתי, ובכמה
+// ---------------------------------------------------------------------------
+
+function growthLog(game) {
+  return Array.isArray(game.flags.growth_log) ? game.flags.growth_log : [];
+}
+
+/** לא "כאילו מתפתח": מספרים מדויקים מהעונה הראשונה שנרשמה ועד היום. */
+function growthSummary(game) {
+  const me = game.me;
+  const log = growthLog(game);
+  if (!log.length) return { seasons: [], since: null, moved: [], physical: null };
+
+  const first = log[0];
+  const rows = [];
+  let previous = null;
+  for (const shot of log) {
+    const row = Object.assign({}, shot);
+    if (previous) {
+      row.d_overall = shot.overall - previous.overall;
+      row.d_height = shot.height - previous.height;
+      row.d_weight = shot.weight - previous.weight;
+      row.d_points = Object.keys(shot.detail).reduce((a, k) =>
+        a + Math.max(0, (shot.detail[k] ?? 10) - (previous.detail[k] ?? 10)), 0);
+    } else {
+      row.d_overall = row.d_height = row.d_weight = row.d_points = 0;
+    }
+    delete row.detail;
+    rows.push(row);
+    previous = shot;
+  }
+
+  const moved = [];
+  for (const attr of attrsFor(me.position)) {
+    const start = first.detail[attr] ?? 10;
+    const delta = (me.detail[attr] ?? 10) - start;
+    if (delta) moved.push({ attr, name: D.DETAIL_NAMES_HE[attr], from: start,
+                            to: me.detail[attr] ?? 10, delta });
+  }
+  moved.sort((a, b) => b.delta - a.delta);
+
+  return {
+    seasons: rows, since: first.year, since_age: first.age, moved,
+    total_points: moved.filter(r => r.delta > 0).reduce((a, r) => a + r.delta, 0),
+    overall_from: first.overall, overall_to: overall(me),
+    physical: {
+      height_from: first.height, height_to: me.height,
+      weight_from: first.weight, weight_to: me.weight,
+      adult_height: me.adultHeight,
+      left: Math.max(0, (me.adultHeight || me.height) - me.height),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// מה יש בקבוצה שלי
+// ---------------------------------------------------------------------------
+
+/** פרטי הקבוצה שהיו חסרים: עומק לפי עמדה, מי לפניך, ואיפה אתה עומד. */
+function squadReport(game) {
+  const club = game.myClub();
+  const me = game.me;
+  if (!club) return { has_club: false };
+
+  const squad = club.squad.map(pid => game.players[pid]).filter(Boolean);
+  const byPosition = {};
+  for (const player of squad) {
+    (byPosition[player.position] = byPosition[player.position] || []).push({
+      pid: player.pid, name: player.name, age: player.age,
+      overall: overall(player), role: player.role, number: player.number,
+      available: isAvailable(player), is_me: player.pid === me.pid,
+    });
+  }
+  for (const rows of Object.values(byPosition)) rows.sort((a, b) => b.overall - a.overall);
+
+  const rivals = (byPosition[me.position] || []).filter(r => !r.is_me);
+  const ages = squad.length ? squad.map(p => p.age) : [25];
+  const leagueClubs = Object.values(game.clubs).filter(c => c.leagueId === club.leagueId);
+  const ranked = leagueClubs.slice().sort((a, b) => b.reputation - a.reputation);
+
+  return {
+    has_club: true, name: club.name, nickname: club.nickname,
+    reputation: club.reputation,
+    rep_rank: ranked.findIndex(c => c.cid === club.cid) + 1,
+    rep_of: ranked.length,
+    manager: club.managerName, squad_size: squad.length,
+    average_age: Math.round(ages.reduce((a, b) => a + b, 0) / ages.length * 10) / 10,
+    average_overall: Math.round(squad.reduce((a, p) => a + overall(p), 0)
+                                / Math.max(1, squad.length)),
+    by_position: byPosition,
+    ahead_of_me: rivals.filter(r => r.overall > overall(me)),
+    depth_here: (byPosition[me.position] || []).length,
+    facilities: Object.entries(D.FACILITIES).map(([key, info]) => ({
+      key, name: info.name, value: Math.trunc(facilityLevel(club, key)),
+      desc: info.desc || "" })),
+    staff: Object.entries(D.STAFF_ROLES).map(([key, info]) => ({
+      role: key, name: info.name, member: club.staff[key] || null,
+      quality: staffQuality(club, key) })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// מישהו שמלווה אותך, ולא חוזר על עצמו — תאום JS של mentor.py
+//
+// הוא לא מגריל שורה מרשימה. הוא קורא את המצב, נותן ציון דחיפות לכל
+// דבר שראה, ומדבר על הדחוף ביותר שעוד לא דיבר עליו. מצב שנמשך לא
+// מקבל את אותו משפט שוב — הוא מקבל משפט חריף יותר.
+// ---------------------------------------------------------------------------
+
+const MENTORS = [
+  ["veteran", "יעקב אזולאי", "ותיק שסיים בגיל 38 ויודע בדיוק איפה כואב",
+   ["תשמע,", "אני אגיד לך את זה פעם אחת.", "אני הייתי שם."]],
+  ["coach", "רונית שגב", "מאמנת כושר שראתה מאתיים נערים נשרפים",
+   ["בוא נדבר תכל'ס.", "אני מסתכלת על המספרים שלך.", "שב רגע."]],
+  ["scout", "מוני ברזילי", "צופה ותיק שקורא שחקנים לפני שהם קוראים את עצמם",
+   ["רשמתי לעצמי משהו.", "אני עוקב אחריך.", "משהו קטן."]],
+  ["agent", "דנה פרץ", "סוכנת שמדברת ישר וחוסכת לך שנים",
+   ["אני לא אעטוף את זה.", "בינינו.", "תקשיב טוב."]],
+];
+
+const MENTOR_COOLDOWN = 26;
+
+function mentorHash(text) {
+  let value = 2166136261;
+  for (const ch of text) {
+    value ^= ch.codePointAt(0);
+    value = Math.imul(value, 16777619) >>> 0;
+  }
+  return value;
+}
+
+/** המנטור שלך — נקבע מהשם שלך, ולכן קבוע לכל הקריירה. */
+function mentorOf(game) {
+  return MENTORS[mentorHash(game.me.name + "mentor") % MENTORS.length];
+}
+
+function mentorLog(game) {
+  if (!game.flags.mentor_log || typeof game.flags.mentor_log !== "object"
+      || Array.isArray(game.flags.mentor_log)) game.flags.mentor_log = {};
+  return game.flags.mentor_log;
+}
+
+/** כמה פעמים כבר אמר לך כל דבר. זה מה שמונע ממנו לחזור על עצמו. */
+function mentorCounts(game) {
+  if (!game.flags.mentor_count || typeof game.flags.mentor_count !== "object"
+      || Array.isArray(game.flags.mentor_count)) game.flags.mentor_count = {};
+  return game.flags.mentor_count;
+}
+
+function saidRecently(game, key, cooldown = MENTOR_COOLDOWN) {
+  const stamp = mentorLog(game)[key];
+  if (stamp === undefined) return false;
+  const year = Math.trunc(stamp / 100), week = stamp % 100;
+  return (game.year - year) * 43 + (game.week - week) < cooldown;
+}
+
+function markSaid(game, key) {
+  mentorLog(game)[key] = game.year * 100 + game.week;
+  const counts = mentorCounts(game);
+  counts[key] = (counts[key] || 0) + 1;
+}
+
+function saidTimes(game, key) { return mentorCounts(game)[key] || 0; }
+
+/** כל מה שהמנטור מזהה עכשיו, עם ציון דחיפות. */
+function mentorObservations(game) {
+  const me = game.me;
+  const club = game.myClub();
+  const out = [];
+
+  const see = (key, urgency, title, body, action = null, cooldown = MENTOR_COOLDOWN) => {
+    const times = saidTimes(game, key);
+    const titles = Array.isArray(title) ? title : [title];
+    const bodies = Array.isArray(body) ? body : [body];
+    out.push({
+      key, urgency: urgency + times * 6,
+      title: titles[Math.min(times, titles.length - 1)],
+      body: bodies[Math.min(times, bodies.length - 1)],
+      action, times, cooldown: cooldown + times * 10,
+      exhausted: times >= Math.max(titles.length, bodies.length) + 1,
+    });
+  };
+
+  const needs = rankedNeeds(game, 3);
+  if (needs.length) {
+    const top = needs[0];
+    const name = D.DETAIL_NAMES_HE[top.attr];
+    const why = top.reasons.length ? top.reasons[0] : "זו החולשה הבולטת שלך";
+    see(`need_${top.attr}`, 62 + top.score * 0.25, `תתאמן על ${name}`,
+        `${why}. ${forecastLine(game, top.attr)}`, top.attr, 18);
+  }
+
+  if (me.role) {
+    const mine = roleSuitability(me, me.role);
+    const [bestKey, bestScore] = bestRole(me);
+    if (bestKey !== me.role && bestScore - mine >= 8) {
+      const row = roleRow(bestKey), current = roleRow(me.role);
+      see("role_mismatch", 74,
+        [`אתה לא ${current[1]}`, `עדיין משחקים אותך כ${current[1]}`],
+        [`התכונות שלך אומרות ${row[1]} (${Math.round(bestScore)}) ולא `
+         + `${current[1]} (${Math.round(mine)}). ${row[6]} לך תדבר איתו — `
+         + "או תתאמן על מה שהתפקיד הנוכחי דורש, ותפסיק להילחם בזה.",
+         `אמרתי לך שאתה ${row[1]}. אתה עדיין ${current[1]}. שתי אפשרויות `
+         + "נשארו: או שאתה מקבל את התפקיד ובונה את התכונות שהוא דורש, או "
+         + `שאתה מוצא מאמן שרואה בך ${row[1]}. מה שאתה עושה עכשיו — לא עובד.`]);
+    }
+  }
+
+  if (club) {
+    const [fit, note] = styleSuitsPlayer(club, me);
+    if (fit < 35) {
+      const styleName = tacticalStyle(club)[1];
+      see("style_mismatch", 58,
+        [`אתה לא בנוי ל${styleName}`, `${styleName} עדיין חונק אותך`],
+        [`${note}. אצל מאמן אחר אותן תשעים דקות היו נראות אחרת. אם זה `
+         + "נמשך עונה שלמה — תתחיל לחשוב על מעבר.",
+         `${note}. עברה עונה ולא השתנה כלום. יש שחקנים שנשברים בניסיון `
+         + "להתאים את עצמם למערכת, ויש כאלה שמוצאים מערכת שמתאימה להם. "
+         + "השנייה מהירה יותר."]);
+    }
+  }
+
+  if (game.noStartStreak >= 5) {
+    see("no_minutes", 80,
+      ["אתה לא משחק", "עדיין לא משחק", "זה כבר לא מקרי"],
+      [`${game.noStartStreak} משחקים ברצף בלי הרכב. בגיל שלך ספסל זה לא `
+       + "מנוחה — זה קיפאון. או שאתה משנה משהו באימונים, או שאתה מחפש "
+       + "מקום שבו תשחק.",
+       `${game.noStartStreak} משחקים. דיברנו על זה, ושום דבר לא זז. המאמן `
+       + "החליט מה הוא חושב עליך, וזה לא ישתנה מאימון טוב אחד. או שאתה "
+       + "מוכיח לו במשהו קונקרטי, או שאתה מרים טלפון לסוכן.",
+       `${game.noStartStreak} משחקים. אני לא אחזור על זה יותר. עונה שלמה `
+       + "על הספסל בגיל הזה עולה לך שנתיים של קריירה. תחליט."],
+      null, 14);
+  }
+
+  if (me.fitness < 45) {
+    see("fitness", 88,
+      ["הגוף שלך על הקצה", "שוב הגעת לאדום", "אתה מתעלם ממני"],
+      [`רעננות ${Math.round(me.fitness)}. ככה נכנסים למשחק ויוצאים פצועים, `
+       + "וגם הציון נענש. שבוע מנוחה עכשיו שווה יותר משלושה אימונים.",
+       `רעננות ${Math.round(me.fitness)}, ושוב. זה כבר לא מקרה — זה איך `
+       + "שאתה מנהל את השבוע. תוריד עצימות, או תיקח שבוע.",
+       `רעננות ${Math.round(me.fitness)}. אני אומר לך את זה בפעם השלישית. `
+       + "הפציעה הבאה שלך כבר נקבעה, השאלה היא רק מתי."],
+      "rest", 10);
+  } else if (me.sharpness < 45 && isAvailable(me)) {
+    see("sharpness", 52, "אין לך דקות ברגליים",
+      `חדות ${Math.round(me.sharpness)}. אתה יכול להיות בכושר מצוין ועדיין `
+      + "להיכנס למשחק חלוד. חדות נבנית רק ממשחקים.", null, 16);
+  }
+
+  if (me.resilience < 38) {
+    see("fragile", 66, "אתה נשבר יותר מדי",
+      `עמידות ${Math.round(me.resilience)}. עבודת כוח וסיבולת בונה גוף `
+      + "שמחזיק. זה משעמם, וזה מה שיקבע כמה עונות תשחק.", "strength");
+  }
+
+  const plan = planSummary(game);
+  if (plan.chosen) {
+    for (const entry of plan.milestones) {
+      if (entry.claimed) continue;
+      const gaps = entry.needs.filter(p => p.have < p.need);
+      const missing = gaps.reduce((a, p) => a + (p.need - p.have), 0);
+      if (gaps.length && missing <= 3) {
+        const names = gaps.map(p => `${p.name} ${p.have}/${p.need}`).join(", ");
+        see(`milestone_${entry.index}`, 76,
+          `אתה על סף אבן הדרך של גיל ${entry.age}`,
+          `חסרות ${missing} נקודות: ${names}. תסגור את זה עכשיו — אבן דרך `
+          + "בזמן שווה כפול מאבן דרך באיחור.", gaps[0].attr, 12);
+      }
+      break;
+    }
+  } else if (["youth", "academy", "player", "veteran"].includes(game.stage)) {
+    see("no_plan", 70,
+      ["אין לך מסלול", "עדיין בלי מסלול"],
+      ["אתה מתאמן בלי יעד. תבחר תפקיד שאתה רוצה להיות, ותקבל יעדים לפי "
+       + "גיל במקום לנחש כל שבוע.",
+       "עוד לא בחרת. כל שבוע בלי מסלול הוא שבוע שבו אתה מפזר עבודה על "
+       + "שלושים ושש תכונות במקום על ארבע שחשובות."]);
+  }
+
+  const history = Array.isArray(game.flags.focus_log) ? game.flags.focus_log : [];
+  if (history.length >= 12) {
+    const recent = history.slice(-12);
+    if (new Set(recent).size <= 2 && recent[recent.length - 1] in D.DETAIL_NAMES_HE) {
+      const name = D.DETAIL_NAMES_HE[recent[recent.length - 1]];
+      see("training_rut", 64, "נתקעת על אותו אימון",
+        `שלושה חודשים של ${name}. ככל שתכונה מתרחקת מהשאר, כל נקודה נעשית `
+        + "יקרה יותר — ובמקביל חורים נפערים במקום אחר. תחליף מיקוד לכמה שבועות.",
+        null, 20);
+    }
+  }
+
+  if (me.contract.yearsLeft <= 1 && club && ["player", "veteran"].includes(game.stage)) {
+    see("contract", 68, "החוזה שלך נגמר",
+      "שנה אחת נשארה. מכאן והלאה כל מועדון יכול לדבר איתך בחינם, וגם "
+      + "המועדון שלך יודע את זה. או שאתה מחדש עכשיו מעמדת כוח, או שאתה "
+      + "מחכה ומהמר.", null, 30);
+  }
+
+  const chasers = watchers(game, SCOUT_COURTED);
+  if (chasers.length) {
+    const country = clubCountry(chasers[0][0].cid);
+    see("suitor", 60, `${chasers[0][0].name} רציניים לגביך`,
+      `הם עוקבים אחריך כבר תקופה${country !== "ישראל" ? " מ" + country : ""}. `
+      + "זה לא אומר לעזוב — זה אומר שיש לך קלף. תמשיך לשחק ככה, והם יגיעו "
+      + "עם הצעה בחלון.", null, 22);
+  }
+
+  if (me.age >= 31 && me.badges === 0) {
+    see("after", 50, "תתחיל לחשוב על מה שאחרי",
+      "בגיל שלך כל עונה היא בונוס. תעודות אימון היום שוות שנים של קריירה "
+      + "שנייה. זה לא במקום לשחק — זה במקביל.", "badges", 40);
+  }
+
+  if (me.morale < 35) {
+    see("morale", 72,
+      ["הראש שלך לא שם", "אתה עדיין למטה"],
+      [`מורל ${Math.round(me.morale)}. זה לא רק הרגשה — זה מוריד לך את קצב `
+       + "ההתפתחות באימונים בעשרות אחוזים. משחק אחד טוב הופך את זה.",
+       `מורל ${Math.round(me.morale)} כבר תקופה. אתה מפסיד התפתחות בכל שבוע `
+       + "שאתה נשאר שם. תתחיל ממשהו קטן שאתה יודע לעשות טוב."],
+      null, 16);
+  }
+
+  return out;
+}
+
+/** הטיפ הבא — הדחוף ביותר שעוד לא נאמר לאחרונה. null כשאין מה לחדש. */
+function mentorAdvise(game, rng = null) {
+  rng = rng || game.rng;
+  const fresh = mentorObservations(game).filter(row =>
+    !row.exhausted && !saidRecently(game, row.key, row.cooldown));
+  if (!fresh.length) return null;
+  fresh.sort((a, b) => b.urgency - a.urgency);
+  const top = fresh[0].urgency;
+  const pool = fresh.filter(row => row.urgency >= top - 8);
+  const chosen = rng.choice(pool);
+  markSaid(game, chosen.key);
+
+  const [, name, blurb, openers] = mentorOf(game);
+  return {
+    mentor: name, blurb,
+    opener: openers[mentorHash(chosen.key) % openers.length],
+    title: chosen.title, body: chosen.body,
+    action: chosen.action, urgency: chosen.urgency,
+  };
+}
+
+function mentorLines(game, rng = null) {
+  const tip = mentorAdvise(game, rng);
+  if (!tip) return [];
+  const lines = [`${tip.mentor}: "${tip.opener} ${tip.title}."`, tip.body];
+  if (tip.action && tip.action in D.DETAIL_NAMES_HE)
+    lines.push(`→ מומלץ להתאמן השבוע על ${D.DETAIL_NAMES_HE[tip.action]}.`);
+  return lines;
+}
+
+/** כל מה שהמנטור רואה עכשיו — למסך שלו. */
+function mentorBoard(game) {
+  const [, name, blurb] = mentorOf(game);
+  const rows = mentorObservations(game).slice().sort((a, b) => b.urgency - a.urgency);
+  return {
+    name, blurb,
+    items: rows.map(row => ({
+      title: row.title, body: row.body, action: row.action,
+      urgency: Math.round(row.urgency),
+      said: saidRecently(game, row.key, row.cooldown),
+    })),
+    needs: rankedNeeds(game, 5),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -15394,6 +16370,14 @@ class Game {
 
   setAction(key) { this.trainingFocus = key; }
 
+  /** רושם על מה התאמנת. המנטור קורא את זה כדי לזהות שגרה. */
+  noteFocus() {
+    if (!Array.isArray(this.flags.focus_log)) this.flags.focus_log = [];
+    this.flags.focus_log.push(this.trainingFocus);
+    if (this.flags.focus_log.length > 60)
+      this.flags.focus_log = this.flags.focus_log.slice(-60);
+  }
+
   advanceWeek() {
     const report = { week: this.week, training: [], notes: [], match: null,
                      personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
@@ -15414,6 +16398,7 @@ class Game {
         report.notes.push({ icon: "↩️", text: `התאמנת על משהו אחר ממה ש${club.managerName} ביקש.` });
       }
     }
+    this.noteFocus();
     report.training = this.doWeeklyAction();
     // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
     this.simulateWeekMatches(report, this.stage === "youth");
@@ -15444,9 +16429,14 @@ class Game {
       const target = nextTarget(this);
       if (target && this.week % 4 === 0)
         report.notes.push({ icon: "", text: target });
-      else if (!target && this.week % 8 === 0)
-        report.notes.push({ icon: "🧭",
-          text: "עוד לא בחרת מסלול פיתוח. בלי מסלול אתה מתאמן בלי יעד." });
+      // המנטור מדבר רק כשיש לו משהו חדש להגיד
+      if (this.week % 3 === 0) {
+        const tip = mentorLines(this, this.rng);
+        if (tip.length) {
+          report.notes.push({ icon: "🧭", text: tip[0] });
+          for (const line of tip.slice(1)) report.notes.push({ icon: "", text: line });
+        }
+      }
     }
 
     this.week += 1;
@@ -16608,7 +17598,9 @@ class Game {
     this.seasonAwards(add);
     this.personalSummary(add);
     this.promotionRelegation(add);
-    this.developEveryone();
+    const beforeDetail = Object.assign({}, this.me.detail);
+    for (const note of this.developEveryone()) add(note.icon || "", note.text || note);
+    for (const note of this.growthReport(beforeDetail)) add(note.icon, note.text);
     this.processRetirements();
     this.transferWindow(add);
     // מסלול הפיתוח — מה נחתם העונה
@@ -16618,6 +17610,15 @@ class Game {
     // נכסים והשקעות
     for (const line of assetsSeasonTick(this, this.rng)) add("", line);
     this.advanceCareerStage(add);
+
+    // תמונת מצב שנתית של השחקן — הבסיס למסך "איך התפתחתי"
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
+      if (!Array.isArray(this.flags.growth_log)) this.flags.growth_log = [];
+      this.flags.growth_log.push(
+        playerSnapshot(this.me, this.year, myClub ? myClub.name : ""));
+      if (this.flags.growth_log.length > 30)
+        this.flags.growth_log = this.flags.growth_log.slice(-30);
+    }
 
     this.history.push({
       year: this.year, stage: this.stage,
@@ -16691,13 +17692,39 @@ class Game {
     }
   }
 
+  /** מפתח את כל העולם, ומחזיר את מה שקרה *לך* — כי זה מה שרצית לדעת. */
   developEveryone() {
+    const mine = [];
     for (const p of Object.values(this.players)) {
       if (p.retired) { if (p.pid === this.meId) p.age += 1; continue; }
       const share = clamp(p.season.minutes / (SEASON_WEEKS * 90), 0, 1);
       const notes = endOfSeasonDevelopment(p, this.rng, share, this.clubs[p.clubId]);
-      if (p.pid === this.meId) for (const n of notes) this.log(n);
+      if (p.pid === this.meId) mine.push(...notes);
     }
+    return mine;
+  }
+
+  /**
+   * מה בדיוק השתנה בך העונה, תכונה־תכונה.
+   * "הכול כאילו מתפתח אבל לא ברור איך ולא מובן עד כמה" — עכשיו כתוב.
+   */
+  growthReport(before) {
+    if (!["youth", "academy", "player", "veteran"].includes(this.stage)) return [];
+    const moved = [];
+    for (const attr of attrsFor(this.me.position)) {
+      const delta = (this.me.detail[attr] ?? 10) - (before[attr] ?? 10);
+      if (delta) moved.push([delta, attr]);
+    }
+    if (!moved.length)
+      return [{ icon: "", text: "שום תכונה לא זזה העונה. שנה תקועה." }];
+    moved.sort((a, b) => b[0] - a[0]);
+    const label = ([, a]) => `${D.DETAIL_NAMES_HE[a]} ${before[a]}→${this.me.detail[a]}`;
+    const out = [];
+    const ups = moved.filter(pair => pair[0] > 0).map(label);
+    const downs = moved.filter(pair => pair[0] < 0).map(label);
+    if (ups.length) out.push({ icon: "📈", text: "עלו: " + ups.join(", ") });
+    if (downs.length) out.push({ icon: "📉", text: "ירדו: " + downs.join(", ") });
+    return out;
   }
 
   processRetirements() {
@@ -18121,8 +19148,9 @@ function tabsBar() {
   const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
   if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
-  if (["youth", "academy", "player", "veteran"].includes(game.stage))
-    items.splice(1, 0, ["plan", "מסלול"]);
+  if (["youth", "academy", "player", "veteran"].includes(game.stage)) {
+    items.splice(1, 0, ["mentor", "מנטור"], ["plan", "מסלול"], ["growth", "התפתחות"]);
+  }
   items.splice(items.length - 1, 0, ["money", "כסף"]);
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
@@ -18154,6 +19182,9 @@ function screenMain() {
   if (view === "money") return appbar() + screenMoney();
   if (view === "scouts") return appbar() + screenScouts();
   if (view === "system") return appbar() + screenSystem();
+  if (view === "mentor") return appbar() + screenMentor();
+  if (view === "growth") return appbar() + screenGrowth();
+  if (view === "attr") return appbar() + screenAttr();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -18193,7 +19224,8 @@ function attributeBoard(game, player) {
           const level = info && info.exact ? info.value
                       : info && info.high ? (info.low + info.high) / 2 : 0;
           const tone = level >= 15 ? "hi" : level >= 11 ? "mid" : level ? "lo" : "unk";
-          return `<div class="attr-row ${tone}">
+          const tap = player.pid === game.meId ? ` data-attr="${attr}"` : "";
+          return `<div class="attr-row ${tone}${tap ? " tappable" : ""}"${tap}>
             <span class="n">${esc(he)}</span>${cell(attr)}
           </div>`;
         }).join("")}
@@ -18440,6 +19472,46 @@ function moneyRow(label, amount, kind) {
  * מסך המועדון: אצטדיון, קופה, מתקנים וצוות מקצועי.
  * כשאתה שחקן אתה רואה הכל אבל לא נוגע; כמנג'ר, מנהל או בעלים — אתה מחליט.
  */
+/**
+ * עומק הסגל לפי עמדה, ומי בדיוק עומד לפניך בתור.
+ * זה הפרט שהיה חסר כדי להבין למה אתה משחק או לא.
+ */
+function squadDepthPanel() {
+  const report = squadReport(game);
+  if (!report.has_club) return "";
+  const me = game.me;
+  const order = D.POSITIONS.filter(p => (report.by_position[p] || []).length);
+  return `
+  <div class="panel">
+    <div class="panel-head"><span class="t">עומק הסגל</span>
+      <span class="r">${report.squad_size} · גיל ${report.average_age} ·
+        ממוצע ${report.average_overall}</span></div>
+    <div class="panel-body tight">
+      ${report.ahead_of_me.length ? `<div class="muted selection">
+        ${report.ahead_of_me.length} שחקנים לפניך בעמדה:
+        ${esc(report.ahead_of_me.map(r => r.name).join(", "))}</div>`
+        : `<div class="muted selection">אף אחד בסגל לא חזק ממך בעמדה שלך.</div>`}
+      ${order.map(position => {
+        const rows = report.by_position[position];
+        const mine = position === me.position;
+        return `<div class="depth ${mine ? "mine" : ""}">
+          <div class="depth-head">${esc(D.POSITION_NAMES_HE[position])}
+            <span class="muted">${rows.length}</span></div>
+          ${rows.map(row => `<div class="row ${row.is_me ? "me" : ""}"
+              ${row.is_me ? "" : `data-player="${row.pid}"`}>
+            <span class="val" style="min-width:26px">${row.number || "-"}</span>
+            <span class="grow"><span class="nm">${esc(row.name)}</span>
+              <span class="sub">בן ${row.age}${
+                row.role && roleRow(row.role) ? " · " + esc(roleRow(row.role)[1]) : ""}${
+                row.available ? "" : " · 🚑"}</span></span>
+            <span class="val num">${row.overall}</span>
+          </div>`).join("")}
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
 function screenClub() {
   const club = game.myClub();
   if (!club) return `<div class="screen"><div class="card">אתה לא משויך למועדון כרגע.</div></div>`;
@@ -18470,6 +19542,8 @@ function screenClub() {
         </div>
       </div>
     </div>
+
+    ${squadDepthPanel()}
 
     <div class="panel">
       <div class="panel-head"><span class="t">הקופה</span>
@@ -18787,6 +19861,7 @@ function screenHub() {
           ${actions.map(([k, l]) => `<button class="chip" data-focus="${k}"
             aria-pressed="${game.trainingFocus === k}">${esc(l)}</button>`).join("")}
         </div>
+        ${isPlayer ? trainingBrief(game.trainingFocus) : ""}
         ${isPlayer ? `<hr class="rule">
         <div class="muted">עצימות</div>
         <div class="chips">
@@ -18884,6 +19959,207 @@ function screenPlan() {
             `<button class="chip" data-plan="${row[0]}"
               aria-pressed="${row[0] === info.key}">${esc(row[1])}</button>`).join("")}
         </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * המנטור — מי שמלווה אותך ואומר לך מה לעשות עכשיו.
+ * כל שורה כאן היא מצב אמיתי במשחק, לא טקסט קבוע.
+ */
+function screenMentor() {
+  const info = mentorBoard(game);
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(info.name)}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(info.blurb)}</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה הוא רואה עכשיו</span>
+        <span class="r">${info.items.length}</span></div>
+      <div class="panel-body">
+        ${info.items.length ? info.items.map(item => `
+        <div class="tip ${item.said ? "said" : ""}">
+          <div class="tip-head">
+            <span class="t">${esc(item.title)}</span>
+            <span class="u">${item.urgency}</span>
+          </div>
+          <div class="muted">${esc(item.body)}</div>
+          ${item.action && D.DETAIL_NAMES_HE[item.action] ? `
+          <button class="mini-btn" data-focus="${item.action}">
+            להתאמן על ${esc(D.DETAIL_NAMES_HE[item.action])}</button>` : ""}
+          ${item.action === "rest" ? `
+          <button class="mini-btn" data-focus="rest">לקחת שבוע מנוחה</button>` : ""}
+        </div>`).join("")
+        : `<div class="muted">אין לו מה להגיד לך עכשיו. זה סימן טוב.</div>`}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה הכי שווה לך לעבוד עליו</span></div>
+      <div class="panel-body tight">
+        ${info.needs.map(need => `
+        <div class="row" data-attr="${need.attr}">
+          <span class="val" style="min-width:30px">#${need.rank}</span>
+          <span class="grow"><span class="nm">${esc(D.DETAIL_NAMES_HE[need.attr])}</span>
+            <span class="sub">${esc(need.reasons.join(" · ") || need.verdict)}</span></span>
+          <span class="val num">${need.level}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** איך התפתחתי, ובכמה — התשובה ל"הכול כאילו מתפתח". */
+function screenGrowth() {
+  const info = growthSummary(game);
+  const me = game.me;
+  if (!info.seasons.length) {
+    return `<div class="screen"><div class="panel">
+      <div class="panel-head"><span class="t">ההתפתחות שלך</span></div>
+      <div class="panel-body"><div class="muted">עוד לא נרשמה עונה שלמה.
+        התמונה תיבנה בסוף העונה הראשונה.</div></div></div></div>`;
+  }
+  const phys = info.physical;
+  const best = info.moved.filter(r => r.delta > 0);
+  const worst = info.moved.filter(r => r.delta < 0);
+  const peak = Math.max(1, ...info.moved.map(r => Math.abs(r.delta)));
+
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">מאז ${info.since}</span>
+        <span class="r">גיל ${info.since_age} → ${me.age}</span></div>
+      <div class="panel-body">
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${info.overall_from} → ${info.overall_to}</div>
+            <div class="l">דירוג כללי</div></div>
+          <div class="stat"><div class="n">+${info.total_points}</div>
+            <div class="l">נקודות תכונה</div></div>
+          <div class="stat"><div class="n">${info.seasons.length}</div>
+            <div class="l">עונות</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">הגוף</span>
+        <span class="r">${phys.left ? `נותרו ${phys.left} ס"מ` : "סיימת לגדול"}</span></div>
+      <div class="panel-body tight">
+        <div class="row">
+          <span class="grow"><span class="nm">גובה</span></span>
+          <span class="val num">${phys.height_from} → ${phys.height_to} ס"מ</span>
+        </div>
+        <div class="row">
+          <span class="grow"><span class="nm">משקל</span></span>
+          <span class="val num">${phys.weight_from} → ${phys.weight_to} ק"ג</span>
+        </div>
+        ${phys.adult_height ? `<div class="attr">
+          <span>לקראת ${phys.adult_height} ס"מ</span>
+          <span class="val">${Math.round(phys.height_to / phys.adult_height * 100)}%</span>
+          <span class="bar"><i style="width:${
+            Math.round(phys.height_to / phys.adult_height * 100)}%"></i></span>
+        </div>` : ""}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">עונה אחרי עונה</span></div>
+      <div class="panel-body tight">
+        ${info.seasons.slice().reverse().map(row => `
+        <div class="row">
+          <span class="val" style="min-width:38px">${row.year}</span>
+          <span class="grow"><span class="nm">${esc(row.club || "-")}</span>
+            <span class="sub">גיל ${row.age} · ${row.apps} משחקים ·
+              ${row.goals} שערים · ציון ${row.rating ? row.rating.toFixed(1) : "-"}</span></span>
+          <span class="val num ${row.d_overall > 0 ? "good" : row.d_overall < 0 ? "bad" : ""}">
+            ${row.overall}${row.d_overall ? ` (${row.d_overall > 0 ? "+" : ""}${row.d_overall})` : ""}</span>
+        </div>`).join("")}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">במה התפתחת</span>
+        <span class="r">${best.length} תכונות</span></div>
+      <div class="panel-body tight">
+        ${best.map(row => `
+        <div class="growth-row">
+          <span class="n">${esc(row.name)}</span>
+          <span class="v num">${row.from} → ${row.to}</span>
+          <span class="bar"><i class="up" style="width:${
+            Math.round(row.delta / peak * 100)}%"></i></span>
+          <span class="d num">+${row.delta}</span>
+        </div>`).join("")}
+        ${worst.length ? `<hr class="rule">` + worst.map(row => `
+        <div class="growth-row">
+          <span class="n">${esc(row.name)}</span>
+          <span class="v num">${row.from} → ${row.to}</span>
+          <span class="bar"><i class="down" style="width:${
+            Math.round(Math.abs(row.delta) / peak * 100)}%"></i></span>
+          <span class="d num bad">${row.delta}</span>
+        </div>`).join("") : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+/** מה זו התכונה הזאת, ולמה שיהיה לי אכפת. */
+function screenAttr() {
+  const attr = (viewData && viewData.attr) || "finishing";
+  const [what, does, who] = explainAttr(attr);
+  const info = relevanceOf(game, attr);
+  const plan = forecast(game, attr);
+  const me = game.me;
+  return `
+  <div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(D.DETAIL_NAMES_HE[attr] || attr)}</span>
+        <span class="r num">${me.detail[attr] ?? 10}/20</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(what)}</div>
+        <hr class="rule">
+        <div class="row"><span class="grow"><span class="nm">מה זה עושה במשחק</span>
+          <span class="sub">${esc(does)}</span></span></div>
+        <div class="row"><span class="grow"><span class="nm">מי צריך את זה</span>
+          <span class="sub">${esc(who)}</span></span></div>
+      </div>
+    </div>
+
+    <div class="panel" ${info.rank <= 3 ? 'style="border-color:var(--accent)"' : ""}>
+      <div class="panel-head"><span class="t">ואתה?</span>
+        <span class="r">#${info.rank} מתוך ${info.of}</span></div>
+      <div class="panel-body">
+        <div class="directive">${esc(info.verdict)}</div>
+        ${info.reasons.length ? `<div class="muted">${
+          esc(info.reasons.join(" · "))}</div>` : ""}
+        <div class="attr"><span>הרמה שלך</span>
+          <span class="val">${info.level}</span>
+          <span class="bar"><i style="width:${info.level / 20 * 100}%"></i></span></div>
+        <div class="attr"><span>ממוצע התכונות שלך</span>
+          <span class="val">${info.average}</span>
+          <span class="bar soft"><i style="width:${info.average / 20 * 100}%"></i></span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">אם תתאמן על זה</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(forecastLine(game, attr))}</div>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${plan.weeks_per_point
+            ? plan.weeks_per_point + " שב'" : "—"}</div><div class="l">לנקודה</div></div>
+          <div class="stat"><div class="n">−${plan.fitness_cost}</div>
+            <div class="l">רעננות לשבוע</div></div>
+          <div class="stat"><div class="n">${plan.injury_pct}%</div>
+            <div class="l">סיכון פציעה</div></div>
+        </div>
+        <button class="btn primary wide" data-focus="${attr}">
+          להתאמן על זה השבוע</button>
       </div>
     </div>
   </div>`;
@@ -19080,6 +20356,30 @@ function screenMoney() {
       </div>
     </div>
   </div>`;
+}
+
+/**
+ * מה האימון שבחרת באמת עושה — הסבר, דירוג רלוונטיות ותחזית.
+ * בלי זה בחירת אימון היא ניחוש בין שמות.
+ */
+function trainingBrief(focus) {
+  const [what, does] = explainAttr(focus);
+  if (!(focus in D.DETAIL_NAMES_HE)) {
+    return what ? `<div class="brief"><strong>${esc(what)}</strong>
+      <span class="muted">${esc(does)}</span></div>` : "";
+  }
+  const info = relevanceOf(game, focus);
+  const tone = info.rank <= 3 ? "good" : info.rank > info.of * 0.7 ? "bad" : "";
+  return `
+    <div class="brief">
+      <div class="brief-head">
+        <strong>${esc(D.DETAIL_NAMES_HE[focus])}</strong>
+        <span class="pill ${tone}">#${info.rank}/${info.of} · ${esc(info.verdict)}</span>
+      </div>
+      <span class="muted">${esc(does)}</span>
+      <span class="muted">${esc(forecastLine(game, focus))}</span>
+      <button class="mini-btn" data-attr="${focus}">להסבר מלא</button>
+    </div>`;
 }
 
 /** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
@@ -19767,6 +21067,8 @@ function bind() {
       }
       render();
     }));
+  app.querySelectorAll("[data-attr]").forEach(el =>
+    el.addEventListener("click", () => goDeep("attr", { attr: el.dataset.attr })));
   app.querySelectorAll("[data-role]").forEach(el =>
     el.addEventListener("click", () => {
       viewData.role = el.dataset.role;

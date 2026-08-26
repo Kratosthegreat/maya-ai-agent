@@ -20,6 +20,8 @@ from . import wealth as WL
 from . import tactics as TA
 from . import models as MDL
 from . import knowledge as KN
+from . import coaching as COACH
+from . import mentor as MN
 from . import commercial as CM
 from .engine import MENTALITIES, PRESSING
 
@@ -321,6 +323,10 @@ def game_loop(game: GameState) -> None:
             keys.append("scouts")
             options.append("🧠 המערכת והתפקיד שלי")
             keys.append("system")
+            options.append("🧭 המנטור שלי")
+            keys.append("mentor")
+            options.append("📊 איך התפתחתי")
+            keys.append("growth")
         options.append("💼 חסויות ונכסים")
         keys.append("money")
         if game.stage in ("manager", "coach"):
@@ -357,6 +363,11 @@ def game_loop(game: GameState) -> None:
             ask("\n[Enter]")
         elif key == "system":
             show_system(game)
+        elif key == "mentor":
+            show_mentor(game)
+        elif key == "growth":
+            show_growth(game)
+            ask("\n[Enter]")
         elif key == "money":
             show_money(game)
         elif key == "tactics":
@@ -653,3 +664,68 @@ def show_money(game: GameState) -> None:
         if pick < len(info["items"]):
             out("\n" + WL.sell(game, pick))
             ask("\n[Enter]")
+
+
+def show_mentor(game: GameState) -> None:
+    """המנטור — מה הוא רואה, ומה כדאי לך לעבוד עליו."""
+    info = MN.board(game)
+    out(f"\n🧭 {info['name']} — {info['blurb']}")
+    out(LINE)
+    if not info["items"]:
+        out("  אין לו מה להגיד לך עכשיו. זה סימן טוב.")
+    for item in info["items"]:
+        mark = "·" if item["said"] else "!"
+        out(f"  {mark} {item['title']}")
+        out(f"     {item['body']}")
+        if item["action"] and item["action"] in D.DETAIL_NAMES_HE:
+            out(f"     → מומלץ להתאמן על {D.DETAIL_NAMES_HE[item['action']]}")
+        out("")
+    out(LINE)
+    out("  מה הכי שווה לך לעבוד עליו:")
+    for need in info["needs"]:
+        out(f"   #{need['rank']:<2} {D.DETAIL_NAMES_HE[need['attr']]:<16} "
+            f"{need['level']:>2}/20  {need['verdict']}")
+        if need["reasons"]:
+            out(f"        {' · '.join(need['reasons'])}")
+    idx = choose("לראות הסבר מלא על תכונה?",
+                 [D.DETAIL_NAMES_HE[n["attr"]] for n in info["needs"]] + ["לא"],
+                 default=len(info["needs"]))
+    if idx < len(info["needs"]):
+        show_attr(game, info["needs"][idx]["attr"])
+        ask("\n[Enter]")
+
+
+def show_attr(game: GameState, attr: str) -> None:
+    """מה זו התכונה הזאת, ולמה שיהיה לי אכפת."""
+    what, does, who = COACH.explain(attr)
+    info = COACH.relevance_of(game, attr)
+    plan = COACH.forecast(game, attr)
+    out(f"\n— {D.DETAIL_NAMES_HE.get(attr, attr)} —  "
+        f"{game.me.detail.get(attr, 10)}/20")
+    out(f"  {what}")
+    out(f"  במשחק:    {does}")
+    out(f"  מי צריך:  {who}")
+    out(LINE)
+    out(f"  ואתה?     #{info['rank']} מתוך {info['of']} — {info['verdict']}")
+    if info["reasons"]:
+        out(f"            {' · '.join(info['reasons'])}")
+    out(f"  אם תתאמן: {COACH.forecast_line(game, attr)}")
+    out(f"            עלות {plan['fitness_cost']} רעננות לשבוע"
+        + (f", סיכון פציעה {plan['injury_pct']}%" if plan["injury_pct"] else ""))
+
+
+def show_growth(game: GameState) -> None:
+    """איך התפתחתי, ובכמה."""
+    out("\n📊 ההתפתחות שלך")
+    out(LINE)
+    for line in COACH.growth_lines(game):
+        out("  " + line)
+    info = COACH.growth_summary(game)
+    if info["seasons"]:
+        out(LINE)
+        out("  עונה אחרי עונה:")
+        for row in info["seasons"]:
+            delta = f"{row['d_overall']:+d}" if row["d_overall"] else "  "
+            out(f"   {row['year']}  גיל {row['age']:<3} {row['club'][:16]:<17} "
+                f"כללי {row['overall']:>2} {delta:<4} "
+                f"{row['apps']:>2} משחקים  ציון {row['rating'] or 0:.1f}")

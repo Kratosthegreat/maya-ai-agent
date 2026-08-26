@@ -340,6 +340,14 @@ class Game {
 
   setAction(key) { this.trainingFocus = key; }
 
+  /** רושם על מה התאמנת. המנטור קורא את זה כדי לזהות שגרה. */
+  noteFocus() {
+    if (!Array.isArray(this.flags.focus_log)) this.flags.focus_log = [];
+    this.flags.focus_log.push(this.trainingFocus);
+    if (this.flags.focus_log.length > 60)
+      this.flags.focus_log = this.flags.focus_log.slice(-60);
+  }
+
   advanceWeek() {
     const report = { week: this.week, training: [], notes: [], match: null,
                      personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
@@ -360,6 +368,7 @@ class Game {
         report.notes.push({ icon: "↩️", text: `התאמנת על משהו אחר ממה ש${club.managerName} ביקש.` });
       }
     }
+    this.noteFocus();
     report.training = this.doWeeklyAction();
     // הליגה הבוגרת רצה גם בשנות הנוער — אתה פשוט צופה בה מבחוץ
     this.simulateWeekMatches(report, this.stage === "youth");
@@ -390,9 +399,14 @@ class Game {
       const target = nextTarget(this);
       if (target && this.week % 4 === 0)
         report.notes.push({ icon: "", text: target });
-      else if (!target && this.week % 8 === 0)
-        report.notes.push({ icon: "🧭",
-          text: "עוד לא בחרת מסלול פיתוח. בלי מסלול אתה מתאמן בלי יעד." });
+      // המנטור מדבר רק כשיש לו משהו חדש להגיד
+      if (this.week % 3 === 0) {
+        const tip = mentorLines(this, this.rng);
+        if (tip.length) {
+          report.notes.push({ icon: "🧭", text: tip[0] });
+          for (const line of tip.slice(1)) report.notes.push({ icon: "", text: line });
+        }
+      }
     }
 
     this.week += 1;
@@ -1554,7 +1568,9 @@ class Game {
     this.seasonAwards(add);
     this.personalSummary(add);
     this.promotionRelegation(add);
-    this.developEveryone();
+    const beforeDetail = Object.assign({}, this.me.detail);
+    for (const note of this.developEveryone()) add(note.icon || "", note.text || note);
+    for (const note of this.growthReport(beforeDetail)) add(note.icon, note.text);
     this.processRetirements();
     this.transferWindow(add);
     // מסלול הפיתוח — מה נחתם העונה
@@ -1564,6 +1580,15 @@ class Game {
     // נכסים והשקעות
     for (const line of assetsSeasonTick(this, this.rng)) add("", line);
     this.advanceCareerStage(add);
+
+    // תמונת מצב שנתית של השחקן — הבסיס למסך "איך התפתחתי"
+    if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
+      if (!Array.isArray(this.flags.growth_log)) this.flags.growth_log = [];
+      this.flags.growth_log.push(
+        playerSnapshot(this.me, this.year, myClub ? myClub.name : ""));
+      if (this.flags.growth_log.length > 30)
+        this.flags.growth_log = this.flags.growth_log.slice(-30);
+    }
 
     this.history.push({
       year: this.year, stage: this.stage,
@@ -1637,13 +1662,39 @@ class Game {
     }
   }
 
+  /** מפתח את כל העולם, ומחזיר את מה שקרה *לך* — כי זה מה שרצית לדעת. */
   developEveryone() {
+    const mine = [];
     for (const p of Object.values(this.players)) {
       if (p.retired) { if (p.pid === this.meId) p.age += 1; continue; }
       const share = clamp(p.season.minutes / (SEASON_WEEKS * 90), 0, 1);
       const notes = endOfSeasonDevelopment(p, this.rng, share, this.clubs[p.clubId]);
-      if (p.pid === this.meId) for (const n of notes) this.log(n);
+      if (p.pid === this.meId) mine.push(...notes);
     }
+    return mine;
+  }
+
+  /**
+   * מה בדיוק השתנה בך העונה, תכונה־תכונה.
+   * "הכול כאילו מתפתח אבל לא ברור איך ולא מובן עד כמה" — עכשיו כתוב.
+   */
+  growthReport(before) {
+    if (!["youth", "academy", "player", "veteran"].includes(this.stage)) return [];
+    const moved = [];
+    for (const attr of attrsFor(this.me.position)) {
+      const delta = (this.me.detail[attr] ?? 10) - (before[attr] ?? 10);
+      if (delta) moved.push([delta, attr]);
+    }
+    if (!moved.length)
+      return [{ icon: "", text: "שום תכונה לא זזה העונה. שנה תקועה." }];
+    moved.sort((a, b) => b[0] - a[0]);
+    const label = ([, a]) => `${D.DETAIL_NAMES_HE[a]} ${before[a]}→${this.me.detail[a]}`;
+    const out = [];
+    const ups = moved.filter(pair => pair[0] > 0).map(label);
+    const downs = moved.filter(pair => pair[0] < 0).map(label);
+    if (ups.length) out.push({ icon: "📈", text: "עלו: " + ups.join(", ") });
+    if (downs.length) out.push({ icon: "📉", text: "ירדו: " + downs.join(", ") });
+    return out;
   }
 
   processRetirements() {
