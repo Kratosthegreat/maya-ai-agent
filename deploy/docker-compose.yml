@@ -1,0 +1,22 @@
+# הרצת המשחק על Synology דרך Container Manager.
+#
+# המשחק הוא קובץ אחד שלא צריך שרת אמיתי — nginx כאן רק מגיש אותו,
+# וזה מספיק. מה שחשוב הוא שהכתובת תישאר קבועה: השמורה נשמרת לפי
+# הכתובת שדרכה נכנסת, ולכן כניסה דרך IP וכניסה דרך שם המכשיר הן
+# שני משחקים נפרדים.
+#
+#   1. להעתיק את התיקייה הזאת ואת web/index.html ל-NAS
+#   2. Container Manager → Project → Create → לבחור את התיקייה
+#   3. להיכנס מהטלפון ל-http://<כתובת-ה-NAS>:8080
+
+services:
+  career:
+    image: nginx:alpine
+    container_name: fm-career
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      # הקובץ עצמו — קריאה בלבד, אין לשרת שום סיבה לכתוב
+      - ../web/index.html:/usr/share/nginx/html/index.html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

@@ -25,7 +25,10 @@ catch (err) {
 const fs = require("fs");
 const path = require("path");
 
-const PAGE = "file://" + path.join(__dirname, "index.html");
+// ברירת המחדל היא הקובץ המקומי. FM_URL מפנה לשרת אמיתי — ככה בודקים
+// שהשמירה עובדת גם כשהמשחק מוגש מ-NAS ולא נפתח כקובץ, ואלה לא אותם
+// כללי אחסון בדפדפן.
+const PAGE = process.env.FM_URL || "file://" + path.join(__dirname, "index.html");
 
 /** נתיב לכרומיום. משתנה סביבה גובר, אחרת מחפשים איפה ש-playwright שם אותו. */
 function chromePath() {
@@ -72,6 +75,26 @@ const start = async (p, weeks) => {
 
 (async () => {
   const b = await chromium.launch({ executablePath: chromePath(), args: ["--no-sandbox"] });
+
+  // -- 0. הדף נקרא בעברית ----------------------------------------------
+  //
+  // מובן מאליו רק בתוך Artifact, שמוסיף הצהרת קידוד משלו. שרת רגיל
+  // שלא מציין קידוד בכותרת גורם לדפדפן לנחש windows-1252, וכל העברית
+  // הופכת לג'יבריש — אז הקובץ חייב להצהיר על עצמו.
+  {
+    const ctx = await b.newContext({ viewport: { width: 420, height: 900 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", e => console.log("PAGEERROR", String(e)));
+    await p.goto(PAGE);
+    const text = await p.evaluate(() => ({
+      charset: document.characterSet,
+      title: document.title,
+      heading: (document.querySelector(".display") || {}).textContent || "",
+    }));
+    ok("הדף מוצהר כ-UTF-8", text.charset === "UTF-8", text);
+    ok("העברית נקראית כמו שצריך", text.title === "קריירה" && text.heading === "קריירה", text);
+    await ctx.close();
+  }
 
   // -- 1. מסלול רגיל: משחקים, סוגרים בלי אזהרה, חוזרים ---------------
   {
