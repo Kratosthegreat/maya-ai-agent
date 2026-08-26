@@ -3,6 +3,9 @@
 // ---------------------------------------------------------------------------
 
 const SAVE_KEY = "fm_career_save_v1";
+const SAVE_AT_KEY = "fm_career_save_at";
+const SAVE_META_KEY = "fm_career_save_meta";
+const SAVE_STALE_KEY = "fm_career_save_stale";
 let game = null;
 let view = "menu";
 let viewData = null;
@@ -29,91 +32,171 @@ function saveMeta() {
 }
 
 /**
- * שמירה אוטומטית. נקראת אחרי כל פעולה, ולכן חייבת להיות זולה:
- * IndexedDB אסינכרוני ולא חוסם, ותור הכתיבה שומר רק את המצב האחרון.
+ * שמירה אוטומטית, אחרי כל פעולה. שני אחסונים, ובכוונה בסדר הזה:
+ *
+ * localStorage ראשון, כי הוא היחיד שמסתיים לפני שהשורה הבאה רצה.
+ * כשהדפדפן נסגר — או שהטלפון סוגר את הלשונית בלי לשאול — אין רגע
+ * שבו "השמירה בדרך": או שהיא כתובה או שלא נכנסנו לפונקציה.
+ *
+ * IndexedDB שני, כתוספת: מקום גדול בהרבה, אבל אסינכרוני, ולפעמים
+ * פשוט לא עונה. הוא כבר לא מחזיק את הקריירה לבדו.
  */
 function saveGame() {
   if (!game) return false;
   // אם יש קובץ מקושר עם הרשאה — לכתוב גם אליו, בשקט וברקע
   if (saveFile.handle && saveFile.permission === "granted") writeCareerFile(true);
-  let bytes;
+  let bytes, meta;
   try {
+    meta = saveMeta();
     bytes = packSaveBytes(game.toJSON());
   } catch (err) {
     saveState = { ok: false, at: saveState.at, error: "הכנת השמורה נכשלה.",
                   store: saveState.store };
     return false;
   }
-  queueSave(bytes, saveMeta(), (ok, error) => {
+
+  const local = saveToLocal(bytes, meta);
+  if (local) {
+    saveState = { ok: true, at: Date.now(), error: "", store: "local" };
+    savedCareer = { known: true, meta, exists: true };
+  }
+
+  queueSave(bytes, meta, (ok, error) => {
     if (ok) {
-      saveState = { ok: true, at: Date.now(), error: "", store: "idb" };
-    } else {
-      // IndexedDB נכשל — נופלים חזרה ל-localStorage, שתמיד היה כאן
-      const fallback = saveToLocal();
-      saveState = fallback
-        ? { ok: true, at: Date.now(), error: "", store: "local" }
-        : { ok: false, at: saveState.at, error, store: "" };
+      saveState = { ok: true, at: Date.now(), error: "",
+                    store: local ? "both" : "idb" };
+      savedCareer = { known: true, meta, exists: true };
+    } else if (!local) {
+      saveState = { ok: false, at: saveState.at,
+                    error: localSaveError || error, store: "" };
     }
     refreshSaveBadge();
   });
-  return true;
+
+  if (!local) refreshSaveBadge();
+  return local;
 }
 
-/** רשת ביטחון סינכרונית: כשאין IndexedDB, או כשסוגרים את הדף. */
-function saveToLocal() {
+/**
+ * כתיבה סינכרונית ל-localStorage. מקבלת את הבייטים שכבר נדחסו, כי
+ * הדחיסה היא החלק היקר — הקידוד למחרוזת עולה מילישניות בודדות.
+ */
+let localSaveError = "";
+
+function saveToLocal(bytes, meta) {
   if (!game) return false;
   try {
-    localStorage.setItem(SAVE_KEY, packSave(game.toJSON()));
+    const payload = bytesToText(bytes || packSaveBytes(game.toJSON()));
+    localStorage.setItem(SAVE_KEY, payload);
+    localStorage.setItem(SAVE_AT_KEY, String(Date.now()));
+    localStorage.setItem(SAVE_META_KEY, JSON.stringify(meta || saveMeta()));
+    localStorage.removeItem(SAVE_STALE_KEY);
+    localSaveError = "";
     return true;
-  } catch (err) { return false; }
+  } catch (err) {
+    // המכסה נגמרה או שהאחסון חסום. השמורה הקודמת נשארת במקומה —
+    // עדיפה שמורה מלפני שבוע על פני מסך תפריט ריק — אבל מסמנים אותה
+    // כמיושנת, כדי שבטעינה הבאה נטרח לבדוק אם יש חדשה יותר.
+    localSaveError = describeSaveError(err);
+    try { localStorage.setItem(SAVE_STALE_KEY, "1"); } catch (e) {}
+    return false;
+  }
 }
 
-/** טעינה: קודם IndexedDB, ואם אין — השמורה הישנה מ-localStorage. */
-function loadGame() {
-  return getSlot(SLOT_AUTO).then(row => {
-    if (row && row.bytes) {
-      try { return Game.fromJSON(unpackSaveBytes(row.bytes)); } catch (err) {}
-    }
-    return loadFromLocal();
-  }).catch(() => loadFromLocal());
-}
-
-function loadFromLocal() {
+/** מה שמור ב-localStorage, בלי לפענח את הקריירה עצמה. */
+function localSaveRecord() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return Game.fromJSON(unpackSave(raw));
+    let meta = null;
+    try { meta = JSON.parse(localStorage.getItem(SAVE_META_KEY) || "null"); }
+    catch (err) {}
+    return { raw, meta, at: Number(localStorage.getItem(SAVE_AT_KEY)) || 0,
+             stale: !!localStorage.getItem(SAVE_STALE_KEY) };
   } catch (err) { return null; }
 }
 
-/** האם יש בכלל קריירה שמורה. נבדק פעם אחת בעליית הדף. */
+/**
+ * טעינה: לוקחים את החדשה מבין השתיים.
+ *
+ * ברוב המקרים אין בכלל מה להשוות — שתי השמורות נכתבו מאותם בייטים,
+ * ואז אין סיבה להמתין ל-IndexedDB. פונים אליו רק כשאין שמורה מהירה,
+ * או כשידוע שהיא מיושנת כי כתיבה אליה נכשלה. ככה מסך טעינה לא תלוי
+ * במסד שאולי לא יענה.
+ */
+function loadGame() {
+  const local = localSaveRecord();
+  const fromLocal = () => {
+    if (!local) return null;
+    try { return Game.fromJSON(unpackSave(local.raw)); } catch (err) { return null; }
+  };
+  if (local && !local.stale) {
+    const loaded = fromLocal();
+    if (loaded) return Promise.resolve(loaded);
+  }
+  return getSlot(SLOT_AUTO).then(row => {
+    const fromIdb = () => {
+      if (!row || !row.bytes) return null;
+      try { return Game.fromJSON(unpackSaveBytes(row.bytes)); } catch (err) { return null; }
+    };
+    const idbNewer = row && row.bytes && (row.at || 0) >= (local ? local.at : 0);
+    // אם החדשה מבין השתיים פגומה — עדיין עדיף להמשיך מהישנה
+    return idbNewer ? fromIdb() || fromLocal() : fromLocal() || fromIdb();
+  }).catch(fromLocal);
+}
+
+/**
+ * האם יש בכלל קריירה שמורה.
+ *
+ * החלק מ-localStorage נקבע כאן ועכשיו, לפני שהפונקציה מחזירה משהו,
+ * כדי שכפתור "להמשיך קריירה" יהיה שם בציור הראשון של התפריט. אסור
+ * שהוא יהיה תלוי בתשובה שאולי לא תגיע.
+ */
 let savedCareer = { known: false, meta: null, exists: false };
 
 function refreshSavedCareer() {
+  const local = localSaveRecord();
+  savedCareer = { known: true, meta: local ? local.meta : null, exists: !!local };
+  if (local && local.meta && !local.stale) return Promise.resolve(true);
   return getSlot(SLOT_AUTO).then(row => {
-    if (row && row.bytes) {
-      savedCareer = { known: true, meta: row.meta || null, exists: true };
-      return true;
-    }
-    let local = false;
-    try { local = !!localStorage.getItem(SAVE_KEY); } catch (err) {}
-    savedCareer = { known: true, meta: null, exists: local };
-    return local;
-  }).catch(() => {
-    let local = false;
-    try { local = !!localStorage.getItem(SAVE_KEY); } catch (err) {}
-    savedCareer = { known: true, meta: null, exists: local };
-    return local;
-  });
+    if (row && row.bytes && (row.at || 0) >= (local ? local.at : 0))
+      savedCareer = { known: true, meta: row.meta || savedCareer.meta, exists: true };
+    return savedCareer.exists;
+  }).catch(() => savedCareer.exists);
 }
 
 function hasSave() { return savedCareer.exists; }
 
+/**
+ * האם הדפדפן הזה בכלל מרשה לשמור.
+ *
+ * נבדק פעם אחת בעלייה, על מפתח בן תו אחד. חצי שעה של משחק שנעלמת
+ * היא לא באג שמגלים בסוף — צריך להגיד את זה לפני שמתחילים.
+ */
+let storageOk = true;
+
+function checkStorage() {
+  try {
+    localStorage.setItem("fm_probe", "1");
+    const back = localStorage.getItem("fm_probe") === "1";
+    localStorage.removeItem("fm_probe");
+    if (back) { storageOk = true; return Promise.resolve(true); }
+  } catch (err) {}
+  // localStorage חסום — נשארת התקווה שהאחסון המורחב כן פתוח
+  return putSlot("probe", new Uint8Array([1]), null)
+    .then(() => deleteSlot("probe"))
+    .then(() => true)
+    .catch(() => false)
+    .then(ok => { storageOk = ok; return ok; });
+}
+
 function clearSave() {
   deleteSlot(SLOT_AUTO);
-  try { localStorage.removeItem(SAVE_KEY); } catch (err) {}
+  for (const key of [SAVE_KEY, SAVE_AT_KEY, SAVE_META_KEY, SAVE_STALE_KEY])
+    try { localStorage.removeItem(key); } catch (err) {}
   savedCareer = { known: true, meta: null, exists: false };
   saveState = { ok: true, at: 0, error: "", store: "" };
+  localSaveError = "";
 }
 
 /** מרענן רק את חיווי השמירה, בלי לצייר מחדש את כל המסך. */
@@ -288,6 +371,7 @@ function savePanel() {
         <span class="val ${saveState.ok ? "good" : "bad"}">${
           saveState.ok ? "✓" : "✕"}</span>
       </div>
+      ${storeRow()}
       ${checkpointRows()}
       <hr class="rule">
       <div class="muted">קובץ הוא לא השמירה — הוא רק דרך להעביר את
@@ -314,6 +398,30 @@ function savePanel() {
       </div>` : ""}
     </div>
   </div>`;
+}
+
+/**
+ * איפה השמורה יושבת בפועל.
+ *
+ * שני אחסונים ולא אחד, וזה לא פרט טכני: המהיר שורד סגירה פתאומית,
+ * הגדול שורד קריירה ארוכה. כשאחד מהם לא עובד עדיף לדעת עכשיו.
+ */
+function storeRow() {
+  const store = saveState.store;
+  if (!store) return "";
+  const label = { both: "שני אחסונים", local: "אחסון מהיר", idb: "אחסון מורחב" }[store];
+  const sub = {
+    both: "מהיר לסגירה פתאומית, מורחב לקריירה ארוכה — שניהם מתעדכנים יחד.",
+    local: "האחסון המורחב חסום בדפדפן הזה. הקריירה נשמרת, אבל כדאי לגבות לקובץ מדי פעם.",
+    idb: localSaveError || "האחסון המהיר מלא. אם הדפדפן ייסגר באמצע שבוע, ייתכן שהשבוע יאבד.",
+  }[store];
+  return `
+      <div class="row">
+        <span class="grow"><span class="nm">${label}</span>
+          <span class="sub">${esc(sub)}</span></span>
+        <span class="val ${store === "both" ? "good" : ""}">${
+          store === "both" ? "✓✓" : "✓"}</span>
+      </div>`;
 }
 
 /**
@@ -456,6 +564,16 @@ function screenMenu() {
       <p class="sub">מנער בקבוצת הנוער ועד המשרד של הבעלים. כל שבוע זו החלטה,
       וכל החלטה נשארת איתך עד סוף הדרך.</p>
     </div>
+    ${storageOk ? "" : `
+    <div class="panel warn">
+      <div class="panel-head"><span class="t">הדפדפן הזה לא נותן לשמור</span></div>
+      <div class="panel-body">
+        <div class="muted">אפשר לשחק, אבל הקריירה לא תחכה לך אחרי שתסגור את
+          הדף. זה קורה בעיקר בגלישה פרטית או כשחסימת מעקב חוסמת אחסון —
+          פתיחה של המשחק בלשונית רגילה בדרך כלל פותרת את זה. בינתיים אפשר
+          לגבות לקובץ ידנית מתוך מסך המערכת.</div>
+      </div>
+    </div>`}
     <div class="actions">
       ${saved ? (() => {
         const meta = savedCareer.meta;
@@ -2882,48 +3000,24 @@ function afterOutcome() {
 // ---------------------------------------------------------------------------
 
 function boot() {
-  // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע. ברגע הסגירה אין
-  // זמן לחכות ל-IndexedDB, ולכן שם דווקא localStorage הוא הנכון.
-  const saveNow = () => { if (game) { saveGame(); saveToLocal(); } };
+  // סגירת הדף באמצע שבוע לא אמורה למחוק את השבוע. saveGame כותב
+  // ל-localStorage סינכרונית, כך שגם אם הדפדפן קוטע אותנו מיד אחרי —
+  // הכתיבה כבר קרתה.
+  const saveNow = () => { if (game) saveGame(); };
   loadSaveFile();
   window.addEventListener("pagehide", saveNow);
+  window.addEventListener("beforeunload", saveNow);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveNow();
   });
 
+  // refreshSavedCareer קובע את החלק מ-localStorage מיד, לפני go —
+  // ולכן כפתור ההמשך מופיע כבר בציור הראשון ולא ממתין לכלום.
+  const known = refreshSavedCareer();
   go("menu");
-  // הבדיקה אם יש שמורה היא אסינכרונית — התפריט מתעדכן כשהתשובה מגיעה
-  refreshSavedCareer().then(() => {
-    migrateLegacySave();
-    if (view === "menu") render();
-  });
+  known.then(() => { if (view === "menu") render(); });
+  checkStorage().then(ok => { if (!ok && view === "menu") render(); });
   refreshCheckpoints().then(rows => { if (rows.length) render(); });
-}
-
-/**
- * שמורה ישנה מ-localStorage עוברת ל-IndexedDB פעם אחת, כדי שקריירה
- * שהתחילה לפני השינוי לא תיעלם ולא תמשיך לתפוס את המכסה הצפופה.
- */
-function migrateLegacySave() {
-  let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); } catch (err) { return; }
-  if (!raw) return;
-  getSlot(SLOT_AUTO).then(row => {
-    if (row && row.bytes) return;          // כבר יש שמורה חדשה
-    let state;
-    try { state = unpackSave(raw); } catch (err) { return; }
-    if (!state) return;
-    let loaded;
-    try { loaded = Game.fromJSON(state); } catch (err) { return; }
-    putSlot(SLOT_AUTO, packSaveBytes(state), {
-      name: loaded.me.name, age: loaded.me.age, year: loaded.year,
-      week: loaded.week, stage: loaded.stage,
-      club: loaded.myClub() ? loaded.myClub().name : "",
-      overall: overall(loaded.me),
-    }).then(() => refreshSavedCareer()).then(() => {
-      if (view === "menu") render();
-    }).catch(() => null);
-  });
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

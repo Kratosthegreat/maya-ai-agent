@@ -28,6 +28,7 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "commercialIncome, weeklyFinances, upgradeCost, canUpgrade, tickWorks, " +
   "stadiumExpansion, staffCandidates, medicalCare, staffQuality, ticketPrice, " +
   "packSave, unpackSave, packSaveBytes, unpackSaveBytes, " +
+  "bytesToBase64, bytesToBits15, bits15ToBytes, bytesToText, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -1820,6 +1821,49 @@ test("שמורה ריקה או פגומה לא מפילה כלום", () => {
   let threw = false;
   try { A.unpackSaveBytes(new Uint8Array([1, 2, 3, 4])); } catch (err) { threw = true; }
   assert(threw, "בייטים אקראיים אמורים לזרוק ולא להחזיר זבל");
+});
+
+test("אריזת 15 סיביות מחזירה בדיוק את מה שנכנס", () => {
+  // כל דפוס בייט אפשרי, וגם אורכים אי־זוגיים שמאלצים ריפוד
+  for (const len of [0, 1, 2, 3, 7, 255, 256, 1000]) {
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = (i * 37 + 11) & 255;
+    const text = A.bytesToBits15(bytes);
+    const back = A.bits15ToBytes(text);
+    assert(back.length === len, `אורך ${len} חזר כ-${back.length}`);
+    for (let i = 0; i < len; i++)
+      assert(back[i] === bytes[i], `בייט ${i} באורך ${len}`);
+    // אף תו לא נופל בטווח הסרוגייטים — משם הוא היה חוזר פגום
+    for (let i = 0; i < text.length; i++)
+      assert(text.charCodeAt(i) < 0xd800, `תו ${i} מחוץ לטווח הבטוח`);
+  }
+});
+
+test("אריזת 15 סיביות חוסכת מקום אמיתי מול base64", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 16, 7);
+  for (let i = 0; i < 40; i++) {
+    if (g.gameOver) break;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+  }
+  const bytes = A.packSaveBytes(g.toJSON());
+  const wide = A.bytesToBits15(bytes);
+  const b64 = A.bytesToBase64(bytes);
+  // localStorage מודד תווים של UTF-16 — האורך הוא המחיר
+  assert(wide.length < b64.length * 0.5,
+    `15 סיביות ${wide.length} מול base64 ${b64.length} — אין חיסכון`);
+  // ועדיין הלוך-חזור מלא דרך unpackSave
+  const state = A.unpackSave("fm3:" + wide);
+  assert(JSON.stringify(state) === JSON.stringify(g.toJSON()), "השמורה לא זהה");
+});
+
+test("unpackSave מזהה את כל הפורמטים", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 16, 7);
+  const state = g.toJSON();
+  const same = text => JSON.stringify(A.unpackSave(text)) === JSON.stringify(state);
+  assert(same(JSON.stringify(state)), "פורמט 1 — JSON גולמי");
+  assert(same(A.packSave(state)), "פורמט 2 — base64");
+  assert(same("fm3:" + A.bytesToBits15(A.packSaveBytes(state))), "פורמט 3 — 15 סיביות");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);
