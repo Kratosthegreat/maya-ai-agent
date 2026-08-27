@@ -2042,8 +2042,14 @@ class GameState:
                      f"{'הצעות' if len(offers) > 1 else 'הצעה'} על השולחן:"]
         for offer in TR.live_offers(self):
             club = self.clubs[offer["cid"]]
-            lines.append(f"   • {club.name} — ₪{offer['wage']:,} לשבוע, "
-                         f"{offer['years']} שנים ({TR.interest_word(offer)})")
+            lines.append(f"   • {TR.club_tag(self, club.cid)} {club.name} — "
+                         f"₪{offer['wage']:,} לשבוע, {offer['years']} שנים "
+                         f"({TR.interest_word(offer)})")
+        # פנייה מחו"ל היא לא עוד שורה ברשימה — זה הרגע שכל שחקן מחכה לו
+        abroad = [o for o in TR.live_offers(self) if TR.is_foreign(o["cid"])]
+        if abroad:
+            names = ", ".join(self.clubs[o["cid"]].name for o in abroad)
+            lines.append(f"   🌍 מחו\"ל: {names}. זה כבר לא אותו משחק.")
         lines.append("   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')")
         return lines
 

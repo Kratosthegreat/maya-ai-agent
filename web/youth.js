@@ -195,8 +195,14 @@ function buildYouthOffer(game, club, rng, eagerness = null) {
   };
 }
 
+function youthClubTag(game, cid) {
+  const club = game.clubs[cid];
+  return clubTag(cid, club ? club.leagueId : "");
+}
+
 function youthOfferLines(game, offer) {
-  const out = [`מיקום: ${DISTANCE_NAMES[offer.distance]}`];
+  const out = [youthClubTag(game, offer.cid),
+               `מיקום: ${DISTANCE_NAMES[offer.distance]}`];
   out.push(offer.boarding ? "מעונות ופנימייה" : "גר בבית, נוסע לאימונים");
   out.push(`בית ספר במסגרת האקדמיה: ${offer.schooling}/100`);
   if (offer.family_help) out.push(`סיוע למשפחה: ₪${fmt(offer.family_help)} לשנה`);
@@ -308,8 +314,13 @@ function maybeOpenYouthMarket(game, rng) {
                + `${live.length > 1 ? "אקדמיות" : "אקדמיה"} רוצות אותך:`];
   for (const offer of live) {
     const club = game.clubs[offer.cid];
-    lines.push(`   • ${club.name} — ${DISTANCE_NAMES[offer.distance]}`);
+    lines.push(`   • ${youthClubTag(game, club.cid)} ${club.name} — `
+             + `${DISTANCE_NAMES[offer.distance]}`);
   }
+  // אקדמיה מחו"ל היא לא עוד שורה — זה מה שכל ילד חולם עליו
+  const abroad = live.filter(o => isForeign(o.cid));
+  if (abroad.length)
+    lines.push(`   🌍 מחו"ל: ${abroad.map(o => game.clubs[o.cid].name).join(", ")}.`);
   lines.push("   ההחלטה היא שלך ושל ההורים. (בתפריט: 'אקדמיות')");
   lines.push(...chaseBonus(game));
   return lines;

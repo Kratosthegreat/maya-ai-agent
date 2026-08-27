@@ -39,8 +39,39 @@ function interestLabel(score) {
   return "רשומים אצלם";
 }
 
+const HOME_COUNTRY = "ישראל";
+
 function clubCountry(cid) {
-  return D.CLUB_COUNTRY[cid] || "ישראל";
+  return D.CLUB_COUNTRY[cid] || HOME_COUNTRY;
+}
+
+function countryFlag(country) {
+  return D.COUNTRY_FLAGS[country] || "🏳";
+}
+
+function isForeign(cid) {
+  return clubCountry(cid) !== HOME_COUNTRY;
+}
+
+function leagueName(leagueId) {
+  const row = D.LEAGUES.find(l => l.id === leagueId);
+  return row ? row.name : "";
+}
+
+/**
+ * שורת הזהות של מועדון: דגל, מדינה, וליגה.
+ *
+ * התלונה שהולידה את זה: "עירבבת מועדונים מקומיים עם מועדונים מחו״ל".
+ * הנתונים תמיד היו נכונים — שלוש ליגות נפרדות — אבל בממשק שם של
+ * מועדון אירופי הופיע בדיוק כמו שם של מועדון מקומי, בלי שום סימן.
+ * זו הפונקציה שאמורה להופיע בכל מקום שבו שם מועדון מוצג.
+ */
+function clubTag(cid, leagueId = "") {
+  const country = clubCountry(cid);
+  const flag = countryFlag(country);
+  const league = leagueName(leagueId);
+  if (country === HOME_COUNTRY) return league ? `${flag} ${league}` : flag;
+  return `${flag} ${country}` + (league ? ` · ${league}` : "");
 }
 
 /** קבוצות שרמת השחקן שלך רלוונטית להן היום. */

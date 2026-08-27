@@ -751,6 +751,10 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 .muted.small { font-size: 11px; }
 .facility .blocked { font-size: 11px; color: var(--ink-soft); text-align: center; }
 .row .val.good { color: var(--good); }
+
+/* מועדון מחו"ל. זה לא קישוט: פנייה מחו"ל היא אירוע אחר לגמרי
+   מפנייה מקומית, וצריך לראות את ההבדל בלי לקרוא. */
+.nm.gold, .row .val.gold { color: var(--gold); }
 .row .val.bad { color: var(--bad); }
 
 .mini-btn.wide { width: 100%; justify-content: center; padding: 7px 10px; }

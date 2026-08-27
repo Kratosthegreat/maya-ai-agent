@@ -40,6 +40,7 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "persuadeFamily, acceptYouthOffer, declineYouthOffer, youthScoutsThisWeek, " +
   "SCOUT_POOL_LIMIT, YOUTH_WINDOW_WEEKS, DISTANCE_NAMES, " +
   "reassessYoungster, REASSESS_EVERY, REASSESS_UNTIL, " +
+  "clubTag, countryFlag, isForeign, leagueName, offerClubTag, youthClubTag, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -2398,6 +2399,85 @@ test("ההתפתחות לא צונחת בגיל 16", () => {
     `נפילה בגיל 16: ${gain(15).toFixed(2)} → ${gain(16).toFixed(2)}`);
   assert(gain(17) > gain(16) * 0.75,
     `נפילה בגיל 17: ${gain(16).toFixed(2)} → ${gain(17).toFixed(2)}`);
+});
+
+// ---------------------------------------------------------------------------
+// בהירות מוחלטת: מי מקומי ומי מחו"ל
+// ---------------------------------------------------------------------------
+
+test("העולם באמת מחולק לפי מדינה", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 3);
+  const byLeague = {};
+  for (const cid in g.clubs) {
+    const c = g.clubs[cid];
+    (byLeague[c.leagueId] = byLeague[c.leagueId] || new Set())
+      .add(A.clubCountry(c.cid));
+  }
+  assert(byLeague.top.size === 1 && byLeague.top.has("ישראל"), "ליגת העל מעורבבת");
+  assert(byLeague.national.size === 1 && byLeague.national.has("ישראל"),
+    "הליגה הלאומית מעורבבת");
+  assert(!byLeague.euro.has("ישראל"), "מועדון ישראלי בליגת האלופות");
+  assert(byLeague.euro.size >= 5, "כל הזרים מאותה מדינה?");
+});
+
+test("כל מועדון אומר מאיפה הוא", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 3);
+  for (const cid in g.clubs) {
+    const c = g.clubs[cid];
+    const tag = A.clubTag(c.cid, c.leagueId);
+    assert(tag && tag.trim(), `${c.name} בלי זהות`);
+    if (A.isForeign(c.cid))
+      assert(tag.includes(A.clubCountry(c.cid)), `${c.name}: ${tag}`);
+  }
+});
+
+test("תווית של מקומי ושל זר לא ניתנות לבלבול", () => {
+  const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 20, 3);
+  const local = new Set(), foreign = new Set();
+  for (const cid in g.clubs) {
+    const c = g.clubs[cid];
+    (A.isForeign(c.cid) ? foreign : local).add(A.clubTag(c.cid, c.leagueId));
+  }
+  assert(local.size && foreign.size, "אין משני הסוגים");
+  for (const tag of foreign)
+    assert(!local.has(tag), `אותה תווית למקומי ולזר: ${tag}`);
+  const homeFlag = A.countryFlag("ישראל");
+  for (const tag of foreign)
+    assert(!tag.startsWith(homeFlag), `זר עם דגל מקומי: ${tag}`);
+});
+
+test("הצעת העברה נושאת את זהות המועדון", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 11);
+  g.me.reputation = 85;
+  const euro = Object.values(g.clubs).find(c => c.leagueId === "euro");
+  const offer = A.buildOffer(g, euro, g.rng, 0.85);
+  const lines = A.offerLines(g, offer);
+  assert(lines[0].includes(A.clubCountry(euro.cid)), lines[0]);
+  assert(A.isForeign(euro.cid) === true, "מועדון אירופי לא סומן כזר");
+});
+
+test("הצעת אקדמיה נושאת את זהות המועדון", () => {
+  const g = A.Game.newGame("ילד", "ST", "hapoel_carmel", 13, 9);
+  const euro = Object.values(g.clubs).find(c => c.leagueId === "euro");
+  const offer = A.buildYouthOffer(g, euro, g.rng, 0.85);
+  const lines = A.youthOfferLines(g, offer);
+  assert(lines[0].includes(A.clubCountry(euro.cid)), lines[0]);
+  assert(offer.distance === "abroad", "אקדמיה זרה לא סומנה כחו\"ל");
+});
+
+test("פנייה מחו\"ל היא חדשות גדולות יותר ממקומית", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 7);
+  g.me.reputation = 80;
+  g.me.contract.yearsLeft = 1;
+  const weight = foreign => {
+    const club = Object.values(g.clubs).find(c =>
+      A.isForeign(c.cid) === foreign && c.cid !== g.me.clubId);
+    g.flags.scout_interest = { [club.cid]: 95 };
+    const row = A.pressCandidates(g).find(r => r.key === "interest");
+    return row ? row.weight : 0;
+  };
+  const abroad = weight(true), home = weight(false);
+  assert(abroad > home, `מחו"ל ${abroad} מול מקומי ${home}`);
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

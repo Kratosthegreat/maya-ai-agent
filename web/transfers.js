@@ -274,9 +274,16 @@ function applyAsk(offer, term, full) {
   return "";
 }
 
+/** דגל, מדינה וליגה — הזהות של המועדון במבט אחד. */
+function offerClubTag(game, cid) {
+  const club = game.clubs[cid];
+  return clubTag(cid, club ? club.leagueId : "");
+}
+
 /** החבילה בשורות, כדי שאפשר יהיה להשוות בעין. */
 function offerLines(game, offer) {
-  const out = [`₪${fmt(offer.wage)} לשבוע · ${offer.years} שנים`];
+  const out = [offerClubTag(game, offer.cid),
+               `₪${fmt(offer.wage)} לשבוע · ${offer.years} שנים`];
   if (offer.bonus) out.push(`מענק חתימה ₪${fmt(offer.bonus)}`);
   out.push(`תפקיד מובטח: ${ROLE_NAMES[offer.role] || offer.role}`);
   if (offer.clause) out.push(`סעיף שחרור ₪${fmt(offer.clause)}`);

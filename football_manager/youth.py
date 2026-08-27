@@ -256,8 +256,14 @@ def build_offer(game, club: Club, rng: random.Random,
     }
 
 
+def club_tag(game, cid: str) -> str:
+    club = game.clubs.get(cid)
+    return D.club_tag(cid, club.league_id if club else "")
+
+
 def offer_lines(game, offer: Dict[str, Any]) -> List[str]:
-    out = [f"מיקום: {DISTANCE_NAMES[offer['distance']]}"]
+    out = [club_tag(game, offer["cid"]),
+           f"מיקום: {DISTANCE_NAMES[offer['distance']]}"]
     out.append("מעונות ופנימייה" if offer["boarding"] else "גר בבית, נוסע לאימונים")
     out.append(f"בית ספר במסגרת האקדמיה: {offer['schooling']}/100")
     if offer["family_help"]:
@@ -398,7 +404,13 @@ def maybe_open_market(game, rng: random.Random) -> List[str]:
                  f"{'אקדמיות' if len(offers) > 1 else 'אקדמיה'} רוצות אותך:"]
     for offer in live_offers(game):
         club = game.clubs[offer["cid"]]
-        lines.append(f"   • {club.name} — {DISTANCE_NAMES[offer['distance']]}")
+        lines.append(f"   • {club_tag(game, club.cid)} {club.name} — "
+                     f"{DISTANCE_NAMES[offer['distance']]}")
+    # אקדמיה מחו"ל היא לא עוד שורה — זה מה שכל ילד חולם עליו
+    abroad = [o for o in live_offers(game) if D.is_foreign(o["cid"])]
+    if abroad:
+        names = ", ".join(game.clubs[o["cid"]].name for o in abroad)
+        lines.append(f"   🌍 מחו\"ל: {names}.")
     lines.append("   ההחלטה היא שלך ושל ההורים. (בתפריט: 'אקדמיות')")
     lines.extend(chase_bonus(game))
     return lines

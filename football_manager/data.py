@@ -438,9 +438,51 @@ CLUB_COUNTRY = {
 }
 
 
+# דגל לכל מדינה. זה לא קישוט: כשמועדון מופיע ברשימה ליד מועדון אחר,
+# הדגל הוא מה שאומר במבט אחד "זה מחו\"ל" בלי לקרוא מילה.
+COUNTRY_FLAGS = {
+    "ישראל": "🇮🇱", "ספרד": "🇪🇸", "גרמניה": "🇩🇪", "אנגליה": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+    "צרפת": "🇫🇷", "איטליה": "🇮🇹", "הולנד": "🇳🇱", "בלגיה": "🇧🇪",
+    "פורטוגל": "🇵🇹", "טורקיה": "🇹🇷", "אוסטריה": "🇦🇹",
+}
+
+HOME_COUNTRY = "ישראל"
+
+
 def club_country(cid: str, league_id: str = "") -> str:
     """המדינה של המועדון. מועדונים ישראלים מוחזרים כ'ישראל'."""
-    return CLUB_COUNTRY.get(cid, "ישראל")
+    return CLUB_COUNTRY.get(cid, HOME_COUNTRY)
+
+
+def country_flag(country: str) -> str:
+    return COUNTRY_FLAGS.get(country, "🏳")
+
+
+def is_foreign(cid: str) -> bool:
+    return club_country(cid) != HOME_COUNTRY
+
+
+def league_name(league_id: str) -> str:
+    for row in LEAGUES:
+        if row["id"] == league_id:
+            return row["name"]
+    return ""
+
+
+def club_tag(cid: str, league_id: str = "") -> str:
+    """שורת הזהות של מועדון: דגל, מדינה, וליגה.
+
+    התלונה שהולידה את זה: "עירבבת מועדונים מקומיים עם מועדונים מחו\"ל".
+    הנתונים תמיד היו נכונים — שלוש ליגות נפרדות — אבל בממשק שם של
+    מועדון אירופי הופיע בדיוק כמו שם של מועדון מקומי, בלי שום סימן.
+    זו הפונקציה שאמורה להופיע בכל מקום שבו שם מועדון מוצג.
+    """
+    country = club_country(cid)
+    flag = country_flag(country)
+    league = league_name(league_id)
+    if country == HOME_COUNTRY:
+        return f"{flag} {league}" if league else flag
+    return f"{flag} {country}" + (f" · {league}" if league else "")
 
 
 # ---------------------------------------------------------------------------

@@ -2180,14 +2180,19 @@ function offerCard(offer) {
   const asks = askOptions(offer);
   const spent = offer.asks;
   const left = Math.max(0, offer.patience - spent + 1);
+  const foreign = isForeign(offer.cid);
   return `
-  <div class="panel">
+  <div class="panel" ${foreign ? 'style="border-color:var(--gold)"' : ""}>
     <div class="panel-head">
       <span class="t">${esc(club.name)}</span>
       <span class="r">${esc(interestWord(offer))}</span>
     </div>
     <div class="panel-body">
-      ${offerLines(game, offer).map(line =>
+      <div class="row"><span class="grow">
+        <span class="nm ${foreign ? "gold" : ""}">${esc(offerClubTag(game, offer.cid))}</span>
+        ${foreign ? `<span class="sub">פנייה מחו"ל — לא כל שחקן מקבל אחת כזאת.</span>` : ""}
+      </span></div>
+      ${offerLines(game, offer).slice(1).map(line =>
         `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
       <div class="muted">מוניטין המועדון ${Math.round(club.reputation)} ·
         נשארו ${offer.weeks} שבועות ·
@@ -2246,8 +2251,10 @@ function screenAcademies() {
       <div class="panel-body">
         ${looking.length ? looking.map(([club, score]) => `
           <div class="row">
-            <span class="grow"><span class="nm">${esc(club.name)}</span>
-              <span class="sub">${score >= 50 ? "פתחו עליך תיק"
+            <span class="grow"><span class="nm ${isForeign(club.cid) ? "gold" : ""}"
+              >${esc(club.name)}</span>
+              <span class="sub">${esc(clubTag(club.cid, club.leagueId))} · ${
+                score >= 50 ? "פתחו עליך תיק"
                 : score >= 35 ? "חוזרים לראות אותך" : "ראו אותך פעם אחת"}</span></span>
             <span class="val ${score >= 50 ? "good" : ""}">${Math.round(score)}</span>
           </div>`).join("")
@@ -2261,14 +2268,20 @@ function academyCard(offer) {
   const club = game.clubs[offer.cid];
   const verdict = familyVerdict(game, offer);
   const moodTone = { happy: "good", unsure: "", against: "bad" }[verdict.mood];
+  const foreign = isForeign(offer.cid);
+  const border = verdict.conflict ? "var(--warn)" : foreign ? "var(--gold)" : "";
   return `
-  <div class="panel" ${verdict.conflict ? 'style="border-color:var(--warn)"' : ""}>
+  <div class="panel" ${border ? `style="border-color:${border}"` : ""}>
     <div class="panel-head">
       <span class="t">${esc(club.name)}</span>
       <span class="r">${offer.weeks} שבועות</span>
     </div>
     <div class="panel-body">
-      ${youthOfferLines(game, offer).map(line =>
+      <div class="row"><span class="grow">
+        <span class="nm ${foreign ? "gold" : ""}">${esc(youthClubTag(game, offer.cid))}</span>
+        ${foreign ? `<span class="sub">אקדמיה בחו"ל. בגיל הזה זה חלום — וגם מעבר דירה.</span>` : ""}
+      </span></div>
+      ${youthOfferLines(game, offer).slice(1).map(line =>
         `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
       <hr class="rule">
       <div class="row">

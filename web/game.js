@@ -1799,9 +1799,15 @@ class Game {
             + `${live.length > 1 ? "הצעות" : "הצעה"} על השולחן`, true);
     for (const offer of live) {
       const club = this.clubs[offer.cid];
-      add("", `   • ${club.name} — ₪${fmt(offer.wage)} לשבוע, `
-            + `${offer.years} שנים (${interestWord(offer)})`);
+      add("", `   • ${offerClubTag(this, club.cid)} ${club.name} — `
+            + `₪${fmt(offer.wage)} לשבוע, ${offer.years} שנים `
+            + `(${interestWord(offer)})`);
     }
+    // פנייה מחו"ל היא לא עוד שורה ברשימה — זה הרגע שכל שחקן מחכה לו
+    const abroad = live.filter(o => isForeign(o.cid));
+    if (abroad.length)
+      add("", `   🌍 מחו"ל: ${abroad.map(o => this.clubs[o.cid].name).join(", ")}. `
+            + `זה כבר לא אותו משחק.`);
     add("", "   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')");
   }
 

@@ -155,11 +155,14 @@ def _candidates(game) -> List[Dict[str, Any]]:
         other, score = watchers[0]
         strong = score >= SC.CHASED
         source = "insider" if strong else rng.choice(["sources", "beat", "tv"])
+        tag = D.club_tag(other.cid, other.league_id)
+        where = "מחו\"ל " if D.is_foreign(other.cid) else ""
         out.append(_story(
             game, "interest", source,
-            f"{other.name} שולחים צופים לכל משחק של {me.name}. "
+            f"{tag} {other.name} שולחים צופים {where}לכל משחק של {me.name}. "
             f"בהנהלה מדברים על פנייה רשמית.",
-            true=True, asks=True, weight=2.4 if strong else 1.4))
+            true=True, asks=True,
+            weight=(3.0 if D.is_foreign(other.cid) else 2.4) if strong else 1.4))
 
     # -- התעניינות שהיא בעיקר רעש ----------------------------------------
     pool = [c for c in SC.candidate_clubs(game)
@@ -168,7 +171,8 @@ def _candidates(game) -> List[Dict[str, Any]]:
         other = rng.choice(pool)
         out.append(_story(
             game, "rumour", rng.choice(["tabloid", "fan", "radio"]),
-            f"{other.name} הניחו עין על {me.name}. מדובר בסכום דמיוני.",
+            f"{D.club_tag(other.cid, other.league_id)} {other.name} הניחו עין "
+            f"על {me.name}. מדובר בסכום דמיוני.",
             true=False, asks=True, weight=1.6))
 
     # -- כושר --------------------------------------------------------------

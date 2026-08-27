@@ -359,10 +359,21 @@ def _apply_ask(offer: Dict[str, Any], term: str, full: bool) -> str:
 # תצוגה
 # ---------------------------------------------------------------------------
 
+def club_tag(game, cid: str) -> str:
+    """דגל, מדינה וליגה — הזהות של המועדון במבט אחד."""
+    club = game.clubs.get(cid)
+    return D.club_tag(cid, club.league_id if club else "")
+
+
+def is_foreign(cid: str) -> bool:
+    return D.is_foreign(cid)
+
+
 def offer_lines(game, offer: Dict[str, Any]) -> List[str]:
     """החבילה בשורות, כדי שאפשר יהיה להשוות בעין."""
     club = game.clubs.get(offer["cid"])
-    out = [f"₪{offer['wage']:,} לשבוע · {offer['years']} שנים"]
+    out = [club_tag(game, offer["cid"]),
+           f"₪{offer['wage']:,} לשבוע · {offer['years']} שנים"]
     if offer["bonus"]:
         out.append(f"מענק חתימה ₪{offer['bonus']:,}")
     out.append(f"תפקיד מובטח: {ROLE_NAMES.get(offer['role'], offer['role'])}")

@@ -757,6 +757,10 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
 .muted.small { font-size: 11px; }
 .facility .blocked { font-size: 11px; color: var(--ink-soft); text-align: center; }
 .row .val.good { color: var(--good); }
+
+/* מועדון מחו"ל. זה לא קישוט: פנייה מחו"ל היא אירוע אחר לגמרי
+   מפנייה מקומית, וצריך לראות את ההבדל בלי לקרוא. */
+.nm.gold, .row .val.gold { color: var(--gold); }
 .row .val.bad { color: var(--bad); }
 
 .mini-btn.wide { width: 100%; justify-content: center; padding: 7px 10px; }
@@ -2568,6 +2572,19 @@ const D = {
  ],
  "MIN_DETAIL": 1,
  "MAX_DETAIL": 20,
+ "COUNTRY_FLAGS": {
+  "ישראל": "🇮🇱",
+  "ספרד": "🇪🇸",
+  "גרמניה": "🇩🇪",
+  "אנגליה": "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  "צרפת": "🇫🇷",
+  "איטליה": "🇮🇹",
+  "הולנד": "🇳🇱",
+  "בלגיה": "🇧🇪",
+  "פורטוגל": "🇵🇹",
+  "טורקיה": "🇹🇷",
+  "אוסטריה": "🇦🇹"
+ },
  "ATTR_GROUPS": [
   [
    "technical",
@@ -13934,8 +13951,39 @@ function interestLabel(score) {
   return "רשומים אצלם";
 }
 
+const HOME_COUNTRY = "ישראל";
+
 function clubCountry(cid) {
-  return D.CLUB_COUNTRY[cid] || "ישראל";
+  return D.CLUB_COUNTRY[cid] || HOME_COUNTRY;
+}
+
+function countryFlag(country) {
+  return D.COUNTRY_FLAGS[country] || "🏳";
+}
+
+function isForeign(cid) {
+  return clubCountry(cid) !== HOME_COUNTRY;
+}
+
+function leagueName(leagueId) {
+  const row = D.LEAGUES.find(l => l.id === leagueId);
+  return row ? row.name : "";
+}
+
+/**
+ * שורת הזהות של מועדון: דגל, מדינה, וליגה.
+ *
+ * התלונה שהולידה את זה: "עירבבת מועדונים מקומיים עם מועדונים מחו״ל".
+ * הנתונים תמיד היו נכונים — שלוש ליגות נפרדות — אבל בממשק שם של
+ * מועדון אירופי הופיע בדיוק כמו שם של מועדון מקומי, בלי שום סימן.
+ * זו הפונקציה שאמורה להופיע בכל מקום שבו שם מועדון מוצג.
+ */
+function clubTag(cid, leagueId = "") {
+  const country = clubCountry(cid);
+  const flag = countryFlag(country);
+  const league = leagueName(leagueId);
+  if (country === HOME_COUNTRY) return league ? `${flag} ${league}` : flag;
+  return `${flag} ${country}` + (league ? ` · ${league}` : "");
 }
 
 /** קבוצות שרמת השחקן שלך רלוונטית להן היום. */
@@ -15575,9 +15623,16 @@ function applyAsk(offer, term, full) {
   return "";
 }
 
+/** דגל, מדינה וליגה — הזהות של המועדון במבט אחד. */
+function offerClubTag(game, cid) {
+  const club = game.clubs[cid];
+  return clubTag(cid, club ? club.leagueId : "");
+}
+
 /** החבילה בשורות, כדי שאפשר יהיה להשוות בעין. */
 function offerLines(game, offer) {
-  const out = [`₪${fmt(offer.wage)} לשבוע · ${offer.years} שנים`];
+  const out = [offerClubTag(game, offer.cid),
+               `₪${fmt(offer.wage)} לשבוע · ${offer.years} שנים`];
   if (offer.bonus) out.push(`מענק חתימה ₪${fmt(offer.bonus)}`);
   out.push(`תפקיד מובטח: ${ROLE_NAMES[offer.role] || offer.role}`);
   if (offer.clause) out.push(`סעיף שחרור ₪${fmt(offer.clause)}`);
@@ -15710,9 +15765,12 @@ function pressCandidates(game) {
     const [other, score] = seen[0];
     const strong = score >= SCOUT_CHASED;
     const source = strong ? "insider" : rng.choice(["sources", "beat", "tv"]);
+    const tag = clubTag(other.cid, other.leagueId);
+    const where = isForeign(other.cid) ? "מחו\"ל " : "";
     out.push(pressStory("interest", source,
-      `${other.name} שולחים צופים לכל משחק של ${me.name}. `
-      + `בהנהלה מדברים על פנייה רשמית.`, true, true, strong ? 2.4 : 1.4));
+      `${tag} ${other.name} שולחים צופים ${where}לכל משחק של ${me.name}. `
+      + `בהנהלה מדברים על פנייה רשמית.`, true, true,
+      strong ? (isForeign(other.cid) ? 3.0 : 2.4) : 1.4));
   }
 
   // -- התעניינות שהיא בעיקר רעש --------------------------------------
@@ -15720,8 +15778,8 @@ function pressCandidates(game) {
   if (pool.length && me.reputation > 45) {
     const other = rng.choice(pool);
     out.push(pressStory("rumour", rng.choice(["tabloid", "fan", "radio"]),
-      `${other.name} הניחו עין על ${me.name}. מדובר בסכום דמיוני.`,
-      false, true, 1.6));
+      `${clubTag(other.cid, other.leagueId)} ${other.name} הניחו עין על `
+      + `${me.name}. מדובר בסכום דמיוני.`, false, true, 1.6));
   }
 
   // -- כושר ------------------------------------------------------------
@@ -16253,8 +16311,14 @@ function buildYouthOffer(game, club, rng, eagerness = null) {
   };
 }
 
+function youthClubTag(game, cid) {
+  const club = game.clubs[cid];
+  return clubTag(cid, club ? club.leagueId : "");
+}
+
 function youthOfferLines(game, offer) {
-  const out = [`מיקום: ${DISTANCE_NAMES[offer.distance]}`];
+  const out = [youthClubTag(game, offer.cid),
+               `מיקום: ${DISTANCE_NAMES[offer.distance]}`];
   out.push(offer.boarding ? "מעונות ופנימייה" : "גר בבית, נוסע לאימונים");
   out.push(`בית ספר במסגרת האקדמיה: ${offer.schooling}/100`);
   if (offer.family_help) out.push(`סיוע למשפחה: ₪${fmt(offer.family_help)} לשנה`);
@@ -16366,8 +16430,13 @@ function maybeOpenYouthMarket(game, rng) {
                + `${live.length > 1 ? "אקדמיות" : "אקדמיה"} רוצות אותך:`];
   for (const offer of live) {
     const club = game.clubs[offer.cid];
-    lines.push(`   • ${club.name} — ${DISTANCE_NAMES[offer.distance]}`);
+    lines.push(`   • ${youthClubTag(game, club.cid)} ${club.name} — `
+             + `${DISTANCE_NAMES[offer.distance]}`);
   }
+  // אקדמיה מחו"ל היא לא עוד שורה — זה מה שכל ילד חולם עליו
+  const abroad = live.filter(o => isForeign(o.cid));
+  if (abroad.length)
+    lines.push(`   🌍 מחו"ל: ${abroad.map(o => game.clubs[o.cid].name).join(", ")}.`);
   lines.push("   ההחלטה היא שלך ושל ההורים. (בתפריט: 'אקדמיות')");
   lines.push(...chaseBonus(game));
   return lines;
@@ -19466,9 +19535,15 @@ class Game {
             + `${live.length > 1 ? "הצעות" : "הצעה"} על השולחן`, true);
     for (const offer of live) {
       const club = this.clubs[offer.cid];
-      add("", `   • ${club.name} — ₪${fmt(offer.wage)} לשבוע, `
-            + `${offer.years} שנים (${interestWord(offer)})`);
+      add("", `   • ${offerClubTag(this, club.cid)} ${club.name} — `
+            + `₪${fmt(offer.wage)} לשבוע, ${offer.years} שנים `
+            + `(${interestWord(offer)})`);
     }
+    // פנייה מחו"ל היא לא עוד שורה ברשימה — זה הרגע שכל שחקן מחכה לו
+    const abroad = live.filter(o => isForeign(o.cid));
+    if (abroad.length)
+      add("", `   🌍 מחו"ל: ${abroad.map(o => this.clubs[o.cid].name).join(", ")}. `
+            + `זה כבר לא אותו משחק.`);
     add("", "   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')");
   }
 
@@ -22471,14 +22546,19 @@ function offerCard(offer) {
   const asks = askOptions(offer);
   const spent = offer.asks;
   const left = Math.max(0, offer.patience - spent + 1);
+  const foreign = isForeign(offer.cid);
   return `
-  <div class="panel">
+  <div class="panel" ${foreign ? 'style="border-color:var(--gold)"' : ""}>
     <div class="panel-head">
       <span class="t">${esc(club.name)}</span>
       <span class="r">${esc(interestWord(offer))}</span>
     </div>
     <div class="panel-body">
-      ${offerLines(game, offer).map(line =>
+      <div class="row"><span class="grow">
+        <span class="nm ${foreign ? "gold" : ""}">${esc(offerClubTag(game, offer.cid))}</span>
+        ${foreign ? `<span class="sub">פנייה מחו"ל — לא כל שחקן מקבל אחת כזאת.</span>` : ""}
+      </span></div>
+      ${offerLines(game, offer).slice(1).map(line =>
         `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
       <div class="muted">מוניטין המועדון ${Math.round(club.reputation)} ·
         נשארו ${offer.weeks} שבועות ·
@@ -22537,8 +22617,10 @@ function screenAcademies() {
       <div class="panel-body">
         ${looking.length ? looking.map(([club, score]) => `
           <div class="row">
-            <span class="grow"><span class="nm">${esc(club.name)}</span>
-              <span class="sub">${score >= 50 ? "פתחו עליך תיק"
+            <span class="grow"><span class="nm ${isForeign(club.cid) ? "gold" : ""}"
+              >${esc(club.name)}</span>
+              <span class="sub">${esc(clubTag(club.cid, club.leagueId))} · ${
+                score >= 50 ? "פתחו עליך תיק"
                 : score >= 35 ? "חוזרים לראות אותך" : "ראו אותך פעם אחת"}</span></span>
             <span class="val ${score >= 50 ? "good" : ""}">${Math.round(score)}</span>
           </div>`).join("")
@@ -22552,14 +22634,20 @@ function academyCard(offer) {
   const club = game.clubs[offer.cid];
   const verdict = familyVerdict(game, offer);
   const moodTone = { happy: "good", unsure: "", against: "bad" }[verdict.mood];
+  const foreign = isForeign(offer.cid);
+  const border = verdict.conflict ? "var(--warn)" : foreign ? "var(--gold)" : "";
   return `
-  <div class="panel" ${verdict.conflict ? 'style="border-color:var(--warn)"' : ""}>
+  <div class="panel" ${border ? `style="border-color:${border}"` : ""}>
     <div class="panel-head">
       <span class="t">${esc(club.name)}</span>
       <span class="r">${offer.weeks} שבועות</span>
     </div>
     <div class="panel-body">
-      ${youthOfferLines(game, offer).map(line =>
+      <div class="row"><span class="grow">
+        <span class="nm ${foreign ? "gold" : ""}">${esc(youthClubTag(game, offer.cid))}</span>
+        ${foreign ? `<span class="sub">אקדמיה בחו"ל. בגיל הזה זה חלום — וגם מעבר דירה.</span>` : ""}
+      </span></div>
+      ${youthOfferLines(game, offer).slice(1).map(line =>
         `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
       <hr class="rule">
       <div class="row">

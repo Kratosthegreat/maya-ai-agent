@@ -2531,3 +2531,80 @@ def test_growth_does_not_fall_off_a_cliff_at_sixteen():
         f"נפילה בגיל 16: {gain[15]:.2f} → {gain[16]:.2f}")
     assert gain[17] > gain[16] * 0.75, (
         f"נפילה בגיל 17: {gain[16]:.2f} → {gain[17]:.2f}")
+
+# ---------------------------------------------------------------------------
+# בהירות מוחלטת: מי מקומי ומי מחו"ל
+# ---------------------------------------------------------------------------
+
+def test_the_world_really_is_split_by_country():
+    """הנתונים תמיד היו נכונים — שלוש ליגות נפרדות. מוודאים שלא התערבבו."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=3)
+    by_league = {}
+    for club in game.clubs.values():
+        by_league.setdefault(club.league_id, set()).add(D.club_country(club.cid))
+    assert by_league["top"] == {"ישראל"}, by_league["top"]
+    assert by_league["national"] == {"ישראל"}, by_league["national"]
+    assert "ישראל" not in by_league["euro"], "מועדון ישראלי בליגת האלופות"
+    assert len(by_league["euro"]) >= 5, "כל הזרים מאותה מדינה?"
+
+
+def test_every_club_says_where_it_is_from():
+    """התלונה: 'עירבבת מועדונים מקומיים עם מועדונים מחו\"ל'."""
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=3)
+    for club in game.clubs.values():
+        tag = D.club_tag(club.cid, club.league_id)
+        assert tag and tag.strip(), f"{club.name} בלי זהות"
+        if D.is_foreign(club.cid):
+            assert D.club_country(club.cid) in tag, f"{club.name}: {tag}"
+        else:
+            assert "ישראל" == D.club_country(club.cid)
+
+
+def test_local_and_foreign_tags_are_never_confusable():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 20, seed=3)
+    local = [c for c in game.clubs.values() if not D.is_foreign(c.cid)]
+    foreign = [c for c in game.clubs.values() if D.is_foreign(c.cid)]
+    assert local and foreign
+    local_tags = {D.club_tag(c.cid, c.league_id) for c in local}
+    foreign_tags = {D.club_tag(c.cid, c.league_id) for c in foreign}
+    assert not (local_tags & foreign_tags), "אותה תווית למקומי ולזר"
+    # וכל תווית של זר נושאת דגל שאינו הדגל המקומי
+    home_flag = D.country_flag("ישראל")
+    for tag in foreign_tags:
+        assert not tag.startswith(home_flag), tag
+
+
+def test_a_transfer_offer_carries_the_club_identity():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=11)
+    game.me.reputation = 85
+    euro = [c for c in game.clubs.values() if c.league_id == "euro"][0]
+    offer = TR.build_offer(game, euro, game.rng, 0.85)
+    lines = TR.offer_lines(game, offer)
+    assert D.club_country(euro.cid) in lines[0], lines[0]
+    assert TR.is_foreign(euro.cid) is True
+
+
+def test_an_academy_offer_carries_the_club_identity():
+    game = GameState.new_game("ילד", "ST", "hapoel_carmel", 13, seed=9)
+    euro = [c for c in game.clubs.values() if c.league_id == "euro"][0]
+    offer = YT.build_offer(game, euro, game.rng, 0.85)
+    lines = YT.offer_lines(game, offer)
+    assert D.club_country(euro.cid) in lines[0], lines[0]
+    # ואקדמיה זרה היא תמיד "בחו\"ל" מבחינת המרחק
+    assert offer["distance"] == "abroad"
+
+
+def test_a_foreign_approach_is_bigger_news_than_a_local_one():
+    """'כל שחקן היה שמח לו פנה אליו מועדון נחשב מחו\"ל'."""
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=7)
+    game.me.reputation = 80
+    game.me.contract.years_left = 1
+    weights = {}
+    for foreign in (True, False):
+        club = next(c for c in game.clubs.values()
+                    if D.is_foreign(c.cid) == foreign and c.cid != game.me.club_id)
+        game.flags["scout_interest"] = {club.cid: 95.0}
+        rows = [r for r in PR._candidates(game) if r["key"] == "interest"]
+        weights[foreign] = rows[0]["weight"] if rows else 0
+    assert weights[True] > weights[False], (
+        f"פנייה מחו\"ל שוקלת {weights[True]} מול מקומית {weights[False]}")

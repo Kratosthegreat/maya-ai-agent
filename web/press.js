@@ -112,9 +112,12 @@ function pressCandidates(game) {
     const [other, score] = seen[0];
     const strong = score >= SCOUT_CHASED;
     const source = strong ? "insider" : rng.choice(["sources", "beat", "tv"]);
+    const tag = clubTag(other.cid, other.leagueId);
+    const where = isForeign(other.cid) ? "מחו\"ל " : "";
     out.push(pressStory("interest", source,
-      `${other.name} שולחים צופים לכל משחק של ${me.name}. `
-      + `בהנהלה מדברים על פנייה רשמית.`, true, true, strong ? 2.4 : 1.4));
+      `${tag} ${other.name} שולחים צופים ${where}לכל משחק של ${me.name}. `
+      + `בהנהלה מדברים על פנייה רשמית.`, true, true,
+      strong ? (isForeign(other.cid) ? 3.0 : 2.4) : 1.4));
   }
 
   // -- התעניינות שהיא בעיקר רעש --------------------------------------
@@ -122,8 +125,8 @@ function pressCandidates(game) {
   if (pool.length && me.reputation > 45) {
     const other = rng.choice(pool);
     out.push(pressStory("rumour", rng.choice(["tabloid", "fan", "radio"]),
-      `${other.name} הניחו עין על ${me.name}. מדובר בסכום דמיוני.`,
-      false, true, 1.6));
+      `${clubTag(other.cid, other.leagueId)} ${other.name} הניחו עין על `
+      + `${me.name}. מדובר בסכום דמיוני.`, false, true, 1.6));
   }
 
   // -- כושר ------------------------------------------------------------
