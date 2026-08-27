@@ -867,7 +867,12 @@ function tabsBar() {
   if (["academy", "player", "veteran"].includes(game.stage))
     items.splice(items.length - 1, 0, ["press", "תקשורת"], ["fame", "שם"]);
   if (offers) items.splice(1, 0, ["offers", "הצעות"]);
-  const badges = { offers, press: question, fame: venture };
+  // בגיל הנוער הטאב הזה הוא כל הסיפור: מי מסתכל עליך, ומי כבר פנה
+  const academies = game.stage === "youth" ? liveYouthOffers(game).length : 0;
+  const looking = game.stage === "youth" ? youthWatchers(game).length : 0;
+  if (game.stage === "youth") items.splice(1, 0, ["academies", "אקדמיות"]);
+  const badges = { offers, press: question, fame: venture,
+                   academies: academies || (looking ? 0 : 0) };
   return `<nav class="tabs">${items.map(([k, l]) => {
     const n = badges[k] || 0;
     return `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
@@ -902,6 +907,7 @@ function screenMain() {
   if (view === "offers") return appbar() + screenOffers();
   if (view === "press") return appbar() + screenPress();
   if (view === "fame") return appbar() + screenFame();
+  if (view === "academies") return appbar() + screenAcademies();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -2195,6 +2201,92 @@ function offerCard(offer) {
 }
 
 // ---------------------------------------------------------------------------
+// אקדמיות — איך צדים ילד בן שלוש־עשרה
+// ---------------------------------------------------------------------------
+
+/**
+ * מי מסתכל עליך, מי כבר פנה, ומה ההורים חושבים על זה.
+ *
+ * שני מספרים לכל הצעה, ובכוונה נפרדים: כמה זה טוב לכדורגל שלך, וכמה
+ * זה טוב בעיני ההורים. כשהם רחוקים זה מזה — זו ההחלטה.
+ */
+function screenAcademies() {
+  const live = liveYouthOffers(game);
+  const looking = youthWatchers(game);
+
+  return `<div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">בבית</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc(familyLine(game))}</div>
+        <div class="row"><span class="grow"><span class="nm">כמה הם סומכים עליך</span>
+          <span class="sub">משפיע על הסיכוי לשכנע אותם</span></span>
+          <span class="val">${Math.round(family(game).trust)}/100</span></div>
+      </div>
+    </div>
+
+    ${live.length ? live.map(academyCard).join("") : `
+    <div class="panel">
+      <div class="panel-head"><span class="t">עוד לא פנו אליך</span></div>
+      <div class="panel-body"><div class="muted">אקדמיות שולחות צופים
+        לטורנירי נוער. ככל שהפוטנציאל שלך גבוה יותר והנחישות שלך גדולה
+        יותר — כך מישהו יבחין בך מוקדם יותר.</div></div>
+    </div>`}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי מסתכל עליך</span>
+        <span class="r">${looking.length}</span></div>
+      <div class="panel-body">
+        ${looking.length ? looking.map(([club, score]) => `
+          <div class="row">
+            <span class="grow"><span class="nm">${esc(club.name)}</span>
+              <span class="sub">${score >= 50 ? "פתחו עליך תיק"
+                : score >= 35 ? "חוזרים לראות אותך" : "ראו אותך פעם אחת"}</span></span>
+            <span class="val ${score >= 50 ? "good" : ""}">${Math.round(score)}</span>
+          </div>`).join("")
+          : `<div class="muted">אף אחד עדיין. זה מתחיל כשהמספרים מתחילים לזוז.</div>`}
+      </div>
+    </div>
+  </div>` + dock(false);
+}
+
+function academyCard(offer) {
+  const club = game.clubs[offer.cid];
+  const verdict = familyVerdict(game, offer);
+  const moodTone = { happy: "good", unsure: "", against: "bad" }[verdict.mood];
+  return `
+  <div class="panel" ${verdict.conflict ? 'style="border-color:var(--warn)"' : ""}>
+    <div class="panel-head">
+      <span class="t">${esc(club.name)}</span>
+      <span class="r">${offer.weeks} שבועות</span>
+    </div>
+    <div class="panel-body">
+      ${youthOfferLines(game, offer).map(line =>
+        `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
+      <hr class="rule">
+      <div class="row">
+        <span class="grow"><span class="nm">⚽ טוב לכדורגל שלך</span></span>
+        <span class="val ${verdict.football >= 70 ? "good" : ""}">${Math.round(verdict.football)}</span>
+      </div>
+      <div class="row">
+        <span class="grow"><span class="nm">👪 טוב בעיני ההורים</span></span>
+        <span class="val ${moodTone}">${Math.round(verdict.family)}</span>
+      </div>
+      <div class="quote">${esc(verdict.text)}</div>
+      ${verdict.conflict ? `<div class="muted bad">זה המקום הכי טוב לכדורגל
+        שלך, וההורים נגד. אפשר לנסות לשכנע — פעם אחת.</div>` : ""}
+      ${offer.blessing ? `<div class="muted good">✓ ההורים נתנו ברכה.</div>` : ""}
+      <div class="btn-row">
+        <button class="btn" data-academy="${offer.cid}">לחתום</button>
+        ${verdict.mood !== "happy" && !offer.persuaded
+          ? `<button class="mini-btn" data-persuade="${offer.cid}">לדבר עם ההורים</button>` : ""}
+        <button class="mini-btn" data-noacademy="${offer.cid}">לא</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
 // תקשורת — מה כותבים עליך, וכמה זה שווה
 // ---------------------------------------------------------------------------
 
@@ -2979,6 +3071,26 @@ function bind() {
       toast(game.rejectOffer(el.dataset.decline));
       saveGame();
       if (!liveOffers(game).length) go("main"); else render();
+    }));
+
+  // -- אקדמיות (גיל הנוער) --------------------------------------------
+  app.querySelectorAll("[data-persuade]").forEach(el =>
+    el.addEventListener("click", () => {
+      toast(persuadeFamily(game, el.dataset.persuade, game.rng));
+      saveGame();
+      render();
+    }));
+  app.querySelectorAll("[data-academy]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = acceptYouthOffer(game, el.dataset.academy).join("\n");
+      saveGame();
+      showOutcome("אקדמיה חדשה", text);
+    }));
+  app.querySelectorAll("[data-noacademy]").forEach(el =>
+    el.addEventListener("click", () => {
+      toast(declineYouthOffer(game, el.dataset.noacademy));
+      saveGame();
+      if (!liveYouthOffers(game).length) go("main"); else render();
     }));
 
   // -- תקשורת ---------------------------------------------------------

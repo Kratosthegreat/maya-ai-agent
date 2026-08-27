@@ -10,7 +10,7 @@ const vm = require("vm");
 const HERE = __dirname;
 const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "matchstats.js",
                "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
-               "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "coaching.js", "mentor.js", "manager.js",
+               "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "youth.js", "coaching.js", "mentor.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -34,6 +34,11 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "offerLines, interestWord, negotiate, tickOffers, askOptions, ROLE_NAMES, " +
   "WINDOW_WEEKS, SOURCE_TRUST, trustWord, pressCandidates, pressPush, pressStory, " +
   "pressReact, openQuestion, openVentures, acceptVenture, passiveIncome, " +
+  "makeFamily, family, familyLine, familyScore, familyVerdict, footballScore, " +
+  "scoutPool, youthWatchers, youthInterest, buildYouthOffer, youthOfferLines, " +
+  "setYouthOffers, liveYouthOffers, youthOfferFor, tickYouthOffers, chaseBonus, " +
+  "persuadeFamily, acceptYouthOffer, declineYouthOffer, youthScoutsThisWeek, " +
+  "SCOUT_POOL_LIMIT, YOUTH_WINDOW_WEEKS, DISTANCE_NAMES, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -2148,6 +2153,163 @@ test("ליגה זרה משלמת גם במוניטין", () => {
   A.acceptVenture(g, { kind: "league", title: "ליגה זרה", who: "ליגה",
                        payout: 9000000, cost: 0, rep_cost: 4.0 });
   assert(g.me.reputation < before, "כסף גדול מליגה חלשה חייב לעלות במשהו");
+});
+
+// ---------------------------------------------------------------------------
+// ציד ילדים: אקדמיות, הורים, ומרוץ שמעלה ערך
+// ---------------------------------------------------------------------------
+
+const kid = (seed = 9, age = 13) => A.Game.newGame("ילד", "ST", "hapoel_carmel", age, seed);
+
+function runToYouthOffers(g, limit = 400) {
+  for (let i = 0; i < limit; i++) {
+    if (g.gameOver || g.stage !== "youth") return false;
+    if (g.pendingEventId) { g.resolveEvent(0); continue; }
+    g.advanceWeek();
+    if (A.liveYouthOffers(g).length) return true;
+  }
+  return false;
+}
+
+const otherClubs = g => Object.values(g.clubs).filter(c => c.cid !== g.me.clubId);
+
+test("אקדמיות צדות ילדים הרבה לפני שוק הבוגרים", () => {
+  let approached = 0;
+  const ages = [];
+  for (const seed of [5, 9, 17, 23, 31, 42, 55, 63, 71, 84]) {
+    const g = kid(seed);
+    if (runToYouthOffers(g)) { approached++; ages.push(g.me.age); }
+  }
+  assert(approached >= 6, `רק ${approached} מתוך 10 ילדים נצפו בכלל`);
+  assert(ages.every(a => a <= 16), `גילאים: ${ages}`);
+  assert(Math.min(...ages) <= 14, `אף אחד לא נצפה לפני 15: ${ages}`);
+});
+
+test("ילד אחד לא נמצא על הרדאר של ארבעים מועדונים", () => {
+  const g = kid();
+  assert(A.scoutPool(g).length <= A.SCOUT_POOL_LIMIT,
+    `${A.scoutPool(g).length} מועדונים בבריכה`);
+});
+
+test("כמה אקדמיות יכולות לריב על אותו נער", () => {
+  let races = 0;
+  for (const seed of [5, 9, 17, 23, 31, 42, 55, 63, 71, 84]) {
+    const g = kid(seed);
+    if (runToYouthOffers(g) && A.liveYouthOffers(g).length > 1) races++;
+  }
+  assert(races >= 2, `רק ${races} מתוך 10 היו מרוץ אמיתי`);
+});
+
+test("מרוץ מעלה את ערכו של נער עוד לפני שהוכיח משהו", () => {
+  const g = kid();
+  const me = g.me;
+  me.potential = 60;
+  me.ceiling = 90;
+  A.setYouthOffers(g, otherClubs(g).slice(0, 3)
+    .map(c => A.buildYouthOffer(g, c, g.rng, 0.8)));
+  const rep = me.reputation, pot = me.potential, ceil = me.ceiling;
+  const lines = A.chaseBonus(g);
+  assert(lines.length, "מרוץ של שלוש אקדמיות לא הפיק כלום");
+  assert(me.reputation > rep, "מוניטין לא עלה");
+  assert(me.potential > pot, "הערכת הפוטנציאל לא עלתה");
+  assert(me.ceiling > ceil, "שלוש אקדמיות אמורות להזיז גם את התקרה");
+});
+
+test("אקדמיה אחת לבד היא לא מרוץ", () => {
+  const g = kid();
+  A.setYouthOffers(g, [A.buildYouthOffer(g, otherClubs(g)[0], g.rng, 0.8)]);
+  const before = g.me.potential;
+  assert(A.chaseBonus(g).length === 0, "הצעה אחת הפיקה בונוס מרוץ");
+  assert(g.me.potential === before, "הפוטנציאל זז בלי מרוץ");
+});
+
+test("הצעת אקדמיה היא חיים ולא שכר", () => {
+  const g = kid();
+  const offer = A.buildYouthOffer(g, otherClubs(g)[0], g.rng, 0.9);
+  assert(offer.wage === undefined, "לילד בן 13 לא מציעים שכר");
+  const lines = A.youthOfferLines(g, offer).join(" ");
+  assert(lines.includes("בית ספר"), lines);
+  assert(A.DISTANCE_NAMES[offer.distance], "מרחק לא מוכר");
+});
+
+test("ההורים והכדורגל יכולים לא להסכים", () => {
+  const g = kid();
+  g.flags.family = { first: "home", second: "schooling", trust: 60 };
+  const club = Object.values(g.clubs).reduce((a, b) => a.reputation >= b.reputation ? a : b);
+  const offer = A.buildYouthOffer(g, club, g.rng, 1.0);
+  offer.distance = "abroad";
+  offer.boarding = true;
+  const v = A.familyVerdict(g, offer);
+  assert(v.football > v.family, `כדורגל ${v.football} מול משפחה ${v.family}`);
+  assert(v.mood === "against", v.mood);
+  assert(v.conflict === true, "זה בדיוק המקרה שאמור להיות מסומן כקונפליקט");
+});
+
+test("הורים שאכפת להם מהבית מעדיפים את המועדון הקרוב", () => {
+  const g = kid();
+  g.flags.family = { first: "home", second: "schooling", trust: 60 };
+  const near = A.buildYouthOffer(g, otherClubs(g)[0], g.rng, 0.7);
+  near.distance = "local";
+  near.boarding = false;
+  const far = Object.assign({}, near, { distance: "abroad", boarding: true });
+  assert(A.familyScore(g, near) > A.familyScore(g, far) + 15,
+    `${A.familyScore(g, near).toFixed(0)} מול ${A.familyScore(g, far).toFixed(0)}`);
+});
+
+test("לשכנע את ההורים זה הימור אמיתי", () => {
+  let won = 0;
+  for (let seed = 0; seed < 30; seed++) {
+    const g = kid(seed);
+    g.flags.family = { first: "home", second: "money", trust: 60 };
+    const club = otherClubs(g)[0];
+    A.setYouthOffers(g, [A.buildYouthOffer(g, club, g.rng, 0.7)]);
+    A.persuadeFamily(g, club.cid, new A.Rng(seed));
+    if (A.youthOfferFor(g, club.cid).blessing) won++;
+  }
+  assert(won >= 3 && won <= 27, `${won}/30 — שכנוע שהוא ודאי הוא לא הימור`);
+});
+
+test("אפשר לדבר איתם רק פעם אחת", () => {
+  const g = kid();
+  const club = otherClubs(g)[0];
+  A.setYouthOffers(g, [A.buildYouthOffer(g, club, g.rng, 0.7)]);
+  A.persuadeFamily(g, club.cid, new A.Rng(1));
+  assert(A.persuadeFamily(g, club.cid, new A.Rng(1)).includes("כבר דיברת"),
+    "אפשר לשכנע פעמיים");
+});
+
+test("ללכת נגד ההורים עולה במשהו", () => {
+  const g = kid();
+  g.flags.family = { first: "home", second: "schooling", trust: 70 };
+  const club = Object.values(g.clubs).reduce((a, b) => a.reputation >= b.reputation ? a : b);
+  const offer = A.buildYouthOffer(g, club, g.rng, 1.0);
+  offer.distance = "abroad";
+  offer.boarding = true;
+  A.setYouthOffers(g, [offer]);
+  assert(A.familyVerdict(g, offer).mood === "against", "התרחיש לא מוגדר נכון");
+  const morale = g.me.morale, trust = A.family(g).trust;
+  const out = A.acceptYouthOffer(g, club.cid);
+  assert(g.me.morale < morale, "ללכת נגד ההורים חייב לעלות");
+  assert(A.family(g).trust < trust, "האמון בבית לא נפגע");
+  assert(out.some(l => l.includes("לא הסכימו")), out.join(" "));
+});
+
+test("חתימה מעבירה אותך ורושמת את ההבטחות", () => {
+  const g = kid();
+  const club = otherClubs(g)[0];
+  A.setYouthOffers(g, [A.buildYouthOffer(g, club, g.rng, 0.95)]);
+  A.acceptYouthOffer(g, club.cid);
+  assert(g.me.clubId === club.cid, "לא עברת בפועל");
+  const deal = g.flag("academy_deal");
+  assert(deal && deal.cid === club.cid, "ההבטחות לא נרשמו");
+  assert(!A.liveYouthOffers(g).length, "אחרי חתימה השולחן מתרוקן");
+});
+
+test("להצעות נוער יש דדליין", () => {
+  const g = kid();
+  A.setYouthOffers(g, [A.buildYouthOffer(g, otherClubs(g)[0], g.rng, 0.7)]);
+  for (let i = 0; i < A.YOUTH_WINDOW_WEEKS; i++) A.tickYouthOffers(g);
+  assert(!A.liveYouthOffers(g).length, "הצעה בלי דדליין היא לא הצעה");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

@@ -33,6 +33,7 @@ from . import development as DEV
 from . import transfers as TR
 from . import press as PR
 from . import fame as FA
+from . import youth as YT
 from . import scouting as SC
 from . import wealth as WL
 from .progression import (end_of_season_development, retirement_pressure,
@@ -534,6 +535,15 @@ class GameState:
             my_rating = report.match.ratings[self.me_id]
         for line in SC.scouts_this_week(self, self.rng, my_rating):
             report.add(line)
+
+        # 5א. צופי נוער — מערך שצד ילדים הרבה לפני שהם שחקנים
+        if self.stage == "youth":
+            for line in YT.scouts_this_week(self, self.rng):
+                report.add(line)
+            for line in YT.maybe_open_market(self, self.rng):
+                report.add(line)
+            for line in YT.tick_offers(self):
+                report.add(line)
 
         # 5ב. מה שנכתב עליך — עיתונות, טלוויזיה ושמועות
         for line in PR.weekly_press(self, self.rng):

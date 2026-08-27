@@ -385,6 +385,16 @@ class Game {
     for (const line of scoutsThisWeek(this, this.rng, myRating))
       report.notes.push({ icon: "", text: line });
 
+    // צופי נוער — מערך שצד ילדים הרבה לפני שהם שחקנים
+    if (this.stage === "youth") {
+      for (const line of youthScoutsThisWeek(this, this.rng))
+        report.notes.push({ icon: "", text: line });
+      for (const line of maybeOpenYouthMarket(this, this.rng))
+        report.notes.push({ icon: "", text: line });
+      for (const line of tickYouthOffers(this))
+        report.notes.push({ icon: "", text: line });
+    }
+
     // מה שנכתב עליך — עיתונות, טלוויזיה ושמועות
     for (const line of weeklyPress(this, this.rng))
       report.notes.push({ icon: "", text: line });

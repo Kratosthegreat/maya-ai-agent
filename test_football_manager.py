@@ -32,6 +32,7 @@ from football_manager import mentor as MN
 from football_manager import transfers as TR
 from football_manager import press as PR
 from football_manager import fame as FA
+from football_manager import youth as YT
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -2257,3 +2258,176 @@ def test_a_foreign_league_pays_in_reputation():
     FA.accept_venture(game, {"kind": "league", "title": "ליגה זרה", "who": "ליגה",
                              "payout": 9_000_000, "cost": 0, "rep_cost": 4.0})
     assert game.me.reputation < before, "כסף גדול מליגה חלשה חייב לעלות במשהו"
+
+# ---------------------------------------------------------------------------
+# ציד ילדים: אקדמיות, הורים, ומרוץ שמעלה ערך
+# ---------------------------------------------------------------------------
+
+def _kid(seed=9, age=13):
+    return GameState.new_game("ילד", "ST", "hapoel_carmel", age, seed=seed)
+
+
+def _run_to_offers(game, limit=400):
+    for _ in range(limit):
+        if game.game_over or game.stage != "youth":
+            return False
+        if game.pending_event_id:
+            game.resolve_event(0)
+            continue
+        game.advance_week()
+        if YT.live_offers(game):
+            return True
+    return False
+
+
+def test_academies_scout_children_long_before_the_senior_market():
+    """התלונה: 'אין פנייה לפני גיל נוער'. עכשיו יש."""
+    approached = 0
+    ages = []
+    for seed in (5, 9, 17, 23, 31, 42, 55, 63, 71, 84):
+        game = _kid(seed)
+        if _run_to_offers(game):
+            approached += 1
+            ages.append(game.me.age)
+    assert approached >= 6, f"רק {approached} מתוך 10 ילדים נצפו בכלל"
+    assert all(age <= 16 for age in ages), f"גילאים: {ages}"
+    assert min(ages) <= 14, f"אף אחד לא נצפה לפני 15: {ages}"
+
+
+def test_a_child_is_not_on_the_radar_of_forty_clubs():
+    """אם כל הביקורים מתפזרים, אף אקדמיה לא בונה תיק ואף אחת לא פונה."""
+    game = _kid()
+    assert len(YT.scout_pool(game)) <= YT.SCOUT_POOL_LIMIT
+
+
+def test_several_academies_can_race_for_the_same_boy():
+    races = 0
+    for seed in (5, 9, 17, 23, 31, 42, 55, 63, 71, 84):
+        game = _kid(seed)
+        if _run_to_offers(game) and len(YT.live_offers(game)) > 1:
+            races += 1
+    assert races >= 2, f"רק {races} מתוך 10 היו מרוץ אמיתי"
+
+
+def test_a_race_raises_a_boys_value_before_he_proved_anything():
+    """זה הלב של הבקשה: ציפייה מייצרת שווי."""
+    game = _kid()
+    me = game.me
+    me.potential = 60
+    me.ceiling = 90
+    clubs = [c for c in game.clubs.values() if c.cid != me.club_id][:3]
+    YT.set_offers(game, [YT.build_offer(game, c, game.rng, 0.8) for c in clubs])
+    before_rep, before_pot, before_ceiling = me.reputation, me.potential, me.ceiling
+    lines = YT.chase_bonus(game)
+    assert lines, "מרוץ של שלוש אקדמיות לא הפיק כלום"
+    assert me.reputation > before_rep, "מוניטין לא עלה"
+    assert me.potential > before_pot, "הערכת הפוטנציאל לא עלתה"
+    assert me.ceiling > before_ceiling, "שלוש אקדמיות אמורות להזיז גם את התקרה"
+
+
+def test_one_academy_alone_is_not_a_race():
+    game = _kid()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    YT.set_offers(game, [YT.build_offer(game, club, game.rng, 0.8)])
+    before = game.me.potential
+    assert YT.chase_bonus(game) == []
+    assert game.me.potential == before
+
+
+def test_an_academy_offer_is_a_life_not_a_wage():
+    game = _kid()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    offer = YT.build_offer(game, club, game.rng, 0.9)
+    assert "wage" not in offer, "לילד בן 13 לא מציעים שכר"
+    lines = " ".join(YT.offer_lines(game, offer))
+    assert "בית ספר" in lines
+    assert offer["distance"] in YT.DISTANCE_NAMES
+
+
+def test_parents_and_football_can_disagree():
+    """שני מספרים נפרדים, ובכוונה — שם נמצאת ההחלטה."""
+    game = _kid()
+    game.flags["family"] = {"first": "home", "second": "schooling", "trust": 60}
+    club = max(game.clubs.values(), key=lambda c: c.reputation)
+    offer = YT.build_offer(game, club, game.rng, 1.0)
+    offer["distance"] = "abroad"
+    offer["boarding"] = True
+    verdict = YT.family_verdict(game, offer)
+    assert verdict["football"] > verdict["family"], "אקדמיה ענקית בחו\"ל צריכה לפצל"
+    assert verdict["mood"] == "against"
+    assert verdict["conflict"] is True
+
+
+def test_parents_who_care_about_home_prefer_the_local_club():
+    game = _kid()
+    game.flags["family"] = {"first": "home", "second": "schooling", "trust": 60}
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    near = YT.build_offer(game, club, game.rng, 0.7)
+    near["distance"] = "local"
+    near["boarding"] = False
+    far = dict(near)
+    far["distance"] = "abroad"
+    far["boarding"] = True
+    assert YT.family_score(game, near) > YT.family_score(game, far) + 15
+
+
+def test_persuading_the_parents_is_a_real_gamble():
+    import random
+    won = 0
+    for seed in range(30):
+        game = _kid(seed)
+        game.flags["family"] = {"first": "home", "second": "money", "trust": 60}
+        club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+        YT.set_offers(game, [YT.build_offer(game, club, game.rng, 0.7)])
+        text = YT.persuade(game, club.cid, random.Random(seed))
+        if YT.offer_for(game, club.cid).get("blessing"):
+            won += 1
+    assert 3 <= won <= 27, f"{won}/30 — שכנוע שהוא ודאי הוא לא הימור"
+
+
+def test_you_can_only_talk_to_them_once():
+    import random
+    game = _kid()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    YT.set_offers(game, [YT.build_offer(game, club, game.rng, 0.7)])
+    YT.persuade(game, club.cid, random.Random(1))
+    again = YT.persuade(game, club.cid, random.Random(1))
+    assert "כבר דיברת" in again
+
+
+def test_going_against_your_parents_costs_something():
+    game = _kid()
+    game.flags["family"] = {"first": "home", "second": "schooling", "trust": 70}
+    club = max(game.clubs.values(), key=lambda c: c.reputation)
+    offer = YT.build_offer(game, club, game.rng, 1.0)
+    offer["distance"] = "abroad"
+    offer["boarding"] = True
+    YT.set_offers(game, [offer])
+    assert YT.family_verdict(game, offer)["mood"] == "against"
+    before_morale = game.me.morale
+    before_trust = YT.family(game)["trust"]
+    out = YT.accept(game, club.cid)
+    assert game.me.morale < before_morale, "ללכת נגד ההורים חייב לעלות"
+    assert YT.family(game)["trust"] < before_trust
+    assert any("לא הסכימו" in line for line in out)
+
+
+def test_signing_moves_you_and_records_the_promises():
+    game = _kid()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    offer = YT.build_offer(game, club, game.rng, 0.95)
+    YT.set_offers(game, [offer])
+    YT.accept(game, club.cid)
+    assert game.me.club_id == club.cid, "לא עברת בפועל"
+    deal = game.flag("academy_deal")
+    assert deal and deal["cid"] == club.cid
+    assert not YT.live_offers(game), "אחרי חתימה השולחן מתרוקן"
+
+
+def test_youth_offers_expire():
+    game = _kid()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    YT.set_offers(game, [YT.build_offer(game, club, game.rng, 0.7)])
+    for _ in range(YT.WINDOW_WEEKS):
+        YT.tick_offers(game)
+    assert not YT.live_offers(game)
