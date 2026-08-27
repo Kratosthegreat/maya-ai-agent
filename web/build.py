@@ -15,7 +15,7 @@ JS_PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "match
             "tacticsteam.js", "knowledge.js", "coaching.js", "mentor.js",
             "transfers.js", "press.js", "fame.js", "youth.js",
             "manager.js", "story.js", "game.js", "graphics.js",
-            "avatars.js", "scenes.js", "ui.js"]
+            "avatars.js", "scenes.js", "widgets.js", "ui.js"]
 
 # הצהרת הקידוד חייבת להיות בבייטים הראשונים, ולפני כל טקסט בעברית.
 #

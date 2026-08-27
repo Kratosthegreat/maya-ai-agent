@@ -12,7 +12,7 @@ const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "ma
                "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
                "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "youth.js", "coaching.js", "mentor.js", "manager.js",
                "story.js", "game.js",
-               "graphics.js", "avatars.js", "scenes.js"];
+               "graphics.js", "avatars.js", "scenes.js", "widgets.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
 const ctx = vm.createContext({ console, Math, JSON, Date,
                               TextEncoder, TextDecoder, btoa, atob,
@@ -68,7 +68,9 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "tacticalStyle, teamInstructions, describeTactics, tacticModifiers, " +
   "styleSuitsPlayer, suitsValues, modifiersFrom, roleFitNote, assignRole, dutyFor, requestRole, " +
   "knowledgeLevel, shownDetail, knowledgeSummary, scoutPlayer, " +
-  "abilityStars, potentialStars, starText, weakestDetail, trainingShares };", ctx);
+  "abilityStars, potentialStars, starText, weakestDetail, trainingShares, " +
+  "ring, meter, verdictRow, statTile, matchup, rankBadge, sparkline, inboxRow, " +
+  "toneFor, wEsc };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -2478,6 +2480,60 @@ test("פנייה מחו\"ל היא חדשות גדולות יותר ממקומי
   };
   const abroad = weight(true), home = weight(false);
   assert(abroad > home, `מחו"ל ${abroad} מול מקומי ${home}`);
+});
+
+console.log("\nרכיבי תצוגה");
+
+test("הקשת בטבעת הדירוג ארוכה ביחס לערך", () => {
+  const arc = html => Number((html.match(/stroke-dasharray="([\d.]+)/) || [])[1]);
+  const full = arc(A.ring(100)), half = arc(A.ring(50)), none = arc(A.ring(0));
+  assert(none === 0, `ב-0 נמשכה קשת באורך ${none}`);
+  near(half / full, 0.48, 0.52, "חצי מהמקסימום");
+});
+
+test("ערך מעל המקסימום לא גולש מהפס", () => {
+  const width = html => Number((html.match(/width:([\d.]+)%/) || [])[1]);
+  assert(width(A.meter("כושר", 140)) === 100, "מד מעל 100% נחתך");
+  assert(width(A.meter("כושר", -20)) === 0, "מד שלילי נחתך");
+});
+
+test("גוון המד נגזר מהערך כשלא נמסר אחר", () => {
+  assert(A.meter("x", 90).includes('i class="good"'), "ערך גבוה אינו ירוק");
+  assert(A.meter("x", 20).includes('i class="bad"'), "ערך נמוך אינו אדום");
+  assert(A.meter("x", 20, { tone: "accent" }).includes('i class="accent"'),
+         "גוון מפורש לא גבר על האוטומטי");
+});
+
+test("גרף הקו נמתח לפי טווח הערכים ולא מאפס", () => {
+  // עלייה מ-70 ל-80 חייבת להיראות; אם הציר מתחיל ב-0 היא קו שטוח.
+  const svg = A.sparkline([70, 74, 72, 80]);
+  const ys = [...svg.matchAll(/<circle cx="[\d.]+" cy="([\d.]+)"/g)].map(m => Number(m[1]));
+  assert(ys.length === 4, `צוירו ${ys.length} נקודות`);
+  assert(Math.max(...ys) - Math.min(...ys) > 40, "הטווח האנכי נמעך");
+});
+
+test("גרף קו של סדרה שטוחה לא מחלק באפס", () => {
+  const svg = A.sparkline([70, 70, 70]);
+  assert(!/NaN|Infinity/.test(svg), "יצאו מספרים לא חוקיים");
+  assert(A.sparkline([70]) === "", "נקודה בודדת אינה גרף");
+});
+
+test("טקסט שמגיע מבחוץ אינו נשתל כ-HTML", () => {
+  const evil = '<img src=x onerror="boom">';
+  for (const html of [A.meter(evil, 50), A.statTile("⚽", evil, evil),
+                      A.rankBadge(evil), A.inboxRow("✉️", evil, evil),
+                      A.verdictRow(evil, evil, ""),
+                      A.matchup({ html: "", name: evil }, { html: "", name: evil })]) {
+    assert(!html.includes("<img"), "תגית זרה עברה: " + html.slice(0, 60));
+  }
+});
+
+test("סמל מועדון שכבר נבנה עובר לכרטיס המשחק כמו שהוא", () => {
+  const html = A.matchup({ html: "<svg id='home'></svg>", name: "הפועל" },
+                         { html: "<svg id='away'></svg>", name: "מכבי", mine: true });
+  assert(html.includes("<svg id='home'>") && html.includes("<svg id='away'>"),
+         "הסמלים לא הגיעו לכרטיס");
+  assert(html.includes("mu-name mine"), "הקבוצה שלי לא סומנה");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

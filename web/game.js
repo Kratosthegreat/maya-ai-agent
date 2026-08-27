@@ -23,6 +23,10 @@ function netIncome(gross) {
 // בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
 const YOUTH_LOAD = 0.52;
 
+// כמה שינויי דירוג נשמרים לגרף. 200 מכסים כמה עונות של עלייה רצופה,
+// והם עולים בשמורה פחות מקילובייט.
+const OVERALL_LOG_LIMIT = 200;
+
 class Game {
   constructor() {
     this.seed = 0;
@@ -39,6 +43,10 @@ class Game {
     this.history = []; this.caps = 0; this.intlGoals = 0;
     this.noStartStreak = 0; this.gameOver = false;
     this.positionLog = [];
+    // יומן הדירוג השבועי. הוא קיים רק כאן ולא במנוע הפייתון — כמו
+    // `positionLog`, זה יומן תצוגה: הגרף במסך הבית צריך קו, ובלי
+    // רישום שבועי הדירוג נראה שטוח עד סוף העונה הראשונה.
+    this.overallLog = [];
     this.rng = new Rng(1);
   }
 
@@ -149,6 +157,7 @@ class Game {
 
     g.startYear = g.year;
     g.startSeason();
+    g.logOverall();                    // נקודת הפתיחה של גרף ההתפתחות
     g.log(`התחלת את הדרך ב${club.name}.`);
     return g;
   }
@@ -279,6 +288,22 @@ class Game {
     const rows = this.standings(club.leagueId);
     const idx = rows.findIndex(r => r.clubId === club.cid);
     return idx < 0 ? 0 : idx + 1;
+  }
+
+  /**
+   * רישום הדירוג לגרף ההתפתחות.
+   *
+   * נרשם רק כשהמספר זז, אחרת קריירה של 25 שנה מייצרת אלף רשומות זהות
+   * בתוך השמורה. `OVERALL_LOG_LIMIT` חותך מלמטה — הגרף מראה את הדרך
+   * האחרונה, וההיסטוריה המלאה ממילא יושבת ב-`growthLog` לפי עונות.
+   */
+  logOverall() {
+    if (!this.me) return;
+    const value = overall(this.me);
+    const last = this.overallLog[this.overallLog.length - 1];
+    if (last && last[2] === value) return;
+    this.overallLog.push([this.year, this.week, value]);
+    if (this.overallLog.length > OVERALL_LOG_LIMIT) this.overallLog.shift();
   }
 
   leagueName(leagueId) {
@@ -422,6 +447,8 @@ class Game {
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
+    // רק כשהערך זז, ותמיד עם השבוע — אחרת אי אפשר לתייג את הציר
+    this.logOverall();
 
     // ההוראה לשבוע הבא
     const next = weeklyDirective(this, this.rng);
@@ -1965,7 +1992,8 @@ class Game {
       firstClubId: this.firstClubId, lastClubId: this.lastClubId,
       history: this.history, caps: this.caps, intlGoals: this.intlGoals,
       noStartStreak: this.noStartStreak, gameOver: this.gameOver,
-      positionLog: this.positionLog, startYear: this.startYear,
+      positionLog: this.positionLog, overallLog: this.overallLog,
+      startYear: this.startYear,
       staffMarket: this.staffMarket, finances: this.finances,
       rngState: this.rng.state(), pidCounter: PID_COUNTER,
     };
@@ -1984,7 +2012,8 @@ class Game {
       firstClubId: raw.firstClubId, lastClubId: raw.lastClubId,
       history: raw.history, caps: raw.caps, intlGoals: raw.intlGoals,
       noStartStreak: raw.noStartStreak, gameOver: raw.gameOver,
-      positionLog: raw.positionLog || [], startYear: raw.startYear,
+      positionLog: raw.positionLog || [], overallLog: raw.overallLog || [],
+      startYear: raw.startYear,
       staffMarket: raw.staffMarket || {}, finances: raw.finances || null,
     });
     g.rng = Rng.fromState(raw.rngState);

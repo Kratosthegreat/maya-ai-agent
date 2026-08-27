@@ -631,6 +631,7 @@ function screenMenu() {
     <div class="card">
       <div class="eyebrow">מה יש כאן</div>
       <div class="notes">
+        <div class="note"><span class="ico">📱</span><span>מסך בית חדש: טבעת דירוג, מדי כושר וחדות, סטטיסטיקות העונה, גרף התפתחות שבועי וטבלה צבועה — הכל במקום אחד.</span></div>
         <div class="note"><span class="ico">⚽</span><span>3 ליגות, 32 מועדונים, סימולציה מלאה של כל משחק בעונה.</span></div>
         <div class="note"><span class="ico">👀</span><span>אקדמיות שולחות צופים כבר בגיל 13 — ואם כמה רבות עליך, הערך שלך עולה עוד לפני שהוכחת משהו.</span></div>
         <div class="note"><span class="ico">👪</span><span>בגיל הנוער ההחלטה היא של המשפחה. להורים יש דעה משלהם, ואפשר לנסות לשכנע.</span></div>
@@ -751,11 +752,19 @@ function screenNew() {
     </div>
 
     <div class="panel">
-      <div class="panel-head"><span class="t">מסלול</span></div>
+      <div class="panel-head"><span class="t">בחר את הדרך שלך</span></div>
       <div class="panel-body">
-        <div class="chips">
-          <button class="chip" data-role="player" aria-pressed="${!isManager}">שחקן</button>
-          <button class="chip" data-role="manager" aria-pressed="${isManager}">מנג'ר</button>
+        <div class="paths">
+          <button class="path" data-role="player" aria-pressed="${!isManager}">
+            <span class="pi" aria-hidden="true">⚽</span>
+            <span class="pt">קריירת שחקן</span>
+            <span class="pd">מנער בקבוצת הנוער ועד הכוכב שכל מועדון רוצה.</span>
+          </button>
+          <button class="path mgr" data-role="manager" aria-pressed="${isManager}">
+            <span class="pi" aria-hidden="true">📋</span>
+            <span class="pt">קריירת מנג'ר</span>
+            <span class="pd">נהל מועדון, קבל את ההחלטות ובנה קבוצה מנצחת.</span>
+          </button>
         </div>
         <div class="muted">${isManager
           ? "מתחילים ישר על הקו: אתה בוחר מערך, הרכב וטקטיקה, וההנהלה סופרת נקודות."
@@ -857,8 +866,19 @@ function appbar() {
   </header>`;
 }
 
+/**
+ * אייקון לכל טאב. במסך רחב הטאבים הופכים לסרגל צד אנכי ואז האייקון
+ * הוא מה שמזהה — לכן כל מפתח חייב להופיע כאן.
+ */
+const TAB_ICONS = {
+  main: "🏠", mentor: "🧭", plan: "🗺️", growth: "📈", club: "🏟️",
+  tactics: "♟️", system: "🧩", squad: "👥", table: "📊", money: "💰",
+  press: "📰", fame: "⭐", offers: "🤝", academies: "🎓", profile: "🪪",
+  news: "📬", editor: "✏️",
+};
+
 function tabsBar() {
-  const items = [["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
+  const items =[["main", "סקירה"], ["squad", "סגל"], ["table", "ליגה"],
                  ["profile", "פרופיל"], ["news", "יומן"], ["editor", "עורך"]];
   if (game.myClub()) items.splice(2, 0, ["club", "מועדון"]);
   if (["youth", "academy", "player", "veteran"].includes(game.stage)) {
@@ -882,7 +902,9 @@ function tabsBar() {
                    academies: academies || (looking ? 0 : 0) };
   return `<nav class="tabs">${items.map(([k, l]) => {
     const n = badges[k] || 0;
-    return `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
+    return `<button class="tab" data-go="${k}" aria-current="${view === k}">
+      <span class="ti" aria-hidden="true">${TAB_ICONS[k] || "•"}</span>
+      <span class="tl">${l}</span>${
       n ? `<span class="badge">${n}</span>` : ""}</button>`;
   }).join("")}</nav>`;
 }
@@ -926,6 +948,31 @@ function bandLabel(value, labels) {
 
 const RESILIENCE_WORDS = ["זכוכית", "שביר", "רגיל", "חסון", "ברזל"];
 const SHARPNESS_WORDS = ["חלוד", "לא בקצב", "בסדר", "חד", "בשיא"];
+
+/** מורל במילה ובפרצוף — 87 לא אומר כלום, "מרוצה" כן. */
+function moraleWord(value) {
+  if (value >= 82) return ["מעולה", "😄", "good"];
+  if (value >= 64) return ["מרוצה", "🙂", "good"];
+  if (value >= 45) return ["בסדר", "😐", "warn"];
+  if (value >= 28) return ["לא מרוצה", "😕", "warn"];
+  return ["ברע", "😠", "bad"];
+}
+
+/** סיכון פציעה: `injuryRisk` מחזיר מכפיל סביב 1, וזה מתורגם למילה. */
+function riskWord(risk) {
+  if (risk < 0.82) return ["נמוך", "good"];
+  if (risk < 1.20) return ["רגיל", ""];
+  if (risk < 1.75) return ["מוגבר", "warn"];
+  return ["גבוה", "bad"];
+}
+
+/**
+ * גוון לטבעת הדירוג. הצבע כאן הוא לא "טוב/רע" אלא רמה — שחקן בן 14
+ * עם 42 לא נכשל בכלום, ולכן הסולם מתחיל בסגול ולא באדום.
+ */
+function ratingTone(value) {
+  return value >= 80 ? "good" : value >= 62 ? "accent" : "accent2";
+}
 
 
 /**
@@ -1418,6 +1465,33 @@ function screenTactics() {
   </div>`;
 }
 
+/**
+ * גוון תג המיקום. ליגת העל: שתי האחרונות יורדות והראשונה אלופה;
+ * הלאומית: שתי הראשונות עולות. הצבע חייב להסכים עם השורות שכתובות
+ * מתחת לטבלה, אחרת הוא משקר.
+ */
+function standingTone(pos, total, leagueId) {
+  if (leagueId === "top") {
+    if (pos === 1) return "up";
+    if (pos <= 3) return "euro";
+    if (pos > total - 2) return "down";
+    return "";
+  }
+  if (leagueId === "national") return pos <= 2 ? "up" : "";
+  return pos === 1 ? "up" : "";
+}
+
+/** אייקון לשורת חדשות, לפי מה שהיא מספרת. */
+function newsIcon(text) {
+  if (/פציע|נפצע|שריר|ניתוח/.test(text)) return "🚑";
+  if (/שער|כבש|בישל/.test(text)) return "⚽";
+  if (/חוזה|חתם|העבר|הצע/.test(text)) return "📝";
+  if (/עיתונ|שמוע|ראיון|תקשור/.test(text)) return "📰";
+  if (/אליפ|גביע|תואר|זכ/.test(text)) return "🏆";
+  if (/מאמן|הנהלה|סגל/.test(text)) return "🎙️";
+  return "✉️";
+}
+
 function screenHub() {
   const me = game.me;
   const club = game.myClub();
@@ -1454,19 +1528,16 @@ function screenHub() {
         <div class="panel-head"><span class="t">המשחק הבא</span>
           <span class="r">${esc(comp)} · ${where}</span></div>
         <div class="panel-body">
-          <div class="scoreline">
-            <div class="side">${crest(home, 34)}<span class="nm ${
-              club && club.cid === homeId ? "mine" : ""}">${esc(home.name)}</span></div>
-            <div class="versus">נגד</div>
-            <div class="side away">${crest(away, 34)}<span class="nm ${
-              club && club.cid === awayId ? "mine" : ""}">${esc(away.name)}</span></div>
-          </div>
+          ${matchup(
+            { html: crest(home, 46), name: home.name, mine: club && club.cid === homeId },
+            { html: crest(away, 46), name: away.name, mine: club && club.cid === awayId },
+            { meta: `${comp} · מחזור ${Math.max(1, game.week)} · שבוע ${game.week}, ${game.year}`,
+              note: `${rival.nickname} · מוניטין ${rival.reputation}${
+                club ? " · אתם במקום " + game.leaguePosition() : ""}` })}
           <div class="scoreline" style="font-size:12px">
             <div class="side">${formGuide(home)}</div><div></div>
             <div class="side away">${formGuide(away)}</div>
           </div>
-          <div class="muted">${esc(rival.nickname)} · מוניטין ${rival.reputation}${
-            club ? " · מקום " + game.leaguePosition() : ""}</div>
           <button class="mini-btn wide" data-club="${rival.cid}">
             תיק על ${esc(rival.name)}</button>
         </div>
@@ -1477,22 +1548,33 @@ function screenHub() {
   }
 
   // --- פאנל המצב ---
-  const statusBody = isPlayer ? `
-      <div class="avatar-row">${avatar(me, club, 46)}
-        <span class="grow"><span class="nm"><strong>${esc(me.name)}</strong></span>
+  // --- כרטיס הזהות עם טבעת הדירוג ---
+  const header = isPlayer ? `
+    <div class="panel">
+      <div class="dash-head">
+        ${avatar(me, club, 52)}
+        <span class="who"><span class="nm">${esc(me.name)}</span>
           <span class="sub">${esc(positionHe(me))} · בן ${me.age}${
-            me.number ? " · מספר " + me.number : ""}</span></span>
-        <span class="val" style="font-size:22px">${overall(me)}</span></div>
-      <div class="stat-grid">
-        <div class="stat"><div class="n">${Math.round(me.form)}</div><div class="l">כושר</div></div>
-        <div class="stat"><div class="n">${Math.round(me.fitness)}</div><div class="l">רעננות</div></div>
-        <div class="stat"><div class="n">${Math.round(me.morale)}</div><div class="l">מורל</div></div>
+            me.number ? " · מספר " + me.number : ""}${
+            club ? " · " + esc(club.name) : ""}</span></span>
+        ${ring(overall(me), { size: 58, label: "כללי", tone: ratingTone(overall(me)) })}
       </div>
-      ${me.injuryWeeks > 0 ? `<div class="note"><span class="ico">🚑</span>
-        <span>${esc(me.injuryName)} — עוד ${me.injuryWeeks} שבועות</span></div>` : ""}
-      ${club ? `<div class="attr"><span>אמון המאמן</span>
-        <span class="val">${Math.round(club.managerTrust)}</span>
-        <span class="bar"><i style="width:${Math.round(club.managerTrust)}%"></i></span></div>` : ""}`
+    </div>` : "";
+
+  // --- מדים: מה שהיה שלושה מספרים יבשים ---
+  const [moraleText, moraleFace, moraleTone] = moraleWord(me.morale);
+  const [riskText, riskTone] = isPlayer ? riskWord(injuryRisk(me)) : ["", ""];
+  const statusBody = isPlayer ? `
+      <div class="meters">
+        ${meter("כושר", me.form)}
+        ${meter("רעננות", me.fitness)}
+        ${meter("חדות", me.sharpness)}
+        ${verdictRow("מורל", moraleFace + " " + moraleText, moraleTone)}
+        ${me.injuryWeeks > 0
+          ? verdictRow("פציעה", `${me.injuryName} — עוד ${me.injuryWeeks} שב'`, "bad")
+          : verdictRow("סיכון פציעה", riskText, riskTone)}
+        ${club ? meter("אמון המאמן", club.managerTrust) : ""}
+      </div>`
     : club ? `
       <div class="stat-grid">
         <div class="stat"><div class="n">${game.leaguePosition()}</div><div class="l">מקום</div></div>
@@ -1502,6 +1584,25 @@ function screenHub() {
       <div class="muted">ציפיית ההנהלה: ${esc(club.seasonExpectation)}</div>`
     : `<div class="muted">ידע אימון ${Math.round(me.coaching)} ·
        תקשורת ${Math.round(me.mediaSkill)} · עסקים ${Math.round(me.business)}</div>`;
+
+  // --- סטטיסטיקות העונה ---
+  const s = me.season;
+  const rating = avgRating(s);
+  const seasonPanel = isPlayer && s ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">סטטיסטיקות עונה</span>
+        <span class="r">${game.year}</span></div>
+      <div class="panel-body">
+        <div class="tiles">
+          ${statTile("👕", s.apps, "משחקים")}
+          ${statTile("⚽", s.goals, "שערים")}
+          ${statTile("🎯", s.assists, "בישולים")}
+          <div class="tile">${ring(rating || 0, { max: 10, size: 44, stroke: 4,
+            text: rating ? rating.toFixed(1) : "—", label: "ציון",
+            tone: rating >= 7.2 ? "good" : rating >= 6.3 ? "accent" : "warn" })}</div>
+        </div>
+      </div>
+    </div>` : "";
 
   // --- טבלה מקוצרת ---
   let tableSnip = "";
@@ -1516,8 +1617,10 @@ function screenHub() {
         <div class="panel-body tight">
           ${rows.slice(from, from + 5).map((r, i) => {
             const c = game.clubs[r.clubId];
+            const pos = from + i + 1;
             return `<div class="row ${c.cid === club.cid ? "me" : ""}">
-              <span class="val" style="min-width:18px">${from + i + 1}</span>
+              ${rankBadge(pos, c.cid === club.cid ? "mine"
+                : standingTone(pos, rows.length, club.leagueId))}
               ${crest(c, 22)}
               <span class="grow"><span class="nm">${esc(c.name)}</span></span>
               ${formGuide(c)}
@@ -1528,28 +1631,45 @@ function screenHub() {
       </div>`;
   }
 
-  // --- הודעות ---
-  const news = game.news.slice(-4).reverse();
+  // --- גרף ההתפתחות ---
+  // שני מספרים אינם קו. עד שיש שלוש נקודות עדיף לא להראות כלום מאשר
+  // להראות גרף שטוח שנראה כאילו נתקעת.
+  const log = (game.overallLog || []).slice(-14);
+  const trendPanel = isPlayer && log.length >= 3 ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">התפתחות</span>
+        <span class="r num">${log[0][2]} → ${log[log.length - 1][2]}</span></div>
+      <div class="panel-body">
+        ${sparkline(log.map(r => r[2]), {
+          // רק מספר השבוע: טקסט עברי בתוך SVG מתערבב עם ספרות
+          labels: log.map((r, i) =>
+            i === 0 || i === log.length - 1 ? String(r[1]) : ""),
+          alt: "הדירוג הכללי בשבועות האחרונים" })}
+      </div>
+    </div>` : "";
+
+  // --- תיבת הדואר ---
+  const news = game.news.slice(-5).reverse();
   const messages = news.length ? `
     <div class="panel">
-      <div class="panel-head"><span class="t">הודעות</span>
-        <span class="r">${news.length}</span></div>
+      <div class="panel-head"><span class="t">חדשות אחרונות</span>
+        <span class="r"><button class="mini-btn" data-go="news">לכל החדשות</button></span></div>
       <div class="panel-body tight">
-        ${news.map(n => {
-          const text = n.replace(/^\[[^\]]+\]\s*/, "");
-          const when = (n.match(/^\[([^\]]+)\]/) || ["", ""])[1];
-          return `<div class="row">
-            ${avatarChip(me, club, 26)}
-            <span class="grow"><span class="nm">${esc(text)}</span>
-              <span class="sub">${esc(when)}</span></span>
-          </div>`;
-        }).join("")}
+        <div class="msgs">
+          ${news.map((n, i) => {
+            const text = n.replace(/^\[[^\]]+\]\s*/, "");
+            const when = (n.match(/^\[([^\]]+)\]/) || ["", ""])[1];
+            return inboxRow(newsIcon(text), text, when, { tone: i === 0 ? "hot" : "" });
+          }).join("")}
+        </div>
       </div>
     </div>` : "";
 
   return `
   <div class="screen">
     ${saveWarning()}
+    ${header}
+    <div class="dash-grid">
     ${nextMatch}
 
     ${offer ? `
@@ -1571,7 +1691,7 @@ function screenHub() {
 
     <div class="panel">
       <div class="panel-head"><span class="t">המצב שלך</span>
-        <span class="r">₪${fmt(game.money)}</span></div>
+        <span class="r num">₪${fmt(game.money)}</span></div>
       <div class="panel-body">${statusBody}
         ${(() => { const note = selectionNote(game);
           return note ? `<div class="muted selection">${esc(note)}</div>` : ""; })()}
@@ -1583,7 +1703,9 @@ function screenHub() {
       </div>
     </div>
 
-    <div class="panel">
+    ${seasonPanel}
+
+    <div class="panel wide">
       <div class="panel-head"><span class="t">תוכנית השבוע</span>
         <span class="r">${esc((actions.find(a => a[0] === game.trainingFocus) || ["", ""])[1])}</span></div>
       <div class="panel-body">
@@ -1605,7 +1727,9 @@ function screenHub() {
     ${scoutSnip()}
     ${clubSnip()}
     ${tableSnip}
+    ${trendPanel}
     ${messages}
+    </div>
 
     ${savePanel()}
 
@@ -1766,14 +1890,17 @@ function screenGrowth() {
       <div class="panel-head"><span class="t">מאז ${info.since}</span>
         <span class="r">גיל ${info.since_age} → ${me.age}</span></div>
       <div class="panel-body">
-        <div class="stat-grid">
-          <div class="stat"><div class="n">${info.overall_from} → ${info.overall_to}</div>
-            <div class="l">דירוג כללי</div></div>
-          <div class="stat"><div class="n">+${info.total_points}</div>
-            <div class="l">נקודות תכונה</div></div>
-          <div class="stat"><div class="n">${info.seasons.length}</div>
-            <div class="l">עונות</div></div>
+        <div class="dash-head" style="padding:0">
+          ${ring(info.overall_to, { size: 62, label: "כללי",
+            tone: ratingTone(info.overall_to) })}
+          <span class="who"><span class="nm">${info.overall_from} → ${info.overall_to}</span>
+            <span class="sub">+${info.total_points} נקודות תכונה ·
+              ${info.seasons.length} עונות</span></span>
         </div>
+        ${sparkline(info.seasons.map(r => r.overall), {
+          labels: info.seasons.map((r, i) =>
+            i === 0 || i === info.seasons.length - 1 ? String(r.year) : ""),
+          alt: "דירוג כללי לאורך העונות", tone: "accent" })}
       </div>
     </div>
 
@@ -2883,7 +3010,9 @@ function screenTable() {
               const cls = [mine ? "me" : "",
                 isDomestic && leagueId === "national" && i < 2 ? "up" : "",
                 isDomestic && leagueId === "top" && i >= rows.length - 2 ? "down" : ""].join(" ");
-              return `<tr class="${cls}"><td>${i + 1}</td>
+              const tone = mine ? "mine"
+                : isDomestic ? standingTone(i + 1, rows.length, leagueId) : "";
+              return `<tr class="${cls}"><td>${rankBadge(i + 1, tone)}</td>
                 <td class="club"><span class="crest-row">${crest(c, 20)}<span class="nm">${esc(c.name)}</span></span></td>
                 <td>${r.played}</td>
                 <td><span class="num">${r.gd > 0 ? "+" : ""}${r.gd}</span></td>
@@ -2924,13 +3053,18 @@ function screenSquad() {
         · מתקנים ${club.trainingFacilities}</div>
       ${formGuide(club) ? `<div>${formGuide(club)}</div>` : ""}
       <hr class="rule">
-      ${squad.map(p => `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
-        <span class="avatar-row">${avatarChip(p, club, 30)}
+      ${squad.map((p, i) => {
+        const [, face] = moraleWord(p.morale);
+        return `<div class="squad-row ${p.pid === game.meId ? "me" : ""}">
+        <span class="avatar-row">${rankBadge(i + 1, p.pid === game.meId ? "mine" : "")}
+          ${avatarChip(p, club, 30)}
           <span class="num">${p.number || ""}</span> <span class="nm">${esc(p.name)}</span>${
           p.injuryWeeks > 0 ? ` <span class="muted">🚑${p.injuryWeeks}ש</span>` : ""}</span>
         <span class="pos">${esc(positionHe(p))} · ${p.age}</span>
+        <span class="mood" title="מורל">${face}</span>
+        <span class="fit num">${Math.round(p.fitness)}%</span>
         <span class="ovr">${overall(p)}</span>
-      </div>`).join("")}
+      </div>`; }).join("")}
     </div>
   </div>`;
 }
@@ -3018,12 +3152,18 @@ function screenNews() {
         <span>${esc(D.CAREER_STAGES_HE[h.stage] || h.stage)} · ${esc(h.club)} — ${h.apps} משחקים, ${h.goals} שערים</span>
       </div>`).join("")}
     </div>` : ""}
-    <div class="card">
-      <div class="eyebrow">יומן</div>
-      <div class="notes">
-        ${game.news.slice(-25).reverse().map(n =>
-          `<div class="note"><span class="ico">·</span><span>${esc(n)}</span></div>`).join("")
-          || '<div class="muted">עוד לא קרה כלום. זה יגיע.</div>'}
+    <div class="panel">
+      <div class="panel-head"><span class="t">תיבת דואר</span>
+        <span class="r">${game.news.length}</span></div>
+      <div class="panel-body tight">
+        <div class="msgs">
+          ${game.news.slice(-30).reverse().map(n => {
+            const text = n.replace(/^\[[^\]]+\]\s*/, "");
+            const when = (n.match(/^\[([^\]]+)\]/) || ["", ""])[1];
+            return inboxRow(newsIcon(text), text, when);
+          }).join("")
+            || '<div class="row"><span class="muted">עוד לא קרה כלום. זה יגיע.</span></div>'}
+        </div>
       </div>
     </div>
   </div>`;
