@@ -385,6 +385,13 @@ class Game {
     for (const line of scoutsThisWeek(this, this.rng, myRating))
       report.notes.push({ icon: "", text: line });
 
+    // הערכה מחדש לנער: הדירוג שלו גדל מהר מדי מכדי לחכות לקיץ
+    if (["youth", "academy", "player"].includes(this.stage)
+        && this.week % REASSESS_EVERY === 0) {
+      const note = reassessYoungster(this.me, this.rng, this.myClub());
+      if (note) report.notes.push({ icon: "", text: note });
+    }
+
     // צופי נוער — מערך שצד ילדים הרבה לפני שהם שחקנים
     if (this.stage === "youth") {
       for (const line of youthScoutsThisWeek(this, this.rng))

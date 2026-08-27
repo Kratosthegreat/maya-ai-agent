@@ -39,6 +39,7 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "setYouthOffers, liveYouthOffers, youthOfferFor, tickYouthOffers, chaseBonus, " +
   "persuadeFamily, acceptYouthOffer, declineYouthOffer, youthScoutsThisWeek, " +
   "SCOUT_POOL_LIMIT, YOUTH_WINDOW_WEEKS, DISTANCE_NAMES, " +
+  "reassessYoungster, REASSESS_EVERY, REASSESS_UNTIL, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -2310,6 +2311,93 @@ test("להצעות נוער יש דדליין", () => {
   A.setYouthOffers(g, [A.buildYouthOffer(g, otherClubs(g)[0], g.rng, 0.7)]);
   for (let i = 0; i < A.YOUTH_WINDOW_WEEKS; i++) A.tickYouthOffers(g);
   assert(!A.liveYouthOffers(g).length, "הצעה בלי דדליין היא לא הצעה");
+});
+
+// ---------------------------------------------------------------------------
+// ההערכה חייבת לרדוף אחרי נער שגדל מהר
+// ---------------------------------------------------------------------------
+
+test("נער חנוק מקבל הערכה מחדש לפני סוף העונה", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 15, 4);
+  const me = g.me;
+  me.ceiling = 90;
+  const before = A.overall(me) + 2;   // דירוג שכמעט נושך את ההערכה
+  let moved = 0;
+  for (let seed = 0; seed < 30; seed++) {
+    me.potential = before;
+    if (A.reassessYoungster(me, new A.Rng(seed), g.myClub())) moved++;
+  }
+  assert(moved >= 15, `רק ${moved} מתוך 30 העריכו מחדש נער חנוק`);
+});
+
+test("כשיש עוד מרווח אין מה למהר", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 15, 4);
+  const me = g.me;
+  me.ceiling = 95;
+  me.potential = A.overall(me) + 20;
+  for (let seed = 0; seed < 20; seed++)
+    assert(A.reassessYoungster(me, new A.Rng(seed), g.myClub()) === null,
+      "ההערכה רצה קדימה בלי סיבה");
+});
+
+test("ההערכה מחדש נעצרת אחרי גיל הנוער", () => {
+  const g = A.Game.newGame("בוגר", "ST", "hapoel_carmel", 24, 4);
+  const me = g.me;
+  me.age = A.REASSESS_UNTIL + 1;
+  me.ceiling = 95;
+  me.potential = A.overall(me) + 1;
+  for (let seed = 0; seed < 20; seed++)
+    assert(A.reassessYoungster(me, new A.Rng(seed), g.myClub()) === null,
+      "בוגר קיבל הערכה מחדש של אמצע עונה");
+});
+
+test("הערכה מחדש לעולם לא מורידה", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 15, 4);
+  const me = g.me;
+  me.ceiling = 90;
+  for (let seed = 0; seed < 30; seed++) {
+    me.potential = 60;
+    A.reassessYoungster(me, new A.Rng(seed), g.myClub());
+    assert(me.potential >= 60, "דוח אמצע הוריד את ההערכה");
+  }
+});
+
+test("הערכה מחדש מכבדת את התקרה", () => {
+  const g = A.Game.newGame("נער", "ST", "hapoel_carmel", 15, 4);
+  const me = g.me;
+  me.ceiling = 70;
+  me.potential = 70;
+  for (let seed = 0; seed < 20; seed++) {
+    A.reassessYoungster(me, new A.Rng(seed), g.myClub());
+    assert(me.potential <= 70, "ההערכה עברה את התקרה");
+  }
+});
+
+test("ההתפתחות לא צונחת בגיל 16", () => {
+  // נמדד לפי הגדילה הגולמית של התכונות ולא לפי הדירוג המשוקלל —
+  // הדירוג מוטה לפי עמדה והיה מסתיר את התמונה.
+  const perAge = {};
+  for (const seed of [3, 7, 11, 19, 27]) {
+    const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 13, seed);
+    const me = g.me;
+    for (let i = 0; i < 4000; i++) {
+      if (g.gameOver || me.age > 18) break;
+      if (g.pendingEventId) { g.resolveEvent(0); continue; }
+      g.advanceWeek();
+      const vals = Object.values(me.detail);
+      (perAge[me.age] = perAge[me.age] || []).push(
+        vals.reduce((a, b) => a + b, 0) / vals.length);
+    }
+  }
+  const mean = {};
+  for (const age in perAge)
+    mean[age] = perAge[age].reduce((a, b) => a + b, 0) / perAge[age].length;
+  const gain = a => mean[a] - mean[a - 1];
+  // הגדילה יורדת עם הגיל — זה בסדר. מה שאסור הוא צניחה פתאומית.
+  assert(gain(16) > gain(15) * 0.80,
+    `נפילה בגיל 16: ${gain(15).toFixed(2)} → ${gain(16).toFixed(2)}`);
+  assert(gain(17) > gain(16) * 0.75,
+    `נפילה בגיל 17: ${gain(16).toFixed(2)} → ${gain(17).toFixed(2)}`);
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

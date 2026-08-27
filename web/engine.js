@@ -1076,6 +1076,39 @@ function simulateAiWeek(players, rng, clubs, skip) {
  * מעדכן את הערכת הפוטנציאל לפי מה שהשחקן באמת עשה השנה.
  * התקרה המוחלטת נסתרת ולא זזה — מה שזז הוא ההערכה.
  */
+const REASSESS_EVERY = 10;    // שבועות
+const REASSESS_UNTIL = 18;    // גיל
+
+/**
+ * מרענן את הערכת הפוטנציאל של נער באמצע העונה.
+ *
+ * למה זה קיים: הערכת הפוטנציאל התעדכנה פעם בשנה, ונער מוכשר גדל תשע
+ * נקודות דירוג באותה שנה. התוצאה הייתה שהדירוג עוקף את ההערכה, המרווח
+ * ביניהם מתאפס, והבלם שמאט ליד תקרת הפוטנציאל חונק את ההתפתחות —
+ * בדיוק בגיל 16-17. נמדד: המרווח נפל מ-8.2 ל-2.0 והבלם מ-0.90 ל-0.37,
+ * בזמן שעקומת הגיל ירדה ב-8% בלבד.
+ *
+ * רק מעלה, לעולם לא מוריד: ירידה היא החלטה של סוף עונה.
+ */
+function reassessYoungster(p, rng, club = null) {
+  if (p.age > REASSESS_UNTIL) return null;
+  const room = p.ceiling - p.potential;
+  if (room <= 0) return null;
+  const headroom = p.potential - overall(p);
+  if (headroom > 7) return null;        // יש עוד מרווח — אין מה למהר
+
+  let grow = Math.max(0, 7 - headroom) * 0.42;
+  grow *= 0.55 + (club ? club.trainingFacilities : 50) / 145;
+  grow *= 0.75 + (p.detail.determination ?? 10) / 26;
+  grow *= rng.uniform(0.7, 1.3);
+  const gained = Math.round(grow);
+  if (gained <= 0) return null;
+  const before = p.potential;
+  p.potential = Math.round(clamp(p.potential + gained, overall(p), p.ceiling));
+  if (p.potential <= before) return null;
+  return `📋 בדוח האמצע כתבו עליך אחרת. ההערכה עלתה ל-${p.potential}.`;
+}
+
 // התקרה המוחלטת. 95 נקבע בלידה; מעבר לזה מגיעים רק בהוכחה על הדשא.
 const ABSOLUTE_CEILING = 99;
 

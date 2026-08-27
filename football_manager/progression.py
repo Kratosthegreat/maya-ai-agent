@@ -384,6 +384,56 @@ def simulate_ai_week(players: Dict[str, Player], rng: random.Random,
 
 
 # ---------------------------------------------------------------------------
+# הערכה מחדש באמצע עונה — רק לצעירים
+# ---------------------------------------------------------------------------
+
+REASSESS_EVERY = 10      # שבועות
+REASSESS_UNTIL = 18      # גיל
+
+
+def reassess_youngster(player: Player, rng: random.Random,
+                       club: Optional[Club] = None) -> Optional[str]:
+    """מרענן את הערכת הפוטנציאל של נער באמצע העונה.
+
+    למה זה קיים: הערכת הפוטנציאל התעדכנה פעם בשנה, ונער מוכשר גדל
+    תשע נקודות דירוג באותה שנה. התוצאה הייתה שהדירוג עוקף את ההערכה,
+    המרווח ביניהם מתאפס, והבלם שמאט ליד תקרת הפוטנציאל חונק את
+    ההתפתחות — בדיוק בגיל 16-17. נמדד: המרווח נפל מ-8.2 ל-2.0 והבלם
+    מ-0.90 ל-0.37, בזמן שעקומת הגיל ירדה ב-8% בלבד.
+
+    בעולם האמיתי אף אחד לא מחכה לסוף העונה כדי לעדכן דעה על ילד בן
+    ארבע־עשרה. מרימים את ההערכה תוך כדי, בצעדים קטנים.
+
+    רק מעלה, לעולם לא מוריד: ירידה היא החלטה של סוף עונה, עם עונה
+    שלמה מאחוריה.
+    """
+    if player.age > REASSESS_UNTIL:
+        return None
+    room = player.ceiling - player.potential
+    if room <= 0:
+        return None
+    # כמה קרוב הדירוג לנשוך את ההערכה
+    headroom = player.potential - player.overall
+    if headroom > 7:
+        return None                     # יש עוד מרווח — אין מה למהר
+
+    grow = max(0.0, 7 - headroom) * 0.42
+    grow *= 0.55 + (club.training_facilities if club else 50) / 145.0
+    grow *= 0.75 + player.detail.get("determination", 10) / 26.0
+    grow *= rng.uniform(0.7, 1.3)
+    gained = int(round(grow))
+    if gained <= 0:
+        return None
+    before = player.potential
+    player.potential = int(clamp(player.potential + gained,
+                                 player.overall, player.ceiling))
+    if player.potential <= before:
+        return None
+    return (f"📋 בדוח האמצע כתבו עליך אחרת. ההערכה עלתה "
+            f"ל-{player.potential}.")
+
+
+# ---------------------------------------------------------------------------
 # סוף עונה
 # ---------------------------------------------------------------------------
 

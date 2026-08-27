@@ -36,7 +36,8 @@ from . import fame as FA
 from . import youth as YT
 from . import scouting as SC
 from . import wealth as WL
-from .progression import (end_of_season_development, retirement_pressure,
+from .progression import (REASSESS_EVERY, end_of_season_development,
+                          reassess_youngster, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
                           weekly_training)
 
@@ -535,6 +536,13 @@ class GameState:
             my_rating = report.match.ratings[self.me_id]
         for line in SC.scouts_this_week(self, self.rng, my_rating):
             report.add(line)
+
+        # 5-. הערכה מחדש לנער: הדירוג שלו גדל מהר מדי מכדי לחכות לקיץ
+        if (self.stage in ("youth", "academy", "player")
+                and self.week % REASSESS_EVERY == 0):
+            note = reassess_youngster(self.me, self.rng, self.my_club)
+            if note:
+                report.add(note)
 
         # 5א. צופי נוער — מערך שצד ילדים הרבה לפני שהם שחקנים
         if self.stage == "youth":

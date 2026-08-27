@@ -2431,3 +2431,103 @@ def test_youth_offers_expire():
     for _ in range(YT.WINDOW_WEEKS):
         YT.tick_offers(game)
     assert not YT.live_offers(game)
+
+# ---------------------------------------------------------------------------
+# ההערכה חייבת לרדוף אחרי נער שגדל מהר
+# ---------------------------------------------------------------------------
+
+def test_a_youngster_is_reassessed_before_the_season_ends():
+    """הבעיה: ההערכה התעדכנה פעם בשנה, והנער גדל 9 נקודות באותה שנה."""
+    import random
+    from football_manager.progression import reassess_youngster
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 15, seed=4)
+    me = game.me
+    me.ceiling = 90
+    # דירוג שכמעט נושך את ההערכה — זה המצב שחנק את ההתפתחות
+    me.potential = me.overall + 2
+    before = me.potential
+    moved = 0
+    for seed in range(30):
+        me.potential = before
+        if reassess_youngster(me, random.Random(seed), game.my_club):
+            moved += 1
+    assert moved >= 15, f"רק {moved} מתוך 30 העריכו מחדש נער חנוק"
+
+
+def test_reassessment_only_helps_when_the_gap_is_closing():
+    """כשיש עוד מרווח אין מה למהר — ההערכה לא צריכה לרוץ קדימה."""
+    import random
+    from football_manager.progression import reassess_youngster
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 15, seed=4)
+    me = game.me
+    me.ceiling = 95
+    me.potential = me.overall + 20         # מרווח ענק
+    for seed in range(20):
+        assert reassess_youngster(me, random.Random(seed), game.my_club) is None
+
+
+def test_reassessment_stops_after_youth():
+    import random
+    from football_manager.progression import reassess_youngster, REASSESS_UNTIL
+    game = GameState.new_game("בוגר", "ST", "hapoel_carmel", 24, seed=4)
+    me = game.me
+    me.age = REASSESS_UNTIL + 1
+    me.ceiling = 95
+    me.potential = me.overall + 1          # חנוק לגמרי
+    for seed in range(20):
+        assert reassess_youngster(me, random.Random(seed), game.my_club) is None
+
+
+def test_reassessment_never_lowers_the_estimate():
+    """ירידה היא החלטה של סוף עונה, לא של דוח אמצע."""
+    import random
+    from football_manager.progression import reassess_youngster
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 15, seed=4)
+    me = game.me
+    me.ceiling = 90
+    for seed in range(30):
+        me.potential = 60
+        reassess_youngster(me, random.Random(seed), game.my_club)
+        assert me.potential >= 60
+
+
+def test_reassessment_respects_the_ceiling():
+    import random
+    from football_manager.progression import reassess_youngster
+    game = GameState.new_game("נער", "ST", "hapoel_carmel", 15, seed=4)
+    me = game.me
+    me.ceiling = 70
+    me.potential = 70
+    for seed in range(20):
+        reassess_youngster(me, random.Random(seed), game.my_club)
+        assert me.potential <= 70, "ההערכה עברה את התקרה"
+
+
+def test_growth_does_not_fall_off_a_cliff_at_sixteen():
+    """התלונה: 'לקראת סוף 16 תחילת 17 ההתקדמות נעצרת'.
+
+    נמדד לפי הגדילה הגולמית של התכונות, לא לפי הדירוג המשוקלל —
+    הדירוג מוטה לפי עמדה והיה מסתיר את התמונה.
+    """
+    import statistics
+    per_age = {}
+    for seed in (3, 7, 11, 19, 27):
+        game = GameState.new_game("בודק", "ST", "hapoel_carmel", 13, seed=seed)
+        me = game.me
+        for _ in range(4000):
+            if game.game_over or me.age > 18:
+                break
+            if game.pending_event_id:
+                game.resolve_event(0)
+                continue
+            game.advance_week()
+            per_age.setdefault(me.age, []).append(
+                statistics.mean(me.detail.values()))
+
+    mean = {age: statistics.mean(vals) for age, vals in per_age.items()}
+    gain = {age: mean[age] - mean[age - 1] for age in sorted(mean) if age - 1 in mean}
+    # הגדילה יורדת עם הגיל — זה בסדר. מה שאסור הוא צניחה פתאומית.
+    assert gain[16] > gain[15] * 0.80, (
+        f"נפילה בגיל 16: {gain[15]:.2f} → {gain[16]:.2f}")
+    assert gain[17] > gain[16] * 0.75, (
+        f"נפילה בגיל 17: {gain[16]:.2f} → {gain[17]:.2f}")
