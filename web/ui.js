@@ -861,10 +861,18 @@ function tabsBar() {
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
     items.splice(2, 0, ["system", "מערכת"]);
-  const offers = game.flag("pending_offer") ? 1 : 0;
-  return `<nav class="tabs">${items.map(([k, l]) =>
-    `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
-      k === "main" && offers ? `<span class="badge">${offers}</span>` : ""}</button>`).join("")}</nav>`;
+  const offers = ["player", "veteran"].includes(game.stage) ? liveOffers(game).length : 0;
+  const question = openQuestion(game) ? 1 : 0;
+  const venture = game.flag("venture") ? 1 : 0;
+  if (["academy", "player", "veteran"].includes(game.stage))
+    items.splice(items.length - 1, 0, ["press", "תקשורת"], ["fame", "שם"]);
+  if (offers) items.splice(1, 0, ["offers", "הצעות"]);
+  const badges = { offers, press: question, fame: venture };
+  return `<nav class="tabs">${items.map(([k, l]) => {
+    const n = badges[k] || 0;
+    return `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
+      n ? `<span class="badge">${n}</span>` : ""}</button>`;
+  }).join("")}</nav>`;
 }
 
 function dock(showPlay) {
@@ -891,6 +899,9 @@ function screenMain() {
   if (view === "mentor") return appbar() + screenMentor();
   if (view === "growth") return appbar() + screenGrowth();
   if (view === "attr") return appbar() + screenAttr();
+  if (view === "offers") return appbar() + screenOffers();
+  if (view === "press") return appbar() + screenPress();
+  if (view === "fame") return appbar() + screenFame();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -2090,6 +2101,213 @@ function trainingBrief(focus) {
     </div>`;
 }
 
+// ---------------------------------------------------------------------------
+// הצעות — שוק, לא הודעה
+// ---------------------------------------------------------------------------
+
+/**
+ * טבלת ההצעות שעל השולחן.
+ *
+ * העיקר כאן הוא לא הכפתור "לחתום" אלא מה שמעליו: כמה הצעות יש, מה
+ * ההבדל ביניהן, וכמה כוח יש לך לבקש עוד. משא ומתן בלי מינוף גלוי הוא
+ * ניחוש; עם מינוף גלוי זו החלטה.
+ */
+function screenOffers() {
+  const live = liveOffers(game);
+  const lev = leverage(game);
+  const levWord = lev > 0.72 ? "חזק מאוד" : lev > 0.52 ? "חזק"
+                : lev > 0.34 ? "בינוני" : "חלש";
+  const levTone = lev > 0.52 ? "good" : lev > 0.34 ? "" : "bad";
+
+  if (!live.length) {
+    return `<div class="screen">
+      <div class="panel"><div class="panel-head"><span class="t">אין הצעות</span></div>
+        <div class="panel-body"><div class="muted">חלון ההעברות נפתח בסוף העונה.
+          מה שקובע מי יפנה אליך זה מי עוקב אחריך עכשיו — במסך הצופים.</div>
+          <button class="btn wide" data-go="scouts">מי עוקב אחריי</button>
+        </div></div>
+    </div>` + dock(false);
+  }
+
+  return `<div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">המינוף שלך</span>
+        <span class="r ${levTone}">${levWord}</span></div>
+      <div class="panel-body">
+        <div class="bar"><span style="width:${Math.round(lev * 100)}%"></span></div>
+        <div class="muted">${esc(leverageWhy(lev))}</div>
+      </div>
+    </div>
+    ${live.map(offerCard).join("")}
+    <div class="panel">
+      <div class="panel-body"><div class="muted">כל בקשה שורפת סבלנות. מועדון
+        שנגמרה לו הסבלנות יורד מהעסקה — וזה קורה.</div></div>
+    </div>
+  </div>` + dock(false);
+}
+
+/** למה המינוף שלך כזה — במשפט, כדי שיהיה מה לשנות. */
+function leverageWhy(lev) {
+  const me = game.me;
+  const parts = [];
+  const n = liveOffers(game).length;
+  parts.push(n > 1 ? `${n} מועדונים מתחרים עליך` : "רק מועדון אחד על השולחן");
+  if (me.contract.yearsLeft <= 1) parts.push("החוזה שלך נגמר — אתה כמעט חופשי");
+  else if (me.contract.yearsLeft >= 4) parts.push("חוזה ארוך מחזיק אותך במקום");
+  if (me.season.apps >= 6) {
+    const r = avgRating(me.season);
+    if (r >= 7.2) parts.push(`עונה של ${r.toFixed(2)} מדברת בשבילך`);
+    else if (r <= 6.4) parts.push(`ממוצע ${r.toFixed(2)} מחליש אותך`);
+  }
+  return parts.join(" · ") + ".";
+}
+
+function offerCard(offer) {
+  const club = game.clubs[offer.cid];
+  const asks = askOptions(offer);
+  const spent = offer.asks;
+  const left = Math.max(0, offer.patience - spent + 1);
+  return `
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t">${esc(club.name)}</span>
+      <span class="r">${esc(interestWord(offer))}</span>
+    </div>
+    <div class="panel-body">
+      ${offerLines(game, offer).map(line =>
+        `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
+      <div class="muted">מוניטין המועדון ${Math.round(club.reputation)} ·
+        נשארו ${offer.weeks} שבועות ·
+        סבלנות: ${left > 2 ? "רגועים" : left === 2 ? "מתחילים להתעצבן" : "על הקצה"}</div>
+      ${offer.log.length ? `<div class="muted">${offer.log.map(esc).join(" · ")}</div>` : ""}
+      <hr class="rule">
+      <div class="muted">לבקש שיפור:</div>
+      <div class="btn-row wrap">
+        ${asks.map(a => `<button class="mini-btn" data-ask="${offer.cid}:${a.term}"
+          title="${esc(a.ask)}">${esc(a.name)}</button>`).join("")}
+      </div>
+      <div class="btn-row">
+        <button class="btn" data-sign="${offer.cid}">לחתום</button>
+        <button class="mini-btn" data-decline="${offer.cid}">לא מעוניין</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// תקשורת — מה כותבים עליך, וכמה זה שווה
+// ---------------------------------------------------------------------------
+
+/**
+ * הפיד, עם אמינות המקור גלויה ואמת הסיפור נסתרת.
+ *
+ * זה כל העניין: אתה יודע שתחקירן ההעברות צודק ב-88% מהמקרים ושחשבון
+ * אוהדים צודק ב-20%, אבל אתה לא יודע אם *הפעם* הוא צדק. להכחיש דבר
+ * נכון זה הימור; לאשר דבר לא נכון זה נזק.
+ */
+function screenPress() {
+  const items = pressFeed(game).slice().reverse();
+  const question = openQuestion(game);
+  return `<div class="screen">
+    ${question ? `
+    <div class="panel" style="border-color:var(--accent)">
+      <div class="panel-head"><span class="t">מחכים לתגובה שלך</span>
+        <span class="r">${esc(trustWord(question.trust))}</span></div>
+      <div class="panel-body">
+        <div class="quote">"${esc(question.text)}"</div>
+        <div class="muted">${SOURCE_ICON[question.source]}
+          ${esc(SOURCE_NAMES[question.source])} —
+          צודק בערך ב-${Math.round(question.trust * 100)}% מהמקרים.</div>
+        <div class="btn-row">
+          ${REACTIONS.map(([key, label]) =>
+            `<button class="btn" data-press="${key}">${label}</button>`).join("")}
+        </div>
+        <div class="muted">כישורי התקשורת שלך: ${Math.round(game.me.mediaSkill)}
+          — ככל שהם גבוהים יותר, כך הכחשה מחזיקה טוב יותר.</div>
+      </div>
+    </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה כותבים עליך</span></div>
+      <div class="panel-body">
+        ${items.length ? items.map(pressRow).join("")
+          : `<div class="muted">עוד לא כתבו עליך כלום. זה משתנה כשמתחילים לשים לב.</div>`}
+      </div>
+    </div>
+  </div>` + dock(false);
+}
+
+function pressRow(item) {
+  const answered = item.answered ? REACTIONS.find(r => r[0] === item.reaction) : null;
+  return `
+    <div class="row">
+      <span class="grow">
+        <span class="nm">${SOURCE_ICON[item.source]} ${esc(SOURCE_NAMES[item.source])}
+          <span class="sub">· עונת ${item.year}, שבוע ${item.week}</span></span>
+        <span class="sub">"${esc(item.text)}"</span>
+        ${answered ? `<span class="sub">← ${esc(answered[1])}</span>` : ""}
+      </span>
+      <span class="val ${item.trust >= 0.62 ? "good" : item.trust >= 0.4 ? "" : "bad"}"
+        >${Math.round(item.trust * 100)}%</span>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// שם — מה השם שלך שווה מחוץ למגרש
+// ---------------------------------------------------------------------------
+
+function screenFame() {
+  const offer = game.flag("venture");
+  const ventures = ventureBook(game);
+  const royalties = royaltyBook(game);
+  const club = game.myClub();
+  const fame = fameScore(game.me, club ? club.reputation : 40, game.honours.length);
+
+  return `<div class="screen">
+    ${offer ? `
+    <div class="panel" style="border-color:var(--gold)">
+      <div class="panel-head"><span class="t">${esc(offer.title)}</span>
+        <span class="r">₪${fmt(offer.payout)}</span></div>
+      <div class="panel-body">
+        <div class="quote">${esc(offer.text)}</div>
+        ${offer.cost ? `<div class="muted">זה יעלה לך בכושר ובחדות —
+          ימי צילום הם לא ימי אימון.</div>` : ""}
+        <div class="btn-row">
+          <button class="btn primary" data-venture="yes">לסגור</button>
+          <button class="btn" data-venture="no">לא עכשיו</button>
+        </div>
+      </div>
+    </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">השם שלך</span>
+        <span class="r">${Math.round(fame)}/100</span></div>
+      <div class="panel-body">
+        <div class="bar"><span style="width:${Math.round(fame)}%"></span></div>
+        ${fameLines(game).map(line =>
+          `<div class="muted">${esc(line)}</div>`).join("")}
+        <hr class="rule">
+        <div class="muted">מה שפותח דלתות: מוניטין, כישורי תקשורת,
+          שערים ובישולים, תארים, וגודל המועדון שאתה משחק בו.</div>
+      </div>
+    </div>
+    ${ventures.length || royalties.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה שכבר שלך</span></div>
+      <div class="panel-body">
+        ${ventures.map(v => `<div class="row">
+          <span class="grow"><span class="nm">${esc(v.who)}</span>
+            <span class="sub">שותפות מעונת ${v.year}</span></span>
+          <span class="val good">${v.equity}%</span></div>`).join("")}
+        ${royalties.map(r => `<div class="row">
+          <span class="grow"><span class="nm">${esc(r.who)}</span>
+            <span class="sub">קולקציה על שמך</span></span>
+          <span class="val good">${r.rate}%</span></div>`).join("")}
+        <div class="muted">הכנסה פסיבית: ₪${fmt(passiveIncome(game))} לעונה —
+          זה ממשיך גם אחרי שתתלה את הנעליים.</div>
+      </div>
+    </div>` : ""}
+  </div>` + dock(false);
+}
+
 /** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
 function systemSnip() {
   if (!["academy", "player", "veteran"].includes(game.stage)) return "";
@@ -2741,6 +2959,48 @@ function bind() {
     el.addEventListener("click", () => go(el.dataset.go)));
   app.querySelectorAll("[data-choice]").forEach(el =>
     el.addEventListener("click", () => resolveChoice(+el.dataset.choice)));
+
+  // -- שוק ההעברות --------------------------------------------------
+  app.querySelectorAll("[data-ask]").forEach(el =>
+    el.addEventListener("click", () => {
+      const [cid, term] = el.dataset.ask.split(":");
+      toast(game.negotiateOffer(cid, term));
+      saveGame();
+      render();
+    }));
+  app.querySelectorAll("[data-sign]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.acceptOffer(el.dataset.sign);
+      saveGame();
+      showOutcome("חתמת", text);
+    }));
+  app.querySelectorAll("[data-decline]").forEach(el =>
+    el.addEventListener("click", () => {
+      toast(game.rejectOffer(el.dataset.decline));
+      saveGame();
+      if (!liveOffers(game).length) go("main"); else render();
+    }));
+
+  // -- תקשורת ---------------------------------------------------------
+  app.querySelectorAll("[data-press]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = pressReact(game, el.dataset.press, game.rng);
+      saveGame();
+      showOutcome("התגובה שלך", text);
+    }));
+
+  // -- מיזמים ---------------------------------------------------------
+  app.querySelectorAll("[data-venture]").forEach(el =>
+    el.addEventListener("click", () => {
+      const offer = game.flag("venture");
+      if (!offer) { render(); return; }
+      delete game.flags.venture;
+      const text = el.dataset.venture === "yes"
+        ? acceptVenture(game, offer).join("\n")
+        : declineVenture(game, offer);
+      saveGame();
+      showOutcome(offer.title, text);
+    }));
   app.querySelectorAll("[data-focus]").forEach(el =>
     el.addEventListener("click", () => { game.setAction(el.dataset.focus); render(); }));
   app.querySelectorAll("[data-int]").forEach(el =>

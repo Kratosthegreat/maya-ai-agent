@@ -385,16 +385,42 @@ class Game {
     for (const line of scoutsThisWeek(this, this.rng, myRating))
       report.notes.push({ icon: "", text: line });
 
+    // מה שנכתב עליך — עיתונות, טלוויזיה ושמועות
+    for (const line of weeklyPress(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+    if (report.match)
+      for (const line of broadcast(this, report.match, this.rng))
+        report.notes.push({ icon: "", text: line });
+    for (const line of tickOffers(this))
+      report.notes.push({ icon: "", text: line });
+
+    // מה שהשם שלך שווה מחוץ למגרש
+    const venture = ventureOffer(this, this.rng);
+    if (venture) {
+      this.flags.venture = venture;
+      report.notes.push({ icon: "💼",
+        text: `${venture.title}: ${venture.text} (בתפריט: 'שם')` });
+    }
+
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
 
     // ההוראה לשבוע הבא
     const next = weeklyDirective(this, this.rng);
+    const prev = this.flag("directive");
     this.setFlag("directive", next);
-    if (next && ["academy", "player", "veteran"].includes(this.stage))
+    // הוראה שלא השתנתה היא לא חדשות. חזרה על אותה שורה מילה במילה כל
+    // שבוע היא מה שגורם למשחק להרגיש כמו לולאה ולא כמו עונה.
+    const onPitch = ["academy", "player", "veteran"].includes(this.stage);
+    if (next && next !== prev && onPitch) {
       report.notes.push({ icon: "🎙️",
         text: directiveLine(this.myClub(), next, this.flags.last_stats) });
+    } else if (next && onPitch && this.week % 6 === 0) {
+      const club = this.myClub();
+      report.notes.push({ icon: "🎙️",
+        text: `${club ? club.managerName : "המאמן"}: "ממשיכים עם מה שהתחלנו."` });
+    }
     if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
       const target = nextTarget(this);
       if (target && this.week % 4 === 0)
@@ -1737,63 +1763,114 @@ class Game {
       p.contract.yearsLeft = this.rng.randint(1, 4);
     }
     if (["player", "veteran"].includes(this.stage)) {
-      const suitor = this.transferOfferForMe();
-      if (suitor) {
-        const wage = Math.round(Math.max(me.contract.wage * 1.25,
-          Math.min(suitor.wageBudget * 0.28,
-            wageForOverall(overall(me)) * (0.9 + me.reputation / 220))));
-        this.flags.pending_offer = { club: suitor.cid, wage, years: 4 };
-        add("📨", `הצעה על השולחן: ${suitor.name} — ₪${fmt(wage)} לשבוע`, true);
-      }
+      this.openTransferMarket(add);
     }
   }
 
   /**
-   * מועדון שמוכן להציע לי חוזה.
-   * קודם כול — מי שבאמת עקב אחריך לאורך העונה. הצעה כבר לא נופלת
-   * משמיים: היא הסוף של תהליך שראית קורה, שבוע אחרי שבוע, ביציע.
+   * פותח חלון העברות: כל מי שרוצה אותך מניח חבילה על השולחן.
+   *
+   * הצעה אחת היא לא שוק. מה שהופך העברה להחלטה הוא בדיוק זה שיש עם
+   * מה להשוות, ושמי שרוצה אותך יותר יודע שיש לו מתחרים.
    */
-  transferOfferForMe() {
-    const me = this.me;
-    const chaser = topSuitor(this, SCOUT_CHASED);
-    if (chaser) return chaser;
-    // סוכן ששילמת לו פותח דלת גם בלי שהצופים סיימו את העבודה
-    const target = this.flag("agent_target");
-    if (target && this.clubs[target] && target !== me.clubId
-        && this.rng.random() < 0.7) {
-      delete this.flags.agent_target;
-      return this.clubs[target];
+  openTransferMarket(add) {
+    const suitors = this.transferSuitors();
+    if (!suitors.length) return;
+    setOffers(this, suitors.map(c => buildOffer(this, c, this.rng)));
+    const live = liveOffers(this);
+    add("📨", `חלון ההעברות נפתח — ${live.length} `
+            + `${live.length > 1 ? "הצעות" : "הצעה"} על השולחן`, true);
+    for (const offer of live) {
+      const club = this.clubs[offer.cid];
+      add("", `   • ${club.name} — ₪${fmt(offer.wage)} לשבוע, `
+            + `${offer.years} שנים (${interestWord(offer)})`);
     }
-    const courting = watchers(this, SCOUT_COURTED);
-    if (courting.length && this.rng.random() < 0.5) return courting[0][0];
-    // ואם אף אחד לא עקב — עדיין קורה ששם עולה בישיבה
-    const pool = candidateClubs(this);
-    if (!pool.length || this.rng.random() > 0.35) return null;
-    return pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+    add("", "   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')");
   }
 
+  /** מי מניח הצעה השנה. אחד לפחות, ולפעמים מרוץ שלם. */
+  transferSuitors() {
+    const me = this.me;
+    const picked = [], seen = new Set();
+    const add = club => {
+      if (club && !seen.has(club.cid) && club.cid !== me.clubId) {
+        seen.add(club.cid);
+        picked.push(club);
+      }
+    };
+    // מי שבאמת עקב אחריך כל העונה קודם — הצעה היא סוף של תהליך
+    for (const [club] of watchers(this, SCOUT_CHASED)) add(club);
+    const target = this.flag("agent_target");
+    if (target && this.clubs[target] && this.rng.random() < 0.7) {
+      delete this.flags.agent_target;
+      add(this.clubs[target]);
+    }
+    for (const [club] of watchers(this, SCOUT_COURTED))
+      if (this.rng.random() < 0.55) add(club);
 
-  acceptOffer() {
-    const offer = this.flag("pending_offer");
-    if (!offer) return "אין הצעה פתוחה.";
-    const club = this.clubs[offer.club];
+    // ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
+    let pool = candidateClubs(this).filter(c => !seen.has(c.cid));
+    let extra = me.reputation >= 55 ? 1 : 0;
+    if (me.reputation >= 75) extra += 1;
+    for (let i = 0; i < extra; i++) {
+      if (pool.length && this.rng.random() < 0.55) {
+        const club = pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+        pool = pool.filter(c => c !== club);
+        add(club);
+      }
+    }
+    if (!picked.length && pool.length && this.rng.random() < 0.35)
+      add(pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b)));
+    return picked.slice(0, 5);
+  }
+
+  /** חותם על אחת ההצעות שעל השולחן. */
+  acceptOffer(cid = null) {
+    const live = liveOffers(this);
+    if (!live.length) return "אין הצעה פתוחה.";
+    const offer = cid ? offerFor(this, cid) : live[0];
+    if (!offer || !["open", "improved", "final"].includes(offer.state))
+      return "ההצעה הזאת כבר לא על השולחן.";
+    const club = this.clubs[offer.cid];
     this.transferMe(club.cid, offer.wage, offer.years);
-    delete this.flags.pending_offer;
+    if (offer.bonus) this.money += offer.bonus;
+    this.flags.squad_role = offer.role;
+    if (offer.clause) this.flags.release_clause = offer.clause;
+    if (offer.image) this.flags.image_share = offer.image;
+    clearOffers(this);
     delete this.flags.wants_transfer;
     this.me.morale = clamp(this.me.morale + 8, 5, 99);
-    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע.`;
+    const extra = offer.bonus ? ` ומענק ₪${fmt(offer.bonus)}` : "";
+    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
+         + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
   }
 
-  rejectOffer() {
-    const offer = this.flag("pending_offer");
-    if (!offer) return "אין הצעה פתוחה.";
-    delete this.flags.pending_offer;
+  /** מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים. */
+  negotiateOffer(cid, term) {
+    return negotiate(this, cid, term, this.rng).text;
+  }
+
+  /** דוחה הצעה אחת, או את כולן אם לא צוין מועדון. */
+  rejectOffer(cid = null) {
+    const offers = openOffers(this);
+    if (!offers.length) return "אין הצעה פתוחה.";
+    if (cid) {
+      const offer = offerFor(this, cid);
+      if (!offer) return "אין הצעה כזאת.";
+      offer.state = "withdrawn";
+      setOffers(this, offers);
+      const club = this.clubs[cid];
+      if (liveOffers(this).length)
+        return `אמרת לא ל${club ? club.name : "מועדון"}. נשארו הצעות אחרות.`;
+    } else {
+      clearOffers(this);
+    }
     const club = this.myClub();
     if (club) {
       club.fanSupport = clamp(club.fanSupport + 6, 0, 100);
       club.managerTrust = clamp(club.managerTrust + 5, 0, 100);
     }
-    return "דחית את ההצעה ונשארת. במועדון שמעו על זה.";
+    return "דחית ונשארת. במועדון שמעו על זה.";
   }
 
   advanceCareerStage(add) {

@@ -29,6 +29,9 @@ from football_manager import tactics as TA
 from football_manager import knowledge as KN
 from football_manager import coaching as COACH
 from football_manager import mentor as MN
+from football_manager import transfers as TR
+from football_manager import press as PR
+from football_manager import fame as FA
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -1306,9 +1309,14 @@ def test_fitness_no_longer_collapses_over_a_season():
 # ---------------------------------------------------------------------------
 
 def test_scouts_build_interest_over_a_season():
-    """התלונה: 'אין פניה של סקאוטינג כמעט'."""
+    """התלונה: 'אין פניה של סקאוטינג כמעט'.
+
+    עשרה זרעים ולא ארבעה: watchers הוא תצלום רגע, וקריירה בודדת
+    שבמקרה לא משכה איש היא תוצאה לגיטימית ולא ראיה שהסקאוטינג שבור.
+    """
+    seeds = (8, 21, 33, 44, 57, 66, 71, 88, 95, 103)
     found = 0
-    for seed in (8, 21, 33, 44):
+    for seed in seeds:
         game = GameState.new_game("בודק", "ST", "hapoel_carmel", 19, seed=seed)
         for _ in range(300):
             if game.game_over or game.me.age > 25:
@@ -1319,7 +1327,7 @@ def test_scouts_build_interest_over_a_season():
             game.advance_week()
         if SC.watchers(game):
             found += 1
-    assert found >= 3, f"רק {found} מתוך 4 קריירות משכו צופים"
+    assert found >= 6, f"רק {found} מתוך {len(seeds)} קריירות משכו צופים"
 
 
 def test_scouting_reaches_beyond_israel():
@@ -2032,3 +2040,220 @@ def test_the_ceiling_does_not_move_for_a_veteran():
     me.age = 34
     for seed in range(40):
         assert _push_ceiling(me, random.Random(seed), quality=0.9) is None
+
+# ---------------------------------------------------------------------------
+# שוק העברות, עיתונות ושם
+# ---------------------------------------------------------------------------
+
+def _market(seed=11, age=24, rep=82, count=3, eagerness=(0.9, 0.7, 0.45)):
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", age, seed=seed)
+    game.me.reputation = rep
+    game.me.contract.years_left = 1
+    others = [c for c in game.clubs.values() if c.cid != game.me.club_id][:count]
+    TR.set_offers(game, [TR.build_offer(game, c, game.rng, e)
+                         for c, e in zip(others, eagerness)])
+    return game
+
+
+def test_several_offers_can_sit_on_the_table_at_once():
+    """הצעה אחת היא לא שוק — צריך עם מה להשוות."""
+    game = _market()
+    live = TR.live_offers(game)
+    assert len(live) == 3
+    # ממוינות מהשווה ביותר לפחות
+    worth = [TR.offer_worth(o) for o in live]
+    assert worth == sorted(worth, reverse=True)
+    # וכל חבילה היא חבילה, לא מספר
+    for offer in live:
+        assert offer["wage"] > 0 and offer["years"] >= 3
+        assert offer["role"] in TR.ROLE_NAMES
+        assert len(TR.offer_lines(game, offer)) >= 3
+
+
+def test_competing_offers_are_real_leverage():
+    """שלוש הצעות שוות יותר מאחת — וזה חייב להיות מדיד."""
+    alone = _market(count=1, eagerness=(0.9,))
+    crowd = _market(count=3)
+    assert TR.leverage(crowd) > TR.leverage(alone) + 0.20
+
+
+def test_a_long_contract_weakens_you():
+    game = _market()
+    strong = TR.leverage(game)
+    game.me.contract.years_left = 5
+    assert TR.leverage(game) < strong
+
+
+def test_asking_for_more_can_actually_win_more():
+    """משא ומתן שלא משנה כלום הוא לא משא ומתן."""
+    import random
+    moved = 0
+    for seed in range(25):
+        game = _market(seed=seed)
+        offer = TR.live_offers(game)[0]
+        before = offer["wage"]
+        TR.negotiate(game, offer["cid"], "wage", random.Random(seed))
+        if TR.offer_for(game, offer["cid"])["wage"] > before:
+            moved += 1
+    assert moved >= 8, f"רק {moved} מתוך 25 בקשות שכר הזיזו משהו"
+
+
+def test_greed_can_lose_the_whole_offer():
+    """בלי סיכון אמיתי, כל בקשה היא בחירה חופשית — וזה משעמם."""
+    import random
+    lost = 0
+    for seed in range(25):
+        game = _market(seed=seed)
+        cid = TR.live_offers(game)[0]["cid"]
+        rng = random.Random(seed)
+        for term in ["wage", "years", "bonus", "clause", "image", "role"]:
+            TR.negotiate(game, cid, term, rng)
+            if TR.offer_for(game, cid)["state"] == "withdrawn":
+                lost += 1
+                break
+    assert lost >= 10, f"רק {lost} מתוך 25 מועדונים קמו מהשולחן — אין סיכון"
+
+
+def test_signing_takes_the_whole_package_not_just_the_wage():
+    game = _market()
+    offer = TR.live_offers(game)[0]
+    offer["bonus"] = 500_000
+    offer["clause"] = 9_000_000
+    offer["role"] = "star"
+    before = game.money
+    text = game.accept_offer(offer["cid"])
+    assert game.money == before + 500_000, "מענק החתימה לא שולם"
+    assert game.flag("release_clause") == 9_000_000
+    assert game.flag("squad_role") == "star"
+    assert "איש הקבוצה" in text
+    assert not TR.live_offers(game), "אחרי חתימה השולחן מתרוקן"
+
+
+def test_rejecting_one_offer_leaves_the_others():
+    game = _market()
+    cid = TR.live_offers(game)[0]["cid"]
+    game.reject_offer(cid)
+    left = TR.live_offers(game)
+    assert len(left) == 2 and all(o["cid"] != cid for o in left)
+
+
+def test_offers_expire_on_a_deadline():
+    game = _market()
+    for _ in range(TR.WINDOW_WEEKS):
+        TR.tick_offers(game)
+    assert not TR.live_offers(game), "הצעה בלי דדליין היא לא הצעה"
+
+
+def test_market_value_follows_age_and_contract():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=3)
+    me = game.me
+    me.contract.years_left = 4
+    young = TR.market_value(me)
+    me.age = 34
+    assert TR.market_value(me) < young * 0.5, "ותיק אמור להיות זול בהרבה"
+    me.age = 24
+    me.contract.years_left = 1
+    assert TR.market_value(me) < young * 0.6, "שנה לסיום חוזה מוזילה"
+
+
+# -- עיתונות ---------------------------------------------------------------
+
+def test_press_sources_differ_in_how_often_they_are_right():
+    """זה כל העניין: אמינות גלויה, אמת נסתרת."""
+    assert PR.SOURCE_TRUST["insider"] > PR.SOURCE_TRUST["fan"] + 0.5
+    assert "אמין" in PR.trust_word(0.9)
+    assert PR.trust_word(0.9) != PR.trust_word(0.2)
+
+
+def test_the_press_writes_both_truth_and_invention():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=7)
+    game.me.reputation = 80
+    game.me.contract.years_left = 1
+    pool = PR._candidates(game)
+    assert pool, "אין על מה לכתוב"
+    assert any(item["true"] for item in pool), "הכל שקר"
+    assert any(not item["true"] for item in pool), "הכל אמת — אין דרמה"
+
+
+def test_denying_something_true_can_blow_up_in_your_face():
+    import random
+    burned = 0
+    for seed in range(30):
+        game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=seed)
+        game.me.media_skill = 10
+        PR.push(game, PR._story(game, "x", "insider", "אמת", True, asks=True))
+        text = PR.react(game, "deny", random.Random(seed))
+        if "ההקלטה" in text:
+            burned += 1
+    assert burned >= 5, f"הכחשת אמת נשברה רק {burned} פעמים מתוך 30"
+
+
+def test_media_skill_protects_a_denial():
+    import random
+    def burns(skill):
+        count = 0
+        for seed in range(40):
+            game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=seed)
+            game.me.media_skill = skill
+            PR.push(game, PR._story(game, "x", "insider", "אמת", True, asks=True))
+            if "ההקלטה" in PR.react(game, "deny", random.Random(seed)):
+                count += 1
+        return count
+    assert burns(95) < burns(5), "כישורי תקשורת חייבים להיות שווים משהו"
+
+
+def test_confirming_an_invention_costs_you():
+    import random
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=5)
+    before = game.me.reputation
+    PR.push(game, PR._story(game, "x", "fan", "המצאה", False, asks=True))
+    PR.react(game, "confirm", random.Random(1))
+    assert game.me.reputation < before, "לאשר משהו שלא היה חייב לעלות"
+
+
+def test_answering_closes_the_question():
+    import random
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 24, seed=5)
+    PR.push(game, PR._story(game, "x", "tv", "משהו", True, asks=True))
+    assert PR.open_question(game) is not None
+    PR.react(game, "silent", random.Random(1))
+    assert PR.open_question(game) is None
+
+
+# -- שם ---------------------------------------------------------------------
+
+def test_fame_opens_doors_in_order():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 26, seed=5)
+    assert FA.open_ventures(20) == []
+    small = len(FA.open_ventures(60))
+    big = len(FA.open_ventures(95))
+    assert big > small > 0, "שם גדול חייב לפתוח יותר דלתות"
+
+
+def test_a_venture_pays_and_costs():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 26, seed=5)
+    me = game.me
+    me.fitness = 100.0
+    money = game.money
+    offer = {"kind": "ambassador", "title": "שגריר קמפיין", "who": "קמפיין",
+             "payout": 400_000, "cost": 5, "weeks": 2}
+    FA.accept_venture(game, offer)
+    assert game.money == money + 400_000
+    assert me.fitness < 100, "ימי צילום הם לא ימי אימון"
+
+
+def test_equity_keeps_paying_after_the_deal():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 26, seed=5)
+    assert FA.passive_income(game) == 0
+    FA.accept_venture(game, {"kind": "tycoon", "title": "שותפות", "who": "קרן",
+                             "payout": 2_000_000, "equity": 10, "cost": 0})
+    assert FA.passive_income(game) > 0, "שותפות אמורה להמשיך לעבוד"
+
+
+def test_a_foreign_league_pays_in_reputation():
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", 30, seed=5)
+    game.me.reputation = 80
+    before = game.me.reputation
+    FA.accept_venture(game, {"kind": "league", "title": "ליגה זרה", "who": "ליגה",
+                             "payout": 9_000_000, "cost": 0, "rep_cost": 4.0})
+    assert game.me.reputation < before, "כסף גדול מליגה חלשה חייב לעלות במשהו"

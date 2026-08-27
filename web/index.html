@@ -15267,6 +15267,763 @@ function mentorBoard(game) {
 }
 
 // ---------------------------------------------------------------------------
+// שוק העברות עם משא ומתן אמיתי — תאום JS של transfers.py
+//
+// עד כאן ההעברה הייתה שורה אחת: מועדון אחד, סכום אחד, כן או לא. מה
+// שיש כאן במקום: כמה הצעות במקביל, משא ומתן על כל סעיף, סיכון אמיתי
+// (מועדון קם מהשולחן), מינוף שגדל עם מספר המתחרים, ודדליין.
+// ---------------------------------------------------------------------------
+
+// תפקיד מובטח בסגל — מה שהמועדון מתחייב לו כשהוא מחתים אותך
+const SQUAD_ROLES = [
+  ["star", "איש הקבוצה", 1.35],
+  ["starter", "שחקן הרכב", 1.12],
+  ["rotation", "רוטציה", 0.92],
+  ["prospect", "לעתיד", 0.78],
+];
+const ROLE_NAMES = Object.fromEntries(SQUAD_ROLES.map(r => [r[0], r[1]]));
+const ROLE_VALUE = Object.fromEntries(SQUAD_ROLES.map(r => [r[0], r[2]]));
+
+const TERMS = [
+  ["wage", "שכר שבועי"], ["years", "אורך חוזה"], ["bonus", "מענק חתימה"],
+  ["clause", "סעיף שחרור"], ["role", "תפקיד בסגל"], ["image", "אחוזי דימוי"],
+];
+const TERM_NAMES = Object.fromEntries(TERMS);
+
+const WINDOW_WEEKS = 4;
+
+/** שווי העברה משוער. הבסיס לכל מספר אחר כאן. */
+function marketValue(p) {
+  let base = wageForOverall(overall(p)) * 46;
+  // גיל הוא המכפיל הגדול: בן 22 עם אותו דירוג שווה כפליים מבן 31
+  if (p.age <= 20) base *= 1.95;
+  else if (p.age <= 23) base *= 1.70;
+  else if (p.age <= 26) base *= 1.35;
+  else if (p.age <= 29) base *= 1.0;
+  else if (p.age <= 32) base *= 0.55;
+  else base *= 0.25;
+  base *= 0.72 + p.reputation / 145;
+  base *= 1 + Math.max(0, p.potential - overall(p)) * 0.020;
+  if (p.contract.yearsLeft <= 1) base *= 0.45;     // שנה לסיום — כמעט חינם
+  else if (p.contract.yearsLeft === 2) base *= 0.80;
+  return Math.round(base / 1000) * 1000;
+}
+
+/**
+ * 0-1: כמה כוח יש לך סביב השולחן. מינוף הוא לא "כמה אתה טוב" אלא
+ * "כמה אפשרויות יש לך".
+ */
+function leverage(game) {
+  const me = game.me;
+  const offers = openOffers(game).filter(o => o.state !== "withdrawn");
+  let score = 0.20;
+  score += Math.min(0.34, Math.max(0, offers.length - 1) * 0.17);
+  score += Math.min(0.20, me.reputation / 500);
+  if (me.contract.yearsLeft <= 1) score += 0.18;
+  else if (me.contract.yearsLeft >= 4) score -= 0.08;
+  if (me.season.apps >= 6)
+    score += clamp((avgRating(me.season) - 6.7) * 0.16, -0.10, 0.16);
+  if (me.age <= 23) score += 0.06;
+  else if (me.age >= 33) score -= 0.14;
+  return clamp(score, 0.03, 0.95);
+}
+
+/** חבילה שלמה ממועדון אחד, לא רק מספר. */
+function buildOffer(game, club, rng, eagerness = null) {
+  const me = game.me;
+  if (eagerness === null) eagerness = rng.uniform(0.35, 0.95);
+
+  const par = wageForOverall(overall(me)) * (0.88 + me.reputation / 200);
+  const ceiling = Math.max(par * 1.05, club.wageBudget * 0.34);
+  let wage = Math.floor(Math.min(ceiling, par * (0.80 + eagerness * 0.55)));
+  wage = Math.max(wage, Math.floor(me.contract.wage * 1.08));
+
+  const value = marketValue(me);
+  const role = roleFor(club, me, eagerness);
+  const years = me.age >= 31 ? 3 : (eagerness > 0.7 && me.age <= 24 ? 5 : 4);
+
+  return {
+    cid: club.cid, wage, years,
+    bonus: Math.floor(value * rng.uniform(0.03, 0.09) * (0.5 + eagerness)),
+    clause: 0, role, image: 0, fee: value,
+    eagerness: Math.round(eagerness * 1000) / 1000,
+    ceiling: Math.floor(ceiling),
+    patience: 2 + Math.floor(eagerness * 3),
+    asks: 0, state: "open", weeks: WINDOW_WEEKS, log: [],
+  };
+}
+
+/** איזה תפקיד מועדון מוכן להבטיח — לפי הפער בינך לבין הסגל שלו. */
+function roleFor(club, me, eagerness) {
+  const gap = overall(me) - club.reputation;
+  if (gap >= 10 && eagerness > 0.55) return "star";
+  if (gap >= 0) return "starter";
+  if (gap >= -9) return "rotation";
+  return "prospect";
+}
+
+/** ערך שנתי מקורב של חבילה — כדי שאפשר יהיה להשוות הצעות. */
+function offerWorth(offer) {
+  let annual = offer.wage * 52;
+  annual += Math.floor(offer.bonus / Math.max(1, offer.years));
+  annual = Math.floor(annual * (ROLE_VALUE[offer.role] || 1));
+  annual += Math.floor(annual * offer.image / 100);
+  return annual;
+}
+
+function openOffers(game) {
+  const data = game.flags.offers;
+  return Array.isArray(data) ? data : [];
+}
+
+function setOffers(game, offers) { game.flags.offers = offers; }
+
+/** מה שעדיין על השולחן, מהשווה ביותר לפחות. */
+function liveOffers(game) {
+  return openOffers(game)
+    .filter(o => ["open", "improved", "final"].includes(o.state))
+    .sort((a, b) => offerWorth(b) - offerWorth(a));
+}
+
+function offerFor(game, cid) {
+  return openOffers(game).find(o => o.cid === cid) || null;
+}
+
+/** שבוע עובר: הצעות מתקרבות לפקיעה, ומתחרים מגיבים זה לזה. */
+function tickOffers(game) {
+  const lines = [];
+  const offers = openOffers(game);
+  if (!offers.length) return lines;
+  const live = offers.filter(o => ["open", "improved", "final"].includes(o.state));
+  for (const offer of live) {
+    offer.weeks -= 1;
+    const club = game.clubs[offer.cid];
+    const name = club ? club.name : "מועדון";
+    if (offer.weeks <= 0) {
+      offer.state = "withdrawn";
+      lines.push(`⌛ ${name} משכו את ההצעה — הדדליין עבר.`);
+    } else if (offer.weeks === 1) {
+      lines.push(`⏳ ${name} רוצים תשובה עד סוף השבוע.`);
+    }
+  }
+
+  // מרוץ: כשיש כמה מתעניינים, מישהו מרים את הרף מעצמו
+  const still = offers.filter(o => ["open", "improved", "final"].includes(o.state));
+  if (still.length >= 2 && game.rng.random() < 0.42) {
+    const best = still.reduce((a, b) => offerWorth(b) > offerWorth(a) ? b : a);
+    const rivals = still.filter(o => o !== best);
+    const rival = rivals[game.rng.randint(0, rivals.length - 1)];
+    if (rival && rival.wage < rival.ceiling * 0.97) {
+      const bump = Math.max(1, Math.floor((best.wage - rival.wage) * 0.6));
+      rival.wage = Math.floor(Math.min(rival.ceiling,
+        rival.wage + Math.max(bump, Math.floor(rival.wage / 20))));
+      rival.state = "improved";
+      const club = game.clubs[rival.cid];
+      lines.push(`📈 ${club ? club.name : "מועדון"} שמעו על ההצעה השנייה `
+               + `והעלו ל-₪${fmt(rival.wage)} לשבוע.`);
+    }
+  }
+  setOffers(game, offers);
+  return lines;
+}
+
+function clearOffers(game) { delete game.flags.offers; }
+
+/** מה אפשר לבקש מההצעה הזאת עכשיו, ומה זה יעלה. */
+function askOptions(offer) {
+  const out = [];
+  for (const [key, name] of TERMS) {
+    if (key === "role" && offer.role === "star") continue;
+    if (key === "years" && offer.years >= 6) continue;
+    if (key === "image" && offer.image >= 25) continue;
+    if (key === "clause" && offer.clause && offer.clause <= offer.fee) continue;
+    out.push({ term: key, name, ask: askText(offer, key) });
+  }
+  return out;
+}
+
+function askText(offer, term) {
+  if (term === "wage")
+    return `₪${fmt(Math.floor(offer.wage * 1.22))} במקום ₪${fmt(offer.wage)}`;
+  if (term === "years") return `${offer.years + 1} שנים במקום ${offer.years}`;
+  if (term === "bonus")
+    return `מענק ₪${fmt(Math.floor(Math.max(offer.bonus * 1.6, 120000)))}`;
+  if (term === "clause") return `סעיף שחרור ₪${fmt(Math.floor(offer.fee * 1.6))}`;
+  if (term === "role") return `התחייבות ל${ROLE_NAMES[betterRole(offer.role)]}`;
+  if (term === "image") return `${Math.min(25, offer.image + 10)}% מזכויות הדימוי`;
+  return "";
+}
+
+function betterRole(role) {
+  const order = SQUAD_ROLES.map(r => r[0]);
+  return order[Math.max(0, order.indexOf(role) - 1)];
+}
+
+/**
+ * מבקש שיפור בסעיף אחד. זו ההחלטה האמיתית של השוק: כל בקשה שורפת
+ * סבלנות, ומועדון שנגמרה לו הסבלנות קם מהשולחן.
+ */
+function negotiate(game, cid, term, rng) {
+  const offer = offerFor(game, cid);
+  if (!offer || !["open", "improved", "final"].includes(offer.state))
+    return { ok: false, text: "ההצעה כבר לא על השולחן.", gone: true };
+
+  const club = game.clubs[cid];
+  const name = club ? club.name : "המועדון";
+  offer.asks += 1;
+  const lev = leverage(game);
+
+  let chance = 0.24 + offer.eagerness * 0.42 + lev * 0.38;
+  chance -= (offer.asks - 1) * 0.19;
+  if (term === "wage" && offer.wage >= offer.ceiling * 0.95) chance -= 0.42;
+  if (term === "clause" || term === "image") chance -= 0.10;
+  chance = clamp(chance, 0.04, 0.93);
+
+  const roll = rng.random();
+  if (roll < chance) {
+    const text = applyAsk(offer, term, true);
+    offer.state = "improved";
+    offer.log.push(`✅ ${text}`);
+    return { ok: true, text: `${name} הסכימו: ${text}`, gone: false };
+  }
+
+  if (offer.asks > offer.patience && rng.random() < 0.55) {
+    offer.state = "withdrawn";
+    offer.log.push("❌ ירדו מהעסקה");
+    return { ok: false, gone: true,
+             text: `${name} סגרו את התיק. "ניסינו, נתראה בקיץ הבא."` };
+  }
+
+  if (roll < chance + 0.28) {
+    const text = applyAsk(offer, term, false);
+    offer.state = "final";
+    offer.log.push(`🤝 ${text}`);
+    return { ok: true, gone: false,
+             text: `${name} לא הלכו על כל הדרך, אבל: ${text}` };
+  }
+
+  offer.log.push(`🚫 סירבו על ${TERM_NAMES[term] || term}`);
+  return { ok: false, gone: false,
+           text: `${name} סירבו. "זה מה שיש, וזה לא ייפתח שוב."` };
+}
+
+/** מזיז את הסעיף בפועל. full=false היא פשרה — כחצי ממה שביקשת. */
+function applyAsk(offer, term, full) {
+  const share = full ? 1 : 0.5;
+  if (term === "wage") {
+    offer.wage = Math.floor(Math.min(offer.ceiling, offer.wage * (1 + 0.22 * share)));
+    return `₪${fmt(offer.wage)} לשבוע`;
+  }
+  if (term === "years") {
+    if (full) { offer.years += 1; return `${offer.years} שנים`; }
+    offer.bonus = Math.floor(offer.bonus * 1.15);
+    return `אותן ${offer.years} שנים, אבל מענק ₪${fmt(offer.bonus)}`;
+  }
+  if (term === "bonus") {
+    offer.bonus = Math.floor(Math.max(offer.bonus * (1 + 0.6 * share), 120000 * share));
+    return `מענק חתימה ₪${fmt(offer.bonus)}`;
+  }
+  if (term === "clause") {
+    offer.clause = Math.floor(offer.fee * (full ? 1.6 : 2.4));
+    return `סעיף שחרור ₪${fmt(offer.clause)}`;
+  }
+  if (term === "role") {
+    if (full) {
+      offer.role = betterRole(offer.role);
+      return `התחייבות ל${ROLE_NAMES[offer.role]}`;
+    }
+    offer.wage = Math.floor(Math.min(offer.ceiling, offer.wage * 1.08));
+    return `בלי התחייבות בכתב, אבל ₪${fmt(offer.wage)} לשבוע`;
+  }
+  if (term === "image") {
+    offer.image = Math.min(25, offer.image + (full ? 10 : 5));
+    return `${offer.image}% מזכויות הדימוי`;
+  }
+  return "";
+}
+
+/** החבילה בשורות, כדי שאפשר יהיה להשוות בעין. */
+function offerLines(game, offer) {
+  const out = [`₪${fmt(offer.wage)} לשבוע · ${offer.years} שנים`];
+  if (offer.bonus) out.push(`מענק חתימה ₪${fmt(offer.bonus)}`);
+  out.push(`תפקיד מובטח: ${ROLE_NAMES[offer.role] || offer.role}`);
+  if (offer.clause) out.push(`סעיף שחרור ₪${fmt(offer.clause)}`);
+  if (offer.image) out.push(`${offer.image}% זכויות דימוי`);
+  const mine = game.myClub();
+  out.push(mine ? `דמי העברה ₪${fmt(offer.fee)} ל${mine.name}`
+                : `דמי העברה ₪${fmt(offer.fee)}`);
+  return out;
+}
+
+/** כמה הם רוצים אותך, בלי לחשוף את המספר. */
+function interestWord(offer) {
+  if (offer.eagerness > 0.82) return "רוצים אותך מאוד";
+  if (offer.eagerness > 0.62) return "מעוניינים ברצינות";
+  if (offer.eagerness > 0.42) return "בודקים אפשרות";
+  return "שומרים אופציה";
+}
+
+// ---------------------------------------------------------------------------
+// עיתונות, טלוויזיה ושמועות — תאום JS של press.py
+//
+// במשחק ניהול אמיתי אתה לא לומד על עצמך מטבלה — אתה לומד מהעיתון.
+// והעיקר: לא כל שמועה נכונה. לכל מקור יש אמינות, ואתה רואה אותה —
+// אבל לא רואה את התשובה.
+// ---------------------------------------------------------------------------
+
+const PRESS_SOURCES = [
+  ["insider", "תחקירן ההעברות", 0.88, "📰"],
+  ["tv", "פרשן הערוץ", 0.74, "📺"],
+  ["beat", "כתב המועדון", 0.70, "🖊"],
+  ["sources", "מקורות יודעי דבר", 0.52, "🕵"],
+  ["radio", "תוכנית הרדיו", 0.44, "📻"],
+  ["tabloid", "העיתון הצהוב", 0.26, "🗞"],
+  ["fan", "חשבון אוהדים ברשת", 0.20, "📱"],
+];
+const SOURCE_NAMES = Object.fromEntries(PRESS_SOURCES.map(s => [s[0], s[1]]));
+const SOURCE_TRUST = Object.fromEntries(PRESS_SOURCES.map(s => [s[0], s[2]]));
+const SOURCE_ICON = Object.fromEntries(PRESS_SOURCES.map(s => [s[0], s[3]]));
+
+const TRUST_WORDS = [
+  [0.80, "מקור אמין מאוד"],
+  [0.62, "בדרך כלל צודק"],
+  [0.40, "לפעמים צודק"],
+  [0.00, "כדאי לקחת בעירבון"],
+];
+
+const REACTIONS = [
+  ["deny", "להכחיש"], ["confirm", "לאשר"], ["silent", "לא להגיב"],
+];
+
+const FEED_LIMIT = 30;
+
+function trustWord(trust) {
+  for (const [floor, word] of TRUST_WORDS) if (trust >= floor) return word;
+  return TRUST_WORDS[TRUST_WORDS.length - 1][1];
+}
+
+function pressFeed(game) {
+  const data = game.flags.press;
+  return Array.isArray(data) ? data : [];
+}
+
+function pressPush(game, item) {
+  const items = pressFeed(game);
+  if (item.year === undefined) item.year = game.year;
+  if (item.week === undefined) item.week = game.week;
+  if (item.answered === undefined) item.answered = false;
+  items.push(item);
+  game.flags.press = items.slice(-FEED_LIMIT);
+}
+
+/** הפריט האחרון שמחכה לתגובה שלך, אם יש. */
+function openQuestion(game) {
+  const items = pressFeed(game);
+  for (let i = items.length - 1; i >= 0; i--)
+    if (items[i].asks && !items[i].answered) return items[i];
+  return null;
+}
+
+function pressStory(key, source, text, isTrue, asks = false, weight = 1.0) {
+  return { key, source, text, true: isTrue, trust: SOURCE_TRUST[source], asks, weight };
+}
+
+/**
+ * מייצר את מה שנכתב עליך השבוע. השמועות לא נשלפות מהאוויר: כל אחת
+ * נשענת על משהו שקורה במצב המשחק, ואז עוברת דרך מקור עם אמינות.
+ */
+function weeklyPress(game, rng) {
+  const me = game.me;
+  const out = [];
+  if (!["player", "veteran", "youth"].includes(game.stage)) return out;
+
+  // קודם ההגרלה ורק אחר כך בניית הסיפורים: ברוב השבועות לא כותבים
+  // עליך כלום, ואין טעם לבנות עשרה סיפורים כדי לזרוק את כולם.
+  let chance = 0.16 + me.reputation / 260;
+  if (me.reputation > 70) chance += 0.12;
+  if (rng.random() > chance) return out;
+
+  const pool = pressCandidates(game);
+  if (!pool.length) return out;
+
+  const item = weightedPick(pool, pool.map(i => i.weight), rng);
+  pressPush(game, item);
+  out.push(`${SOURCE_ICON[item.source]} ${SOURCE_NAMES[item.source]}: "${item.text}"`);
+  if (item.asks) out.push("   (אפשר להגיב — בתפריט: 'תקשורת')");
+  return out;
+}
+
+function weightedPick(items, weights, rng) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = rng.random() * total, acc = 0;
+  for (let i = 0; i < items.length; i++) {
+    acc += weights[i];
+    if (roll <= acc) return items[i];
+  }
+  return items[items.length - 1];
+}
+
+/** כל הסיפורים שאפשר לכתוב עליך עכשיו, לפי מצב המשחק. */
+function pressCandidates(game) {
+  const me = game.me;
+  const club = game.myClub();
+  const rng = game.rng;
+  const out = [];
+  const clubName = club ? club.name : "המועדון";
+
+  // -- התעניינות אמיתית של מועדון -----------------------------------
+  const seen = watchers(game);
+  if (seen.length) {
+    const [other, score] = seen[0];
+    const strong = score >= SCOUT_CHASED;
+    const source = strong ? "insider" : rng.choice(["sources", "beat", "tv"]);
+    out.push(pressStory("interest", source,
+      `${other.name} שולחים צופים לכל משחק של ${me.name}. `
+      + `בהנהלה מדברים על פנייה רשמית.`, true, true, strong ? 2.4 : 1.4));
+  }
+
+  // -- התעניינות שהיא בעיקר רעש --------------------------------------
+  const pool = candidateClubs(game).filter(c => !seen.some(w => w[0].cid === c.cid));
+  if (pool.length && me.reputation > 45) {
+    const other = rng.choice(pool);
+    out.push(pressStory("rumour", rng.choice(["tabloid", "fan", "radio"]),
+      `${other.name} הניחו עין על ${me.name}. מדובר בסכום דמיוני.`,
+      false, true, 1.6));
+  }
+
+  // -- כושר ------------------------------------------------------------
+  if (me.season.apps >= 4) {
+    const rating = avgRating(me.season);
+    if (rating >= 7.3) {
+      out.push(pressStory("hot", "tv",
+        `אין היום שחקן בכושר של ${me.name}. ממוצע ${rating.toFixed(2)} `
+        + `זה לא מקרי — זה מישהו שעולה מדרגה.`, true, false, 1.8));
+    } else if (rating <= 6.3) {
+      out.push(pressStory("cold", rng.choice(["radio", "tabloid", "beat"]),
+        `מה קרה ל${me.name}? ממוצע ${rating.toFixed(2)} מתחילת העונה. `
+        + `ב${clubName} מתחילים לשאול שאלות.`, true, true, 1.6));
+    }
+  }
+
+  // -- חוזה -------------------------------------------------------------
+  if (me.contract.yearsLeft <= 1 && game.stage !== "youth") {
+    out.push(pressStory("contract", "insider",
+      `החוזה של ${me.name} ב${clubName} נגמר בסוף העונה, `
+      + `והמגעים לחידוש תקועים.`, true, true, 2.0));
+  }
+
+  // -- פציעה ------------------------------------------------------------
+  if (me.injuryWeeks > 0) {
+    out.push(pressStory("injury", "tabloid",
+      `הפציעה של ${me.name} חמורה בהרבה ממה שב${clubName} מוכנים להגיד. `
+      + `מדברים על חצי עונה.`, false, true, 1.8));
+  } else if (me.fitness < 62) {
+    out.push(pressStory("fitness", "sources",
+      `${me.name} מגיע לאימונים על חצי מיכל. בצוות הרפואי לא רגועים.`,
+      me.fitness < 55, true, 1.2));
+  }
+
+  // -- יחסים במועדון -----------------------------------------------------
+  if (club && club.managerTrust < 42) {
+    out.push(pressStory("manager", rng.choice(["sources", "beat"]),
+      `ב${clubName} מספרים על שיחה לא נעימה בין המאמן ל${me.name}. `
+      + `הוא לא בטוח בהרכב.`, true, true, 1.9));
+  } else if (club && club.managerTrust > 78) {
+    out.push(pressStory("trusted", "beat",
+      `המאמן של ${clubName} על ${me.name}: "הוא הראשון על הדף שלי."`,
+      true, false, 1.0));
+  }
+
+  // -- שמועה מומצאת לגמרי ------------------------------------------------
+  if (me.reputation > 55) {
+    out.push(pressStory("gossip", rng.choice(["tabloid", "fan"]), rng.choice([
+      `${me.name} נראה מחפש בתים בחו"ל. אצלנו יודעים למה.`,
+      `ב${clubName} כועסים על ${me.name} אחרי שאיחר לאימון. המקורבים מכחישים.`,
+      `${me.name} החליף סוכן בשקט. זה תמיד אומר משהו.`,
+    ]), false, true, 1.3));
+  }
+
+  // -- נבחרת -------------------------------------------------------------
+  if (me.reputation > 62 && !game.caps) {
+    out.push(pressStory("national", rng.choice(["tv", "sources"]),
+      `השם של ${me.name} עלה בישיבת הסגל של הנבחרת. `
+      + `יש מי שאומר שזה רק עניין של זמן.`,
+      me.reputation > 70, true, 1.7));
+  }
+  return out;
+}
+
+/**
+ * מגיב לשמועה הפתוחה. לכל בחירה יש מחיר, וגם לשתיקה.
+ */
+function pressReact(game, choice, rng) {
+  const item = openQuestion(game);
+  if (!item) return "אין כרגע משהו שמחכה לתגובה.";
+  const me = game.me;
+  const club = game.myClub();
+  item.answered = true;
+  item.reaction = choice;
+  game.flags.press = pressFeed(game);
+
+  let smooth = me.mediaSkill / 100;
+  if (hasTrait(me, "media_darling")) smooth += 0.18;
+  if (hasTrait(me, "hothead")) smooth -= 0.20;
+  smooth = clamp(smooth, 0, 1);
+
+  if (choice === "deny") {
+    if (item.true) {
+      // הכחשת אמת מחזיקה בדיוק עד שהיא לא
+      if (rng.random() < 0.45 - smooth * 0.30) {
+        gainReputation(me, -2.5);
+        me.morale = clamp(me.morale - 7, 5, 99);
+        if (club) club.fanSupport = clamp(club.fanSupport - 5, 0, 100);
+        return "הכחשת — ותוך שבוע יצאה ההקלטה. "
+             + "\"אמרתי מה שהייתי צריך להגיד\" לא עבד הפעם.";
+      }
+      if (club) {
+        club.managerTrust = clamp(club.managerTrust + 4, 0, 100);
+        club.fanSupport = clamp(club.fanSupport + 3, 0, 100);
+      }
+      return "הכחשת בתוקף. במועדון אהבו את זה; אתה יודע מה האמת.";
+    }
+    gainReputation(me, 0.8 + smooth);
+    if (club) club.fanSupport = clamp(club.fanSupport + 5, 0, 100);
+    return "הכחשת, וצדקת. הסיפור נגמר תוך יומיים והיציע זכר את זה.";
+  }
+
+  if (choice === "confirm") {
+    if (item.true) {
+      gainReputation(me, 2.2);
+      me.morale = clamp(me.morale + 4, 5, 99);
+      if (club) {
+        club.managerTrust = clamp(club.managerTrust - 7, 0, 100);
+        club.fanSupport = clamp(club.fanSupport - 8, 0, 100);
+      }
+      game.setFlag("open_to_europe", true);
+      return "אישרת. הכותרות ענקיות, הסוכן שלך מאושר, "
+           + "וביציע לא סולחים על זה מהר.";
+    }
+    gainReputation(me, -3.0);
+    me.morale = clamp(me.morale - 5, 5, 99);
+    return "אישרת משהו שלא היה. כשהתברר שאין שום הצעה, "
+         + "יצאת מי שמנסה ליצור לעצמו שוק.";
+  }
+
+  // שתיקה
+  if (item.true) {
+    if (club) club.managerTrust = clamp(club.managerTrust - 2, 0, 100);
+    return "לא הגבת. הסיפור המשיך לרוץ, וכולם הבינו לבד.";
+  }
+  return "לא הגבת. בלי דלק הסיפור דעך מעצמו תוך שבוע.";
+}
+
+/** מה אמרו עליך באולפן אחרי המשחק. נשען על המספרים האמיתיים. */
+function broadcast(game, result, rng) {
+  const me = game.me;
+  const stats = game.flags.last_stats;
+  const rating = stats && stats.rating ? stats.rating : 0;
+  if (!rating) return [];
+  const lines = [];
+  if (rating >= 8.2) {
+    lines.push(rng.choice([
+      `📺 "אם מישהו עוד לא ראה את ${me.name} — תראו את המשחק הזה."`,
+      `📺 "ציון ${rating.toFixed(1)}. לא צריך להוסיף מילה."`,
+    ]));
+  } else if (rating >= 7.2) {
+    lines.push(rng.choice([
+      `📺 "${me.name} היה הכי טוב על המגרש, ובלי לעשות רעש."`,
+      `📺 "זה שחקן שהקבוצה כבר בנויה סביבו."`,
+    ]));
+  } else if (rating <= 5.6) {
+    lines.push(rng.choice([
+      `📺 "אני אגיד את זה בזהירות — ${me.name} לא היה שם היום."`,
+      `📺 "ציון ${rating.toFixed(1)}. יש ימים כאלה, אבל לא שניים ברצף."`,
+    ]));
+  }
+  return lines;
+}
+
+// ---------------------------------------------------------------------------
+// מה שקורה לך בגלל שאתה מפורסם, ולא בגלל שאתה טוב — תאום JS של fame.py
+//
+// חסויות היו כל מה שהיה כאן, וזה חלק קטן מהתמונה. שחקן שהפך לשם עולמי
+// מקבל טלפונים מסוג אחר: שותפות עסקית, ליגה שמשלמת על עצם הנוכחות,
+// קמפיין, סרט דוקו, קולקציה. לכל אחת מחיר שהוא לא כסף.
+// ---------------------------------------------------------------------------
+
+// סוג, כותרת, סף שם עולמי, מכפיל תשלום, מחיר בכושר/חדות
+const VENTURES = [
+  ["tycoon", "שותפות עסקית", 62, 3.4, 6],
+  ["league", "פנייה מליגה זרה", 70, 5.5, 0],
+  ["ambassador", "שגריר קמפיין", 58, 2.2, 4],
+  ["collection", "קולקציה על שמך", 74, 3.0, 3],
+  ["documentary", "סרט דוקו", 66, 1.6, 8],
+  ["academy", "אקדמיה על שמך", 78, 2.6, 5],
+];
+
+const TYCOONS = [
+  "קרן השקעות אטלס", "אחים ורדימון החזקות", "ליאון קפיטל",
+  "משפחת דה־קסטרו", "אוליב גרופ", "נורת'סטאר ונצ'רס",
+];
+
+const FOREIGN_LEAGUES = [
+  ["ליגת המפרץ", 1.9], ["הליגה הצפון־אמריקאית", 1.35],
+  ["הליגה היפנית", 1.15], ["הליגה הטורקית", 1.25],
+  ["הליגה הסעודית", 2.1], ["הליגה הסינית", 1.6],
+];
+
+const CAMPAIGNS = [
+  "קמפיין תיירות", "מיזם ספורט לנוער", "קמפיין בטיחות בדרכים",
+  "פסטיבל ספורט בינלאומי", "מיזם חינוך דרך כדורגל",
+];
+
+/** 0-100. לא "כמה אתה טוב" אלא "כמה אנשים מחוץ לכדורגל מכירים אותך". */
+function fameScore(p, clubReputation = 40, honours = 0) {
+  let score = p.reputation * 0.70;
+  score += p.mediaSkill * 0.22;
+  score += Math.min(16, (p.career.goals + p.career.assists) * 0.05);
+  score += clubReputation * 0.10;
+  score += Math.min(10, honours * 2.5);
+  if (hasTrait(p, "media_darling")) score += 8;
+  if (hasTrait(p, "hothead")) score -= 3;
+  return clamp(score, 0, 100);
+}
+
+function openVentures(fame) { return VENTURES.filter(v => fame >= v[2]); }
+
+/** פנייה אחת, אם מישהו בכלל מתעניין השבוע. */
+function ventureOffer(game, rng) {
+  const me = game.me;
+  const club = game.myClub();
+  const fame = fameScore(me, club ? club.reputation : 40, game.honours.length);
+  const available = openVentures(fame);
+  if (!available.length) return null;
+  // ככל שאתה גדול יותר, כך הטלפון מצלצל יותר
+  if (rng.random() > 0.05 + fame / 900) return null;
+
+  const [kind, title, , mult, cost] = rng.choice(available);
+  const base = Math.floor(fame * fame * 24 * mult);
+  let payout = Math.floor(base * rng.uniform(0.75, 1.4));
+
+  const offer = { kind, title, payout, cost, weeks: rng.randint(1, 3) };
+
+  if (kind === "tycoon") {
+    offer.who = rng.choice(TYCOONS);
+    offer.equity = rng.randint(3, 12);
+    offer.text = `${offer.who} רוצים אותך כשותף, לא כפרזנטור. `
+                + `₪${fmt(payout)} ו-${offer.equity}% מהמיזם.`;
+  } else if (kind === "league") {
+    const [league, factor] = rng.choice(FOREIGN_LEAGUES);
+    offer.who = league;
+    offer.payout = Math.floor(payout * factor);
+    offer.text = `${league} מוכנים לשלם ₪${fmt(offer.payout)} בשנה — `
+               + `על עצם זה שתשחק שם. הרמה נמוכה מהמקום שלך היום.`;
+    offer.rep_cost = 4.0;
+  } else if (kind === "ambassador") {
+    offer.who = rng.choice(CAMPAIGNS);
+    offer.text = `הוזמנת להיות הפנים של ${offer.who}. `
+               + `₪${fmt(payout)}, וכמה ימי צילום באמצע העונה.`;
+  } else if (kind === "collection") {
+    offer.who = rng.choice(["נייקי", "אדידס", "פומה", "אמברו"]);
+    offer.royalty = rng.randint(2, 7);
+    offer.text = `${offer.who} רוצים קולקציה על שמך. `
+               + `₪${fmt(payout)} מראש, ואחוזים מהמכירות.`;
+  } else if (kind === "documentary") {
+    offer.who = rng.choice(["נטפליקס", "אמזון", "ערוץ הספורט"]);
+    offer.text = `${offer.who} רוצים לעשות עליך סדרה. `
+               + `₪${fmt(payout)}, וצוות שילווה אותך חודשיים.`;
+  } else {
+    offer.who = "עיריית " + rng.choice(["באר שבע", "חיפה", "נתניה", "אשדוד"]);
+    offer.text = `${offer.who} מציעים לפתוח אקדמיה על שמך. `
+               + `₪${fmt(payout)}, ומשהו שיישאר אחרייך.`;
+  }
+  return offer;
+}
+
+/** לוקח את העסקה. הכסף נכנס, והמחיר נגבה מהמגרש. */
+function acceptVenture(game, offer) {
+  const me = game.me;
+  const out = [`✍️ סגרת: ${offer.title} — ${offer.who || ""}.`];
+  game.money += offer.payout;
+  out.push(`   ₪${fmt(offer.payout)} נכנסו לחשבון.`);
+
+  if (offer.cost) {
+    me.fitness = clamp(me.fitness - offer.cost, 0, 100);
+    me.sharpness = clamp(me.sharpness - offer.cost * 1.4, 0, 100);
+    out.push("   ימי הצילום עלו לך בכושר ובחדות.");
+  }
+
+  gainReputation(me, 1.6);
+  me.mediaSkill = clamp(me.mediaSkill + 2.2, 0, 100);
+
+  if (offer.kind === "tycoon") {
+    if (!Array.isArray(game.flags.ventures)) game.flags.ventures = [];
+    game.flags.ventures.push({ who: offer.who || "", equity: offer.equity,
+                               value: offer.payout, year: game.year });
+    out.push(`   ${offer.equity}% מהמיזם רשומים על שמך — `
+           + `זה ימשיך לעבוד גם אחרי שתפרוש.`);
+  } else if (offer.kind === "league") {
+    gainReputation(me, -(offer.rep_cost || 0));
+    game.setFlag("open_to_europe", true);
+    out.push("   בכדורגל האירופי הרימו גבה. הכסף שווה את זה?");
+  } else if (offer.kind === "collection") {
+    if (!Array.isArray(game.flags.royalties)) game.flags.royalties = [];
+    game.flags.royalties.push({ who: offer.who || "", rate: offer.royalty });
+    out.push(`   ${offer.royalty}% מכל פריט שנמכר.`);
+  } else if (offer.kind === "academy") {
+    game.setFlag("academy", offer.who || "");
+    out.push("   ילדים ילבשו את השם שלך על הגב.");
+  }
+  return out;
+}
+
+function declineVenture(game, offer) {
+  const me = game.me;
+  if (offer.kind === "league" && me.age >= 32)
+    return "אמרת לא. בגיל הזה לא בטוח שיצלצלו שוב "
+         + "— אבל אתה עוד רוצה לשחק כדורגל.";
+  me.morale = clamp(me.morale + 1.5, 5, 99);
+  return "אמרת לא. הראש נשאר על המגרש.";
+}
+
+function ventureBook(game) {
+  return Array.isArray(game.flags.ventures) ? game.flags.ventures : [];
+}
+
+function royaltyBook(game) {
+  return Array.isArray(game.flags.royalties) ? game.flags.royalties : [];
+}
+
+/** מה שממשיך להיכנס כל עונה מהמיזמים שסגרת. */
+function passiveIncome(game) {
+  let total = 0;
+  for (const row of ventureBook(game))
+    total += Math.floor(row.value * row.equity / 100 * 0.22);
+  const club = game.myClub();
+  const fame = fameScore(game.me, club ? club.reputation : 40, game.honours.length);
+  for (const row of royaltyBook(game))
+    total += Math.floor(fame * fame * row.rate * 1.4);
+  return total;
+}
+
+/** מה השם שלך שווה עכשיו, בשורות. */
+function fameLines(game) {
+  const me = game.me;
+  const club = game.myClub();
+  const fame = fameScore(me, club ? club.reputation : 40, game.honours.length);
+  const out = [`שם עולמי: ${Math.round(fame)} מתוך 100`];
+  const tiers = openVentures(fame);
+  if (tiers.length) out.push("פתוח לך: " + tiers.map(t => t[1]).join(", "));
+  else {
+    const nxt = VENTURES.reduce((a, b) => b[2] < a[2] ? b : a);
+    out.push(`הפנייה הראשונה מסוג הזה תגיע סביב ${nxt[2]} — ${nxt[1]}.`);
+  }
+  const income = passiveIncome(game);
+  if (income) out.push(`הכנסה פסיבית מהמיזמים: ₪${fmt(income)} לעונה`);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // המאמן של הקבוצה — פורט מ-football_manager/manager.py.
 // דמות שמדברת אליך אחרי כל משחק, דורשת ממך דברים בשבוע, ומסבירה
 // למה אתה בהרכב או מחוצה לו. לכל מאמן אופי, והאופי קובע מה מרגיז אותו.
@@ -16829,16 +17586,42 @@ class Game {
     for (const line of scoutsThisWeek(this, this.rng, myRating))
       report.notes.push({ icon: "", text: line });
 
+    // מה שנכתב עליך — עיתונות, טלוויזיה ושמועות
+    for (const line of weeklyPress(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+    if (report.match)
+      for (const line of broadcast(this, report.match, this.rng))
+        report.notes.push({ icon: "", text: line });
+    for (const line of tickOffers(this))
+      report.notes.push({ icon: "", text: line });
+
+    // מה שהשם שלך שווה מחוץ למגרש
+    const venture = ventureOffer(this, this.rng);
+    if (venture) {
+      this.flags.venture = venture;
+      report.notes.push({ icon: "💼",
+        text: `${venture.title}: ${venture.text} (בתפריט: 'שם')` });
+    }
+
     this.weeklyIncome(report);
 
     if (this.myClub()) this.positionLog.push(this.leaguePosition());
 
     // ההוראה לשבוע הבא
     const next = weeklyDirective(this, this.rng);
+    const prev = this.flag("directive");
     this.setFlag("directive", next);
-    if (next && ["academy", "player", "veteran"].includes(this.stage))
+    // הוראה שלא השתנתה היא לא חדשות. חזרה על אותה שורה מילה במילה כל
+    // שבוע היא מה שגורם למשחק להרגיש כמו לולאה ולא כמו עונה.
+    const onPitch = ["academy", "player", "veteran"].includes(this.stage);
+    if (next && next !== prev && onPitch) {
       report.notes.push({ icon: "🎙️",
         text: directiveLine(this.myClub(), next, this.flags.last_stats) });
+    } else if (next && onPitch && this.week % 6 === 0) {
+      const club = this.myClub();
+      report.notes.push({ icon: "🎙️",
+        text: `${club ? club.managerName : "המאמן"}: "ממשיכים עם מה שהתחלנו."` });
+    }
     if (["youth", "academy", "player", "veteran"].includes(this.stage)) {
       const target = nextTarget(this);
       if (target && this.week % 4 === 0)
@@ -18181,63 +18964,114 @@ class Game {
       p.contract.yearsLeft = this.rng.randint(1, 4);
     }
     if (["player", "veteran"].includes(this.stage)) {
-      const suitor = this.transferOfferForMe();
-      if (suitor) {
-        const wage = Math.round(Math.max(me.contract.wage * 1.25,
-          Math.min(suitor.wageBudget * 0.28,
-            wageForOverall(overall(me)) * (0.9 + me.reputation / 220))));
-        this.flags.pending_offer = { club: suitor.cid, wage, years: 4 };
-        add("📨", `הצעה על השולחן: ${suitor.name} — ₪${fmt(wage)} לשבוע`, true);
-      }
+      this.openTransferMarket(add);
     }
   }
 
   /**
-   * מועדון שמוכן להציע לי חוזה.
-   * קודם כול — מי שבאמת עקב אחריך לאורך העונה. הצעה כבר לא נופלת
-   * משמיים: היא הסוף של תהליך שראית קורה, שבוע אחרי שבוע, ביציע.
+   * פותח חלון העברות: כל מי שרוצה אותך מניח חבילה על השולחן.
+   *
+   * הצעה אחת היא לא שוק. מה שהופך העברה להחלטה הוא בדיוק זה שיש עם
+   * מה להשוות, ושמי שרוצה אותך יותר יודע שיש לו מתחרים.
    */
-  transferOfferForMe() {
-    const me = this.me;
-    const chaser = topSuitor(this, SCOUT_CHASED);
-    if (chaser) return chaser;
-    // סוכן ששילמת לו פותח דלת גם בלי שהצופים סיימו את העבודה
-    const target = this.flag("agent_target");
-    if (target && this.clubs[target] && target !== me.clubId
-        && this.rng.random() < 0.7) {
-      delete this.flags.agent_target;
-      return this.clubs[target];
+  openTransferMarket(add) {
+    const suitors = this.transferSuitors();
+    if (!suitors.length) return;
+    setOffers(this, suitors.map(c => buildOffer(this, c, this.rng)));
+    const live = liveOffers(this);
+    add("📨", `חלון ההעברות נפתח — ${live.length} `
+            + `${live.length > 1 ? "הצעות" : "הצעה"} על השולחן`, true);
+    for (const offer of live) {
+      const club = this.clubs[offer.cid];
+      add("", `   • ${club.name} — ₪${fmt(offer.wage)} לשבוע, `
+            + `${offer.years} שנים (${interestWord(offer)})`);
     }
-    const courting = watchers(this, SCOUT_COURTED);
-    if (courting.length && this.rng.random() < 0.5) return courting[0][0];
-    // ואם אף אחד לא עקב — עדיין קורה ששם עולה בישיבה
-    const pool = candidateClubs(this);
-    if (!pool.length || this.rng.random() > 0.35) return null;
-    return pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+    add("", "   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')");
   }
 
+  /** מי מניח הצעה השנה. אחד לפחות, ולפעמים מרוץ שלם. */
+  transferSuitors() {
+    const me = this.me;
+    const picked = [], seen = new Set();
+    const add = club => {
+      if (club && !seen.has(club.cid) && club.cid !== me.clubId) {
+        seen.add(club.cid);
+        picked.push(club);
+      }
+    };
+    // מי שבאמת עקב אחריך כל העונה קודם — הצעה היא סוף של תהליך
+    for (const [club] of watchers(this, SCOUT_CHASED)) add(club);
+    const target = this.flag("agent_target");
+    if (target && this.clubs[target] && this.rng.random() < 0.7) {
+      delete this.flags.agent_target;
+      add(this.clubs[target]);
+    }
+    for (const [club] of watchers(this, SCOUT_COURTED))
+      if (this.rng.random() < 0.55) add(club);
 
-  acceptOffer() {
-    const offer = this.flag("pending_offer");
-    if (!offer) return "אין הצעה פתוחה.";
-    const club = this.clubs[offer.club];
+    // ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
+    let pool = candidateClubs(this).filter(c => !seen.has(c.cid));
+    let extra = me.reputation >= 55 ? 1 : 0;
+    if (me.reputation >= 75) extra += 1;
+    for (let i = 0; i < extra; i++) {
+      if (pool.length && this.rng.random() < 0.55) {
+        const club = pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
+        pool = pool.filter(c => c !== club);
+        add(club);
+      }
+    }
+    if (!picked.length && pool.length && this.rng.random() < 0.35)
+      add(pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b)));
+    return picked.slice(0, 5);
+  }
+
+  /** חותם על אחת ההצעות שעל השולחן. */
+  acceptOffer(cid = null) {
+    const live = liveOffers(this);
+    if (!live.length) return "אין הצעה פתוחה.";
+    const offer = cid ? offerFor(this, cid) : live[0];
+    if (!offer || !["open", "improved", "final"].includes(offer.state))
+      return "ההצעה הזאת כבר לא על השולחן.";
+    const club = this.clubs[offer.cid];
     this.transferMe(club.cid, offer.wage, offer.years);
-    delete this.flags.pending_offer;
+    if (offer.bonus) this.money += offer.bonus;
+    this.flags.squad_role = offer.role;
+    if (offer.clause) this.flags.release_clause = offer.clause;
+    if (offer.image) this.flags.image_share = offer.image;
+    clearOffers(this);
     delete this.flags.wants_transfer;
     this.me.morale = clamp(this.me.morale + 8, 5, 99);
-    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע.`;
+    const extra = offer.bonus ? ` ומענק ₪${fmt(offer.bonus)}` : "";
+    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
+         + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
   }
 
-  rejectOffer() {
-    const offer = this.flag("pending_offer");
-    if (!offer) return "אין הצעה פתוחה.";
-    delete this.flags.pending_offer;
+  /** מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים. */
+  negotiateOffer(cid, term) {
+    return negotiate(this, cid, term, this.rng).text;
+  }
+
+  /** דוחה הצעה אחת, או את כולן אם לא צוין מועדון. */
+  rejectOffer(cid = null) {
+    const offers = openOffers(this);
+    if (!offers.length) return "אין הצעה פתוחה.";
+    if (cid) {
+      const offer = offerFor(this, cid);
+      if (!offer) return "אין הצעה כזאת.";
+      offer.state = "withdrawn";
+      setOffers(this, offers);
+      const club = this.clubs[cid];
+      if (liveOffers(this).length)
+        return `אמרת לא ל${club ? club.name : "מועדון"}. נשארו הצעות אחרות.`;
+    } else {
+      clearOffers(this);
+    }
     const club = this.myClub();
     if (club) {
       club.fanSupport = clamp(club.fanSupport + 6, 0, 100);
       club.managerTrust = clamp(club.managerTrust + 5, 0, 100);
     }
-    return "דחית את ההצעה ונשארת. במועדון שמעו על זה.";
+    return "דחית ונשארת. במועדון שמעו על זה.";
   }
 
   advanceCareerStage(add) {
@@ -19835,10 +20669,18 @@ function tabsBar() {
   if (["manager", "coach"].includes(game.stage)) items.splice(2, 0, ["tactics", "טקטיקה"]);
   else if (["academy", "player", "veteran"].includes(game.stage) && game.myClub())
     items.splice(2, 0, ["system", "מערכת"]);
-  const offers = game.flag("pending_offer") ? 1 : 0;
-  return `<nav class="tabs">${items.map(([k, l]) =>
-    `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
-      k === "main" && offers ? `<span class="badge">${offers}</span>` : ""}</button>`).join("")}</nav>`;
+  const offers = ["player", "veteran"].includes(game.stage) ? liveOffers(game).length : 0;
+  const question = openQuestion(game) ? 1 : 0;
+  const venture = game.flag("venture") ? 1 : 0;
+  if (["academy", "player", "veteran"].includes(game.stage))
+    items.splice(items.length - 1, 0, ["press", "תקשורת"], ["fame", "שם"]);
+  if (offers) items.splice(1, 0, ["offers", "הצעות"]);
+  const badges = { offers, press: question, fame: venture };
+  return `<nav class="tabs">${items.map(([k, l]) => {
+    const n = badges[k] || 0;
+    return `<button class="tab" data-go="${k}" aria-current="${view === k}">${l}${
+      n ? `<span class="badge">${n}</span>` : ""}</button>`;
+  }).join("")}</nav>`;
 }
 
 function dock(showPlay) {
@@ -19865,6 +20707,9 @@ function screenMain() {
   if (view === "mentor") return appbar() + screenMentor();
   if (view === "growth") return appbar() + screenGrowth();
   if (view === "attr") return appbar() + screenAttr();
+  if (view === "offers") return appbar() + screenOffers();
+  if (view === "press") return appbar() + screenPress();
+  if (view === "fame") return appbar() + screenFame();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -21064,6 +21909,213 @@ function trainingBrief(focus) {
     </div>`;
 }
 
+// ---------------------------------------------------------------------------
+// הצעות — שוק, לא הודעה
+// ---------------------------------------------------------------------------
+
+/**
+ * טבלת ההצעות שעל השולחן.
+ *
+ * העיקר כאן הוא לא הכפתור "לחתום" אלא מה שמעליו: כמה הצעות יש, מה
+ * ההבדל ביניהן, וכמה כוח יש לך לבקש עוד. משא ומתן בלי מינוף גלוי הוא
+ * ניחוש; עם מינוף גלוי זו החלטה.
+ */
+function screenOffers() {
+  const live = liveOffers(game);
+  const lev = leverage(game);
+  const levWord = lev > 0.72 ? "חזק מאוד" : lev > 0.52 ? "חזק"
+                : lev > 0.34 ? "בינוני" : "חלש";
+  const levTone = lev > 0.52 ? "good" : lev > 0.34 ? "" : "bad";
+
+  if (!live.length) {
+    return `<div class="screen">
+      <div class="panel"><div class="panel-head"><span class="t">אין הצעות</span></div>
+        <div class="panel-body"><div class="muted">חלון ההעברות נפתח בסוף העונה.
+          מה שקובע מי יפנה אליך זה מי עוקב אחריך עכשיו — במסך הצופים.</div>
+          <button class="btn wide" data-go="scouts">מי עוקב אחריי</button>
+        </div></div>
+    </div>` + dock(false);
+  }
+
+  return `<div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">המינוף שלך</span>
+        <span class="r ${levTone}">${levWord}</span></div>
+      <div class="panel-body">
+        <div class="bar"><span style="width:${Math.round(lev * 100)}%"></span></div>
+        <div class="muted">${esc(leverageWhy(lev))}</div>
+      </div>
+    </div>
+    ${live.map(offerCard).join("")}
+    <div class="panel">
+      <div class="panel-body"><div class="muted">כל בקשה שורפת סבלנות. מועדון
+        שנגמרה לו הסבלנות יורד מהעסקה — וזה קורה.</div></div>
+    </div>
+  </div>` + dock(false);
+}
+
+/** למה המינוף שלך כזה — במשפט, כדי שיהיה מה לשנות. */
+function leverageWhy(lev) {
+  const me = game.me;
+  const parts = [];
+  const n = liveOffers(game).length;
+  parts.push(n > 1 ? `${n} מועדונים מתחרים עליך` : "רק מועדון אחד על השולחן");
+  if (me.contract.yearsLeft <= 1) parts.push("החוזה שלך נגמר — אתה כמעט חופשי");
+  else if (me.contract.yearsLeft >= 4) parts.push("חוזה ארוך מחזיק אותך במקום");
+  if (me.season.apps >= 6) {
+    const r = avgRating(me.season);
+    if (r >= 7.2) parts.push(`עונה של ${r.toFixed(2)} מדברת בשבילך`);
+    else if (r <= 6.4) parts.push(`ממוצע ${r.toFixed(2)} מחליש אותך`);
+  }
+  return parts.join(" · ") + ".";
+}
+
+function offerCard(offer) {
+  const club = game.clubs[offer.cid];
+  const asks = askOptions(offer);
+  const spent = offer.asks;
+  const left = Math.max(0, offer.patience - spent + 1);
+  return `
+  <div class="panel">
+    <div class="panel-head">
+      <span class="t">${esc(club.name)}</span>
+      <span class="r">${esc(interestWord(offer))}</span>
+    </div>
+    <div class="panel-body">
+      ${offerLines(game, offer).map(line =>
+        `<div class="row"><span class="nm">${esc(line)}</span></div>`).join("")}
+      <div class="muted">מוניטין המועדון ${Math.round(club.reputation)} ·
+        נשארו ${offer.weeks} שבועות ·
+        סבלנות: ${left > 2 ? "רגועים" : left === 2 ? "מתחילים להתעצבן" : "על הקצה"}</div>
+      ${offer.log.length ? `<div class="muted">${offer.log.map(esc).join(" · ")}</div>` : ""}
+      <hr class="rule">
+      <div class="muted">לבקש שיפור:</div>
+      <div class="btn-row wrap">
+        ${asks.map(a => `<button class="mini-btn" data-ask="${offer.cid}:${a.term}"
+          title="${esc(a.ask)}">${esc(a.name)}</button>`).join("")}
+      </div>
+      <div class="btn-row">
+        <button class="btn" data-sign="${offer.cid}">לחתום</button>
+        <button class="mini-btn" data-decline="${offer.cid}">לא מעוניין</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// תקשורת — מה כותבים עליך, וכמה זה שווה
+// ---------------------------------------------------------------------------
+
+/**
+ * הפיד, עם אמינות המקור גלויה ואמת הסיפור נסתרת.
+ *
+ * זה כל העניין: אתה יודע שתחקירן ההעברות צודק ב-88% מהמקרים ושחשבון
+ * אוהדים צודק ב-20%, אבל אתה לא יודע אם *הפעם* הוא צדק. להכחיש דבר
+ * נכון זה הימור; לאשר דבר לא נכון זה נזק.
+ */
+function screenPress() {
+  const items = pressFeed(game).slice().reverse();
+  const question = openQuestion(game);
+  return `<div class="screen">
+    ${question ? `
+    <div class="panel" style="border-color:var(--accent)">
+      <div class="panel-head"><span class="t">מחכים לתגובה שלך</span>
+        <span class="r">${esc(trustWord(question.trust))}</span></div>
+      <div class="panel-body">
+        <div class="quote">"${esc(question.text)}"</div>
+        <div class="muted">${SOURCE_ICON[question.source]}
+          ${esc(SOURCE_NAMES[question.source])} —
+          צודק בערך ב-${Math.round(question.trust * 100)}% מהמקרים.</div>
+        <div class="btn-row">
+          ${REACTIONS.map(([key, label]) =>
+            `<button class="btn" data-press="${key}">${label}</button>`).join("")}
+        </div>
+        <div class="muted">כישורי התקשורת שלך: ${Math.round(game.me.mediaSkill)}
+          — ככל שהם גבוהים יותר, כך הכחשה מחזיקה טוב יותר.</div>
+      </div>
+    </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה כותבים עליך</span></div>
+      <div class="panel-body">
+        ${items.length ? items.map(pressRow).join("")
+          : `<div class="muted">עוד לא כתבו עליך כלום. זה משתנה כשמתחילים לשים לב.</div>`}
+      </div>
+    </div>
+  </div>` + dock(false);
+}
+
+function pressRow(item) {
+  const answered = item.answered ? REACTIONS.find(r => r[0] === item.reaction) : null;
+  return `
+    <div class="row">
+      <span class="grow">
+        <span class="nm">${SOURCE_ICON[item.source]} ${esc(SOURCE_NAMES[item.source])}
+          <span class="sub">· עונת ${item.year}, שבוע ${item.week}</span></span>
+        <span class="sub">"${esc(item.text)}"</span>
+        ${answered ? `<span class="sub">← ${esc(answered[1])}</span>` : ""}
+      </span>
+      <span class="val ${item.trust >= 0.62 ? "good" : item.trust >= 0.4 ? "" : "bad"}"
+        >${Math.round(item.trust * 100)}%</span>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// שם — מה השם שלך שווה מחוץ למגרש
+// ---------------------------------------------------------------------------
+
+function screenFame() {
+  const offer = game.flag("venture");
+  const ventures = ventureBook(game);
+  const royalties = royaltyBook(game);
+  const club = game.myClub();
+  const fame = fameScore(game.me, club ? club.reputation : 40, game.honours.length);
+
+  return `<div class="screen">
+    ${offer ? `
+    <div class="panel" style="border-color:var(--gold)">
+      <div class="panel-head"><span class="t">${esc(offer.title)}</span>
+        <span class="r">₪${fmt(offer.payout)}</span></div>
+      <div class="panel-body">
+        <div class="quote">${esc(offer.text)}</div>
+        ${offer.cost ? `<div class="muted">זה יעלה לך בכושר ובחדות —
+          ימי צילום הם לא ימי אימון.</div>` : ""}
+        <div class="btn-row">
+          <button class="btn primary" data-venture="yes">לסגור</button>
+          <button class="btn" data-venture="no">לא עכשיו</button>
+        </div>
+      </div>
+    </div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><span class="t">השם שלך</span>
+        <span class="r">${Math.round(fame)}/100</span></div>
+      <div class="panel-body">
+        <div class="bar"><span style="width:${Math.round(fame)}%"></span></div>
+        ${fameLines(game).map(line =>
+          `<div class="muted">${esc(line)}</div>`).join("")}
+        <hr class="rule">
+        <div class="muted">מה שפותח דלתות: מוניטין, כישורי תקשורת,
+          שערים ובישולים, תארים, וגודל המועדון שאתה משחק בו.</div>
+      </div>
+    </div>
+    ${ventures.length || royalties.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה שכבר שלך</span></div>
+      <div class="panel-body">
+        ${ventures.map(v => `<div class="row">
+          <span class="grow"><span class="nm">${esc(v.who)}</span>
+            <span class="sub">שותפות מעונת ${v.year}</span></span>
+          <span class="val good">${v.equity}%</span></div>`).join("")}
+        ${royalties.map(r => `<div class="row">
+          <span class="grow"><span class="nm">${esc(r.who)}</span>
+            <span class="sub">קולקציה על שמך</span></span>
+          <span class="val good">${r.rate}%</span></div>`).join("")}
+        <div class="muted">הכנסה פסיבית: ₪${fmt(passiveIncome(game))} לעונה —
+          זה ממשיך גם אחרי שתתלה את הנעליים.</div>
+      </div>
+    </div>` : ""}
+  </div>` + dock(false);
+}
+
 /** תקציר המערכת בסקירה: מה המאמן משחק, ומה התפקיד שלך בתוכה. */
 function systemSnip() {
   if (!["academy", "player", "veteran"].includes(game.stage)) return "";
@@ -21715,6 +22767,48 @@ function bind() {
     el.addEventListener("click", () => go(el.dataset.go)));
   app.querySelectorAll("[data-choice]").forEach(el =>
     el.addEventListener("click", () => resolveChoice(+el.dataset.choice)));
+
+  // -- שוק ההעברות --------------------------------------------------
+  app.querySelectorAll("[data-ask]").forEach(el =>
+    el.addEventListener("click", () => {
+      const [cid, term] = el.dataset.ask.split(":");
+      toast(game.negotiateOffer(cid, term));
+      saveGame();
+      render();
+    }));
+  app.querySelectorAll("[data-sign]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.acceptOffer(el.dataset.sign);
+      saveGame();
+      showOutcome("חתמת", text);
+    }));
+  app.querySelectorAll("[data-decline]").forEach(el =>
+    el.addEventListener("click", () => {
+      toast(game.rejectOffer(el.dataset.decline));
+      saveGame();
+      if (!liveOffers(game).length) go("main"); else render();
+    }));
+
+  // -- תקשורת ---------------------------------------------------------
+  app.querySelectorAll("[data-press]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = pressReact(game, el.dataset.press, game.rng);
+      saveGame();
+      showOutcome("התגובה שלך", text);
+    }));
+
+  // -- מיזמים ---------------------------------------------------------
+  app.querySelectorAll("[data-venture]").forEach(el =>
+    el.addEventListener("click", () => {
+      const offer = game.flag("venture");
+      if (!offer) { render(); return; }
+      delete game.flags.venture;
+      const text = el.dataset.venture === "yes"
+        ? acceptVenture(game, offer).join("\n")
+        : declineVenture(game, offer);
+      saveGame();
+      showOutcome(offer.title, text);
+    }));
   app.querySelectorAll("[data-focus]").forEach(el =>
     el.addEventListener("click", () => { game.setAction(el.dataset.focus); render(); }));
   app.querySelectorAll("[data-int]").forEach(el =>

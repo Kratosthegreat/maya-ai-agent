@@ -30,6 +30,9 @@ from . import coaching as CO2
 from . import mentor as MN
 from . import commercial as CM
 from . import development as DEV
+from . import transfers as TR
+from . import press as PR
+from . import fame as FA
 from . import scouting as SC
 from . import wealth as WL
 from .progression import (end_of_season_development, retirement_pressure,
@@ -532,15 +535,36 @@ class GameState:
         for line in SC.scouts_this_week(self, self.rng, my_rating):
             report.add(line)
 
+        # 5ב. מה שנכתב עליך — עיתונות, טלוויזיה ושמועות
+        for line in PR.weekly_press(self, self.rng):
+            report.add(line)
+        if report.match:
+            for line in PR.broadcast(self, report.match, self.rng):
+                report.add(line)
+        for line in TR.tick_offers(self):
+            report.add(line)
+
+        # 5ג. מה שהשם שלך שווה מחוץ למגרש
+        venture = FA.venture_offer(self, self.rng)
+        if venture:
+            self.flags["venture"] = venture
+            report.add(f"💼 {venture['title']}: {venture['text']} (בתפריט: 'שם')")
+
         # 6. שכר
         self._weekly_income(report)
 
         # 7. ההוראה לשבוע הבא
         nxt = MG.weekly_directive(self, self.rng)
+        prev = self.flag("directive")
         self.set_flag("directive", nxt)
-        if nxt and self.stage in ("academy", "player", "veteran"):
+        # הוראה שלא השתנתה היא לא חדשות. חזרה על אותה שורה מילה במילה
+        # כל שבוע היא מה שגורם למשחק להרגיש כמו לולאה ולא כמו עונה.
+        if nxt and nxt != prev and self.stage in ("academy", "player", "veteran"):
             report.add(MG.directive_line(self.my_club, nxt,
                                          self.flags.get("last_stats")))
+        elif nxt and self.week % 6 == 0 and self.stage in ("academy", "player", "veteran"):
+            report.add(f"🎙️ {self.my_club.manager_name if self.my_club else 'המאמן'}: "
+                       f"\"ממשיכים עם מה שהתחלנו.\"")
         if self.stage in ("youth", "academy", "player", "veteran"):
             target = DEV.next_target(self)
             if target and self.week % 4 == 0:
@@ -1978,20 +2002,67 @@ class GameState:
                     player.club_id = target.cid
             player.contract.years_left = self.rng.randint(1, 4)
 
-        # הצעה עבורי
+        # הצעות עבורי — שוק, לא הודעה אחת
         if self.stage in ("player", "veteran"):
-            suitor = self._transfer_offer_for_me()
-            if suitor:
-                wage = int(max(me.contract.wage * 1.25,
-                               min(suitor.wage_budget * 0.28,
-                                   wage_for_overall(me.overall) *
-                                   (0.9 + me.reputation / 220.0))))
-                self.flags["pending_offer"] = {"club": suitor.cid, "wage": wage,
-                                               "years": 4}
-                lines.append("")
-                lines.append(f"📨 הצעה על השולחן: {suitor.name} — "
-                             f"₪{wage:,} לשבוע. (בתפריט: 'הצעות')")
+            lines.extend(self._open_transfer_market())
         return lines
+
+    def _open_transfer_market(self) -> List[str]:
+        """פותח חלון העברות: כל מי שרוצה אותך מניח חבילה על השולחן.
+
+        הצעה אחת היא לא שוק. מה שהופך העברה להחלטה הוא בדיוק זה
+        שיש עם מה להשוות, ושמי שרוצה אותך יותר יודע שיש לו מתחרים.
+        """
+        me = self.me
+        suitors = self._transfer_suitors()
+        if not suitors:
+            return []
+        offers = [TR.build_offer(self, club, self.rng) for club in suitors]
+        TR.set_offers(self, offers)
+
+        lines = ["", f"📨 חלון ההעברות נפתח — {len(offers)} "
+                     f"{'הצעות' if len(offers) > 1 else 'הצעה'} על השולחן:"]
+        for offer in TR.live_offers(self):
+            club = self.clubs[offer["cid"]]
+            lines.append(f"   • {club.name} — ₪{offer['wage']:,} לשבוע, "
+                         f"{offer['years']} שנים ({TR.interest_word(offer)})")
+        lines.append("   אפשר לנהל משא ומתן על כל סעיף. (בתפריט: 'הצעות')")
+        return lines
+
+    def _transfer_suitors(self) -> List["Club"]:
+        """מי מניח הצעה השנה. אחד לפחות, ולפעמים מרוץ שלם."""
+        me = self.me
+        picked: List["Club"] = []
+        seen = set()
+
+        def add(club):
+            if club is not None and club.cid not in seen and club.cid != me.club_id:
+                seen.add(club.cid)
+                picked.append(club)
+
+        # מי שבאמת עקב אחריך כל העונה קודם — הצעה היא סוף של תהליך
+        for club, _ in SC.watchers(self, SC.CHASED):
+            add(club)
+        target = self.flag("agent_target")
+        if target and target in self.clubs and self.rng.random() < 0.7:
+            self.flags.pop("agent_target", None)
+            add(self.clubs[target])
+        for club, _ in SC.watchers(self, SC.COURTED):
+            if self.rng.random() < 0.55:
+                add(club)
+
+        # ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
+        pool = [c for c in SC.candidate_clubs(self) if c.cid not in seen]
+        extra = 1 if me.reputation >= 55 else 0
+        extra += 1 if me.reputation >= 75 else 0
+        for _ in range(extra):
+            if pool and self.rng.random() < 0.55:
+                club = max(pool, key=lambda c: c.reputation)
+                pool.remove(club)
+                add(club)
+        if not picked and pool and self.rng.random() < 0.35:
+            add(max(pool, key=lambda c: c.reputation))
+        return picked[:5]
 
     def _transfer_offer_for_me(self) -> Optional[Club]:
         """מועדון שמוכן להציע לי חוזה.
@@ -2018,27 +2089,56 @@ class GameState:
             return None
         return max(pool, key=lambda c: c.reputation)
 
-    def accept_offer(self) -> str:
-        """מקבל את הצעת ההעברה הפתוחה."""
-        offer = self.flag("pending_offer")
-        if not offer:
+    def accept_offer(self, cid: Optional[str] = None) -> str:
+        """חותם על אחת ההצעות שעל השולחן."""
+        live = TR.live_offers(self)
+        if not live:
             return "אין הצעה פתוחה."
-        club = self.clubs[offer["club"]]
+        offer = TR.offer_for(self, cid) if cid else live[0]
+        if not offer or offer["state"] not in ("open", "improved", "final"):
+            return "ההצעה הזאת כבר לא על השולחן."
+        club = self.clubs[offer["cid"]]
         self.transfer_me(club.cid, offer["wage"], offer["years"])
-        self.flags.pop("pending_offer", None)
+        if offer["bonus"]:
+            self.money += offer["bonus"]
+        self.flags["squad_role"] = offer["role"]
+        if offer["clause"]:
+            self.flags["release_clause"] = offer["clause"]
+        if offer["image"]:
+            self.flags["image_share"] = offer["image"]
+        TR.clear_offers(self)
         self.flags.pop("wants_transfer", None)
         self.me.morale = clamp(self.me.morale + 8, 5, 99)
-        return f"חתמת ב{club.name} על ₪{offer['wage']:,} לשבוע."
+        extra = f" ומענק ₪{offer['bonus']:,}" if offer["bonus"] else ""
+        return (f"חתמת ב{club.name} על ₪{offer['wage']:,} לשבוע{extra}. "
+                f"הובטח לך תפקיד: {TR.ROLE_NAMES.get(offer['role'], offer['role'])}.")
 
-    def reject_offer(self) -> str:
-        offer = self.flags.pop("pending_offer", None)
-        if not offer:
+    def negotiate_offer(self, cid: str, term: str) -> str:
+        """מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים."""
+        result = TR.negotiate(self, cid, term, self.rng)
+        return result["text"]
+
+    def reject_offer(self, cid: Optional[str] = None) -> str:
+        """דוחה הצעה אחת, או את כולן אם לא צוין מועדון."""
+        offers = TR.open_offers(self)
+        if not offers:
             return "אין הצעה פתוחה."
+        if cid:
+            offer = TR.offer_for(self, cid)
+            if not offer:
+                return "אין הצעה כזאת."
+            offer["state"] = "withdrawn"
+            TR.set_offers(self, offers)
+            club = self.clubs.get(cid)
+            if TR.live_offers(self):
+                return f"אמרת לא ל{club.name if club else 'מועדון'}. נשארו הצעות אחרות."
+        else:
+            TR.clear_offers(self)
         club = self.my_club
         if club:
             club.fan_support = clamp(club.fan_support + 6, 0, 100)
             club.manager_trust = clamp(club.manager_trust + 5, 0, 100)
-        return "דחית את ההצעה ונשארת. במועדון שמעו על זה."
+        return "דחית ונשארת. במועדון שמעו על זה."
 
     def _advance_career_stage(self) -> List[str]:
         """מעבר בין שלבי הקריירה בסוף עונה."""

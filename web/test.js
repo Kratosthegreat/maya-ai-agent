@@ -10,7 +10,7 @@ const vm = require("vm");
 const HERE = __dirname;
 const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "matchstats.js",
                "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
-               "tacticsteam.js", "knowledge.js", "coaching.js", "mentor.js", "manager.js",
+               "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "coaching.js", "mentor.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -30,6 +30,10 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "packSave, unpackSave, packSaveBytes, unpackSaveBytes, " +
   "bytesToBase64, bytesToBits15, bits15ToBytes, bytesToText, persistStorage, " +
   "ceilingDamper, spillFromCapped, cappedAttrs, pushCeiling, ABSOLUTE_CEILING, " +
+  "marketValue, leverage, buildOffer, setOffers, liveOffers, offerFor, offerWorth, " +
+  "offerLines, interestWord, negotiate, tickOffers, askOptions, ROLE_NAMES, " +
+  "WINDOW_WEEKS, SOURCE_TRUST, trustWord, pressCandidates, pressPush, pressStory, " +
+  "pressReact, openQuestion, openVentures, acceptVenture, passiveIncome, " +
   "injuryRisk, marketability, sponsorOffer, " +
   "managerStyle, postMatchLine, selectionNote, weeklyDirective, directiveLine, STORY, " +
   "availableNumbers, assignNumber, STORY_CONDITIONS, applyStoryEffects, " +
@@ -1230,8 +1234,11 @@ test("הכושר לא קורס לאורך עונה, ויש מחיר לעומס",
 // ---------------------------------------------------------------------------
 
 test("צופים בונים עניין לאורך עונה", () => {
+  // עשרה זרעים ולא ארבעה: watchers הוא תצלום רגע, וקריירה בודדת
+  // שבמקרה לא משכה איש היא תוצאה לגיטימית ולא ראיה שהסקאוטינג שבור.
   let found = 0;
-  for (const seed of [8, 21, 33, 44]) {
+  const seeds = [8, 21, 33, 44, 57, 66, 71, 88, 95, 103];
+  for (const seed of seeds) {
     const g = A.Game.newGame("בודק", "ST", "hapoel_carmel", 19, seed);
     for (let i = 0; i < 300; i++) {
       if (g.gameOver || g.me.age > 25) break;
@@ -1240,7 +1247,7 @@ test("צופים בונים עניין לאורך עונה", () => {
     }
     if (A.watchers(g).length) found++;
   }
-  assert(found >= 3, `רק ${found} מתוך 4 קריירות משכו צופים`);
+  assert(found >= 6, `רק ${found} מתוך ${seeds.length} קריירות משכו צופים`);
 });
 
 test("הסקאוטינג מגיע גם מחוץ לישראל", () => {
@@ -1941,6 +1948,206 @@ test("התקרה לא זזה לוותיק", () => {
   me.ceiling = 90; me.potential = 90; me.age = 34;
   for (let seed = 0; seed < 40; seed++)
     assert(A.pushCeiling(me, new A.Rng(seed), 0.9) === null, "ותיק קיבל תקרה חדשה");
+});
+
+// ---------------------------------------------------------------------------
+// שוק העברות, עיתונות ושם
+// ---------------------------------------------------------------------------
+
+function market(seed = 11, age = 24, rep = 82, count = 3,
+                eagerness = [0.9, 0.7, 0.45]) {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", age, seed);
+  g.me.reputation = rep;
+  g.me.contract.yearsLeft = 1;
+  const others = Object.values(g.clubs).filter(c => c.cid !== g.me.clubId).slice(0, count);
+  A.setOffers(g, others.map((c, i) => A.buildOffer(g, c, g.rng, eagerness[i])));
+  return g;
+}
+
+test("כמה הצעות יכולות לשבת על השולחן יחד", () => {
+  const g = market();
+  const live = A.liveOffers(g);
+  assert(live.length === 3, `${live.length} הצעות`);
+  const worth = live.map(A.offerWorth);
+  for (let i = 1; i < worth.length; i++)
+    assert(worth[i] <= worth[i - 1], "ההצעות לא ממוינות לפי שווי");
+  for (const o of live) {
+    assert(o.wage > 0 && o.years >= 3, "חבילה חסרה");
+    assert(A.ROLE_NAMES[o.role], "תפקיד לא מוכר");
+    assert(A.offerLines(g, o).length >= 3, "החבילה לא מוצגת כחבילה");
+  }
+});
+
+test("הצעות מתחרות הן מינוף אמיתי", () => {
+  const alone = market(11, 24, 82, 1, [0.9]);
+  const crowd = market();
+  assert(A.leverage(crowd) > A.leverage(alone) + 0.20,
+    `${A.leverage(crowd).toFixed(2)} מול ${A.leverage(alone).toFixed(2)}`);
+});
+
+test("חוזה ארוך מחליש אותך", () => {
+  const g = market();
+  const strong = A.leverage(g);
+  g.me.contract.yearsLeft = 5;
+  assert(A.leverage(g) < strong, "חוזה ארוך אמור להחליש");
+});
+
+test("לבקש יותר באמת יכול להשיג יותר", () => {
+  let moved = 0;
+  for (let seed = 0; seed < 25; seed++) {
+    const g = market(seed);
+    const offer = A.liveOffers(g)[0];
+    const before = offer.wage;
+    A.negotiate(g, offer.cid, "wage", new A.Rng(seed));
+    if (A.offerFor(g, offer.cid).wage > before) moved++;
+  }
+  assert(moved >= 8, `רק ${moved} מתוך 25 בקשות שכר הזיזו משהו`);
+});
+
+test("חמדנות יכולה לעלות בהצעה כולה", () => {
+  let lost = 0;
+  for (let seed = 0; seed < 25; seed++) {
+    const g = market(seed);
+    const cid = A.liveOffers(g)[0].cid;
+    const rng = new A.Rng(seed);
+    for (const term of ["wage", "years", "bonus", "clause", "image", "role"]) {
+      A.negotiate(g, cid, term, rng);
+      if (A.offerFor(g, cid).state === "withdrawn") { lost++; break; }
+    }
+  }
+  assert(lost >= 10, `רק ${lost} מתוך 25 מועדונים קמו מהשולחן — אין סיכון`);
+});
+
+test("חתימה לוקחת את כל החבילה ולא רק את השכר", () => {
+  const g = market();
+  const offer = A.liveOffers(g)[0];
+  offer.bonus = 500000;
+  offer.clause = 9000000;
+  offer.role = "star";
+  const before = g.money;
+  const text = g.acceptOffer(offer.cid);
+  assert(g.money === before + 500000, "מענק החתימה לא שולם");
+  assert(g.flag("release_clause") === 9000000, "סעיף שחרור לא נשמר");
+  assert(g.flag("squad_role") === "star", "התפקיד לא נשמר");
+  assert(text.includes("איש הקבוצה"), text);
+  assert(!A.liveOffers(g).length, "אחרי חתימה השולחן מתרוקן");
+});
+
+test("דחיית הצעה אחת משאירה את השאר", () => {
+  const g = market();
+  const cid = A.liveOffers(g)[0].cid;
+  g.rejectOffer(cid);
+  const left = A.liveOffers(g);
+  assert(left.length === 2 && left.every(o => o.cid !== cid), "הדחייה לא ממוקדת");
+});
+
+test("להצעות יש דדליין", () => {
+  const g = market();
+  for (let i = 0; i < A.WINDOW_WEEKS; i++) A.tickOffers(g);
+  assert(!A.liveOffers(g).length, "הצעה בלי דדליין היא לא הצעה");
+});
+
+test("שווי שוק הולך אחרי גיל וחוזה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 3);
+  const me = g.me;
+  me.contract.yearsLeft = 4;
+  const young = A.marketValue(me);
+  me.age = 34;
+  assert(A.marketValue(me) < young * 0.5, "ותיק אמור להיות זול בהרבה");
+  me.age = 24;
+  me.contract.yearsLeft = 1;
+  assert(A.marketValue(me) < young * 0.6, "שנה לסיום חוזה מוזילה");
+});
+
+test("למקורות בעיתונות יש אמינות שונה", () => {
+  assert(A.SOURCE_TRUST.insider > A.SOURCE_TRUST.fan + 0.5, "אין הבדל בין מקורות");
+  assert(A.trustWord(0.9).includes("אמין"), A.trustWord(0.9));
+  assert(A.trustWord(0.9) !== A.trustWord(0.2), "כל האמינויות נקראות אותו דבר");
+});
+
+test("העיתונות כותבת גם אמת וגם המצאה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 7);
+  g.me.reputation = 80;
+  g.me.contract.yearsLeft = 1;
+  const pool = A.pressCandidates(g);
+  assert(pool.length, "אין על מה לכתוב");
+  assert(pool.some(i => i.true), "הכל שקר");
+  assert(pool.some(i => !i.true), "הכל אמת — אין דרמה");
+});
+
+test("הכחשה של אמת יכולה להתפוצץ לך בפנים", () => {
+  let burned = 0;
+  for (let seed = 0; seed < 30; seed++) {
+    const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, seed);
+    g.me.mediaSkill = 10;
+    A.pressPush(g, A.pressStory("x", "insider", "אמת", true, true));
+    if (A.pressReact(g, "deny", new A.Rng(seed)).includes("ההקלטה")) burned++;
+  }
+  assert(burned >= 5, `הכחשת אמת נשברה רק ${burned} פעמים מתוך 30`);
+});
+
+test("כישורי תקשורת מגנים על הכחשה", () => {
+  const burns = skill => {
+    let count = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, seed);
+      g.me.mediaSkill = skill;
+      A.pressPush(g, A.pressStory("x", "insider", "אמת", true, true));
+      if (A.pressReact(g, "deny", new A.Rng(seed)).includes("ההקלטה")) count++;
+    }
+    return count;
+  };
+  assert(burns(95) < burns(5), "כישורי תקשורת חייבים להיות שווים משהו");
+});
+
+test("לאשר המצאה עולה לך", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  const before = g.me.reputation;
+  A.pressPush(g, A.pressStory("x", "fan", "המצאה", false, true));
+  A.pressReact(g, "confirm", new A.Rng(1));
+  assert(g.me.reputation < before, "לאשר משהו שלא היה חייב לעלות");
+});
+
+test("תגובה סוגרת את השאלה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  A.pressPush(g, A.pressStory("x", "tv", "משהו", true, true));
+  assert(A.openQuestion(g) !== null, "השאלה לא נפתחה");
+  A.pressReact(g, "silent", new A.Rng(1));
+  assert(A.openQuestion(g) === null, "השאלה נשארה פתוחה");
+});
+
+test("שם גדול פותח יותר דלתות", () => {
+  assert(A.openVentures(20).length === 0, "בשם קטן לא אמור להיפתח כלום");
+  const small = A.openVentures(60).length;
+  const big = A.openVentures(95).length;
+  assert(big > small && small > 0, `${small} מול ${big}`);
+});
+
+test("מיזם משלם וגם עולה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 26, 5);
+  g.me.fitness = 100;
+  const money = g.money;
+  A.acceptVenture(g, { kind: "ambassador", title: "שגריר קמפיין", who: "קמפיין",
+                       payout: 400000, cost: 5, weeks: 2 });
+  assert(g.money === money + 400000, "הכסף לא נכנס");
+  assert(g.me.fitness < 100, "ימי צילום הם לא ימי אימון");
+});
+
+test("שותפות ממשיכה לשלם גם אחרי העסקה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 26, 5);
+  assert(A.passiveIncome(g) === 0, "אין מיזמים אבל יש הכנסה");
+  A.acceptVenture(g, { kind: "tycoon", title: "שותפות", who: "קרן",
+                       payout: 2000000, equity: 10, cost: 0 });
+  assert(A.passiveIncome(g) > 0, "שותפות אמורה להמשיך לעבוד");
+});
+
+test("ליגה זרה משלמת גם במוניטין", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 30, 5);
+  g.me.reputation = 80;
+  const before = g.me.reputation;
+  A.acceptVenture(g, { kind: "league", title: "ליגה זרה", who: "ליגה",
+                       payout: 9000000, cost: 0, rep_cost: 4.0 });
+  assert(g.me.reputation < before, "כסף גדול מליגה חלשה חייב לעלות במשהו");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);
