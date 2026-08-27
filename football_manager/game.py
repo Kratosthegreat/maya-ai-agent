@@ -36,6 +36,8 @@ from . import fame as FA
 from . import youth as YT
 from . import scouting as SC
 from . import wealth as WL
+from . import agents as AG
+from . import life as LF
 from .progression import (REASSESS_EVERY, end_of_season_development,
                           reassess_youngster, retirement_pressure,
                           should_retire, simulate_ai_week, weekly_recovery,
@@ -45,6 +47,10 @@ SEASON_WEEKS = 43
 
 # בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
 YOUTH_LOAD = 0.52
+
+# כמה "חום שוק" מתאדה בשבוע. כתבה אחת שווה 6-20, ולכן זה מחזיק
+# כשלושה שבועות — בערך כמה שכותרת מחזיקה במציאות.
+HYPE_DECAY = 0.6
 CUP_WEEKS = {6: "שלב 32 האחרונות", 13: "שמינית הגמר", 21: "רבע הגמר",
              29: "חצי הגמר", 37: "גמר הגביע"}
 SAVE_DIR = os.path.join(os.path.expanduser("~"), ".football_manager_saves")
@@ -496,6 +502,7 @@ class GameState:
         """מריץ שבוע שלם ומחזיר דוח."""
         report = WeekReport(week=self.week)
         self._week_attendance = 0
+        self._played_this_week = False
         if self.game_over:
             report.add("הקריירה הסתיימה.")
             return report
@@ -567,6 +574,32 @@ class GameState:
         if venture:
             self.flags["venture"] = venture
             report.add(f"💼 {venture['title']}: {venture['text']} (בתפריט: 'שם')")
+
+        # 5ד. הרעש בשוק דועך. בלי זה כתבה אחת מגיל 17 ממשיכה לנפח
+        # את ההצעות גם בגיל 23, וזה בדיוק ההפך מ"מה חם עכשיו".
+        heat = float(self.flags.get("hype", 0) or 0)
+        if heat > 0:
+            self.flags["hype"] = max(0.0, heat - HYPE_DECAY)
+
+        # 5ה. הסוכן — מה הוא עשה השבוע בלי לשאול אותך
+        for line in AG.weekly(self, self.rng):
+            report.add(line)
+
+        # 5ו. הבית: הורים, בן/בת זוג, ומה שנשאר אחרי פרידה
+        for line in LF.weekly(self, self.rng):
+            report.add(line)
+        broke = LF.heartbreak_tick(self)
+        if broke:
+            report.add(broke)
+
+        # 5ז. הבטחות המאמן, ומאמנים שמפוטרים
+        kept = MG.promise_tick(self, self._played_this_week)
+        if kept:
+            report.add(kept)
+        swap = MG.maybe_replace(self, self.rng)
+        if swap:
+            report.add(swap)
+
 
         # 6. שכר
         self._weekly_income(report)
@@ -848,6 +881,9 @@ class GameState:
         my_score = me.effective + (club.manager_trust - 50) * 0.14
         if self.flag("captain"):
             my_score += 4
+        # הדעה של המאמן היא לא קישוט: שחקן בכלוב לא נכנס גם כשהוא
+        # הכי טוב בעמדה, ומועדף נכנס גם כשהוא לא.
+        my_score += MG.selection_bonus(self)
         best_rival = max((p.effective for p in rivals), default=0.0)
         return my_score >= best_rival - 1.0
 
@@ -858,6 +894,7 @@ class GameState:
         if self.stage in ("academy", "player", "veteran"):
             if me.pid in result.ratings:
                 self.no_start_streak = 0
+                self._played_this_week = True
                 rating = result.ratings[me.pid]
                 goals = sum(1 for e in result.events
                             if e.kind == "goal" and e.player_id == me.pid)
@@ -1101,7 +1138,9 @@ class GameState:
         if self.stage == "youth":
             pass                      # בגיל הזה עוד לא משלמים לך
         elif self.stage in ("academy", "player", "veteran"):
-            self.earn_money(net_income(me.contract.wage))
+            # הסוכן גובה מהברוטו, לפני שהמדינה גובה משלה. ככה זה עובד.
+            fee = AG.agent_cut(self, me.contract.wage)
+            self.earn_money(net_income(me.contract.wage - fee))
 
         # חסויות משלמות כל שבוע כל עוד החוזה בתוקף — לא פעם אחת ונגמר
         retainer = CM.weekly_retainer(self.deals, SEASON_WEEKS)
@@ -2075,10 +2114,23 @@ class GameState:
             if self.rng.random() < 0.55:
                 add(club)
 
+        # עילוי: כשהשוק בוער, מועדונים שלא ראו אותך מעולם נכנסים
+        # לרשימה. זה בדיוק ההבדל בין "שחקן טוב" ל"כולם רוצים אותו".
+        boom = TR.frenzy(self)
+        if boom > 1.0:
+            elite = sorted((c for c in self.clubs.values()
+                            if c.cid not in seen and c.cid != me.club_id
+                            and c.reputation >= 80),
+                           key=lambda c: -c.reputation)
+            for club in elite[:int((boom - 1.0) * 3.2) + 1]:
+                if self.rng.random() < 0.35 + (boom - 1.0) * 0.42:
+                    add(club)
+
         # ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
         pool = [c for c in SC.candidate_clubs(self) if c.cid not in seen]
         extra = 1 if me.reputation >= 55 else 0
         extra += 1 if me.reputation >= 75 else 0
+        extra += 1 if AG.reach(self) >= 0.7 else 0      # סוכן מקושר פותח דלת
         for _ in range(extra):
             if pool and self.rng.random() < 0.55:
                 club = max(pool, key=lambda c: c.reputation)
@@ -2086,7 +2138,7 @@ class GameState:
                 add(club)
         if not picked and pool and self.rng.random() < 0.35:
             add(max(pool, key=lambda c: c.reputation))
-        return picked[:5]
+        return picked[:7]
 
     def _transfer_offer_for_me(self) -> Optional[Club]:
         """מועדון שמוכן להציע לי חוזה.
@@ -2130,12 +2182,90 @@ class GameState:
             self.flags["release_clause"] = offer["clause"]
         if offer["image"]:
             self.flags["image_share"] = offer["image"]
+        if offer.get("minutes"):
+            self.flags["minutes_clause"] = offer["minutes"]
+        if offer.get("loyalty"):
+            self.flags["loyalty_bonus"] = offer["loyalty"]
+        if offer.get("family"):
+            self.money += offer["family"]
+        if offer.get("promises"):
+            self.flags["club_promises"] = list(offer["promises"])
+        agent_lines = AG.on_deal(self, offer)
         TR.clear_offers(self)
         self.flags.pop("wants_transfer", None)
+        self.flags.pop("hype", None)         # הרעש נגמר ברגע שחתמת
         self.me.morale = clamp(self.me.morale + 8, 5, 99)
         extra = f" ומענק ₪{offer['bonus']:,}" if offer["bonus"] else ""
-        return (f"חתמת ב{club.name} על ₪{offer['wage']:,} לשבוע{extra}. "
+        text = (f"חתמת ב{club.name} על ₪{offer['wage']:,} לשבוע{extra}. "
                 f"הובטח לך תפקיד: {TR.ROLE_NAMES.get(offer['role'], offer['role'])}.")
+        for promise in offer.get("promises", []):
+            text += f"\n   • {promise}"
+        for line in agent_lines:
+            text += f"\n{line}"
+        return text
+
+    # -- סוכן -------------------------------------------------------------
+
+    def agent_candidates(self) -> List[Dict[str, Any]]:
+        """מי מוכן לייצג אותך. נבנה פעם אחת ונשמר עד שבוחרים."""
+        rows = self.flags.get("agent_offers")
+        if not isinstance(rows, list) or not rows:
+            rows = AG.market(self, self.rng)
+            self.flags["agent_offers"] = rows
+        return rows
+
+    def open_agent_market(self) -> str:
+        """מחפש סוכן ביוזמתך. אפשר גם בלי שמישהו ניגש אליך בבית קפה."""
+        self.flags["agent_offers"] = AG.market(self, self.rng)
+        return "שלושה סוכנים הסכימו להיפגש."
+
+    def sign_agent(self, index: int) -> str:
+        rows = self.agent_candidates()
+        if index < 0 or index >= len(rows):
+            return "אין סוכן כזה."
+        text = AG.sign(self, rows[index])
+        self.flags.pop("agent_offers", None)
+        self.log(text)
+        return text
+
+    def fire_agent(self) -> str:
+        """מפטר. סוכן שמפוטר לא נשאר חבר, ולפעמים זה עולה בדלת סגורה."""
+        row = AG.agent(self)
+        if not row:
+            return "אין לך סוכן."
+        text = AG.leave(self, "\"בהצלחה. תזכור מי פתח לך את הדלתות.\"")
+        # כריש מפוטר שורף מועדון בדרך החוצה
+        if AG.agent_type(row)[5] >= 0.6 and self.rng.random() < 0.45:
+            book = self.flags.get("scout_interest") or {}
+            if book:
+                cid = max(book, key=lambda k: book[k])
+                book[cid] = 0.0
+                club = self.clubs.get(cid)
+                if club:
+                    text += f"\n🕳️ פתאום ב{club.name} הפסיקו לענות."
+        self.log(text)
+        return text
+
+    # -- חיים אישיים ------------------------------------------------------
+
+    def life_actions(self) -> List[Dict[str, Any]]:
+        return LF.actions(self)
+
+    def do_life_action(self, key: str) -> str:
+        text = LF.do_action(self, key)
+        if isinstance(text, str) and text:
+            self.log(text)
+        return text
+
+    # -- פגישה עם המאמן ---------------------------------------------------
+
+    def manager_meetings(self) -> List[Dict[str, Any]]:
+        return MG.meeting_options(self)
+
+    def manager_request(self, key: str) -> str:
+        text = MG.request(self, key, self.rng)
+        self.log(text.split("\n")[0])
+        return text
 
     def negotiate_offer(self, cid: str, term: str) -> str:
         """מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים."""

@@ -14,6 +14,7 @@ JS_PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "match
             "commercial.js", "scouting.js", "development.js", "wealth.js",
             "tacticsteam.js", "knowledge.js", "coaching.js", "mentor.js",
             "transfers.js", "press.js", "fame.js", "youth.js",
+            "agents.js", "life.js",
             "manager.js", "story.js", "game.js", "graphics.js",
             "avatars.js", "scenes.js", "widgets.js", "ui.js"]
 

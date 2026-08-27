@@ -23,6 +23,9 @@ from . import knowledge as KN
 from . import coaching as COACH
 from . import mentor as MN
 from . import commercial as CM
+from . import agents as AG
+from . import life as LF
+from . import manager as MG
 from .engine import MENTALITIES, PRESSING
 
 LINE = "─" * 52
@@ -307,6 +310,94 @@ def status_bar(game: GameState) -> None:
     show_fixture(game)
 
 
+def show_agent(game: GameState) -> None:
+    """הסוכן: מי הוא, מה הוא עשה, ומי עוד מוכן לייצג אותך."""
+    row = AG.agent(game)
+    out("")
+    for line in AG.describe(game):
+        out(line)
+    if row and row.get("target") in game.clubs:
+        heat = (game.flags.get("scout_interest") or {}).get(row["target"], 0)
+        out(f"עובד עכשיו על {game.clubs[row['target']].name} — {int(heat)}% מהדרך.")
+    for move in (row or {}).get("moves", []):
+        out(f"  · {move}")
+
+    options = ["לשמוע סוכנים אחרים" if row else "לחפש סוכן"]
+    keys = ["market"]
+    if row:
+        options.append("לפטר")
+        keys.append("fire")
+    options.append("חזרה")
+    keys.append("back")
+    key = keys[choose("מה עכשיו?", options)]
+    if key == "market":
+        out(game.open_agent_market())
+        rows = game.agent_candidates()
+        labels = []
+        for cand in rows:
+            kind = AG.AGENT_BY_KEY[cand["kind"]]
+            labels.append(f"{cand['name']} · {kind[1]} · {cand['cut']}% — {kind[2]}")
+        labels.append("לא עכשיו")
+        pick = choose("עם מי לחתום?", labels)
+        if pick < len(rows):
+            out(game.sign_agent(pick))
+        ask("\n[Enter]")
+    elif key == "fire":
+        out(game.fire_agent())
+        ask("\n[Enter]")
+
+
+def show_boss(game: GameState) -> None:
+    """איפה אתה עומד אצל המאמן, ומה אפשר לבקש."""
+    club = game.my_club
+    if not club:
+        out("אין לך מועדון.")
+        ask("\n[Enter]")
+        return
+    out("")
+    out(MG.standing_line(game))
+    promise = MG.active_promise(game)
+    if promise:
+        out(f"הבטחה פתוחה: {promise['kind']} — עוד {promise['weeks']} שבועות "
+            f"({promise.get('starts', 0)}/{MG.PROMISE_WEEKS} קוימו)")
+    meetings = MG.meeting_options(game)
+    if not meetings:
+        out("היית אצלו לאחרונה. חכה כמה שבועות.")
+        ask("\n[Enter]")
+        return
+    labels = [f"{row['name']} — {int(row['odds'] * 100)}% שיסכים" for row in meetings]
+    labels.append("לא עכשיו")
+    pick = choose("מה לבקש?", labels)
+    if pick < len(meetings):
+        out(game.manager_request(meetings[pick]["key"]))
+    ask("\n[Enter]")
+
+
+def show_life(game: GameState) -> None:
+    """הבית: הורים, בן/בת זוג, ומה אפשר לעשות."""
+    out("")
+    out(LF.family_line(game))
+    par = LF.parents(game)
+    if par.get("ask"):
+        out(f"בקשה פתוחה: {par['ask']['name']} — ₪{par['ask']['cost']:,} "
+            f"({par['ask']['why']})")
+    row = LF.partner(game)
+    if row:
+        out(f"מצב הקשר {int(row['mood'])} · תמיכה {row['support']} · "
+            f"זרקור {row['spotlight']}")
+    actions = game.life_actions()
+    if not actions:
+        ask("\n[Enter]")
+        return
+    labels = [f"{a['name']}" + (f" — ₪{a['cost']:,}" if a["cost"] else "")
+              + f" ({a['note']})" for a in actions]
+    labels.append("לא עכשיו")
+    pick = choose("מה עושים?", labels)
+    if pick < len(actions):
+        out(game.do_life_action(actions[pick]["key"]))
+    ask("\n[Enter]")
+
+
 def game_loop(game: GameState) -> None:
     while not game.game_over:
         if game.pending_event_id:
@@ -327,6 +418,13 @@ def game_loop(game: GameState) -> None:
             keys.append("mentor")
             options.append("📊 איך התפתחתי")
             keys.append("growth")
+        if game.stage in ("academy", "player", "veteran"):
+            options.append("📞 הסוכן שלי")
+            keys.append("agent")
+            options.append("🎙️ המאמן — פגישה בארבע עיניים")
+            keys.append("boss")
+            options.append("🏡 הבית: הורים ובן/בת זוג")
+            keys.append("life")
         options.append("💼 חסויות ונכסים")
         keys.append("money")
         if game.stage in ("manager", "coach"):
@@ -368,6 +466,12 @@ def game_loop(game: GameState) -> None:
         elif key == "growth":
             show_growth(game)
             ask("\n[Enter]")
+        elif key == "agent":
+            show_agent(game)
+        elif key == "boss":
+            show_boss(game)
+        elif key == "life":
+            show_life(game)
         elif key == "money":
             show_money(game)
         elif key == "tactics":

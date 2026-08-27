@@ -46,10 +46,77 @@ TERMS = [
     ("clause", "סעיף שחרור"),
     ("role", "תפקיד בסגל"),
     ("image", "אחוזי דימוי"),
+    ("minutes", "התחייבות לדקות"),
+    ("loyalty", "מענק נאמנות"),
+    ("family", "חבילה למשפחה"),
 ]
 TERM_NAMES = dict(TERMS)
 
 WINDOW_WEEKS = 4          # כמה שבועות הדלת פתוחה
+
+
+# ---------------------------------------------------------------------------
+# עילוי
+#
+# "שחקן שנחשב לעילוי — קופצים עליו מכל כיוון ומציעים לו עולם ומלואו."
+# זה לא קורה מעצמו: מועדון עשיר לא מציע פי שלושה כי הדירוג עלה בשתיים,
+# הוא מציע פי שלושה כי **כולם רוצים אותו והוא בן תשע־עשרה**. הציון כאן
+# הוא בדיוק זה — גיל, מרווח לפוטנציאל, ביצועים ורעש בשוק.
+# ---------------------------------------------------------------------------
+
+WONDERKID_AGE = 23          # מעל זה כבר לא מדובר בהימור על העתיד
+FRENZY_MIN = 0.50           # מאיזה ציון השוק מתחיל להתנהג אחרת
+
+
+def hype(game) -> float:
+    """כמה השם שלך "בוער". נבנה מפגישות, כתבות וקרבות רכש."""
+    try:
+        return float(game.flags.get("hype", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def wonderkid_score(game) -> float:
+    """0-1: כמה השוק רואה בך עילוי ולא עוד שחקן טוב.
+
+    המרווח לפוטנציאל הוא הרכיב הכבד: בן 19 עם 74 ותקרה 92 שווה יותר
+    בעיני מועדון־על מבן 27 עם 84 ותקרה 85. זה מה שמייצר את הטירוף.
+    """
+    me = game.me
+    if me.age > WONDERKID_AGE:
+        return 0.0
+    # +2 כדי שבן 19 עדיין ייחשב עילוי. בלי זה הגיל אכל את הציון
+    # בדיוק בשנים שבהן השוק באמת משתגע.
+    youth = clamp((WONDERKID_AGE - me.age + 2) / 8.0, 0.0, 1.0)
+    headroom = clamp((me.potential - me.overall) / 18.0, 0.0, 1.0)
+    quality = clamp((me.overall - 58) / 30.0, 0.0, 1.0)
+    noise = clamp(hype(game) / 100.0, 0.0, 1.0)
+    # בלי משחקים בעונה — ניטרלי. אפס היה מעניש על תחילת עונה.
+    rating = 0.4
+    if me.season.apps >= 4:
+        rating = clamp((me.season.avg_rating - 6.6) / 1.4, 0.0, 1.0)
+    score = (youth * 0.26 + headroom * 0.26 + quality * 0.24
+             + noise * 0.14 + rating * 0.10)
+    return clamp(score, 0.0, 1.0)
+
+
+def frenzy(game) -> float:
+    """מכפיל הטירוף. 1.0 = שוק רגיל; 2.6 = כל אירופה על הדלת."""
+    score = wonderkid_score(game)
+    if score < FRENZY_MIN:
+        return 1.0
+    return 1.0 + (score - FRENZY_MIN) / (1.0 - FRENZY_MIN) * 1.6
+
+
+def frenzy_word(game) -> str:
+    mult = frenzy(game)
+    if mult >= 2.2:
+        return "כל אירופה מדברת עליך. המספרים שהם מוכנים לשלם לא הגיוניים."
+    if mult >= 1.6:
+        return "אתה בשוק של העילויים. מי שרוצה אותך יודע שיש תור."
+    if mult >= 1.15:
+        return "מתחילים להתייחס אליך כאל השקעה, לא כאל חתימה."
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -115,20 +182,23 @@ def build_offer(game, club: Club, rng: random.Random,
                 eagerness: Optional[float] = None) -> Dict[str, Any]:
     """חבילה שלמה ממועדון אחד, לא רק מספר."""
     me = game.me
+    boom = frenzy(game)
     if eagerness is None:
         eagerness = rng.uniform(0.35, 0.95)
+    # מועדון שרודף אחרי עילוי לא "בודק אפשרות"
+    eagerness = clamp(eagerness * (0.75 + boom * 0.35), 0.05, 0.99)
 
     # מה הם מוכנים לשלם: מה שהשוק אומר, מוטה לפי כמה הם רוצים אותך
     par = wage_for_overall(me.overall) * (0.88 + me.reputation / 200.0)
-    ceiling = max(par * 1.05, club.wage_budget * 0.34)
-    wage = int(min(ceiling, par * (0.80 + eagerness * 0.55)))
+    ceiling = max(par * 1.05, club.wage_budget * 0.34) * boom
+    wage = int(min(ceiling, par * (0.80 + eagerness * 0.55) * boom))
     wage = max(wage, int(me.contract.wage * 1.08))
 
-    value = market_value(me)
+    value = int(market_value(me) * boom)
     role = _role_for(club, me, eagerness)
     years = 3 if me.age >= 31 else (5 if eagerness > 0.7 and me.age <= 24 else 4)
 
-    return {
+    offer = {
         "cid": club.cid,
         "wage": wage,
         "years": years,
@@ -136,6 +206,10 @@ def build_offer(game, club: Club, rng: random.Random,
         "clause": 0,
         "role": role,
         "image": 0,
+        "minutes": 0,
+        "loyalty": 0,
+        "family": 0,
+        "promises": [],
         "fee": value,
         "eagerness": round(eagerness, 3),
         "ceiling": int(ceiling),
@@ -144,7 +218,20 @@ def build_offer(game, club: Club, rng: random.Random,
         "state": "open",
         "weeks": WINDOW_WEEKS,
         "log": [],
+        "frenzy": round(boom, 2),
     }
+    # בטירוף אמיתי הם לא מחכים שתבקש — הם שמים את הכול על השולחן מראש
+    if boom >= 1.9:
+        offer["bonus"] = int(offer["bonus"] * 2.2)
+        offer["image"] = 15
+        offer["minutes"] = 55
+        offer["promises"] = ["מספר החולצה שתבחר",
+                             "פרויקט שנבנה סביבך",
+                             "לא נמכור אותך בשנתיים הראשונות"]
+    elif boom >= 1.35:
+        offer["bonus"] = int(offer["bonus"] * 1.5)
+        offer["promises"] = ["פרויקט שנבנה סביבך"]
+    return offer
 
 
 def _role_for(club: Club, me: Player, eagerness: float) -> str:
@@ -164,7 +251,11 @@ def offer_worth(offer: Dict[str, Any]) -> int:
     annual = offer["wage"] * 52
     annual += offer["bonus"] // max(1, offer["years"])
     annual = int(annual * ROLE_VALUE.get(offer["role"], 1.0))
-    annual += annual * offer["image"] // 100
+    annual += annual * offer.get("image", 0) // 100
+    annual += int(offer.get("loyalty", 0))
+    annual += int(offer.get("family", 0))
+    # התחייבות לדקות היא לא כסף, אבל היא שווה — קריירה נבנית מדקות
+    annual = int(annual * (1.0 + offer.get("minutes", 0) / 420.0))
     return annual
 
 
@@ -248,6 +339,12 @@ def ask_options(offer: Dict[str, Any]) -> List[Dict[str, Any]]:
             continue
         if key == "clause" and offer["clause"] and offer["clause"] <= offer["fee"]:
             continue
+        if key == "minutes" and offer.get("minutes", 0) >= 75:
+            continue
+        if key == "loyalty" and offer.get("loyalty", 0) >= offer["wage"] * 30:
+            continue
+        if key == "family" and offer.get("family", 0):
+            continue
         out.append({"term": key, "name": name, "ask": _ask_text(offer, key)})
     return out
 
@@ -266,6 +363,12 @@ def _ask_text(offer: Dict[str, Any], term: str) -> str:
         return f"התחייבות ל{ROLE_NAMES[nxt]}"
     if term == "image":
         return f"{min(25, offer['image'] + 10)}% מזכויות הדימוי"
+    if term == "minutes":
+        return f"התחייבות ל-{min(75, offer.get('minutes', 0) + 25)}% מהדקות"
+    if term == "loyalty":
+        return f"מענק נאמנות ₪{int(max(offer['wage'] * 14, 200000)):,} לשנה"
+    if term == "family":
+        return "דירה, בית ספר ורילוקיישן למשפחה"
     return ""
 
 
@@ -352,6 +455,18 @@ def _apply_ask(offer: Dict[str, Any], term: str, full: bool) -> str:
     if term == "image":
         offer["image"] = min(25, offer["image"] + (10 if full else 5))
         return f"{offer['image']}% מזכויות הדימוי"
+    if term == "minutes":
+        step = 25 if full else 12
+        offer["minutes"] = min(75, offer.get("minutes", 0) + step)
+        return f"התחייבות ל-{offer['minutes']}% מהדקות"
+    if term == "loyalty":
+        base = max(offer["wage"] * 14, 200000)
+        offer["loyalty"] = int(base * (1.0 if full else 0.5))
+        return f"מענק נאמנות ₪{offer['loyalty']:,} לשנה"
+    if term == "family":
+        offer["family"] = int(max(offer["wage"] * 8, 120000) * (1.0 if full else 0.5))
+        return ("דירה, בית ספר ורילוקיישן למשפחה"
+                if full else "השתתפות בדיור למשפחה")
     return ""
 
 
@@ -381,6 +496,14 @@ def offer_lines(game, offer: Dict[str, Any]) -> List[str]:
         out.append(f"סעיף שחרור ₪{offer['clause']:,}")
     if offer["image"]:
         out.append(f"{offer['image']}% זכויות דימוי")
+    if offer.get("minutes"):
+        out.append(f"התחייבות ל-{offer['minutes']}% מהדקות")
+    if offer.get("loyalty"):
+        out.append(f"מענק נאמנות ₪{offer['loyalty']:,} לשנה")
+    if offer.get("family"):
+        out.append(f"חבילה למשפחה ₪{offer['family']:,}")
+    for promise in offer.get("promises", []):
+        out.append(f"הבטחה: {promise}")
     if club:
         out.append(f"דמי העברה ₪{offer['fee']:,} ל{game.my_club.name}"
                    if game.my_club else f"דמי העברה ₪{offer['fee']:,}")

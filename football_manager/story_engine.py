@@ -157,7 +157,71 @@ EFFECT_KEYS = {
     "resilience", "sharpness", "coaching", "media", "business", "potential",
     "attr", "attrs", "injury", "flag", "clear_flag", "trait", "drop_trait",
     "honour",
+    # מה שהפגישות (encounter_pack) צריכות: העולם מגיב, לא רק השחקן
+    "interest", "open_offer", "hype", "press", "agent_market", "agent_cut",
+    "agent_trust", "meet_partner", "pride", "mood", "promise",
 }
+
+
+# ---------------------------------------------------------------------------
+# העולם מגיב
+#
+# אירוע שמשנה רק את השחקן הוא בסוף עוד שורת מספרים. מה שהופך פגישה
+# לאירוע הוא שהיא **מזיזה משהו בחוץ**: מועדון מתחיל להסתכל, הצעה
+# נוחתת על השולחן, עיתון כותב. הפונקציות כאן הן הידיות האלה.
+# ---------------------------------------------------------------------------
+
+# כמה מוניטין צריך מועדון כדי להיחשב "עילית"
+ELITE_REPUTATION = 84
+
+
+def _club_pool(game, tier: str):
+    """מועדונים לפי דרגה, בלי זה שאתה כבר בו."""
+    mine = game.me.club_id
+    clubs = [c for c in game.clubs.values() if c.cid != mine]
+    if tier == "elite":
+        pool = [c for c in clubs if c.reputation >= ELITE_REPUTATION]
+    elif tier == "foreign":
+        pool = [c for c in clubs if D.is_foreign(c.cid)]
+    elif tier == "rich":
+        pool = sorted(clubs, key=lambda c: -c.wage_budget)[:6]
+    else:
+        pool = clubs
+    return pool or clubs
+
+
+def _add_interest(game, tier: str, amount: float) -> None:
+    pool = _club_pool(game, tier)
+    if not pool:
+        return
+    club = game.rng.choice(pool)
+    book = game.flags.setdefault("scout_interest", {})
+    book[club.cid] = clamp(float(book.get(club.cid, 0.0)) + amount, 0, 100)
+
+
+def _open_offer(game, tier: str) -> None:
+    """הצעה על השולחן עכשיו — גם באמצע העונה.
+
+    זה הרגע שהמשתמש ביקש: מועדון שרוצה אותך לא מחכה לקיץ, הוא מרים
+    טלפון היום. ההצעה נכנסת לאותה רשימה שהחלון מייצר, ולכן אפשר
+    לנהל עליה משא ומתן בדיוק כמו על כל אחת אחרת.
+    """
+    from . import transfers as TR          # מיובא כאן כדי לא לסגור מעגל
+    pool = [c for c in _club_pool(game, tier)
+            if not TR.offer_for(game, c.cid)]
+    if not pool:
+        return
+    club = max(pool, key=lambda c: c.reputation)
+    offers = TR.open_offers(game)
+    offers.append(TR.build_offer(game, club, game.rng,
+                                 eagerness=game.rng.uniform(0.72, 0.98)))
+    TR.set_offers(game, offers)
+
+
+def _push_press(game, text: str) -> None:
+    from . import press as PR          # מיובא כאן כדי לא לסגור מעגל
+    PR.push(game, {"key": "encounter", "source": "insider",
+                   "true": True, "text": text})
 
 
 def apply_attr(me, attr: str, delta: float) -> None:
@@ -229,6 +293,44 @@ def apply_effects(game, fx: Optional[Dict[str, Any]]) -> None:
             me.traits = [t for t in me.traits if t != value]
         elif key == "honour":
             game.record_honour(fill(value, game))
+        elif key == "interest":
+            tier, amount = value
+            _add_interest(game, tier, amount)
+        elif key == "open_offer":
+            _open_offer(game, value[0] if isinstance(value, (list, tuple)) else value)
+        elif key == "hype":
+            game.flags["hype"] = clamp(float(game.flags.get("hype", 0)) + value, 0, 100)
+        elif key == "press":
+            _push_press(game, fill(value, game))
+        elif key == "agent_market":
+            from . import agents as AG
+            game.flags["agent_offers"] = AG.market(game, game.rng)
+        elif key == "agent_cut":
+            row = game.flags.get("agent")
+            if isinstance(row, dict):
+                row["cut"] = round(float(row.get("cut", 5)) + value, 1)
+        elif key == "agent_trust":
+            row = game.flags.get("agent")
+            if isinstance(row, dict):
+                row["trust"] = clamp(float(row.get("trust", 60)) + value, 0, 100)
+        elif key == "meet_partner":
+            from . import life as LF
+            kind = value[0] if isinstance(value, (list, tuple)) else value
+            if kind in ("any", "", None):
+                kind = game.rng.choice([k for k, *_ in LF.PARTNER_KINDS])
+            game.flags["partner"] = LF.make_partner(kind, game.rng)
+        elif key == "pride":
+            from . import life as LF
+            par = LF.parents(game)
+            par["pride"] = clamp(par["pride"] + value, 0, 100)
+        elif key == "mood":
+            from . import life as LF
+            row = LF.partner(game)
+            if row:
+                row["mood"] = clamp(row["mood"] + value, 0, 100)
+        elif key == "promise":
+            from . import manager as MG
+            MG.give_promise(game, value[0] if isinstance(value, (list, tuple)) else value)
 
 
 def choice_result(game, choice: Dict[str, Any]) -> str:

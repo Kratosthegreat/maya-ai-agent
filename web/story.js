@@ -953,7 +953,59 @@ const EFFECT_KEYS = new Set([
   "resilience", "sharpness", "coaching", "media", "business", "potential",
   "attr", "attrs", "injury", "flag", "clear_flag", "trait", "drop_trait",
   "honour",
+  // מה שהפגישות צריכות: העולם מגיב, לא רק השחקן
+  "interest", "open_offer", "hype", "press", "agent_market", "agent_cut",
+  "agent_trust", "meet_partner", "pride", "mood", "promise",
 ]);
+
+// ---------------------------------------------------------------------------
+// העולם מגיב
+//
+// אירוע שמשנה רק את השחקן הוא בסוף עוד שורת מספרים. מה שהופך פגישה
+// לאירוע הוא שהיא מזיזה משהו בחוץ: מועדון מתחיל להסתכל, הצעה נוחתת
+// על השולחן, עיתון כותב.
+// ---------------------------------------------------------------------------
+
+const ELITE_REPUTATION = 84;   // מוניטין שמעליו מועדון נחשב "עילית"
+
+/** מועדונים לפי דרגה, בלי זה שאתה כבר בו. */
+function tierClubs(g, tier) {
+  const mine = g.me.clubId;
+  const clubs = Object.values(g.clubs).filter(c => c.cid !== mine);
+  let pool;
+  if (tier === "elite") pool = clubs.filter(c => c.reputation >= ELITE_REPUTATION);
+  else if (tier === "foreign") pool = clubs.filter(c => isForeign(c.cid));
+  else if (tier === "rich")
+    pool = clubs.slice().sort((a, b) => b.wageBudget - a.wageBudget).slice(0, 6);
+  else pool = clubs;
+  return pool.length ? pool : clubs;
+}
+
+function addTierInterest(g, tier, amount) {
+  const pool = tierClubs(g, tier);
+  if (!pool.length) return;
+  const club = g.rng.choice(pool);
+  if (!g.flags.scout_interest) g.flags.scout_interest = {};
+  const book = g.flags.scout_interest;
+  book[club.cid] = clamp(Number(book[club.cid] || 0) + amount, 0, 100);
+}
+
+/**
+ * הצעה על השולחן עכשיו — גם באמצע העונה. מועדון שרוצה אותך לא מחכה
+ * לקיץ, הוא מרים טלפון היום. ההצעה נכנסת לאותה רשימה שהחלון מייצר.
+ */
+function openTierOffer(g, tier) {
+  const pool = tierClubs(g, tier).filter(c => !offerFor(g, c.cid));
+  if (!pool.length) return;
+  const club = pool.reduce((a, b) => (b.reputation > a.reputation ? b : a));
+  const offers = openOffers(g);
+  offers.push(buildOffer(g, club, g.rng, g.rng.uniform(0.72, 0.98)));
+  setOffers(g, offers);
+}
+
+function pushPressStory(g, text) {
+  pressPush(g, { key: "encounter", source: "insider", true: true, text });
+}
 
 /** מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט. */
 function applyStoryEffects(g, fx) {
@@ -988,6 +1040,38 @@ function applyStoryEffects(g, fx) {
       case "trait": if (!me.traits.includes(value)) me.traits.push(value); break;
       case "drop_trait": me.traits = me.traits.filter(t => t !== value); break;
       case "honour": g.recordHonour(fillStory(value, g)); break;
+      case "interest": addTierInterest(g, value[0], value[1]); break;
+      case "open_offer": openTierOffer(g, Array.isArray(value) ? value[0] : value); break;
+      case "hype":
+        g.flags.hype = clamp(Number(g.flags.hype || 0) + value, 0, 100); break;
+      case "press": pushPressStory(g, fillStory(value, g)); break;
+      case "agent_market": g.flags.agent_offers = agentMarket(g, g.rng); break;
+      case "agent_cut":
+        if (g.flags.agent)
+          g.flags.agent.cut = Math.round((Number(g.flags.agent.cut || 5) + value) * 10) / 10;
+        break;
+      case "agent_trust":
+        if (g.flags.agent)
+          g.flags.agent.trust = clamp(Number(g.flags.agent.trust || 60) + value, 0, 100);
+        break;
+      case "meet_partner": {
+        let kind = Array.isArray(value) ? value[0] : value;
+        if (!kind || kind === "any") kind = g.rng.choice(PARTNER_KINDS.map(r => r[0]));
+        g.flags.partner = makePartner(kind, g.rng);
+        break;
+      }
+      case "pride": {
+        const par = parents(g);
+        par.pride = clamp(par.pride + value, 0, 100);
+        break;
+      }
+      case "mood": {
+        const row = partner(g);
+        if (row) row.mood = clamp(row.mood + value, 0, 100);
+        break;
+      }
+      case "promise":
+        givePromise(g, Array.isArray(value) ? value[0] : value); break;
       default: break;
     }
   }
@@ -1016,3 +1100,7 @@ function registerStoryPack(pack) {
 }
 
 const STORY_PACK_COUNT = registerStoryPack(D.STORY_PACK || []);
+
+// הפגישות רצות באותו מנוע ובאותו מרשם. ההבדל הוא באופי: אירוע עלילה
+// הוא תחנה בדרך, ופגישה היא משהו שקרה במקרה — ולכן היא חוזרת.
+const ENCOUNTER_PACK_COUNT = registerStoryPack(D.ENCOUNTER_PACK || []);

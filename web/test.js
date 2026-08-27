@@ -10,7 +10,8 @@ const vm = require("vm");
 const HERE = __dirname;
 const PARTS = ["data.js", "art.js", "save.js", "attributes.js", "engine.js", "matchstats.js",
                "clubops.js", "commercial.js", "scouting.js", "development.js", "wealth.js",
-               "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "youth.js", "coaching.js", "mentor.js", "manager.js",
+               "tacticsteam.js", "knowledge.js", "transfers.js", "press.js", "fame.js", "youth.js",
+               "agents.js", "life.js", "coaching.js", "mentor.js", "manager.js",
                "story.js", "game.js",
                "graphics.js", "avatars.js", "scenes.js", "widgets.js"];
 const source = PARTS.map(f => fs.readFileSync(path.join(HERE, f), "utf8")).join("\n");
@@ -70,7 +71,21 @@ vm.runInContext(source + "\nthis.API = { D, Rng, Game, STORY, generateWorld, gen
   "knowledgeLevel, shownDetail, knowledgeSummary, scoutPlayer, " +
   "abilityStars, potentialStars, starText, weakestDetail, trainingShares, " +
   "ring, meter, verdictRow, statTile, matchup, rankBadge, sparkline, inboxRow, " +
-  "toneFor, wEsc };", ctx);
+  "toneFor, wEsc, " +
+  "AGENT_TYPES, AGENT_BY_KEY, agentRow, agentType, agentCut, agentReach, " +
+  "makeAgent, agentMarket, signAgent, agentLeave, describeAgent, agentWeekly, " +
+  "agentCampaign, agentSabotage, agentPush, agentOnDeal, agentCandidateClubs, " +
+  "CAMPAIGN_READY, CAMPAIGN_STEPS, agentFame, " +
+  "parents, partner, makePartner, PARTNER_KINDS, LIFE_STAGES, PARENT_ASKS, " +
+  "supportBonus, spotlightBonus, lifeWeekly, partnerWeek, lifeActions, " +
+  "doLifeAction, grantAsk, declineAsk, heartbreakTick, homeLine, " +
+  "partnerStageName, nextLifeStage, " +
+  "managerStanding, selectionBonus, standingLine, givePromise, activePromise, " +
+  "promiseTick, meetingOptions, managerRequest, maybeReplaceManager, " +
+  "STANDINGS, MEETINGS, PROMISE_WEEKS, " +
+  "hype, wonderkidScore, frenzy, frenzyWord, applyAsk, " +
+  "STORY_CONDITIONS, EFFECT_KEYS, applyStoryEffects, tierClubs, " +
+  "ENCOUNTER_PACK_COUNT };", ctx);
 const A = ctx.API;
 
 let passed = 0, failed = 0;
@@ -2534,6 +2549,302 @@ test("סמל מועדון שכבר נבנה עובר לכרטיס המשחק כ�
   assert(html.includes("<svg id='home'>") && html.includes("<svg id='away'>"),
          "הסמלים לא הגיעו לכרטיס");
   assert(html.includes("mu-name mine"), "הקבוצה שלי לא סומנה");
+});
+
+
+console.log("\nסוכנים");
+
+test("סוכן גובה את שלו מכל משכורת", () => {
+  const mk = withAgent => {
+    const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+    g.me.contract.wage = 100000;
+    if (withAgent) {
+      g.flags.agent = A.makeAgent("shark", new A.Rng(1));
+      g.flags.agent.cut = 10;
+    }
+    const before = g.money;
+    g.advanceWeek();
+    return g.money - before;
+  };
+  assert(mk(true) < mk(false), `עם סוכן ${mk(true)}, בלי ${mk(false)}`);
+});
+
+test("סוכן גדול מגיע למועדונים גדולים יותר", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  const top = span => {
+    const pool = A.agentCandidateClubs(g, span);
+    return pool.length ? Math.max(...pool.map(c => c.reputation)) : 0;
+  };
+  assert(top(A.AGENT_BY_KEY.shark[4]) > top(A.AGENT_BY_KEY.family[4]),
+         "לכריש ולסוכן המשפחה אותו טווח");
+});
+
+test("הקמפיין עובד על מועדון אחד לאורך שבועות", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.agent = A.makeAgent("connected", new A.Rng(3));
+  const row = g.flags.agent, rng = new A.Rng(9);
+  const targets = new Set();
+  for (let i = 0; i < 6; i++) {
+    A.agentCampaign(g, row, rng);
+    if (row.target) targets.add(row.target);
+  }
+  assert(targets.size === 1, `הקמפיין קפץ בין ${targets.size} יעדים`);
+  assert((g.flags.scout_interest || {})[row.target] > 0,
+         "הקמפיין לא הזיז את ההתעניינות");
+});
+
+test("קמפיין שהבשיל עובר ליעד הבא", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.agent = A.makeAgent("connected", new A.Rng(3));
+  const row = g.flags.agent, rng = new A.Rng(4);
+  A.agentCampaign(g, row, rng);
+  const first = row.target;
+  g.flags.scout_interest[first] = 99;
+  A.agentCampaign(g, row, rng);
+  A.agentCampaign(g, row, rng);
+  assert(row.target !== first, "הסוכן נשאר על יעד שכבר בשל");
+});
+
+test("סוכן המשפחה לא מחבל לעולם", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.agent = A.makeAgent("family", new A.Rng(2));
+  const clubs = Object.values(g.clubs).filter(c => c.cid !== g.me.clubId).slice(0, 2);
+  A.setOffers(g, clubs.map(c => A.buildOffer(g, c, g.rng, 0.8)));
+  A.agentSabotage(g, g.flags.agent, new A.Rng(1), A.liveOffers(g));
+  assert(A.liveOffers(g).length === 2, "סוכן המשפחה חיסל הצעה");
+});
+
+test("חבלה מורידה הצעה מהשולחן ומרימה את השנייה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.agent = A.makeAgent("shark", new A.Rng(2));
+  const clubs = Object.values(g.clubs).filter(c => c.cid !== g.me.clubId).slice(0, 2);
+  A.setOffers(g, clubs.map(c => A.buildOffer(g, c, g.rng, 0.8)));
+  const live = A.liveOffers(g);
+  const before = live[0].wage;
+  A.agentSabotage(g, g.flags.agent, new A.Rng(1), live);
+  const after = A.liveOffers(g);
+  assert(after.length === 1, "החבלה לא הורידה הצעה");
+  assert(after[0].wage >= before, "מי שנשאר לא שיפר");
+});
+
+test("שחקן אלמוני לא מקבל סופר־סוכן", () => {
+  const g = A.Game.newGame("ילד", "ST", "hapoel_carmel", 13, 4);
+  const kinds = new Set(A.agentMarket(g, new A.Rng(7)).map(r => r.kind));
+  assert(!kinds.has("super") && !kinds.has("shark"), [...kinds].join(","));
+});
+
+console.log("\nחיים אישיים");
+
+test("בן זוג תומך מרים, וקשר שבור מוריד", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.partner = A.makePartner("hometown", new A.Rng(1));
+  g.flags.partner.mood = 90;
+  const good = A.supportBonus(g);
+  g.flags.partner.mood = 25;
+  const bad = A.supportBonus(g);
+  assert(good > 0 && bad < 0, `טוב ${good}, רע ${bad}`);
+});
+
+test("הזנחה שוחקת את הקשר", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.partner = A.makePartner("student", new A.Rng(1));
+  g.intensity = 1.3;
+  const start = g.flags.partner.mood;
+  for (let i = 0; i < 10; i++) A.partnerWeek(g, new A.Rng(2));
+  assert(g.flags.partner.mood < start - 5, "עצימות גבוהה לא נגבתה");
+});
+
+test("מתנה חמישית כבר לא מרגשת אף אחד", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.money = 10000000;
+  g.flags.partner = A.makePartner("model", new A.Rng(1));
+  g.flags.partner.mood = 50;
+  const gains = [];
+  for (let i = 0; i < 4; i++) {
+    const before = g.flags.partner.mood;
+    A.doLifeAction(g, "gift");
+    gains.push(g.flags.partner.mood - before);
+  }
+  assert(gains[0] > gains[gains.length - 1], `מתנות שוות: ${gains}`);
+});
+
+test("פרידה נגררת שבועות", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.flags.heartbreak = 4;
+  const before = g.me.morale;
+  for (let i = 0; i < 4; i++) A.heartbreakTick(g);
+  assert(g.me.morale < before, "הפרידה לא נמדדה");
+  assert(g.flags.heartbreak === 0);
+});
+
+test("לעזור להורים עולה כסף וקונה גאווה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.money = 3000000;
+  const par = A.parents(g);
+  par.ask = { key: "house", name: "בית להורים", why: "כי כן",
+              cost: 1400000, pride: 26 };
+  const before = par.pride;
+  A.grantAsk(g);
+  assert(g.money < 3000000, "לא ירד כסף");
+  assert(A.parents(g).pride > before, "הגאווה לא עלתה");
+});
+
+test("אי אפשר להציע נישואין בשבוע שנפגשתם", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.money = 50000000;
+  g.flags.partner = A.makePartner("hometown", new A.Rng(1));
+  let keys = new Set(A.lifeActions(g).map(r => r.key));
+  assert(!keys.has("advance"), "אפשר להתארס בשבוע הראשון");
+  g.flags.partner.weeks = 40;
+  g.flags.partner.mood = 80;
+  keys = new Set(A.lifeActions(g).map(r => r.key));
+  assert(keys.has("advance"), "אי אפשר להתקדם גם אחרי עונה");
+});
+
+console.log("\nלמאמן יש משקל");
+
+test("הדעה של המאמן מזיזה את ההרכב", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.myClub().managerTrust = 90;
+  const high = A.selectionBonus(g);
+  g.myClub().managerTrust = 15;
+  g.setFlag("doghouse", true);
+  const low = A.selectionBonus(g);
+  assert(high > 0 && low < 0, `מועדף ${high}, בכלוב ${low}`);
+});
+
+test("הבטחה שקוימה משתלמת, ושבורה עולה", () => {
+  const run = played => {
+    const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+    A.givePromise(g, "start", 2);
+    const before = g.me.morale;
+    A.promiseTick(g, played);
+    A.promiseTick(g, played);
+    return g.me.morale - before;
+  };
+  assert(run(true) > 0, "הבטחה שקוימה לא הורגשה");
+  assert(run(false) < 0, "הבטחה שנשברה לא הורגשה");
+});
+
+test("הבטחה מכניסה אותך להרכב כל עוד היא בתוקף", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  const plain = A.selectionBonus(g);
+  A.givePromise(g, "start");
+  assert(A.selectionBonus(g) > plain, "הבטחה לא שווה כלום בהרכב");
+});
+
+test("אי אפשר לדפוק לו על הדלת כל שבוע", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  assert(A.meetingOptions(g).length, "אין פגישות בכלל");
+  A.managerRequest(g, "why", new A.Rng(1));
+  assert(!A.meetingOptions(g).length, "אפשר להיכנס אליו שוב מיד");
+});
+
+test("מאמן חדש מוחק את מה שנבנה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  const club = g.myClub();
+  club.boardConfidence = 10;
+  club.managerTrust = 95;
+  A.givePromise(g, "start");
+  const old = club.managerName;
+  let swapped = false;
+  for (let seed = 0; seed < 60 && !swapped; seed++)
+    swapped = !!A.maybeReplaceManager(g, new A.Rng(seed));
+  assert(swapped, "מאמן לא הוחלף גם כשההנהלה קרסה");
+  assert(club.managerName !== old, "אותו שם");
+  assert(!A.activePromise(g), "הבטחה שרדה מאמן מפוטר");
+});
+
+console.log("\nעילוי");
+
+function wonderkid(seed = 5) {
+  const g = A.Game.newGame("עילוי", "ST", "maccabi_harel", 19, seed);
+  A.setAll(g.me, 82);
+  g.me.potential = 95;
+  g.me.ceiling = 97;
+  g.me.reputation = 70;
+  g.flags.hype = 80;
+  return g;
+}
+
+test("עילוי מזיז את השוק", () => {
+  const plain = A.Game.newGame("רגיל", "ST", "maccabi_harel", 28, 5);
+  assert(A.frenzy(plain) === 1, "שחקן בן 28 יצר טירוף");
+  assert(A.frenzy(wonderkid()) > 1.5, String(A.frenzy(wonderkid())));
+});
+
+test("לעילוי מציעים עולם ומלואו", () => {
+  const kid = wonderkid();
+  const club = Object.values(kid.clubs).find(c => c.cid !== kid.me.clubId);
+  const big = A.buildOffer(kid, club, new A.Rng(1), 0.8);
+
+  const plain = A.Game.newGame("רגיל", "ST", "maccabi_harel", 28, 5);
+  A.setAll(plain.me, 82);
+  plain.me.reputation = 70;
+  const small = A.buildOffer(plain, plain.clubs[club.cid], new A.Rng(1), 0.8);
+
+  assert(big.wage > small.wage, `${big.wage} מול ${small.wage}`);
+  assert(big.bonus > small.bonus, "אותו מענק");
+  assert(big.promises.length, "לעילוי לא הובטח כלום");
+});
+
+test("הסעיפים החדשים הם ידיות אמיתיות", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  const club = Object.values(g.clubs).find(c => c.cid !== g.me.clubId);
+  A.setOffers(g, [A.buildOffer(g, club, new A.Rng(1), 0.9)]);
+  const offer = A.offerFor(g, club.cid);
+  const terms = new Set(A.askOptions(offer).map(r => r.term));
+  for (const key of ["minutes", "loyalty", "family"])
+    assert(terms.has(key), `חסר סעיף ${key}`);
+  const before = A.offerWorth(offer);
+  A.applyAsk(offer, "minutes", true);
+  assert(offer.minutes > 0 && A.offerWorth(offer) > before,
+         "התחייבות לדקות לא שווה כלום");
+});
+
+console.log("\nפגישות");
+
+test("ספריית הפגישות נטענה בשני המנועים", () => {
+  assert(A.ENCOUNTER_PACK_COUNT >= 25,
+         `רק ${A.ENCOUNTER_PACK_COUNT} פגישות ב-JS`);
+  const ids = new Set((A.D.ENCOUNTER_PACK || []).map(r => r.eid));
+  assert(ids.size === (A.D.ENCOUNTER_PACK || []).length, "מזהה כפול");
+});
+
+test("כל אפקט וכל תנאי בפגישות מוכרים למנוע", () => {
+  for (const row of (A.D.ENCOUNTER_PACK || [])) {
+    for (const key of Object.keys(row.when || {}))
+      assert(A.STORY_CONDITIONS[key], `${row.eid}: תנאי לא מוכר ${key}`);
+    for (const choice of row.choices)
+      for (const key of Object.keys(choice.fx || {}))
+        assert(A.EFFECT_KEYS.has(key), `${row.eid}: אפקט לא מוכר ${key}`);
+  }
+});
+
+test("פגישה יכולה לשים מועדון על העקבות שלך", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.rng = new A.Rng(3);
+  A.applyStoryEffects(g, { interest: ["elite", 40] });
+  const book = g.flags.scout_interest || {};
+  const keys = Object.keys(book);
+  assert(keys.length, "פגישה לא הזיזה כלום");
+  const cid = keys.reduce((a, b) => (book[b] > book[a] ? b : a));
+  assert(g.clubs[cid].reputation >= 84, "המועדון אינו עילית");
+});
+
+test("פגישה יכולה להניח הצעה על השולחן באמצע העונה", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.rng = new A.Rng(3);
+  assert(!A.liveOffers(g).length, "כבר הייתה הצעה");
+  A.applyStoryEffects(g, { open_offer: ["elite"] });
+  assert(A.liveOffers(g).length, "הצעה לא נחתה");
+});
+
+test("פגישה יכולה להתחיל קשר", () => {
+  const g = A.Game.newGame("בודק", "ST", "maccabi_harel", 24, 5);
+  g.rng = new A.Rng(3);
+  A.applyStoryEffects(g, { meet_partner: ["any"] });
+  assert(A.partner(g), "לא נוצר קשר");
 });
 
 console.log(`\n${passed} עברו, ${failed} נכשלו\n`);

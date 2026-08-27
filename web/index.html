@@ -11555,6 +11555,1358 @@ const D = {
     }
    ]
   }
+ ],
+ "ENCOUNTER_PACK": [
+  {
+   "eid": "e_agent_cafe",
+   "title": "מישהו ניגש לשולחן",
+   "stages": [
+    "academy",
+    "player"
+   ],
+   "weight": 3.4,
+   "cooldown": 40,
+   "once": false,
+   "when": {
+    "age_min": 16,
+    "rep_min": 12,
+    "not_flag": "agent"
+   },
+   "body": "אתה יושב בבית קפה עם {mate}. גבר בחליפה בלי עניבה מושך כיסא\nבלי לשאול ומניח כרטיס ביקור על השולחן.\n\n\"אני יודע מי אתה. השאלה היא אם אתה יודע.\"",
+   "choices": [
+    {
+     "label": "לשמוע מה יש לו להציע",
+     "hint": "פותח את שוק הסוכנים",
+     "text": "הוא דיבר עשרים דקות ולא הזכיר כדורגל אפילו פעם אחת.\nבסוף הוא אמר: \"תבדוק גם אחרים. רק אל תישאר לבד.\"",
+     "fx": {
+      "agent_market": true,
+      "business": 1.0
+     }
+    },
+    {
+     "label": "לקחת את הכרטיס ולא להתקשר",
+     "hint": "בלי התחייבות",
+     "text": "הכרטיס נשאר בכיס של המכנסיים ועבר כביסה. \nכעבור שבועיים ראית אותו יושב עם שחקן אחר מהקבוצה.",
+     "fx": {
+      "morale": -2
+     }
+    },
+    {
+     "label": "\"אני מסתדר לבד\"",
+     "hint": "גאווה",
+     "text": "הוא חייך, קם, ואמר בלי להסתובב: \"כולם מסתדרים לבד. עד שלא.\"",
+     "fx": {
+      "attr": [
+       "mental",
+       0.6
+      ],
+      "morale": 3
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_agent_poach",
+   "title": "סוכן אחר מתקשר",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.8,
+   "cooldown": 45,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "flag": "agent",
+    "rep_min": 30
+   },
+   "body": "מספר לא מזוהה. קול שקט, בטוח בעצמו.\n\n\"אני יודע כמה אתה מרוויח. אני יכול להביא לך כפול,\nואני לוקח פחות ממה שהוא לוקח. תחשוב על זה.\"",
+   "choices": [
+    {
+     "label": "להיפגש איתו",
+     "hint": "פותח את שוק הסוכנים",
+     "text": "נפגשתם. הוא הראה לך מספרים. הם היו אמיתיים.",
+     "fx": {
+      "agent_market": true
+     }
+    },
+    {
+     "label": "לספר לסוכן שלך",
+     "hint": "נאמנות",
+     "text": "הוא שתק שנייה ואז אמר: \"טוב שסיפרת לי.\" למחרת אותו מספר\nכבר לא היה פעיל.",
+     "fx": {
+      "morale": 3,
+      "attr": [
+       "mental",
+       0.5
+      ]
+     }
+    },
+    {
+     "label": "לנתק",
+     "hint": "בלי דרמה",
+     "text": "ניתקת באמצע משפט. זה הרגיש טוב בערך יומיים.",
+     "fx": {}
+    }
+   ]
+  },
+  {
+   "eid": "e_agent_cut",
+   "title": "הסוכן רוצה יותר",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.2,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "flag": "agent",
+    "rep_min": 40
+   },
+   "body": "\"תראה,\" הוא אומר ומזמין קפה שלישי, \"אני עובד עליך יותר\nמעל כל אחד אחר בתיק. אני רוצה לעדכן את האחוזים.\"",
+   "choices": [
+    {
+     "label": "להסכים",
+     "hint": "יקר, אבל הוא יעבוד",
+     "text": "הוא לחץ לך את היד בשתי ידיים. באותו שבוע התחילו טלפונים.",
+     "fx": {
+      "agent_cut": 2.0,
+      "agent_trust": 14,
+      "interest": [
+       "any",
+       16
+      ]
+     }
+    },
+    {
+     "label": "לסרב",
+     "hint": "הוא לא ישכח",
+     "text": "\"בסדר גמור,\" הוא אמר, ושילם על הקפה. משהו קטן השתנה בקול.",
+     "fx": {
+      "agent_trust": -12
+     }
+    },
+    {
+     "label": "\"קודם תביא עסקה\"",
+     "hint": "מבחן",
+     "text": "הוא צחק. \"אתה לומד.\" ויצא בלי לסיים את הקפה.",
+     "fx": {
+      "agent_trust": -4,
+      "business": 1.2
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_fixer",
+   "title": "ההצעה שאסור לשמוע",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 1.6,
+   "cooldown": 70,
+   "once": false,
+   "when": {
+    "age_min": 20,
+    "rep_min": 25
+   },
+   "body": "אדם שלא הצגת לו את עצמך יודע את שם אחיך ואת מספר החניה שלך.\n\"משחק אחד,\" הוא אומר. \"כרטיס צהוב בעשרים הראשונות. זה הכול.\"\n\nהוא מניח מעטפה על השולחן ולא נוגע בה יותר.",
+   "choices": [
+    {
+     "label": "לקום וללכת",
+     "hint": "הדבר הנכון",
+     "text": "קמת באמצע המשפט. בלילה לא ישנת, אבל בבוקר יכולת להסתכל במראה.",
+     "fx": {
+      "attr": [
+       "mental",
+       1.4
+      ],
+      "resilience": 2,
+      "morale": -3
+     }
+    },
+    {
+     "label": "לדווח למועדון",
+     "hint": "מסוכן ונכון",
+     "text": "ההנהלה העבירה את זה הלאה. בעיתון לא הופיע שמך — הפעם.",
+     "fx": {
+      "attr": [
+       "mental",
+       1.0
+      ],
+      "trust": 8,
+      "board": 6,
+      "rep": 2
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_hotel_director",
+   "title": "אותו מלון, אותו בוקר",
+   "stages": [
+    "player"
+   ],
+   "weight": 3.0,
+   "cooldown": 42,
+   "once": false,
+   "when": {
+    "age_min": 18,
+    "rep_min": 30
+   },
+   "body": "ארוחת בוקר במלון לפני משחק חוץ. ליד החלון יושב לבד גבר\nשראית אלף פעם בטלוויזיה — מנהל ספורטיבי של מועדון מאירופה.\n\nהוא מרים את המבט בדיוק כשאתה עובר.",
+   "choices": [
+    {
+     "label": "לגשת ולהציג את עצמך",
+     "hint": "עניין מחו\"ל",
+     "text": "\"אני יודע מי אתה,\" הוא אמר, ולא הסביר איך. דיברתם ארבע דקות.\nבסוף הוא אמר: \"תמשיך ככה ונדבר שוב.\"",
+     "fx": {
+      "interest": [
+       "elite",
+       26
+      ],
+      "rep": 1.5,
+      "hype": 8
+     }
+    },
+    {
+     "label": "להנהן ולהמשיך",
+     "hint": "מקצועי",
+     "text": "הנהנת. הוא הנהן בחזרה. במטוס חזרה חשבת על זה שלוש שעות.",
+     "fx": {
+      "interest": [
+       "elite",
+       9
+      ]
+     }
+    },
+    {
+     "label": "לצלם איתו סלפי",
+     "hint": "מביך",
+     "text": "הוא הסכים בנימוס. התמונה הגיעה לאינסטגרם ומשם לעיתון,\nובמועדון שלך שאלו מה זה היה.",
+     "fx": {
+      "rep": 2.5,
+      "trust": -5,
+      "press": "\"השחקן כבר מצטלם עם מנהלים של מועדונים אחרים.\""
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_elite_watch",
+   "title": "שני אנשים ביציע הריק",
+   "stages": [
+    "academy",
+    "player"
+   ],
+   "weight": 3.2,
+   "cooldown": 30,
+   "once": false,
+   "when": {
+    "age_min": 16,
+    "overall_min": 60,
+    "needs_club": true
+   },
+   "body": "אימון רגיל בבוקר שלישי. ביציע המערבי, שריק לגמרי, יושבים\nשני אנשים עם מחברת. {manager} לא מסתכל לשם, וזה מספר לך הכול.",
+   "choices": [
+    {
+     "label": "לשחק כאילו זה גמר",
+     "hint": "הכול על אחת",
+     "text": "רצת על כל כדור, ניסית כל דבר. חלק הצליח, חלק פחות —\nאבל הם רשמו הרבה.",
+     "fx": {
+      "interest": [
+       "foreign",
+       22
+      ],
+      "fitness": -8,
+      "sharpness": 3,
+      "hype": 6
+     }
+    },
+    {
+     "label": "לשחק בדיוק כמו תמיד",
+     "hint": "מי שאתה",
+     "text": "לא שינית כלום. אחד מהם סימן משהו במחברת בדקה השלישית\nולא הרים את הראש עד הסוף.",
+     "fx": {
+      "interest": [
+       "foreign",
+       15
+      ],
+      "attr": [
+       "mental",
+       0.8
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_legend_call",
+   "title": "שיחה שלא ציפית לה",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.4,
+   "cooldown": 55,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 45
+   },
+   "body": "הטלפון מצלצל ממספר בחו\"ל. בצד השני קול שגדלת עליו —\nשחקן עבר שכל ילד בעולם מכיר, היום בתפקיד במועדון ענק.\n\n\"אני לא מתקשר לכולם,\" הוא אומר. \"רציתי לשמוע אותך מדבר.\"",
+   "choices": [
+    {
+     "label": "לדבר בכנות על איפה אתה",
+     "hint": "רושם",
+     "text": "סיפרת על הפציעה, על השבועות שלא שיחקת, על מה שאתה רוצה.\nהוא הקשיב עד הסוף ואמר: \"אתה מוכן יותר ממה שאתה חושב.\"",
+     "fx": {
+      "interest": [
+       "elite",
+       30
+      ],
+      "morale": 10,
+      "attr": [
+       "mental",
+       1.0
+      ],
+      "hype": 12
+     }
+    },
+    {
+     "label": "לשאול מה הם מציעים",
+     "hint": "ישיר מדי",
+     "text": "\"עוד לא הגענו לשם,\" הוא אמר, וקיצר את השיחה.",
+     "fx": {
+      "interest": [
+       "elite",
+       12
+      ],
+      "business": 0.8
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_private_jet",
+   "title": "מטוס ליום אחד",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.0,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 55
+   },
+   "body": "\"תגיע ביום שני בבוקר. נחזיר אותך באותו יום. אף אחד לא יידע.\"\nהמטוס ממתין. בסוף המסלול — אצטדיון שראית רק בשידורים.",
+   "choices": [
+    {
+     "label": "לטוס",
+     "hint": "הצעה על השולחן, וסיכון",
+     "text": "הסתובבת במנהרה שלהם, נגעת בדשא, ראית את החולצה עם השם שלך\nתלויה בארון. הם לא שיחקו הוגן, והם ידעו את זה.",
+     "fx": {
+      "open_offer": [
+       "elite"
+      ],
+      "morale": 12,
+      "trust": -6,
+      "hype": 16,
+      "press": "\"נראה שהשחקן ביקר במתקנים של מועדון אירופי.\""
+     }
+    },
+    {
+     "label": "לא לטוס באמצע העונה",
+     "hint": "מקצועי",
+     "text": "אמרת שתבוא בקיץ. הם אמרו שבקיץ יש עוד שחקנים.",
+     "fx": {
+      "interest": [
+       "elite",
+       14
+      ],
+      "trust": 5,
+      "attr": [
+       "mental",
+       0.8
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_national_call",
+   "title": "מאמן הנבחרת בשורה השנייה",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.6,
+   "cooldown": 40,
+   "once": false,
+   "when": {
+    "age_min": 18,
+    "overall_min": 68
+   },
+   "body": "אחרי המשחק מחכה לך אדם אחד ליד האוטובוס. הוא לא מבקש חתימה.\n\"אני עוקב אחריך שלוש עונות,\" הוא אומר. \"רק רציתי שתדע.\"",
+   "choices": [
+    {
+     "label": "להודות ולעלות לאוטובוס",
+     "hint": "צנוע",
+     "text": "הוא הנהן. שבוע אחר כך השם שלך הופיע ברשימה המורחבת.",
+     "fx": {
+      "rep": 3.5,
+      "morale": 9,
+      "hype": 6
+     }
+    },
+    {
+     "label": "לשאול מה צריך כדי להיכנס",
+     "hint": "יעד ברור",
+     "text": "\"דקות,\" הוא אמר. \"לא כישרון. דקות.\" זה נשמע פשוט וזה לא.",
+     "fx": {
+      "rep": 2.0,
+      "attr": [
+       "mental",
+       1.0
+      ],
+      "morale": 5
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_gulf_offer",
+   "title": "המספר שלא נראה אמיתי",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 1.8,
+   "cooldown": 70,
+   "once": false,
+   "when": {
+    "age_min": 24,
+    "rep_min": 50
+   },
+   "body": "מצגת. באמת מצגת, עם שקפים. מועדון ממדינה שלא חשבת עליה,\nעם מספר שכר שאתה קורא שלוש פעמים כדי לספור אפסים.\n\n\"אתה לא צריך לענות היום.\"",
+   "choices": [
+    {
+     "label": "לשמוע ברצינות",
+     "hint": "כסף גדול, כדורגל קטן",
+     "text": "הם לא ניסו למכור לך כדורגל. הם מכרו לך חיים.\nזה עבד יותר טוב ממה שרצית להודות.",
+     "fx": {
+      "open_offer": [
+       "rich"
+      ],
+      "hype": 10
+     }
+    },
+    {
+     "label": "\"עוד לא סיימתי כאן\"",
+     "hint": "שאפתנות",
+     "text": "אמרת את זה בקול רם וזה נשמע כמו הבטחה. גם לעצמך.",
+     "fx": {
+      "attr": [
+       "mental",
+       1.2
+      ],
+      "morale": 6,
+      "rep": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_rival_captain",
+   "title": "הקפטן של היריבה",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.2,
+   "cooldown": 45,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 28
+   },
+   "body": "אחרי המשחק מול {opponent}, הקפטן שלהם עוצר אותך בחילופי החולצות.\n\n\"אצלנו היית משחק כל שבוע. תחשוב על זה. לא אמרתי כלום.\"",
+   "choices": [
+    {
+     "label": "להקשיב",
+     "hint": "עניין",
+     "text": "לא עניתי כלום. הוא הבין את התשובה בדיוק.",
+     "fx": {
+      "interest": [
+       "any",
+       20
+      ]
+     }
+    },
+    {
+     "label": "\"אני בבית שלי\"",
+     "hint": "נאמנות",
+     "text": "הוא הרים גבה. הקהל שלך שמע את זה מהיציע, ואהב.",
+     "fx": {
+      "fans": 6,
+      "trust": 5,
+      "morale": 5
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_yacht",
+   "title": "היאכטה",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.0,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "age_min": 20,
+    "rep_min": 48
+   },
+   "body": "הזמנה בכתב יד. איל הון שאתה מכיר משמות של חברות מזמין אותך\nלסופ\"ש. \"בלי סוכנים, בלי עיתונאים. רק לדבר.\"",
+   "choices": [
+    {
+     "label": "לנסוע",
+     "hint": "הזדמנויות, וגם מבטים",
+     "text": "בסופ\"ש הזה ישבת עם אנשים שמחליטים דברים.\nאחד מהם החזיק במועדון. הוא לא הזכיר את זה אפילו פעם.",
+     "fx": {
+      "business": 2.5,
+      "interest": [
+       "elite",
+       18
+      ],
+      "rep": 2.0,
+      "fitness": -6,
+      "hype": 8
+     }
+    },
+    {
+     "label": "לנסוע ולקחת את הסוכן",
+     "hint": "זהיר",
+     "text": "המארח לא אהב את זה, אבל דיבר. הסוכן שלך לא הפסיק לרשום.",
+     "fx": {
+      "business": 1.2,
+      "interest": [
+       "elite",
+       10
+      ],
+      "agent_trust": 8
+     }
+    },
+    {
+     "label": "לוותר — יש משחק",
+     "hint": "ראש במשחק",
+     "text": "נשארת. במשחק כבשת. אף אחד לא ידע מה ויתרת בשביל זה.",
+     "fx": {
+      "sharpness": 5,
+      "form": 4,
+      "attr": [
+       "mental",
+       0.8
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_crypto",
+   "title": "החסות עם הריח",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.0,
+   "cooldown": 55,
+   "once": false,
+   "when": {
+    "age_min": 20,
+    "rep_min": 38
+   },
+   "body": "חברה שקיימת שנה מציעה לך סכום שחברה שקיימת שנה לא אמורה\nלהציע. צריך רק סרטון אחד, ולומר שאתה מאמין בהם.",
+   "choices": [
+    {
+     "label": "לקחת את הכסף",
+     "hint": "עכשיו טוב, אחר כך נראה",
+     "text": "הכסף נכנס באותו יום. הסרטון רץ בכל מקום.",
+     "fx": {
+      "money": 850000,
+      "rep": 2.0,
+      "flag": "risky_deal"
+     }
+    },
+    {
+     "label": "לבקש שהעורך דין יבדוק",
+     "hint": "איטי ובטוח",
+     "text": "העו\"ד מצא שלושה סעיפים שלא היית רוצה לחתום עליהם.\nהם ירדו מהעסקה תוך יומיים.",
+     "fx": {
+      "business": 2.0,
+      "attr": [
+       "mental",
+       0.6
+      ]
+     }
+    },
+    {
+     "label": "לסרב",
+     "hint": "שם נקי",
+     "text": "חודשיים אחר כך הם קרסו, ושחקן אחר הסביר את זה בטלוויזיה.",
+     "fx": {
+      "business": 1.0,
+      "rep": 1.0,
+      "morale": 4
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_talkshow",
+   "title": "אולפן בשידור חי",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.4,
+   "cooldown": 40,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 35
+   },
+   "body": "תוכנית אירוח בפריים־טיים. המנחה מחייך ושואל בדיוק את השאלה\nשביקשו ממנו לא לשאול: \"אתה נשאר ב{club}?\"",
+   "choices": [
+    {
+     "label": "לענות בכנות",
+     "hint": "כותרות",
+     "text": "אמרת שאתה שם היום, ושמחר זה כדורגל. זה היה כן ולא נוח.",
+     "fx": {
+      "media": 2.0,
+      "rep": 2.5,
+      "trust": -6,
+      "press": "\"בשידור חי: השחקן לא התחייב להישאר.\""
+     }
+    },
+    {
+     "label": "להתחמק בחיוך",
+     "hint": "מקצועי",
+     "text": "\"אני מתרכז במשחק הבא.\" המנחה ניסה שוב, ואתה חייכת שוב.",
+     "fx": {
+      "media": 1.2,
+      "trust": 3
+     }
+    },
+    {
+     "label": "\"אני נשאר\"",
+     "hint": "מחייב",
+     "text": "האולפן שתק רגע. הקהל של {club} לא שתק בכלל.",
+     "fx": {
+      "fans": 10,
+      "trust": 8,
+      "flag": "promised_stay",
+      "rep": 1.5
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_boot_deal",
+   "title": "הנעליים שלך, השם שלך",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.2,
+   "cooldown": 50,
+   "once": false,
+   "when": {
+    "age_min": 18,
+    "rep_min": 42
+   },
+   "body": "חברת ספורט רוצה דגם על שמך. לא חסות — **דגם**.\nצריך לצלם שלושה ימים באמצע העונה.",
+   "choices": [
+    {
+     "label": "לצלם",
+     "hint": "כסף ושם, על חשבון הרגליים",
+     "text": "שלושה ימים על סט. הדגם יצא, ובאותו חודש כל ילד בשכונה\nרץ עם השם שלך על הרגל.",
+     "fx": {
+      "money": 1200000,
+      "rep": 4.0,
+      "fitness": -12,
+      "sharpness": -5,
+      "media": 1.5
+     }
+    },
+    {
+     "label": "לדחות לקיץ",
+     "hint": "ראש במשחק",
+     "text": "הם הסכימו. הסכום ירד ברבע, והרגליים נשארו טריות.",
+     "fx": {
+      "money": 400000,
+      "rep": 1.5,
+      "business": 1.0
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_gala",
+   "title": "ערב התרמה",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.6,
+   "cooldown": 45,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 25,
+    "not_flag": "partner"
+   },
+   "body": "המועדון שלח אותך לייצג בערב התרמה. חליפה, צלמים, נאום קצר.\nבשולחן שלך יושבת מישהי שלא שאלה אותך על כדורגל אפילו פעם אחת.",
+   "choices": [
+    {
+     "label": "לקחת מספר",
+     "hint": "התחלה",
+     "text": "דיברתם עד שכיבו את האורות. \"תתקשר,\" היא אמרה, \"אבל לא הלילה.\"",
+     "fx": {
+      "meet_partner": [
+       "any"
+      ],
+      "morale": 8
+     }
+    },
+    {
+     "label": "להישאר מקצועי",
+     "hint": "ראש במשחק",
+     "text": "יצאת מוקדם. במשחק ביום ראשון היית חד.",
+     "fx": {
+      "sharpness": 4,
+      "attr": [
+       "mental",
+       0.5
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_setup",
+   "title": "{mate} רוצה לסדר לך משהו",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.4,
+   "cooldown": 40,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "not_flag": "partner"
+   },
+   "body": "\"יש לי מישהי בשבילך,\" אומר {mate} בחדר ההלבשה,\n\"ואם זה לא יעבוד — אני לא מכיר אותך.\"",
+   "choices": [
+    {
+     "label": "ללכת לפגישה",
+     "hint": "אולי",
+     "text": "היא הגיעה באיחור של עשרים דקות והסבירה למה, ואת ההסבר\nרצית לשמוע עד הסוף.",
+     "fx": {
+      "meet_partner": [
+       "any"
+      ],
+      "morale": 6
+     }
+    },
+    {
+     "label": "לא עכשיו",
+     "hint": "עונה עמוסה",
+     "text": "\"אתה תתחרט,\" הוא אמר. אולי.",
+     "fx": {}
+    }
+   ]
+  },
+  {
+   "eid": "e_partner_abroad",
+   "title": "גם לה יש קריירה",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.2,
+   "cooldown": 50,
+   "once": false,
+   "when": {
+    "flag": "partner",
+    "age_min": 20
+   },
+   "body": "היא קיבלה הצעה. טובה, בחו\"ל, ולא באותה מדינה שאתה חושב\nלעבור אליה. היא שואלת מה אתה חושב, ומתכוונת לזה.",
+   "choices": [
+    {
+     "label": "\"תיסעי. נסתדר\"",
+     "hint": "בוגר, וקשה",
+     "text": "היא נסעה. הטלפונים בשעות מוזרות הפכו לחלק מהשגרה.",
+     "fx": {
+      "mood": -12,
+      "morale": -4,
+      "attr": [
+       "mental",
+       1.2
+      ]
+     }
+    },
+    {
+     "label": "לבקש שתישאר",
+     "hint": "עכשיו טוב, אחר כך?",
+     "text": "היא נשארה. אמרה שזה בסדר. חצי מזה היה נכון.",
+     "fx": {
+      "mood": 6,
+      "morale": 5,
+      "flag": "she_stayed"
+     }
+    },
+    {
+     "label": "לבדוק מעבר לשם",
+     "hint": "לשנות מסלול",
+     "text": "התחלת לשאול שאלות שלא שאלת קודם. הסוכן שלך שמע ולא אהב.",
+     "fx": {
+      "interest": [
+       "foreign",
+       24
+      ],
+      "mood": 14,
+      "agent_trust": -6
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_parents_stands",
+   "title": "הם ביציע",
+   "stages": [
+    "academy",
+    "player"
+   ],
+   "weight": 2.6,
+   "cooldown": 35,
+   "once": false,
+   "when": {
+    "needs_club": true,
+    "age_min": 16
+   },
+   "body": "אבא שלך לקח יום חופש בשביל המשחק הזה. הוא לא אמר לך\nכדי לא ללחוץ, ואתה רואה אותו בשורה השמינית.",
+   "choices": [
+    {
+     "label": "לשחק בשבילו",
+     "hint": "לחץ שהופך לדלק",
+     "text": "רצת כמו ילד בן שתים־עשרה. בסוף המשחק הוא רק הנהן,\nוזה היה יותר מכל מה שאמר בעשר שנים.",
+     "fx": {
+      "form": 6,
+      "morale": 10,
+      "pride": 12
+     }
+    },
+    {
+     "label": "לשכוח מזה ולשחק",
+     "hint": "קר",
+     "text": "לא הסתכלת לשורה השמינית אפילו פעם. שיחקת טוב.",
+     "fx": {
+      "attr": [
+       "mental",
+       1.0
+      ],
+      "form": 3
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_home_town",
+   "title": "חוזרים לשכונה",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.0,
+   "cooldown": 50,
+   "once": false,
+   "when": {
+    "rep_min": 35
+   },
+   "body": "המגרש שגדלת עליו מתפרק. מישהו מהעירייה מתקשר ושואל\nאם תרצה \"לעזור\", ומתכוון לכסף.",
+   "choices": [
+    {
+     "label": "לממן מגרש חדש",
+     "hint": "יקר, ולא נשכח",
+     "text": "בחנוכה חתכו סרט. על השלט כתוב את השם שלך, וילדים\nשיחקו שם עד חצות.",
+     "fx": {
+      "money": -600000,
+      "fans": 12,
+      "rep": 3.0,
+      "pride": 15,
+      "morale": 8
+     }
+    },
+    {
+     "label": "לבוא לצלם בלי לשלם",
+     "hint": "זול, ונראה",
+     "text": "התמונות יצאו יפות. בשכונה דיברו על זה אחרת.",
+     "fx": {
+      "rep": 1.0,
+      "fans": -4,
+      "pride": -6
+     }
+    },
+    {
+     "label": "להתעלם",
+     "hint": "לא הבעיה שלך",
+     "text": "לא ענית. אחרי חודש קראת על זה בעיתון המקומי.",
+     "fx": {
+      "pride": -10
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_tunnel",
+   "title": "במנהרה, לפני",
+   "stages": [
+    "player"
+   ],
+   "weight": 3.0,
+   "cooldown": 26,
+   "once": false,
+   "when": {
+    "needs_club": true,
+    "age_min": 17
+   },
+   "body": "שחקן של {opponent} עומד לידך במנהרה ואומר, בלי להסתכל:\n\n\"שמעתי שאתה הולך. חבל, אף פעם לא באמת הוכחת פה כלום.\"",
+   "choices": [
+    {
+     "label": "לענות לו על המגרש",
+     "hint": "מרוכז",
+     "text": "לא אמרת מילה. בדקה 63 הוא עוד חיפש אותך.",
+     "fx": {
+      "form": 7,
+      "sharpness": 4,
+      "attr": [
+       "mental",
+       0.8
+      ]
+     }
+    },
+    {
+     "label": "לענות לו במנהרה",
+     "hint": "מתלהט",
+     "text": "השופט הפריד ביניכם עוד לפני השריקה. שניכם התחלתם עצבניים.",
+     "fx": {
+      "form": 3,
+      "attr": [
+       "mental",
+       -0.5
+      ],
+      "morale": 3
+     }
+    },
+    {
+     "label": "לצחוק",
+     "hint": "קר כקרח",
+     "text": "צחקת בקול. הוא איבד את החוט, ואתה לא.",
+     "fx": {
+      "attr": [
+       "mental",
+       1.2
+      ],
+      "form": 4
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_young_asks",
+   "title": "הילד מהנוער",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.4,
+   "cooldown": 40,
+   "once": false,
+   "when": {
+    "age_min": 24,
+    "needs_club": true
+   },
+   "body": "ילד בן שש־עשרה מחכה לך בחניון. הוא לא מבקש חתימה.\n\"אני באותה עמדה שלך,\" הוא אומר. \"מה עשית בגיל שלי?\"",
+   "choices": [
+    {
+     "label": "לקחת אותו לאימון אישי",
+     "hint": "מנטור",
+     "text": "עבדתם ביחד יומיים בשבוע חודשיים. הוא עלה לסגל.\nלא שכחת איך זה מרגיש להיות הוא.",
+     "fx": {
+      "coaching": 3.0,
+      "morale": 7,
+      "fans": 5,
+      "trust": 4
+     }
+    },
+    {
+     "label": "לתת לו עצה אחת",
+     "hint": "קצר",
+     "text": "\"תבוא ראשון ותצא אחרון. זה הכול.\" הוא רשם את זה בטלפון.",
+     "fx": {
+      "coaching": 1.0,
+      "morale": 3
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_old_mate",
+   "title": "חבר מהצד השני",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.0,
+   "cooldown": 48,
+   "once": false,
+   "when": {
+    "age_min": 22,
+    "needs_club": true
+   },
+   "body": "השבוע אתה משחק מול {opponent}. שם ברשימה יש חבר שלך\nמקבוצת הנוער — אותו חדר, אותם חלומות, לפני עשר שנים.",
+   "choices": [
+    {
+     "label": "לשחק בלי רחמים",
+     "hint": "מקצוען",
+     "text": "נכנסת בו חזק בדקה השנייה. אחרי המשחק הוא חיבק אותך\nואמר: \"ככה זה צריך להיות.\"",
+     "fx": {
+      "form": 5,
+      "attr": [
+       "mental",
+       0.8
+      ],
+      "trust": 3
+     }
+    },
+    {
+     "label": "להזמין אותו לארוחה אחרי",
+     "hint": "אנושי",
+     "text": "ישבתם עד מאוחר ודיברתם על כולם שלא הצליחו.\nבבוקר היה קשה לקום, וזה היה שווה.",
+     "fx": {
+      "morale": 9,
+      "fitness": -4
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_fan_letter",
+   "title": "מכתב בכתב יד",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.0,
+   "cooldown": 45,
+   "once": false,
+   "when": {
+    "rep_min": 30
+   },
+   "body": "בין מאות המעטפות במועדון יש אחת בכתב יד של ילד.\nהוא כותב שהוא בבית חולים, ושהוא צופה בכל משחק.",
+   "choices": [
+    {
+     "label": "לבקר אותו",
+     "hint": "בלי מצלמות",
+     "text": "הגעת בלי לספר לאף אחד. אמו בכתה בפרוזדור.\nהתמונה היחידה מהיום ההוא היא בטלפון שלה.",
+     "fx": {
+      "morale": 12,
+      "fans": 6,
+      "attr": [
+       "mental",
+       0.6
+      ]
+     }
+    },
+    {
+     "label": "לשלוח חולצה חתומה",
+     "hint": "משהו",
+     "text": "החולצה הגיעה. הוא ענד אותה גם על הפיג'מה.",
+     "fx": {
+      "morale": 5,
+      "fans": 3
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_captain_vote",
+   "title": "מי לוקח את הסרט",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 2.2,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "age_min": 23,
+    "trust_min": 58,
+    "needs_club": true,
+    "not_flag": "captain"
+   },
+   "body": "{manager} סוגר את הדלת. \"אני צריך קפטן. אתה לא הוותיק כאן,\nאבל אתה זה שכולם מסתכלים עליו. אתה רוצה את זה?\"",
+   "choices": [
+    {
+     "label": "לקחת את הסרט",
+     "hint": "אחריות",
+     "text": "הסרט על הזרוע שינה איך אתה נכנס לחדר. גם איך יוצאים ממנו.",
+     "fx": {
+      "flag": "captain",
+      "trust": 10,
+      "morale": 10,
+      "rep": 2.5,
+      "attr": [
+       "mental",
+       1.2
+      ]
+     }
+    },
+    {
+     "label": "\"תן את זה ל{mate}\"",
+     "hint": "ענווה",
+     "text": "הוא הסתכל עליך רגע ואמר: \"זו בדיוק התשובה של קפטן.\"",
+     "fx": {
+      "trust": 6,
+      "morale": 5
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_new_manager",
+   "title": "מאמן חדש, דף חלק",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 6.0,
+   "cooldown": 20,
+   "once": false,
+   "when": {
+    "needs_club": true,
+    "flag": "new_manager"
+   },
+   "body": "המאמן החדש קרא לכולם אחד־אחד. אתה נכנס אחרון.\n\"אני לא יודע כלום עלייך,\" הוא אומר. \"תספר לי מי אתה.\"",
+   "choices": [
+    {
+     "label": "להגיד בדיוק מה אתה עושה הכי טוב",
+     "hint": "ברור",
+     "text": "דיברת שתי דקות בלי לגמגם. הוא רשם. בשבוע הבא שיחקת.",
+     "fx": {
+      "trust": 12,
+      "morale": 6,
+      "promise": [
+       "start"
+      ],
+      "clear_flag": "new_manager"
+     }
+    },
+    {
+     "label": "\"תשפוט אותי באימונים\"",
+     "hint": "מסוכן, ומכובד",
+     "text": "\"טוב,\" הוא אמר. באימון הראשון הוא לא הוריד ממך עין.",
+     "fx": {
+      "trust": 5,
+      "sharpness": 4,
+      "attr": [
+       "mental",
+       0.8
+      ],
+      "clear_flag": "new_manager"
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_bidding_war",
+   "title": "שלושה טלפונים באותו ערב",
+   "stages": [
+    "player"
+   ],
+   "weight": 2.2,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "age_min": 19,
+    "rep_min": 58,
+    "overall_min": 76
+   },
+   "body": "הסוכן שלך שולח הודעה אחת: \"תתקשר.\"\nכשאתה מתקשר הוא אומר שלושה שמות ומחכה שתגיב.",
+   "choices": [
+    {
+     "label": "\"תפתח את זה\"",
+     "hint": "מרוץ אמיתי",
+     "text": "תוך שבוע כל אחד מהם ידע על השניים האחרים.\nהמספרים התחילו לזוז לבד.",
+     "fx": {
+      "open_offer": [
+       "elite"
+      ],
+      "interest": [
+       "elite",
+       24
+      ],
+      "hype": 20,
+      "press": "\"שלושה מועדונים אחרי אותו שחקן. המחיר עולה.\""
+     }
+    },
+    {
+     "label": "\"רק אחד. תבחר את הנכון\"",
+     "hint": "ממוקד",
+     "text": "הוא בחר. אמר שזה המקום שבו תשחק, לא המקום שישלם הכי הרבה.",
+     "fx": {
+      "open_offer": [
+       "elite"
+      ],
+      "agent_trust": 10
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_wonderkid_hype",
+   "title": "\"הכי טוב שיצא מכאן\"",
+   "stages": [
+    "academy",
+    "player"
+   ],
+   "weight": 2.4,
+   "cooldown": 45,
+   "once": false,
+   "when": {
+    "age_max": 21,
+    "overall_min": 70,
+    "rep_min": 30
+   },
+   "body": "כתבה גדולה בעיתון: התמונה שלך על חצי עמוד, והכותרת\n\"הכי טוב שיצא מכאן מזה עשרים שנה.\"\n\nבחדר ההלבשה מחאו לך כפיים בלעג. חלקם צחקו באמת.",
+   "choices": [
+    {
+     "label": "לתלות את זה בארונית",
+     "hint": "ביטחון",
+     "text": "תלית. חלק צחקו, וחלק הבינו שאתה לא מתנצל.",
+     "fx": {
+      "morale": 8,
+      "rep": 2.5,
+      "hype": 14,
+      "attr": [
+       "mental",
+       0.6
+      ]
+     }
+    },
+    {
+     "label": "לומר לעיתונאי שזה מוקדם",
+     "hint": "בוגר",
+     "text": "הציטוט שלך היה הכותרת של יום שני: \"עוד לא עשיתי כלום.\"\nהמאמנים בליגה שמו לב לזה יותר מלכתבה עצמה.",
+     "fx": {
+      "rep": 1.5,
+      "trust": 8,
+      "hype": 6
+     }
+    },
+    {
+     "label": "להתעלם לגמרי",
+     "hint": "שקט",
+     "text": "לא הגבת. הרעש נגמר בשבוע, והמשחק שלך לא השתנה.",
+     "fx": {
+      "sharpness": 3,
+      "attr": [
+       "mental",
+       1.0
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_release_clause",
+   "title": "מישהו שילם את הסעיף",
+   "stages": [
+    "player"
+   ],
+   "weight": 1.8,
+   "cooldown": 70,
+   "once": false,
+   "when": {
+    "age_min": 20,
+    "rep_min": 62,
+    "flag": "release_clause"
+   },
+   "body": "הטלפון של המנכ\"ל צלצל בשעה שבע בבוקר. עד תשע כבר\nהעבירו את הסכום המלא של סעיף השחרור שלך.\n\nלפי החוזה — ההחלטה עכשיו שלך בלבד.",
+   "choices": [
+    {
+     "label": "לשמוע מה הם מציעים",
+     "hint": "הצעה מיידית",
+     "text": "הם הגיעו עם חוזה מודפס, לא טיוטה. זה אומר משהו.",
+     "fx": {
+      "open_offer": [
+       "elite"
+      ],
+      "hype": 14
+     }
+    },
+    {
+     "label": "לסרב ולהישאר",
+     "hint": "הקהל לא ישכח",
+     "text": "המועדון החזיר את הכסף. בקבוצה הבינו מה עשית,\nובקהל זה הפך לשיר.",
+     "fx": {
+      "fans": 18,
+      "trust": 12,
+      "morale": 12,
+      "rep": 2.0
+     }
+    }
+   ]
+  },
+  {
+   "eid": "e_charity_match",
+   "title": "משחק הצדקה של האגדות",
+   "stages": [
+    "player",
+    "veteran"
+   ],
+   "weight": 1.8,
+   "cooldown": 60,
+   "once": false,
+   "when": {
+    "rep_min": 52
+   },
+   "body": "הזמינו אותך למשחק צדקה עם שמות שהיו פוסטרים בחדר שלך.\nזה באמצע העונה, ו{manager} לא התלהב.",
+   "choices": [
+    {
+     "label": "לשחק",
+     "hint": "רגע שלא חוזר",
+     "text": "החלפת חולצה עם מי שהיה על הקיר שלך בגיל תשע.\nהוא ידע את השם שלך.",
+     "fx": {
+      "morale": 14,
+      "rep": 3.0,
+      "fitness": -10,
+      "trust": -5,
+      "business": 0.8
+     }
+    },
+    {
+     "label": "לוותר בכבוד",
+     "hint": "העונה קודמת",
+     "text": "שלחת חולצה חתומה והתנצלות. {manager} שמע על זה\nולא אמר כלום — וזה אמר הכול.",
+     "fx": {
+      "trust": 7,
+      "sharpness": 3
+     }
+    }
+   ]
+  }
  ]
 };
 
@@ -15644,10 +16996,64 @@ const ROLE_VALUE = Object.fromEntries(SQUAD_ROLES.map(r => [r[0], r[2]]));
 const TERMS = [
   ["wage", "שכר שבועי"], ["years", "אורך חוזה"], ["bonus", "מענק חתימה"],
   ["clause", "סעיף שחרור"], ["role", "תפקיד בסגל"], ["image", "אחוזי דימוי"],
+  ["minutes", "התחייבות לדקות"], ["loyalty", "מענק נאמנות"],
+  ["family", "חבילה למשפחה"],
 ];
 const TERM_NAMES = Object.fromEntries(TERMS);
 
 const WINDOW_WEEKS = 4;
+
+// ---------------------------------------------------------------------------
+// עילוי
+//
+// "שחקן שנחשב לעילוי — קופצים עליו מכל כיוון ומציעים לו עולם ומלואו."
+// זה לא קורה מעצמו: מועדון עשיר מציע פי שלושה כי **כולם רוצים אותו והוא
+// בן תשע־עשרה**, לא כי הדירוג עלה בשתיים.
+// ---------------------------------------------------------------------------
+
+const WONDERKID_AGE = 23;    // מעל זה כבר לא הימור על העתיד
+const FRENZY_MIN = 0.50;     // מאיזה ציון השוק מתחיל להתנהג אחרת
+
+/** כמה השם שלך "בוער". נבנה מפגישות, כתבות וקרבות רכש. */
+function hype(game) {
+  const value = Number(game.flags.hype || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * 0-1: כמה השוק רואה בך עילוי ולא עוד שחקן טוב. המרווח לפוטנציאל
+ * הוא הרכיב הכבד — בן 19 עם 74 ותקרה 92 שווה יותר מבן 27 עם 84.
+ */
+function wonderkidScore(game) {
+  const me = game.me;
+  if (me.age > WONDERKID_AGE) return 0;
+  // +2 כדי שבן 19 עדיין ייחשב עילוי — בלי זה הגיל אכל את הציון
+  // בדיוק בשנים שבהן השוק באמת משתגע.
+  const youth = clamp((WONDERKID_AGE - me.age + 2) / 8, 0, 1);
+  const headroom = clamp((me.potential - overall(me)) / 18, 0, 1);
+  const quality = clamp((overall(me) - 58) / 30, 0, 1);
+  const noise = clamp(hype(game) / 100, 0, 1);
+  // בלי משחקים בעונה — ניטרלי. אפס היה מעניש על תחילת עונה.
+  let rating = 0.4;
+  if (me.season.apps >= 4) rating = clamp((avgRating(me.season) - 6.6) / 1.4, 0, 1);
+  return clamp(youth * 0.26 + headroom * 0.26 + quality * 0.24
+               + noise * 0.14 + rating * 0.10, 0, 1);
+}
+
+/** מכפיל הטירוף. 1.0 = שוק רגיל; 2.6 = כל אירופה על הדלת. */
+function frenzy(game) {
+  const score = wonderkidScore(game);
+  if (score < FRENZY_MIN) return 1;
+  return 1 + (score - FRENZY_MIN) / (1 - FRENZY_MIN) * 1.6;
+}
+
+function frenzyWord(game) {
+  const mult = frenzy(game);
+  if (mult >= 2.2) return "כל אירופה מדברת עליך. המספרים שהם מוכנים לשלם לא הגיוניים.";
+  if (mult >= 1.6) return "אתה בשוק של העילויים. מי שרוצה אותך יודע שיש תור.";
+  if (mult >= 1.15) return "מתחילים להתייחס אליך כאל השקעה, לא כאל חתימה.";
+  return "";
+}
 
 /** שווי העברה משוער. הבסיס לכל מספר אחר כאן. */
 function marketValue(p) {
@@ -15688,26 +17094,43 @@ function leverage(game) {
 /** חבילה שלמה ממועדון אחד, לא רק מספר. */
 function buildOffer(game, club, rng, eagerness = null) {
   const me = game.me;
+  const boom = frenzy(game);
   if (eagerness === null) eagerness = rng.uniform(0.35, 0.95);
+  // מועדון שרודף אחרי עילוי לא "בודק אפשרות"
+  eagerness = clamp(eagerness * (0.75 + boom * 0.35), 0.05, 0.99);
 
   const par = wageForOverall(overall(me)) * (0.88 + me.reputation / 200);
-  const ceiling = Math.max(par * 1.05, club.wageBudget * 0.34);
-  let wage = Math.floor(Math.min(ceiling, par * (0.80 + eagerness * 0.55)));
+  const ceiling = Math.max(par * 1.05, club.wageBudget * 0.34) * boom;
+  let wage = Math.floor(Math.min(ceiling, par * (0.80 + eagerness * 0.55) * boom));
   wage = Math.max(wage, Math.floor(me.contract.wage * 1.08));
 
-  const value = marketValue(me);
+  const value = Math.floor(marketValue(me) * boom);
   const role = roleFor(club, me, eagerness);
   const years = me.age >= 31 ? 3 : (eagerness > 0.7 && me.age <= 24 ? 5 : 4);
 
-  return {
+  const offer = {
     cid: club.cid, wage, years,
     bonus: Math.floor(value * rng.uniform(0.03, 0.09) * (0.5 + eagerness)),
-    clause: 0, role, image: 0, fee: value,
+    clause: 0, role, image: 0, minutes: 0, loyalty: 0, family: 0,
+    promises: [], fee: value,
     eagerness: Math.round(eagerness * 1000) / 1000,
     ceiling: Math.floor(ceiling),
     patience: 2 + Math.floor(eagerness * 3),
     asks: 0, state: "open", weeks: WINDOW_WEEKS, log: [],
+    frenzy: Math.round(boom * 100) / 100,
   };
+  // בטירוף אמיתי הם לא מחכים שתבקש — הכול על השולחן מראש
+  if (boom >= 1.9) {
+    offer.bonus = Math.floor(offer.bonus * 2.2);
+    offer.image = 15;
+    offer.minutes = 55;
+    offer.promises = ["מספר החולצה שתבחר", "פרויקט שנבנה סביבך",
+                      "לא נמכור אותך בשנתיים הראשונות"];
+  } else if (boom >= 1.35) {
+    offer.bonus = Math.floor(offer.bonus * 1.5);
+    offer.promises = ["פרויקט שנבנה סביבך"];
+  }
+  return offer;
 }
 
 /** איזה תפקיד מועדון מוכן להבטיח — לפי הפער בינך לבין הסגל שלו. */
@@ -15724,7 +17147,11 @@ function offerWorth(offer) {
   let annual = offer.wage * 52;
   annual += Math.floor(offer.bonus / Math.max(1, offer.years));
   annual = Math.floor(annual * (ROLE_VALUE[offer.role] || 1));
-  annual += Math.floor(annual * offer.image / 100);
+  annual += Math.floor(annual * (offer.image || 0) / 100);
+  annual += Math.floor(offer.loyalty || 0);
+  annual += Math.floor(offer.family || 0);
+  // התחייבות לדקות היא לא כסף, אבל היא שווה — קריירה נבנית מדקות
+  annual = Math.floor(annual * (1 + (offer.minutes || 0) / 420));
   return annual;
 }
 
@@ -15794,6 +17221,9 @@ function askOptions(offer) {
     if (key === "years" && offer.years >= 6) continue;
     if (key === "image" && offer.image >= 25) continue;
     if (key === "clause" && offer.clause && offer.clause <= offer.fee) continue;
+    if (key === "minutes" && (offer.minutes || 0) >= 75) continue;
+    if (key === "loyalty" && (offer.loyalty || 0) >= offer.wage * 30) continue;
+    if (key === "family" && offer.family) continue;
     out.push({ term: key, name, ask: askText(offer, key) });
   }
   return out;
@@ -15808,6 +17238,11 @@ function askText(offer, term) {
   if (term === "clause") return `סעיף שחרור ₪${fmt(Math.floor(offer.fee * 1.6))}`;
   if (term === "role") return `התחייבות ל${ROLE_NAMES[betterRole(offer.role)]}`;
   if (term === "image") return `${Math.min(25, offer.image + 10)}% מזכויות הדימוי`;
+  if (term === "minutes")
+    return `התחייבות ל-${Math.min(75, (offer.minutes || 0) + 25)}% מהדקות`;
+  if (term === "loyalty")
+    return `מענק נאמנות ₪${fmt(Math.floor(Math.max(offer.wage * 14, 200000)))} לשנה`;
+  if (term === "family") return "דירה, בית ספר ורילוקיישן למשפחה";
   return "";
 }
 
@@ -15896,6 +17331,19 @@ function applyAsk(offer, term, full) {
     offer.image = Math.min(25, offer.image + (full ? 10 : 5));
     return `${offer.image}% מזכויות הדימוי`;
   }
+  if (term === "minutes") {
+    offer.minutes = Math.min(75, (offer.minutes || 0) + (full ? 25 : 12));
+    return `התחייבות ל-${offer.minutes}% מהדקות`;
+  }
+  if (term === "loyalty") {
+    const base = Math.max(offer.wage * 14, 200000);
+    offer.loyalty = Math.floor(base * (full ? 1 : 0.5));
+    return `מענק נאמנות ₪${fmt(offer.loyalty)} לשנה`;
+  }
+  if (term === "family") {
+    offer.family = Math.floor(Math.max(offer.wage * 8, 120000) * (full ? 1 : 0.5));
+    return full ? "דירה, בית ספר ורילוקיישן למשפחה" : "השתתפות בדיור למשפחה";
+  }
   return "";
 }
 
@@ -15913,6 +17361,10 @@ function offerLines(game, offer) {
   out.push(`תפקיד מובטח: ${ROLE_NAMES[offer.role] || offer.role}`);
   if (offer.clause) out.push(`סעיף שחרור ₪${fmt(offer.clause)}`);
   if (offer.image) out.push(`${offer.image}% זכויות דימוי`);
+  if (offer.minutes) out.push(`התחייבות ל-${offer.minutes}% מהדקות`);
+  if (offer.loyalty) out.push(`מענק נאמנות ₪${fmt(offer.loyalty)} לשנה`);
+  if (offer.family) out.push(`חבילה למשפחה ₪${fmt(offer.family)}`);
+  for (const promise of (offer.promises || [])) out.push(`הבטחה: ${promise}`);
   const mine = game.myClub();
   out.push(mine ? `דמי העברה ₪${fmt(offer.fee)} ל${mine.name}`
                 : `דמי העברה ₪${fmt(offer.fee)}`);
@@ -16835,6 +18287,723 @@ function declineYouthOffer(game, cid) {
 }
 
 // ---------------------------------------------------------------------------
+// סוכנים — תאום JS של football_manager/agents.py
+//
+// עד כאן השוק היה הוגן: מועדונים ראו אותך, שקלו, והציעו. זה נקי, וזו
+// בדיוק הבעיה — הכול צפוי. כאן נכנס אדם שלישי שהאינטרס שלו לא זהה
+// לשלך, והוא פועל גם כשאתה לא מסתכל.
+// ---------------------------------------------------------------------------
+
+// [מפתח, שם, תיאור, עמלה%, טווח, תוקפנות, נאמנות]
+const AGENT_TYPES = [
+  ["family", "סוכן המשפחה", "עורך דין שהאבא שלך מכיר. לא יעשה לך נזק, וגם לא נס.",
+   3.0, 0.28, 0.10, 0.95],
+  ["rookie", "הטירון", "התיק הראשון שלו זה אתה. רעב, לומד מהר, עוד לא מכיר אף אחד.",
+   4.0, 0.34, 0.35, 0.80],
+  ["connected", "המקושר", "מכיר מנהלים ספורטיביים בשם הפרטי. שיחה אחת פותחת דלת.",
+   7.0, 0.82, 0.45, 0.55],
+  ["shark", "הכריש", "יוציא לך חוזה חלומות ויעשה את זה על גופות. גם על שלך, אם צריך.",
+   11.0, 0.95, 0.90, 0.30],
+  ["super", "הסופר־סוכן", "מנהל תיק של ארבעים כוכבים. אתה מספר ארבעים ואחת — עד שלא.",
+   9.0, 1.00, 0.70, 0.45],
+];
+const AGENT_BY_KEY = Object.fromEntries(AGENT_TYPES.map(r => [r[0], r]));
+
+const SUPER_AGENT_FAME = 72.0;   // מתחת לזה הסופר־סוכן לא מחזיר טלפון
+
+const AGENT_FIRST = ["רוני", "איציק", "ז'אן", "מרקו", "דודו", "אבי", "פאולו",
+                     "שרון", "ליאור", "ז'ילבר", "אמיר", "טוני", "ניר", "סמי"];
+const AGENT_LAST = ["ברזילי", "מנשה", "לוינסון", "דה סילבה", "אזולאי", "קרן",
+                    "מורנו", "שגב", "בן־חיים", "רוסו", "אלמליח", "פישר"];
+
+const MOVE_CHANCE = 0.30;
+const SABOTAGE_EXPOSURE = 0.32;
+const AGENT_CANDIDATES = 3;
+
+function agentRow(game) {
+  const data = game.flags.agent;
+  return data && typeof data === "object" ? data : null;
+}
+
+function agentType(row) {
+  return row ? (AGENT_BY_KEY[row.kind] || AGENT_BY_KEY.family) : null;
+}
+
+function agentCutPercent(game) {
+  const row = agentRow(game);
+  return row ? Number(row.cut != null ? row.cut : agentType(row)[3]) : 0;
+}
+
+/** העמלה על סכום — גם על שכר שבועי וגם על מענק חתימה. */
+function agentCut(game, gross) {
+  return Math.floor(gross * agentCutPercent(game) / 100);
+}
+
+/** בלי סוכן מגיעים רק למי שראה אותך במגרש. */
+function agentReach(game) {
+  const row = agentRow(game);
+  return row ? Number(agentType(row)[4]) : 0.20;
+}
+
+/** סוכן חדש. העמלה מתנדנדת סביב הבסיס — אין שני סוכנים זהים. */
+function makeAgent(kind, rng) {
+  const [key, , , cut] = AGENT_BY_KEY[kind];
+  return {
+    kind: key,
+    name: `${rng.choice(AGENT_FIRST)} ${rng.choice(AGENT_LAST)}`,
+    cut: Math.round(cut * rng.uniform(0.85, 1.2) * 10) / 10,
+    trust: rng.randint(50, 70),
+    deals: 0, burned: [], moves: [], since: 0,
+  };
+}
+
+/** כמה גדול השם שלך — הסולם שמחליט מי מחזיר לך טלפון. */
+function agentFame(game) {
+  const club = game.myClub();
+  let score = game.me.reputation;
+  // המועדון עוזר, אבל השם הוא שלך
+  if (club) score += club.reputation * 0.14;
+  return score + game.honours.length * 4;
+}
+
+/** מי מוכן לייצג אותך עכשיו. שלושה, ולא אותם שלושה תמיד. */
+function agentMarket(game, rng) {
+  const fame = agentFame(game);
+  let pool = AGENT_TYPES.map(r => r[0]).filter(k => k !== "super");
+  if (fame >= SUPER_AGENT_FAME) pool.push("super");
+  if (fame < 18) pool = pool.filter(k => k === "family" || k === "rookie");
+  else if (fame < 34) pool = pool.filter(k => k !== "shark");
+  rng.shuffle(pool);
+  return pool.slice(0, AGENT_CANDIDATES).map(kind => makeAgent(kind, rng));
+}
+
+function signAgent(game, row) {
+  const old = agentRow(game);
+  const copy = Object.assign({}, row, { since: game.year });
+  game.flags.agent = copy;
+  const kind = agentType(copy);
+  if (old)
+    return `🤝 ${copy.name} מחליף את ${old.name}. ${kind[1]} — ${copy.cut}% מהשכר.`;
+  return `🤝 חתמת עם ${copy.name}. ${kind[1]}, ${copy.cut}% מהשכר.`;
+}
+
+function agentLeave(game, reason = "") {
+  const row = agentRow(game);
+  delete game.flags.agent;
+  if (!row) return "";
+  return `👋 ${row.name} כבר לא מייצג אותך. ${reason}`.trim();
+}
+
+function reachWord(span) {
+  if (span >= 0.9) return "כל מועדון באירופה";
+  if (span >= 0.7) return "צמרת אירופה בהישג יד";
+  if (span >= 0.32) return "הליגה המקומית, ולפעמים מעבר";
+  return "מה שמסביב";
+}
+
+function agentTrustWord(trust) {
+  if (trust >= 78) return "אתה התיק הכי חשוב שלו";
+  if (trust >= 58) return "מרוצה, עובד בשבילך";
+  if (trust >= 38) return "מתחיל לאבד עניין";
+  return "מחזיק בך מהרגל";
+}
+
+/** הסוכן בשורות, למסך. */
+function describeAgent(game) {
+  const row = agentRow(game);
+  if (!row)
+    return ["אין לך סוכן. אתה מנהל את הקריירה שלך לבד — וזה נראה בכמות ההצעות."];
+  const kind = agentType(row);
+  const out = [`${row.name} · ${kind[1]}`, kind[2],
+               `עמלה ${row.cut}% מהשכר ומהמענקים`,
+               `טווח: ${reachWord(kind[4])}`,
+               `מה הוא חושב עליך: ${agentTrustWord(row.trust)}`];
+  if (row.deals) out.push(`סגר בשבילך ${row.deals} עסקאות`);
+  const burned = (row.burned || []).map(c => game.clubs[c] && game.clubs[c].name)
+    .filter(Boolean).join(", ");
+  if (burned) out.push(`שרוף מולם: ${burned}`);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// מה הסוכן עושה השבוע
+//
+// סוכן שעושה כל שבוע את אותו מהלך הוא רעש, לא דמות. לכן הוא מנהל
+// קמפיין: יעד אחד, כמה שבועות, ובכל פעם שלב אחר בתהליך.
+// ---------------------------------------------------------------------------
+
+const CAMPAIGN_READY = 74.0;
+const CAMPAIGN_MAX_WEEKS = 9;
+
+// תשעה שלבים ולא חמישה, כי אחרת הקמפיין מתחיל מהתחלה מול אותו מועדון
+const CAMPAIGN_STEPS = [
+  ["שלח להם קלטת של שלושה משחקים.", 9],
+  ["דיבר עם המנהל הספורטיבי שלהם. הם שאלו על החוזה.", 11],
+  ["סידר שיבואו לראות אותך חי.", 13],
+  ["ישב איתם ארוחת צהריים ארוכה מדי מכדי שתהיה נימוסית.", 12],
+  ["אמר להם שיש עוד מישהו בתמונה. זה לא היה מדויק.", 15],
+  ["העביר להם נתונים שהוא הזמין מחברת אנליזה.", 10],
+  ["דאג שהשם שלך יעלה בישיבת הרכש שלהם.", 14],
+  ["הביא את המאמן שלהם לשיחת טלפון של שתי דקות.", 16],
+  ["אמר להם שהחלון נסגר, וששאלו עליך גם ממקום אחר.", 13],
+];
+
+/** המהלך של הסוכן, אם בכלל. הגרלה קודם, בנייה אחר כך. */
+function agentWeekly(game, rng) {
+  const row = agentRow(game);
+  if (!row || !["academy", "player", "veteran"].includes(game.stage)) return [];
+
+  const kind = agentType(row);
+  const live = liveOffers(game);
+  let chance = MOVE_CHANCE * (0.55 + kind[5]);
+  if (live.length) chance *= 1.8;
+  if (rng.random() > Math.min(0.55, chance)) return agentIdle(game, row, rng);
+
+  const moves = [];
+  if (live.length) {
+    moves.push("push", "push");
+    if (live.length >= 2 && kind[5] >= 0.45) moves.push("sabotage", "sabotage");
+  } else {
+    moves.push("campaign", "campaign", "campaign");
+  }
+  if (kind[5] >= 0.35) moves.push("leak");
+
+  const move = rng.choice(moves);
+  if (move === "campaign") return agentCampaign(game, row, rng);
+  if (move === "push") return agentPush(game, row, rng, live);
+  if (move === "leak") return agentLeak(game, row, rng);
+  return agentSabotage(game, row, rng, live);
+}
+
+/** שבוע שקט. סוכן שלא רואה תנועה מתחיל להתקרר — לאט. */
+function agentIdle(game, row, rng) {
+  const kind = agentType(row);
+  row.trust = clamp(row.trust - 0.10 * (1.4 - kind[6]), 0, 100);
+  if (row.trust > 20 || row.deals > 0 || rng.random() > 0.05) return [];
+  return [agentLeave(game, "\"תתקשר כשיהיה מה למכור.\"")];
+}
+
+/** מי בטווח של הסוכן ועוד לא על השולחן. */
+function agentCandidateClubs(game, span) {
+  const me = game.me;
+  const taken = new Set(openOffers(game).map(o => o.cid));
+  const out = [];
+  for (const club of Object.values(game.clubs)) {
+    if (taken.has(club.cid) || club.cid === me.clubId) continue;
+    if (club.reputation > 55 + span * 48) continue;     // מעל הטווח שלו
+    if (club.reputation < overall(me) - 26) continue;   // קטן מכדי שיעניין
+    out.push(club);
+  }
+  return out;
+}
+
+function agentPickTarget(game, row, rng) {
+  const kind = agentType(row);
+  const burned = new Set(row.burned || []);
+  const pool = agentCandidateClubs(game, kind[4])
+    .filter(c => !burned.has(c.cid) && c.cid !== row.target);
+  if (!pool.length) return null;
+  pool.sort((a, b) => b.reputation - a.reputation);
+  const top = pool.slice(0, Math.max(2, Math.floor(pool.length * (0.15 + kind[4] * 0.4))));
+  return rng.choice(top);
+}
+
+/** עובד על יעד אחד לאורך שבועות, ומדווח בכל פעם על שלב אחר. */
+function agentCampaign(game, row, rng) {
+  if (!game.flags.scout_interest) game.flags.scout_interest = {};
+  const book = game.flags.scout_interest;
+  const target = row.target;
+  const heat = target ? Number(book[target] || 0) : 0;
+  const stale = (row.targetWeeks || 0) >= CAMPAIGN_MAX_WEEKS;
+  // "הם מוכנים" נאמר פעם אחת. בלי הדגל ההתעניינות דועכת שבוע אחרי,
+  // הקמפיין מרים אותה חזרה, והשורה חוזרת על עצמה.
+  const ready = row.targetDone || heat >= CAMPAIGN_READY;
+
+  if (!game.clubs[target] || ready || stale) {
+    const done = !!game.clubs[target] && ready;
+    row.targetDone = false;
+    const club = agentPickTarget(game, row, rng);
+    if (!club) return [];
+    const previous = game.clubs[target];
+    row.target = club.cid;
+    row.targetWeeks = 0;
+    row.moves = (row.moves || []).concat([`פתח תיק: ${club.name}`]).slice(-5);
+    return [done && previous
+      ? `📞 ${row.name}: "סגרנו את ${previous.name}. עכשיו ${club.name}."`
+      : `📞 ${row.name} התחיל לעבוד על ${club.name}. ${clubTag(club.cid, club.leagueId)}`];
+  }
+
+  const club = game.clubs[target];
+  const step = row.targetWeeks || 0;
+  const [text, gain] = CAMPAIGN_STEPS[step % CAMPAIGN_STEPS.length];
+  row.targetWeeks = step + 1;
+  book[target] = clamp(heat + gain * (0.7 + agentType(row)[4] * 0.5), 0, 100);
+  if (book[target] >= CAMPAIGN_READY) {
+    row.targetDone = true;
+    return [`📞 ${row.name}: "${club.name} מוכנים. הם יניחו הצעה."`];
+  }
+  return [`📞 ${row.name} ${text} (${club.name})`];
+}
+
+/** דוחף הצעה קיימת למעלה בלי שביקשת. לפעמים זה עובד. */
+function agentPush(game, row, rng, live) {
+  if (!live.length) return agentCampaign(game, row, rng);
+  const kind = agentType(row);
+  const offer = rng.choice(live);
+  const club = game.clubs[offer.cid];
+  const name = club ? club.name : "המועדון";
+  const chance = clamp(0.24 + kind[4] * 0.30 + kind[5] * 0.18 - offer.asks * 0.09,
+                       0.05, 0.82);
+  if (rng.random() < chance) {
+    const before = offer.wage;
+    offer.wage = Math.floor(Math.min(offer.ceiling, offer.wage * 1.11));
+    offer.state = "improved";
+    if (offer.wage <= before) {
+      offer.bonus = Math.floor(offer.bonus * 1.25);
+      return [`📈 ${row.name} סחט מ${name} מענק גדול יותר: ₪${fmt(offer.bonus)}.`];
+    }
+    return [`📈 ${row.name} טלפן ל${name} בלי לשאול אותך. `
+          + `₪${fmt(offer.wage)} לשבוע במקום ₪${fmt(before)}.`];
+  }
+  offer.patience -= 1;
+  if (offer.patience <= 0) {
+    offer.state = "withdrawn";
+    row.trust = clamp(row.trust - 6, 0, 100);
+    return [`❌ ${row.name} לחץ יותר מדי. ${name} ירדו מהעסקה.`];
+  }
+  return [`😐 ${row.name} ניסה על ${name} ונענה "זה מה שיש".`];
+}
+
+/** דליפה לעיתונות — לוחצת על המועדון, ומרגיזה אותו. */
+function agentLeak(game, row, rng) {
+  const kind = agentType(row);
+  const club = game.myClub();
+  const live = liveOffers(game);
+  const book = game.flags.scout_interest || {};
+  let target = null;
+  if (live.length) target = game.clubs[live[0].cid];
+  else {
+    const keys = Object.keys(book);
+    if (keys.length) {
+      const best = keys.reduce((a, b) => (book[b] > book[a] ? b : a));
+      target = game.clubs[best];
+    }
+  }
+  if (!target) return [];
+
+  // דרך `pressPush` ולא ביד: הוא זה שיודע מה הצורה של פריט בפיד
+  pressPush(game, { key: "agent_leak", source: "insider", true: true,
+                    text: `מקורב לשחקן: "יש קשר עם ${target.name}, `
+                        + `והשחקן פתוח לשמוע."` });
+
+  const out = [`📰 ${row.name} דלף לעיתונות. הכותרת יצאה: "${target.name} בודקים אותך."`];
+  if (club && rng.random() < 0.55 + kind[5] * 0.25) {
+    club.managerTrust = clamp(club.managerTrust - 4.5, 0, 100);
+    out.push(`😠 ב${club.name} לא אהבו את הכותרת.`);
+  }
+  if (!game.flags.scout_interest) game.flags.scout_interest = {};
+  const cur = game.flags.scout_interest;
+  cur[target.cid] = clamp(Number(cur[target.cid] || 0) + 9, 0, 100);
+  return out;
+}
+
+/**
+ * מחסל הצעה מתחרה כדי לפנות מקום לזו שמשלמת לו יותר.
+ * זה המהלך שהופך סוכן לדמות: הוא עושה את זה בלי לשאול, וכשזה נחשף
+ * אתה משלם — לא הוא.
+ */
+function agentSabotage(game, row, rng, live) {
+  if (live.length < 2) return agentPush(game, row, rng, live);
+  const kind = agentType(row);
+  if (kind[5] < 0.25) return agentPush(game, row, rng, live);
+
+  const best = live[0];
+  const victim = rng.choice(live.slice(1));
+  const vclub = game.clubs[victim.cid];
+  const bclub = game.clubs[best.cid];
+  if (!vclub || !bclub) return [];
+
+  victim.state = "withdrawn";
+  victim.log.push("🕳️ נעלמו בלי הסבר");
+  best.wage = Math.floor(Math.min(best.ceiling, best.wage * 1.07));
+  best.state = "improved";
+  row.burned = (row.burned || []).concat([vclub.cid]).slice(-6);
+  row.moves = (row.moves || []).concat([`חיסל את ${vclub.name}`]).slice(-5);
+
+  const out = [`🕳️ ${vclub.name} ירדו מהעסקה בלי הסבר. ${row.name} לא נראה מופתע.`];
+  if (rng.random() < SABOTAGE_EXPOSURE + kind[5] * 0.12) {
+    game.me.reputation = clamp(game.me.reputation - 3.5, 0, 100);
+    const club = game.myClub();
+    if (club) club.managerTrust = clamp(club.managerTrust - 6, 0, 100);
+    pressPush(game, { key: "agent_exposed", source: "insider", true: true,
+                      text: `"הסוכן של השחקן טרפד את המהלך של ${vclub.name}." `
+                          + `בחדרי חדרים כועסים.` });
+    out.push("🔥 זה יצא החוצה. \"ככה לא עובדים\" — וזה נדבק בך, לא בו.");
+  }
+  return out;
+}
+
+/** הסוכן גובה את שלו ברגע החתימה, ומרוצה בהתאם. */
+function agentOnDeal(game, offer) {
+  const row = agentRow(game);
+  if (!row) return [];
+  row.deals += 1;
+  row.trust = clamp(row.trust + 9, 0, 100);
+  const fee = agentCut(game, offer.bonus || 0);
+  if (fee <= 0) return [`🤝 ${row.name} סגר. "אמרתי לך שאני עובד."`];
+  game.spend(fee);
+  return [`🤝 ${row.name} סגר את העסקה ולקח ₪${fmt(fee)} מהמענק.`];
+}
+
+// ---------------------------------------------------------------------------
+// חיים אישיים — תאום JS של football_manager/life.py
+//
+// המשפחה נכנסה למשחק בגיל שלוש־עשרה והתאדתה ברגע שחתמת חוזה ראשון.
+// זו טעות: ההורים לא נעלמים כשהילד מצליח. וגם, לשחקן יש חיים — יש מי
+// שמחכה בבית, ויש מי שנשאר ער כשהפסדתם.
+// ---------------------------------------------------------------------------
+
+// [מפתח, שם, למה, עלות, גאווה]
+const PARENT_ASKS = [
+  ["house", "בית להורים", "הם עדיין בדירת השכירות שגדלת בה.", 1400000, 26],
+  ["car", "אוטו לאבא", "האוטו שלו לא עובר טסט כבר שנתיים.", 180000, 12],
+  ["debt", "לסגור חוב", "הם לא סיפרו לך, ואתה גילית במקרה.", 320000, 18],
+  ["trip", "לקחת אותם למשחק בחו\"ל", "אמא שלך אף פעם לא טסה.", 90000, 14],
+  ["sibling", "לממן לימודים לאח", "הוא טוב בלימודים. אתה טוב בכדורגל.", 240000, 16],
+];
+
+const PRIDE_START = 60.0;
+
+// [מפתח, שם השלב, כמה שבועות עד שאפשר להתקדם]
+const LIFE_STAGES = [
+  ["dating", "בהיכרות", 10],
+  ["serious", "זוגיות", 26],
+  ["engaged", "מאורסים", 30],
+  ["married", "נשואים", 0],
+];
+const LIFE_STAGE_NAMES = Object.fromEntries(LIFE_STAGES.map(r => [r[0], r[1]]));
+const LIFE_STAGE_ORDER = LIFE_STAGES.map(r => r[0]);
+
+// הזרקור הוא לא "יותר טוב" — הוא סוג אחר של חיים.
+const PARTNER_KINDS = [
+  ["hometown", "מהשכונה", "מכירה אותך מלפני שהיית מישהו.", 82, 8],
+  ["student", "סטודנטית לרפואה", "יש לה חיים משלה, והם תובעניים.", 64, 14],
+  ["athlete", "ספורטאית", "מבינה בדיוק מה זה שבוע לפני דרבי.", 74, 34],
+  ["model", "דוגמנית", "כל יציאה שלכם היא ידיעה.", 46, 88],
+  ["singer", "זמרת", "מפורסמת יותר ממך, לפחות בינתיים.", 42, 95],
+  ["agent_daughter", "עורכת דין", "קוראת את החוזה שלך לפני שאתה חותם.", 70, 26],
+];
+const PARTNER_BY_KIND = Object.fromEntries(PARTNER_KINDS.map(r => [r[0], r]));
+
+const PARTNER_FIRST = ["מאיה", "נועה", "שירה", "רוני", "טל", "אביגיל", "ליהי",
+                       "יערה", "דנה", "עדי", "הילה", "אלמה", "סתיו", "רותם",
+                       "יסמין", "אמילי", "לוסיה", "אנה", "סופיה", "מיה"];
+
+const DRIFT_PER_WEEK = 0.55;
+const NEGLECT_INTENSITY = 1.3;
+const BREAKUP_MOOD = 22.0;
+const BREAKUP_CHANCE = 0.16;
+
+const GIFT_COST = 45000;
+const HOLIDAY_COST = 160000;
+const RING_COST = 400000;
+const WEDDING_COST = 900000;
+
+/** מצב ההורים. נבנה בפעם הראשונה שמישהו שואל. */
+function parents(game) {
+  let data = game.flags.parents;
+  if (!data || typeof data !== "object") {
+    data = { pride: PRIDE_START, given: [], ask: null, asked: 0 };
+    game.flags.parents = data;
+  }
+  return data;
+}
+
+function partner(game) {
+  const data = game.flags.partner;
+  return data && typeof data === "object" ? data : null;
+}
+
+function makePartner(kind, rng, name = "") {
+  const [key, , , support, spotlight] = PARTNER_BY_KIND[kind];
+  return {
+    kind: key,
+    name: name || rng.choice(PARTNER_FIRST),
+    support: Math.round(clamp(support + rng.randint(-9, 9), 10, 99)),
+    spotlight: Math.round(clamp(spotlight + rng.randint(-8, 8), 0, 99)),
+    stage: "dating", mood: 72.0, weeks: 0, kids: 0, gifts: 0,
+  };
+}
+
+function partnerStageName(row) {
+  return row ? (LIFE_STAGE_NAMES[row.stage] || row.stage) : "";
+}
+
+function nextLifeStage(stage) {
+  const idx = LIFE_STAGE_ORDER.indexOf(stage);
+  if (idx < 0 || idx >= LIFE_STAGE_ORDER.length - 1) return null;
+  return LIFE_STAGE_ORDER[idx + 1];
+}
+
+/**
+ * כמה המורל מרוויח מזה שיש מישהו בבית. לא בונוס קבוע: בן זוג במשבר
+ * מוריד, ולכן המספר יכול להיות שלילי.
+ */
+function supportBonus(game) {
+  const row = partner(game);
+  if (!row) return 0;
+  const quality = (row.support / 100) * (row.mood - 45) / 55;
+  const weight = { dating: 0.7, serious: 1.0, engaged: 1.15, married: 1.3 }[row.stage] || 1;
+  return clamp(quality * 3.4 * weight, -3.2, 3.6);
+}
+
+/** כמה מוניטין הזוגיות מוסיפה בשבוע. מפורסמת = כותרות. */
+function spotlightBonus(game) {
+  const row = partner(game);
+  if (!row || row.mood < 30) return 0;
+  return (row.spotlight / 100) * 0.22;
+}
+
+function prideWord(pride) {
+  if (pride >= 85) return "לא מפסיקים לספר עליך";
+  if (pride >= 65) return "גאים בך";
+  if (pride >= 45) return "בסדר, אבל מרגישים רחוקים";
+  return "נפגעו, ולא אומרים";
+}
+
+function moodWord(mood) {
+  if (mood >= 80) return "מצוין";
+  if (mood >= 60) return "טוב";
+  if (mood >= 40) return "מתוח";
+  if (mood >= 25) return "רע";
+  return "על הקצה";
+}
+
+/** שורה אחת שמסכמת את הבית — למסך הראשי. */
+function homeLine(game) {
+  const row = partner(game);
+  const par = parents(game);
+  const bits = [`ההורים: ${prideWord(par.pride)}`];
+  if (row) {
+    bits.push(`${row.name} — ${partnerStageName(row)}, ${moodWord(row.mood)}`);
+    if (row.kids) bits.push(`${row.kids} ילדים`);
+  }
+  return bits.join(" · ");
+}
+
+// ---------------------------------------------------------------------------
+// השבוע
+// ---------------------------------------------------------------------------
+
+function lifeWeekly(game, rng) {
+  return partnerWeek(game, rng).concat(parentsWeek(game, rng));
+}
+
+function partnerWeek(game, rng) {
+  const row = partner(game);
+  if (!row) return [];
+  const me = game.me;
+  row.weeks += 1;
+
+  // שחיקה: זמן לבד, עצימות גבוהה, והפסדים
+  let drift = DRIFT_PER_WEEK;
+  if (game.intensity >= NEGLECT_INTENSITY) drift += 0.8;
+  if (me.morale < 40) drift += 0.5;
+  drift *= 1.25 - (row.support / 100) * 0.55;   // מי שמבין ספורט סופג פחות
+  row.mood = clamp(row.mood - drift, 0, 100);
+
+  const bonus = supportBonus(game);
+  me.morale = clamp(me.morale + bonus, 5, 99);
+  if (bonus > 1.4) me.resilience = clamp(me.resilience + 0.05, 0, 100);
+  me.reputation = clamp(me.reputation + spotlightBonus(game), 0, 100);
+
+  if (row.mood > BREAKUP_MOOD) return partnerEvent(game, row, rng);
+
+  if (rng.random() < BREAKUP_CHANCE) {
+    const name = row.name;
+    delete game.flags.partner;
+    game.flags.heartbreak = 8;
+    me.morale = clamp(me.morale - 16, 5, 99);
+    return [`💔 ${name} עזבה. "אני לא מתחרה בכדורגל, ואני לא רוצה."`];
+  }
+  return [`⚠️ ${row.name} אמרה שאתם לא נפגשים. זה לא היה שקט.`];
+}
+
+/** אירוע קטן מהבית. נדיר מספיק כדי שלא יהפוך לרעש. */
+function partnerEvent(game, row, rng) {
+  if (rng.random() > 0.09) return [];
+  const name = row.name;
+  const pool = [];
+  if (row.spotlight >= 60)
+    pool.push(["📸 צילמו אתכם יוצאים ממסעדה. הכותרת לא עסקה בכדורגל.",
+               { reputation: 1.2 }]);
+  if (row.support >= 70)
+    pool.push([`🏠 ${name} חיכתה ער עד שחזרת מהמשחק. זה נשמע קטן, וזה לא.`,
+               { morale: 3.0 }]);
+  pool.push([`🍽️ ערב בלי טלפונים עם ${name}.`, { mood: 6.0 }]);
+  if (row.stage === "engaged" || row.stage === "married")
+    pool.push([`👨‍👩‍👦 ${name} שאלה מתי מתכננים קדימה.`, { mood: -3.0 }]);
+  const [text, effect] = rng.choice(pool);
+  applyLifeEffect(game, row, effect);
+  return [text];
+}
+
+function applyLifeEffect(game, row, effect) {
+  const me = game.me;
+  if (effect.morale != null) me.morale = clamp(me.morale + effect.morale, 5, 99);
+  if (effect.reputation != null)
+    me.reputation = clamp(me.reputation + effect.reputation, 0, 100);
+  if (effect.mood != null && row) row.mood = clamp(row.mood + effect.mood, 0, 100);
+}
+
+/** ההורים מבקשים משהו — לא כל שבוע, ורק כשיש מה לבקש. */
+function parentsWeek(game, rng) {
+  if (!["academy", "player", "veteran"].includes(game.stage)) return [];
+  const par = parents(game);
+  if (par.ask) return [];
+  const left = PARENT_ASKS.filter(r => !par.given.includes(r[0]));
+  if (!left.length) return [];
+  // ככל שאתה מרוויח יותר, כך הבקשות מגיעות מוקדם יותר
+  const chance = 0.012 + Math.min(0.03, game.money / 40000000);
+  if (rng.random() > chance) return [];
+  const [key, name, why, cost, pride] = rng.choice(left);
+  par.ask = { key, name, why, cost, pride };
+  par.asked += 1;
+  return [`📞 אבא שלך התקשר. ${why} (${name} — בתפריט: 'חיים')`];
+}
+
+function grantAsk(game) {
+  const par = parents(game);
+  const ask = par.ask;
+  if (!ask) return "אין בקשה פתוחה.";
+  if (game.money < ask.cost) return `אין לך ₪${fmt(ask.cost)}. עוד לא.`;
+  game.spend(ask.cost);
+  par.given = par.given.concat([ask.key]);
+  par.pride = clamp(par.pride + ask.pride, 0, 100);
+  par.ask = null;
+  game.me.morale = clamp(game.me.morale + 6, 5, 99);
+  return `✅ ${ask.name} — ₪${fmt(ask.cost)}. אמא שלך בכתה בטלפון.`;
+}
+
+function declineAsk(game) {
+  const par = parents(game);
+  if (!par.ask) return "אין בקשה פתוחה.";
+  par.ask = null;
+  par.pride = clamp(par.pride - 9, 0, 100);
+  return "אמרת שעכשיו לא. הוא אמר \"בסדר, בסדר\" וניתק מהר מדי.";
+}
+
+// ---------------------------------------------------------------------------
+// מה אתה יכול לעשות
+// ---------------------------------------------------------------------------
+
+function stageWait(stage) {
+  const row = LIFE_STAGES.find(r => r[0] === stage);
+  return row ? row[2] : 0;
+}
+
+function advanceName(stage) {
+  return { serious: "להפוך את זה לרציני", engaged: "להציע נישואין",
+           married: "להתחתן" }[stage] || "להתקדם";
+}
+
+function lifeActions(game) {
+  const out = [];
+  const row = partner(game);
+  const par = parents(game);
+
+  if (par.ask) {
+    out.push({ key: "grant", name: `לתת: ${par.ask.name}`,
+               cost: par.ask.cost, note: par.ask.why });
+    out.push({ key: "decline", name: "להגיד שעכשיו לא", cost: 0,
+               note: "הם יבינו. פחות ממה שהם יגידו." });
+  }
+  if (!row) return out;
+
+  out.push({ key: "gift", name: `מתנה ל${row.name}`, cost: GIFT_COST,
+             note: "לא פותר, אבל עוזר." });
+  out.push({ key: "holiday", name: "לקחת חופשה ביחד", cost: HOLIDAY_COST,
+             note: "שבוע בלי כדורגל. הגוף גם ירוויח." });
+  const nxt = nextLifeStage(row.stage);
+  if (nxt && row.weeks >= stageWait(row.stage) && row.mood >= 62) {
+    const cost = nxt === "engaged" ? RING_COST : nxt === "married" ? WEDDING_COST : 0;
+    out.push({ key: "advance", name: advanceName(nxt), cost,
+               note: "צעד גדול. אין דרך חזרה." });
+  }
+  if (row.stage === "married" && row.kids < 3 && row.mood >= 60)
+    out.push({ key: "child", name: "להביא ילד", cost: 0,
+               note: "החיים ישתנו. גם המשחק." });
+  return out;
+}
+
+function doLifeAction(game, key) {
+  if (key === "grant") return grantAsk(game);
+  if (key === "decline") return declineAsk(game);
+
+  const row = partner(game);
+  if (!row) return "אין למי.";
+
+  if (key === "gift") {
+    if (game.money < GIFT_COST) return "אין לך מספיק.";
+    game.spend(GIFT_COST);
+    row.gifts += 1;
+    // מתנה חמישית כבר לא מרגשת אף אחד
+    const gain = Math.max(3, 12 - row.gifts * 1.5);
+    row.mood = clamp(row.mood + gain, 0, 100);
+    return `🎁 ${row.name} שמחה. (+${Math.round(gain)} למצב הקשר)`;
+  }
+
+  if (key === "holiday") {
+    if (game.money < HOLIDAY_COST) return "אין לך מספיק.";
+    game.spend(HOLIDAY_COST);
+    row.mood = clamp(row.mood + 22, 0, 100);
+    game.me.fitness = clamp(game.me.fitness + 12, 0, 100);
+    game.me.morale = clamp(game.me.morale + 8, 5, 99);
+    game.me.sharpness = clamp(game.me.sharpness - 6, 0, 100);
+    return "✈️ שבוע איתה, בלי טלפונים. חזרת רענן ופחות חד — וזה שווה את זה.";
+  }
+
+  if (key === "advance") {
+    const nxt = nextLifeStage(row.stage);
+    if (!nxt) return "אין לאן.";
+    const cost = nxt === "engaged" ? RING_COST : nxt === "married" ? WEDDING_COST : 0;
+    if (cost && game.money < cost) return `זה עולה ₪${fmt(cost)}. עוד לא.`;
+    if (cost) game.spend(cost);
+    row.stage = nxt;
+    row.weeks = 0;
+    row.mood = clamp(row.mood + 14, 0, 100);
+    game.me.morale = clamp(game.me.morale + 10, 5, 99);
+    if (row.spotlight >= 55)
+      game.me.reputation = clamp(game.me.reputation + 2.5, 0, 100);
+    return { serious: `אתם ביחד. ${row.name} עברה לגור אצלך.`,
+             engaged: "💍 היא אמרה כן. הטלפון שלך התפוצץ.",
+             married: "💒 התחתנתם. חצי מהסגל היה שם." }[nxt];
+  }
+
+  if (key === "child") {
+    row.kids += 1;
+    row.mood = clamp(row.mood + 10, 0, 100);
+    game.me.morale = clamp(game.me.morale + 12, 5, 99);
+    // לילה ראשון בבית עם תינוק — הגוף יודע
+    game.me.fitness = clamp(game.me.fitness - 10, 0, 100);
+    return "👶 נולד לכם ילד. חגגת את השער הבא עם אצבע באוויר, וכולם הבינו.";
+  }
+  return "לא ידוע.";
+}
+
+/** פרידה לא נגמרת בשבוע. זה נגרר, וזה נמדד. */
+function heartbreakTick(game) {
+  const weeks = Number(game.flags.heartbreak || 0);
+  if (weeks <= 0) return null;
+  game.flags.heartbreak = weeks - 1;
+  const me = game.me;
+  me.morale = clamp(me.morale - 1.6, 5, 99);
+  me.sharpness = clamp(me.sharpness - 0.8, 0, 100);
+  if (weeks === 1) return "🙂 מתחיל להיות בסדר. הראש חזר למגרש.";
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // המאמן של הקבוצה — פורט מ-football_manager/manager.py.
 // דמות שמדברת אליך אחרי כל משחק, דורשת ממך דברים בשבוע, ומסבירה
 // למה אתה בהרכב או מחוצה לו. לכל מאמן אופי, והאופי קובע מה מרגיז אותו.
@@ -16989,6 +19158,206 @@ function trustMove(club, delta) {
   if (!club) return 0;
   club.managerTrust = clamp(club.managerTrust + delta * managerStyle(club)[3], 0, 100);
   return club.managerTrust;
+}
+
+
+// ---------------------------------------------------------------------------
+// למאמן יש דעה עליך, ולדעה יש משקל
+//
+// עד כאן `managerTrust` היה מספר שהשפיע קצת על ההרכב וזהו. מאמן אמיתי
+// הוא לא מד־חום: יש לו מועדפים, יש לו כלב שלא מקבל דקות, הוא מבטיח
+// ולפעמים שובר, ואפשר לדפוק לו על הדלת ולשאול למה.
+// ---------------------------------------------------------------------------
+
+// [מפתח, שם, סף אמון, מה זה שווה בהרכב]
+//
+// הבונוס נכנס ישירות לבחירת ההרכב, ולכן "בכלוב" הוא לא תווית — הוא
+// שמונה נקודות דירוג שנעלמות, וזה מורגש בכל שבוע.
+const STANDINGS = [
+  ["favourite", "המועדף שלו", 78, 6.0],
+  ["trusted", "בתוך התוכנית", 58, 2.5],
+  ["neutral", "עוד אחד בסגל", 40, 0.0],
+  ["doubted", "מסומן בשאלה", 24, -3.5],
+  ["frozen", "בכלוב", 0, -8.0],
+];
+
+// [מפתח, שם, משפט, קושי, אמון אם הצליח, אמון אם נכשל]
+const MEETINGS = [
+  ["role", "לבקש מקום קבוע בהרכב", "\"אני צריך לדעת אם אני משחק כאן.\"", 0.55, 6, -8],
+  ["why", "לשאול למה אתה לא משחק", "\"תסביר לי מה חסר לי.\"", 0.30, 3, -3],
+  ["promise", "להבטיח לו עונה", "\"תן לי שלושה משחקים ואני אראה לך.\"", 0.45, 8, -6],
+  ["position", "לבקש לשחק בעמדה שלך",
+   "\"אני לא שחקן שאתה מכניס לאן שחסר.\"", 0.50, 5, -6],
+  ["leave", "לבקש רשות לעזוב", "\"אני רוצה לשמוע הצעות. בלי מלחמות.\"", 0.60, -2, -12],
+];
+const MEETING_NAMES = Object.fromEntries(MEETINGS.map(r => [r[0], r[1]]));
+
+const PROMISE_WEEKS = 5;
+const PROMISE_TRUST_BREAK = -14.0;
+const MEETING_COOLDOWN = 6;
+
+/** איפה אתה עומד אצלו: מפתח, שם, ומה זה שווה בהרכב. */
+function managerStanding(game) {
+  const club = game.myClub();
+  let trust = club ? club.managerTrust : 50;
+  if (game.flag("doghouse")) trust -= 22;
+  if (game.flag("captain")) trust += 8;
+  for (const [key, name, threshold, bonus] of STANDINGS)
+    if (trust >= threshold) return [key, name, bonus];
+  const last = STANDINGS[STANDINGS.length - 1];
+  return [last[0], last[1], last[3]];
+}
+
+/**
+ * כמה נקודות המאמן מוסיף או מוריד לך בבחירת ההרכב. זה מה שהופך את
+ * היחסים איתו למשהו שמרגישים.
+ */
+function selectionBonus(game) {
+  let bonus = managerStanding(game)[2];
+  const promise = activePromise(game);
+  if (promise && (promise.kind === "start" || promise.kind === "role")) bonus += 9;
+  return bonus;
+}
+
+function standingLine(game) {
+  const club = game.myClub();
+  if (!club) return "";
+  const [key] = managerStanding(game);
+  const who = club.managerName;
+  if (key === "favourite")
+    return `⭐ ${who} רואה בך את הציר. אתה משחק גם כשאתה לא בכושר.`;
+  if (key === "trusted") return `✅ ${who} סופר אותך. המקום שלך תלוי בך.`;
+  if (key === "neutral") return `⚖️ ${who} עוד לא החליט לגביך.`;
+  if (key === "doubted")
+    return `⚠️ ${who} מסתכל עליך אחרת. עוד משחק חלש וזה ייסגר.`;
+  return `⛔ אתה מחוץ לתוכניות של ${who}. גם אימון מצוין לא יזיז את זה מהר.`;
+}
+
+/** המאמן מבטיח משהו. מרגע זה הוא נמדד לפיו. */
+function givePromise(game, kind, weeks = PROMISE_WEEKS) {
+  game.flags.promise = { kind, weeks, made: game.week, starts: 0 };
+  const club = game.myClub();
+  const who = club ? club.managerName : "המאמן";
+  const text = { start: `${who} הבטיח לך ${weeks} משחקים בהרכב.`,
+                 role: `${who} הבטיח לך את העמדה שלך.`,
+                 minutes: `${who} הבטיח לך דקות.`,
+                 leave: `${who} הבטיח לא לחסום מעבר בקיץ.` }[kind]
+             || `${who} הבטיח לך משהו.`;
+  return `🤝 ${text}`;
+}
+
+function activePromise(game) {
+  const row = game.flags.promise;
+  if (!row || typeof row !== "object" || (row.weeks || 0) <= 0) return null;
+  return row;
+}
+
+/** שבוע עובר על הבטחה. שבורה — זה עולה לו, לא לך. */
+function promiseTick(game, played) {
+  const row = activePromise(game);
+  if (!row) return null;
+  row.weeks -= 1;
+  if (played) row.starts = (row.starts || 0) + 1;
+  const club = game.myClub();
+  const who = club ? club.managerName : "המאמן";
+
+  if (row.weeks > 0) return null;
+  const kept = (row.starts || 0) >= Math.max(1, Math.floor(PROMISE_WEEKS / 2));
+  delete game.flags.promise;
+  if (kept) {
+    game.me.morale = clamp(game.me.morale + 8, 5, 99);
+    return `✅ ${who} עמד במילה שלו.`;
+  }
+  game.me.morale = clamp(game.me.morale - 12, 5, 99);
+  if (club) club.managerTrust = clamp(club.managerTrust + PROMISE_TRUST_BREAK, 0, 100);
+  game.setFlag("broken_promise", true);
+  return `💢 ${who} הבטיח ולא קיים. אתה זוכר בדיוק מה הוא אמר ובאיזה יום.`;
+}
+
+/** כמה סיכוי שהוא יגיד כן. גלוי לשחקן — זו החלטה, לא הימור עיוור. */
+function meetingOdds(game, difficulty) {
+  const club = game.myClub();
+  const trust = club ? club.managerTrust : 50;
+  const me = game.me;
+  let chance = 0.9 - difficulty;
+  chance += (trust - 50) / 145;
+  chance += (me.reputation - 40) / 320;
+  if (me.season.apps >= 5)
+    chance += clamp((avgRating(me.season) - 6.7) * 0.14, -0.12, 0.16);
+  if (game.flag("doghouse")) chance -= 0.22;
+  chance += (managerStyle(club)[4] - 1.0) * 0.18;   // מאמן שסולח יותר
+  return clamp(chance, 0.05, 0.92);
+}
+
+function meetingOptions(game) {
+  const club = game.myClub();
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return [];
+  const last = Number(game.flag("meeting_week", -99));
+  if (game.week - last < MEETING_COOLDOWN) return [];
+  return MEETINGS.map(([key, name, line, difficulty]) =>
+    ({ key, name, line, odds: meetingOdds(game, difficulty) }));
+}
+
+/** נכנס אליו למשרד ומבקש. יוצא עם משהו, או עם פחות ממה שנכנסת. */
+function managerRequest(game, key, rng) {
+  const club = game.myClub();
+  if (!club) return "אין לך מועדון.";
+  const row = MEETINGS.find(r => r[0] === key);
+  if (!row) return "לא ידוע.";
+  const [, , , difficulty, gain, cost] = row;
+  game.setFlag("meeting_week", game.week);
+  const who = club.managerName;
+
+  if (rng.random() < meetingOdds(game, difficulty)) {
+    club.managerTrust = clamp(club.managerTrust + gain, 0, 100);
+    game.setFlag("doghouse", false);
+    if (key === "role")
+      return givePromise(game, "start") + `\n${who}: "תוכיח לי שצדקתי."`;
+    if (key === "position")
+      return givePromise(game, "role") + `\n${who}: "בסדר. העמדה שלך."`;
+    if (key === "promise")
+      return givePromise(game, "minutes") + `\n${who}: "שלושה משחקים. לא יותר."`;
+    if (key === "leave") {
+      game.setFlag("free_to_leave", true);
+      return `🤝 ${who}: "אני לא כולא אף אחד. תביא הצעה נורמלית ואני לא אעמוד בדרך."`;
+    }
+    return `🎙️ ${who} הסביר בדיוק מה חסר לך, בלי לרכך. `
+         + `יצאת עם רשימה ולא עם תירוץ.`;
+  }
+
+  club.managerTrust = clamp(club.managerTrust + cost, 0, 100);
+  game.me.morale = clamp(game.me.morale - 5, 5, 99);
+  if ((key === "role" || key === "leave") && rng.random() < 0.45) {
+    game.setFlag("doghouse", true);
+    return `⛔ ${who}: "אתה לא במצב לבקש." מהשבוע הבא אתה מתאמן עם הקבוצה השנייה.`;
+  }
+  return `🚫 ${who} שמע עד הסוף ואמר "לא עכשיו". זה לא נשמע כמו "אחר כך".`;
+}
+
+/**
+ * הנהלה מאבדת סבלנות — ומאמן חדש הוא דף חדש, לטוב ולרע. כל היחסים
+ * שבנית חצי שנה נמחקים ברביעי בבוקר, והחדש לא חייב לך כלום.
+ */
+function maybeReplaceManager(game, rng) {
+  const club = game.myClub();
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return null;
+  let pressure = 0;
+  if (club.boardConfidence < 35) pressure += 0.05;
+  if (club.boardConfidence < 22) pressure += 0.07;
+  if (club.fanSupport < 30) pressure += 0.02;
+  if (pressure <= 0 || rng.random() > pressure) return null;
+
+  const old = club.managerName;
+  club.managerName = rng.choice(D.MANAGER_NAMES.filter(n => n !== old));
+  // אמון מתאפס לאמצע, וכל מה שנצבר — הבטחות, כלוב, סרט — יורד לטמיון
+  club.managerTrust = clamp(rng.uniform(38, 58), 0, 100);
+  club.boardConfidence = clamp(club.boardConfidence + 12, 0, 100);
+  delete game.flags.promise;
+  game.setFlag("doghouse", false);
+  game.setFlag("new_manager", true);
+  const style = managerStyle(club);
+  return `📣 ${old} פוטר. ${club.managerName} נכנס — ${style[1]}. ${style[2]}\n`
+       + `   כל מה שבנית מול הקודם — מתחיל מאפס.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -17946,7 +20315,59 @@ const EFFECT_KEYS = new Set([
   "resilience", "sharpness", "coaching", "media", "business", "potential",
   "attr", "attrs", "injury", "flag", "clear_flag", "trait", "drop_trait",
   "honour",
+  // מה שהפגישות צריכות: העולם מגיב, לא רק השחקן
+  "interest", "open_offer", "hype", "press", "agent_market", "agent_cut",
+  "agent_trust", "meet_partner", "pride", "mood", "promise",
 ]);
+
+// ---------------------------------------------------------------------------
+// העולם מגיב
+//
+// אירוע שמשנה רק את השחקן הוא בסוף עוד שורת מספרים. מה שהופך פגישה
+// לאירוע הוא שהיא מזיזה משהו בחוץ: מועדון מתחיל להסתכל, הצעה נוחתת
+// על השולחן, עיתון כותב.
+// ---------------------------------------------------------------------------
+
+const ELITE_REPUTATION = 84;   // מוניטין שמעליו מועדון נחשב "עילית"
+
+/** מועדונים לפי דרגה, בלי זה שאתה כבר בו. */
+function tierClubs(g, tier) {
+  const mine = g.me.clubId;
+  const clubs = Object.values(g.clubs).filter(c => c.cid !== mine);
+  let pool;
+  if (tier === "elite") pool = clubs.filter(c => c.reputation >= ELITE_REPUTATION);
+  else if (tier === "foreign") pool = clubs.filter(c => isForeign(c.cid));
+  else if (tier === "rich")
+    pool = clubs.slice().sort((a, b) => b.wageBudget - a.wageBudget).slice(0, 6);
+  else pool = clubs;
+  return pool.length ? pool : clubs;
+}
+
+function addTierInterest(g, tier, amount) {
+  const pool = tierClubs(g, tier);
+  if (!pool.length) return;
+  const club = g.rng.choice(pool);
+  if (!g.flags.scout_interest) g.flags.scout_interest = {};
+  const book = g.flags.scout_interest;
+  book[club.cid] = clamp(Number(book[club.cid] || 0) + amount, 0, 100);
+}
+
+/**
+ * הצעה על השולחן עכשיו — גם באמצע העונה. מועדון שרוצה אותך לא מחכה
+ * לקיץ, הוא מרים טלפון היום. ההצעה נכנסת לאותה רשימה שהחלון מייצר.
+ */
+function openTierOffer(g, tier) {
+  const pool = tierClubs(g, tier).filter(c => !offerFor(g, c.cid));
+  if (!pool.length) return;
+  const club = pool.reduce((a, b) => (b.reputation > a.reputation ? b : a));
+  const offers = openOffers(g);
+  offers.push(buildOffer(g, club, g.rng, g.rng.uniform(0.72, 0.98)));
+  setOffers(g, offers);
+}
+
+function pushPressStory(g, text) {
+  pressPush(g, { key: "encounter", source: "insider", true: true, text });
+}
 
 /** מפעיל את כל האפקטים של בחירה. מפתח לא מוכר — מדולג בשקט. */
 function applyStoryEffects(g, fx) {
@@ -17981,6 +20402,38 @@ function applyStoryEffects(g, fx) {
       case "trait": if (!me.traits.includes(value)) me.traits.push(value); break;
       case "drop_trait": me.traits = me.traits.filter(t => t !== value); break;
       case "honour": g.recordHonour(fillStory(value, g)); break;
+      case "interest": addTierInterest(g, value[0], value[1]); break;
+      case "open_offer": openTierOffer(g, Array.isArray(value) ? value[0] : value); break;
+      case "hype":
+        g.flags.hype = clamp(Number(g.flags.hype || 0) + value, 0, 100); break;
+      case "press": pushPressStory(g, fillStory(value, g)); break;
+      case "agent_market": g.flags.agent_offers = agentMarket(g, g.rng); break;
+      case "agent_cut":
+        if (g.flags.agent)
+          g.flags.agent.cut = Math.round((Number(g.flags.agent.cut || 5) + value) * 10) / 10;
+        break;
+      case "agent_trust":
+        if (g.flags.agent)
+          g.flags.agent.trust = clamp(Number(g.flags.agent.trust || 60) + value, 0, 100);
+        break;
+      case "meet_partner": {
+        let kind = Array.isArray(value) ? value[0] : value;
+        if (!kind || kind === "any") kind = g.rng.choice(PARTNER_KINDS.map(r => r[0]));
+        g.flags.partner = makePartner(kind, g.rng);
+        break;
+      }
+      case "pride": {
+        const par = parents(g);
+        par.pride = clamp(par.pride + value, 0, 100);
+        break;
+      }
+      case "mood": {
+        const row = partner(g);
+        if (row) row.mood = clamp(row.mood + value, 0, 100);
+        break;
+      }
+      case "promise":
+        givePromise(g, Array.isArray(value) ? value[0] : value); break;
       default: break;
     }
   }
@@ -18010,6 +20463,10 @@ function registerStoryPack(pack) {
 
 const STORY_PACK_COUNT = registerStoryPack(D.STORY_PACK || []);
 
+// הפגישות רצות באותו מנוע ובאותו מרשם. ההבדל הוא באופי: אירוע עלילה
+// הוא תחנה בדרך, ופגישה היא משהו שקרה במקרה — ולכן היא חוזרת.
+const ENCOUNTER_PACK_COUNT = registerStoryPack(D.ENCOUNTER_PACK || []);
+
 // ---------------------------------------------------------------------------
 // מצב המשחק — פורט מ-football_manager/game.py
 // ---------------------------------------------------------------------------
@@ -18034,6 +20491,10 @@ function netIncome(gross) {
 
 // בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
 const YOUTH_LOAD = 0.52;
+
+// כמה "חום שוק" מתאדה בשבוע. כתבה אחת שווה 6-20, ולכן זה מחזיק
+// כשלושה שבועות — בערך כמה שכותרת מחזיקה במציאות.
+const HYPE_DECAY = 0.6;
 
 // כמה שינויי דירוג נשמרים לגרף. 200 מכסים כמה עונות של עלייה רצופה,
 // והם עולים בשמורה פחות מקילובייט.
@@ -18390,6 +20851,7 @@ class Game {
                      personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
                      attendance: 0, finances: null };
     this.weekAttendance = 0;
+    this._playedThisWeek = false;
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
@@ -18455,6 +20917,28 @@ class Game {
       report.notes.push({ icon: "💼",
         text: `${venture.title}: ${venture.text} (בתפריט: 'שם')` });
     }
+
+    // הרעש בשוק דועך. בלי זה כתבה אחת מגיל 17 ממשיכה לנפח את
+    // ההצעות גם בגיל 23, וזה בדיוק ההפך מ"מה חם עכשיו".
+    const heat = Number(this.flags.hype || 0);
+    if (heat > 0) this.flags.hype = Math.max(0, heat - HYPE_DECAY);
+
+    // הסוכן — מה הוא עשה השבוע בלי לשאול אותך
+    for (const line of agentWeekly(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+
+    // הבית: הורים, בן/בת זוג, ומה שנשאר אחרי פרידה
+    for (const line of lifeWeekly(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+    const broke = heartbreakTick(this);
+    if (broke) report.notes.push({ icon: "", text: broke });
+
+    // הבטחות המאמן, ומאמנים שמפוטרים
+    const keptPromise = promiseTick(this, this._playedThisWeek);
+    if (keptPromise) report.notes.push({ icon: "", text: keptPromise });
+    const swap = maybeReplaceManager(this, this.rng);
+    if (swap) report.notes.push({ icon: "", text: swap });
+
 
     this.weeklyIncome(report);
 
@@ -18729,6 +21213,9 @@ class Game {
       .filter(p => p && p.pid !== this.meId && isAvailable(p) && p.position === me.position);
     let myScore = effective(me) + (club.managerTrust - 50) * 0.14;
     if (this.flag("captain")) myScore += 4;
+    // הדעה של המאמן היא לא קישוט: שחקן בכלוב לא נכנס גם כשהוא הכי
+    // טוב בעמדה, ומועדף נכנס גם כשהוא לא.
+    myScore += selectionBonus(this);
     const bestRival = rivals.reduce((m, p) => Math.max(m, effective(p)), 0);
     return myScore >= bestRival - 1.0;
   }
@@ -18738,6 +21225,7 @@ class Game {
     if (["academy", "player", "veteran"].includes(this.stage)) {
       if (me.pid in result.ratings) {
         this.noStartStreak = 0;
+        this._playedThisWeek = true;
         report.personal = {
           status: "started",
           rating: result.ratings[me.pid],
@@ -18882,8 +21370,10 @@ class Game {
   weeklyIncome(report) {
     const me = this.me;
     if (this.stage === "youth") { /* בלי שכר — אתה עוד בבית ספר */ }
-    else if (["academy", "player", "veteran"].includes(this.stage))
-      this.earn(netIncome(me.contract.wage));
+    else if (["academy", "player", "veteran"].includes(this.stage)) {
+      // הסוכן גובה מהברוטו, לפני שהמדינה גובה משלה. ככה זה עובד.
+      this.earn(netIncome(me.contract.wage - agentCut(this, me.contract.wage)));
+    }
     else if (["coach", "manager", "director"].includes(this.stage)) {
       const club = this.myClub();
       let base = this.stage === "coach" ? 4000 : 12000;
@@ -19870,10 +22360,22 @@ class Game {
     for (const [club] of watchers(this, SCOUT_COURTED))
       if (this.rng.random() < 0.55) add(club);
 
+    // עילוי: כשהשוק בוער, מועדונים שלא ראו אותך מעולם נכנסים לרשימה.
+    // זה בדיוק ההבדל בין "שחקן טוב" ל"כולם רוצים אותו".
+    const boom = frenzy(this);
+    if (boom > 1) {
+      const elite = Object.values(this.clubs)
+        .filter(c => !seen.has(c.cid) && c.cid !== me.clubId && c.reputation >= 80)
+        .sort((a, b) => b.reputation - a.reputation);
+      for (const club of elite.slice(0, Math.floor((boom - 1) * 3.2) + 1))
+        if (this.rng.random() < 0.35 + (boom - 1) * 0.42) add(club);
+    }
+
     // ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
     let pool = candidateClubs(this).filter(c => !seen.has(c.cid));
     let extra = me.reputation >= 55 ? 1 : 0;
     if (me.reputation >= 75) extra += 1;
+    if (agentReach(this) >= 0.7) extra += 1;      // סוכן מקושר פותח דלת
     for (let i = 0; i < extra; i++) {
       if (pool.length && this.rng.random() < 0.55) {
         const club = pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
@@ -19883,7 +22385,7 @@ class Game {
     }
     if (!picked.length && pool.length && this.rng.random() < 0.35)
       add(pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b)));
-    return picked.slice(0, 5);
+    return picked.slice(0, 7);
   }
 
   /** חותם על אחת ההצעות שעל השולחן. */
@@ -19899,15 +22401,90 @@ class Game {
     this.flags.squad_role = offer.role;
     if (offer.clause) this.flags.release_clause = offer.clause;
     if (offer.image) this.flags.image_share = offer.image;
+    if (offer.minutes) this.flags.minutes_clause = offer.minutes;
+    if (offer.loyalty) this.flags.loyalty_bonus = offer.loyalty;
+    if (offer.family) this.money += offer.family;
+    if (offer.promises && offer.promises.length)
+      this.flags.club_promises = offer.promises.slice();
+    const agentLines = agentOnDeal(this, offer);
     clearOffers(this);
     delete this.flags.wants_transfer;
+    delete this.flags.hype;              // הרעש נגמר ברגע שחתמת
     this.me.morale = clamp(this.me.morale + 8, 5, 99);
     const extra = offer.bonus ? ` ומענק ₪${fmt(offer.bonus)}` : "";
-    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
-         + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
+    let text = `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
+             + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
+    for (const promise of (offer.promises || [])) text += `\n   • ${promise}`;
+    for (const line of agentLines) text += `\n${line}`;
+    return text;
   }
 
-  /** מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים. */
+  // -- סוכן -------------------------------------------------------------
+
+  /** מי מוכן לייצג אותך. נבנה פעם אחת ונשמר עד שבוחרים. */
+  agentCandidates() {
+    let rows = this.flags.agent_offers;
+    if (!Array.isArray(rows) || !rows.length) {
+      rows = agentMarket(this, this.rng);
+      this.flags.agent_offers = rows;
+    }
+    return rows;
+  }
+
+  /** מחפש סוכן ביוזמתך — בלי לחכות שמישהו ייגש אליך בבית קפה. */
+  openAgentMarket() {
+    this.flags.agent_offers = agentMarket(this, this.rng);
+    return "שלושה סוכנים הסכימו להיפגש.";
+  }
+
+  signAgent(index) {
+    const rows = this.agentCandidates();
+    if (index < 0 || index >= rows.length) return "אין סוכן כזה.";
+    const text = signAgent(this, rows[index]);
+    delete this.flags.agent_offers;
+    this.log(text);
+    return text;
+  }
+
+  /** מפטר. סוכן שמפוטר לא נשאר חבר, ולפעמים זה עולה בדלת סגורה. */
+  fireAgent() {
+    const row = agentRow(this);
+    if (!row) return "אין לך סוכן.";
+    let text = agentLeave(this, "\"בהצלחה. תזכור מי פתח לך את הדלתות.\"");
+    if (agentType(row)[5] >= 0.6 && this.rng.random() < 0.45) {
+      const book = this.flags.scout_interest || {};
+      const keys = Object.keys(book);
+      if (keys.length) {
+        const cid = keys.reduce((a, b) => (book[b] > book[a] ? b : a));
+        book[cid] = 0;
+        const club = this.clubs[cid];
+        if (club) text += `\n🕳️ פתאום ב${club.name} הפסיקו לענות.`;
+      }
+    }
+    this.log(text);
+    return text;
+  }
+
+  // -- חיים אישיים ------------------------------------------------------
+
+  lifeActions() { return lifeActions(this); }
+
+  doLifeAction(key) {
+    const text = doLifeAction(this, key);
+    if (typeof text === "string" && text) this.log(text);
+    return text;
+  }
+
+  // -- פגישה עם המאמן ---------------------------------------------------
+
+  managerMeetings() { return meetingOptions(this); }
+
+  managerRequest(key) {
+    const text = managerRequest(this, key, this.rng);
+    this.log(text.split("\n")[0]);
+    return text;
+  }
+
   negotiateOffer(cid, term) {
     return negotiate(this, cid, term, this.rng).text;
   }
@@ -21491,7 +24068,12 @@ function screenMenu() {
         <div class="note"><span class="ico">⚽</span><span>3 ליגות, 32 מועדונים, סימולציה מלאה של כל משחק בעונה.</span></div>
         <div class="note"><span class="ico">👀</span><span>אקדמיות שולחות צופים כבר בגיל 13 — ואם כמה רבות עליך, הערך שלך עולה עוד לפני שהוכחת משהו.</span></div>
         <div class="note"><span class="ico">👪</span><span>בגיל הנוער ההחלטה היא של המשפחה. להורים יש דעה משלהם, ואפשר לנסות לשכנע.</span></div>
-        <div class="note"><span class="ico">🤝</span><span>שוק העברות עם משא ומתן על שכר, שנים, מענק, סעיף שחרור ותפקיד — ומועדון שמאבד סבלנות קם מהשולחן.</span></div>
+        <div class="note"><span class="ico">📞</span><span>סוכנים אמיתיים: כריש שמייצר לך הצעות ומחסל עסקאות של אחרים, סוכן משפחה שלא יעשה נזק ולא נס. הוא פועל לבד, וגובה אחוזים.</span></div>
+        <div class="note"><span class="ico">🎙️</span><span>למאמן יש משקל: מועדף או בכלוב, הבטחות שנשמרות או נשברות, ופגישה בארבע עיניים שאפשר לצאת ממנה עם הרכב — או בלי.</span></div>
+        <div class="note"><span class="ico">☕</span><span>30 פגישות מקריות: מנהל ספורטיבי באותו מלון, אגדה שמתקשרת, יאכטה של איל הון, והצעה אחת שאסור לשמוע.</span></div>
+        <div class="note"><span class="ico">🏡</span><span>ההורים לא נעלמים כשמצליחים — יש להם בקשות וגאווה. ובן/בת זוג עם תמיכה, זרקור, ולפעמים פרידה שנמשכת חודשיים.</span></div>
+        <div class="note"><span class="ico">💎</span><span>עילוי? כל אירופה על הדלת: שכר כפול, מענקים, התחייבות לדקות והבטחות בכתב.</span></div>
+        <div class="note"><span class="ico">🤝</span><span>שוק העברות עם משא ומתן על שכר, שנים, מענק, סעיף שחרור, דקות, מענק נאמנות ותפקיד — ומועדון שמאבד סבלנות קם מהשולחן.</span></div>
         <div class="note"><span class="ico">📰</span><span>עיתונות עם מקורות באמינות שונה. לא כל שמועה נכונה, ואתה מחליט אם להכחיש.</span></div>
         <div class="note"><span class="ico">💼</span><span>ככל שהשם גדל: חסויות, שותפויות עסקיות, קמפיינים והצעות מליגות זרות.</span></div>
         <div class="note"><span class="ico">📈</span><span>47 תכונות בסולם 1-20, 42 תפקידים, ומסך שמסביר לכל תכונה אם אתה צריך אותה עכשיו.</span></div>
@@ -21730,7 +24312,7 @@ const TAB_ICONS = {
   main: "🏠", mentor: "🧭", plan: "🗺️", growth: "📈", club: "🏟️",
   tactics: "♟️", system: "🧩", squad: "👥", table: "📊", money: "💰",
   press: "📰", fame: "⭐", offers: "🤝", academies: "🎓", profile: "🪪",
-  news: "📬", editor: "✏️",
+  news: "📬", editor: "✏️", agent: "📞", life: "🏡", boss: "🎙️",
 };
 
 function tabsBar() {
@@ -21747,14 +24329,24 @@ function tabsBar() {
   const offers = ["player", "veteran"].includes(game.stage) ? liveOffers(game).length : 0;
   const question = openQuestion(game) ? 1 : 0;
   const venture = game.flag("venture") ? 1 : 0;
-  if (["academy", "player", "veteran"].includes(game.stage))
+  if (["academy", "player", "veteran"].includes(game.stage)) {
+    // סוכן/מאמן/חיים בראש הרשימה בכוונה: סרגל הטאבים נגלל, ומה
+    // שיושב בסוף שלו פשוט לא נראה — וזה כמו שהמערכת לא קיימת.
+    items.splice(1, 0, ["agent", "סוכן"], ["boss", "מאמן"], ["life", "חיים"]);
     items.splice(items.length - 1, 0, ["press", "תקשורת"], ["fame", "שם"]);
+  }
   if (offers) items.splice(1, 0, ["offers", "הצעות"]);
   // בגיל הנוער הטאב הזה הוא כל הסיפור: מי מסתכל עליך, ומי כבר פנה
   const academies = game.stage === "youth" ? liveYouthOffers(game).length : 0;
   const looking = game.stage === "youth" ? youthWatchers(game).length : 0;
   if (game.stage === "youth") items.splice(1, 0, ["academies", "אקדמיות"]);
+  // תג על "סוכן" כשמחכים לך מועמדים, ועל "חיים" כשההורים ביקשו משהו
+  const agentWaiting = Array.isArray(game.flags.agent_offers)
+    && game.flags.agent_offers.length ? 1 : 0;
+  const homeWaiting = ["academy", "player", "veteran"].includes(game.stage)
+    && parents(game).ask ? 1 : 0;
   const badges = { offers, press: question, fame: venture,
+                   agent: agentWaiting, life: homeWaiting,
                    academies: academies || (looking ? 0 : 0) };
   return `<nav class="tabs">${items.map(([k, l]) => {
     const n = badges[k] || 0;
@@ -21793,6 +24385,9 @@ function screenMain() {
   if (view === "press") return appbar() + screenPress();
   if (view === "fame") return appbar() + screenFame();
   if (view === "academies") return appbar() + screenAcademies();
+  if (view === "agent") return appbar() + screenAgent();
+  if (view === "life") return appbar() + screenLife();
+  if (view === "boss") return appbar() + screenBoss();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -22487,6 +25082,56 @@ function screenHub() {
       </div>`;
   }
 
+  // --- מי מסביבך: סוכן, מאמן, בית ורעש בשוק ---
+  // מערכת בלי מסך היא "לא קרה כלום". הפאנל הזה הוא הדלת לשלושת
+  // המסכים החדשים, והוא מציג את השורה האחת שחשובה מכל אחד מהם.
+  const around = isPlayer && game.stage !== "youth" ? (() => {
+    const agent = agentRow(game);
+    const boom = frenzy(game);
+    const heat = frenzyWord(game);
+    const promise = activePromise(game);
+    const par = parents(game);
+    const mate = partner(game);
+    const rows = [];
+    rows.push(`<div class="row link" data-go="agent">
+      <span class="msg-ico">📞</span>
+      <span class="grow"><span class="nm">${agent
+        ? esc(agent.name) + " · " + esc(agentType(agent)[1])
+        : "אין לך סוכן"}</span>
+        <span class="sub">${agent
+          ? (agent.target && game.clubs[agent.target]
+              ? "עובד על " + esc(game.clubs[agent.target].name)
+              : "עמלה " + agent.cut + "%")
+          : "מועדון לא מרים טלפון לשחקן שאף אחד לא מדבר עליו"}</span></span>
+      <span class="val">›</span></div>`);
+    if (club) {
+      const [, standName] = managerStanding(game);
+      rows.push(`<div class="row link" data-go="boss">
+        <span class="msg-ico">🎙️</span>
+        <span class="grow"><span class="nm">${esc(standName)}</span>
+          <span class="sub">${promise
+            ? "הבטחה פתוחה — עוד " + promise.weeks + " שבועות"
+            : esc(club.managerName)}</span></span>
+        <span class="val">›</span></div>`);
+    }
+    rows.push(`<div class="row link" data-go="life">
+      <span class="msg-ico">🏡</span>
+      <span class="grow"><span class="nm">${mate
+        ? esc(mate.name) + " · " + esc(partnerStageName(mate))
+        : "הבית"}</span>
+        <span class="sub">${par.ask
+          ? "אבא שלך ביקש: " + esc(par.ask.name)
+          : esc(homeLine(game))}</span></span>
+      <span class="val">›</span></div>`);
+    return `
+    <div class="panel wide">
+      <div class="panel-head"><span class="t">מי מסביבך</span>
+        ${boom > 1.05 ? `<span class="r gold">שוק בוער ×${boom.toFixed(1)}</span>` : ""}</div>
+      <div class="panel-body tight">${rows.join("")}</div>
+      ${heat ? `<div class="panel-body"><div class="muted">🔥 ${esc(heat)}</div></div>` : ""}
+    </div>`;
+  })() : "";
+
   // --- גרף ההתפתחות ---
   // שני מספרים אינם קו. עד שיש שלוש נקודות עדיף לא להראות כלום מאשר
   // להראות גרף שטוח שנראה כאילו נתקעת.
@@ -22582,6 +25227,7 @@ function screenHub() {
     ${systemSnip()}
     ${scoutSnip()}
     ${clubSnip()}
+    ${around}
     ${tableSnip}
     ${trendPanel}
     ${messages}
@@ -23350,6 +25996,228 @@ function pressRow(item) {
 // שם — מה השם שלך שווה מחוץ למגרש
 // ---------------------------------------------------------------------------
 
+/**
+ * הסוכן — מי מייצג אותך, מה הוא עשה השבוע, וכמה הוא לוקח.
+ *
+ * זה המסך שהופך את הסוכן מטקסט בדוח לדמות: רואים את הטווח שלו, את
+ * מה שהוא חושב עליך, ואת רשימת המהלכים שהוא עשה בלי לשאול.
+ */
+function screenAgent() {
+  const row = agentRow(game);
+  const candidates = Array.isArray(game.flags.agent_offers)
+    ? game.flags.agent_offers : [];
+  const kind = agentType(row);
+
+  const card = row ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(kind[1])}</span>
+        <span class="r num">${row.cut}%</span></div>
+      <div class="panel-body">
+        <div class="dash-head" style="padding:0">
+          <span class="who"><span class="nm">${esc(row.name)}</span>
+            <span class="sub">${esc(kind[2])}</span></span>
+          ${ring(row.trust, { size: 52, label: "יחס", tone: ratingTone(row.trust) })}
+        </div>
+        <div class="meters">
+          ${meter("טווח", kind[4] * 100, { tone: "accent" })}
+          ${verdictRow("מגיע עד", reachWord(kind[4]), "")}
+          ${verdictRow("עמלה", row.cut + "% מהשכר ומהמענקים", "warn")}
+          ${verdictRow("עסקאות", String(row.deals), "")}
+        </div>
+        ${row.target && game.clubs[row.target] ? `<div class="note">
+          <span class="ico">🎯</span><span>עובד עכשיו על
+          <strong>${esc(game.clubs[row.target].name)}</strong> —
+          ${Math.round(Number((game.flags.scout_interest || {})[row.target] || 0))}%
+          מהדרך.</span></div>` : ""}
+        ${(row.moves || []).length ? `<hr class="rule">
+          <div class="muted">מה שהוא עשה לאחרונה</div>
+          <div class="notes">${row.moves.slice().reverse().map(m =>
+            `<div class="note"><span class="ico">·</span><span>${esc(m)}</span></div>`
+          ).join("")}</div>` : ""}
+        ${(row.burned || []).length ? `<div class="note"><span class="ico">🕳️</span>
+          <span>שרוף מול: ${esc((row.burned || [])
+            .map(c => game.clubs[c] && game.clubs[c].name).filter(Boolean)
+            .join(", "))}</span></div>` : ""}
+        <div class="btn-row">
+          <button class="btn" data-agentmarket="1">לשמוע סוכנים אחרים</button>
+          <button class="btn ghost" data-agentfire="1">לפטר</button>
+        </div>
+      </div>
+    </div>`
+  : `<div class="panel">
+      <div class="panel-head"><span class="t">אין לך סוכן</span></div>
+      <div class="panel-body">
+        <div class="muted">אתה מנהל את הקריירה שלך לבד. זה חוסך עמלה,
+        וזה נראה בכמות ההצעות שמגיעות — מועדון לא מרים טלפון לשחקן
+        שאף אחד לא מדבר עליו.</div>
+        <button class="btn primary wide" data-agentmarket="1">לחפש סוכן</button>
+      </div>
+    </div>`;
+
+  const list = candidates.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי מוכן לייצג אותך</span>
+        <span class="r">${candidates.length}</span></div>
+      <div class="panel-body">
+        ${candidates.map((c, i) => {
+          const k = AGENT_BY_KEY[c.kind] || AGENT_BY_KEY.family;
+          return `<div class="card" style="border-color:var(--line)">
+            <div class="crest-row">
+              <span class="nm"><strong>${esc(c.name)}</strong> · ${esc(k[1])}</span>
+            </div>
+            <div class="muted">${esc(k[2])}</div>
+            <div class="meters">
+              ${meter("טווח", k[4] * 100, { tone: "accent" })}
+              ${meter("תוקפנות", k[5] * 100, { tone: k[5] > 0.6 ? "bad" : "warn" })}
+              ${verdictRow("עמלה", c.cut + "%", c.cut > 8 ? "bad" : "good")}
+            </div>
+            <button class="btn primary wide" data-agentsign="${i}">
+              לחתום עם ${esc(c.name)}</button>
+          </div>`;
+        }).join("")}
+        <div class="muted">כריש יביא לך הצעות שלא היית רואה אחרת — ויעשה
+        את זה בדרכים שיחזרו אליך. סוכן משפחה לא יעשה לך נזק, וגם לא נס.</div>
+      </div>
+    </div>` : "";
+
+  return `<div class="screen">${card}${list}</div>`;
+}
+
+/**
+ * החיים מחוץ למגרש: ההורים ובן/בת הזוג.
+ *
+ * המשפחה נכנסה למשחק בגיל שלוש־עשרה ונעלמה. כאן היא חוזרת — עם
+ * גאווה שאפשר לאבד, בקשות שעולות כסף, ובית שמחכה בסוף השבוע.
+ */
+function screenLife() {
+  const par = parents(game);
+  const row = partner(game);
+  const acts = lifeActions(game);
+
+  const parentPanel = `
+    <div class="panel">
+      <div class="panel-head"><span class="t">ההורים</span>
+        <span class="r">${esc(prideWord(par.pride))}</span></div>
+      <div class="panel-body">
+        <div class="meters">${meter("גאווה", par.pride)}</div>
+        ${par.ask ? `<div class="note"><span class="ico">📞</span>
+          <span><strong>${esc(par.ask.name)}</strong> — ${esc(par.ask.why)}
+          <br><span class="muted num">₪${fmt(par.ask.cost)}</span></span></div>` : ""}
+        ${par.given.length ? `<div class="muted">כבר עשית בשבילם:
+          ${esc(par.given.map(k => (PARENT_ASKS.find(r => r[0] === k) || ["", k])[1])
+            .join(" · "))}</div>` : ""}
+      </div>
+    </div>`;
+
+  const partnerPanel = row ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(row.name)}</span>
+        <span class="r">${esc(partnerStageName(row))}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc((PARTNER_BY_KIND[row.kind] || [])[2] || "")}</div>
+        <div class="meters">
+          ${meter("מצב הקשר", row.mood)}
+          ${meter("תמיכה", row.support, { tone: "good" })}
+          ${meter("זרקור", row.spotlight, { tone: "accent" })}
+          ${row.kids ? verdictRow("ילדים", String(row.kids), "") : ""}
+        </div>
+        <div class="muted">${row.spotlight >= 60
+          ? "כל יציאה שלכם היא ידיעה. זה מגדיל את השם שלך, וגם את הרעש."
+          : "היא לא מביאה מצלמות, והיא מחזיקה אותך כשקשה."}</div>
+        ${row.mood < 40 ? `<div class="note"><span class="ico">⚠️</span>
+          <span>זה לא במקום טוב. עוד כמה שבועות כאלה וזה ייגמר.</span></div>` : ""}
+      </div>
+    </div>`
+  : `<div class="panel">
+      <div class="panel-head"><span class="t">לבד</span></div>
+      <div class="panel-body"><div class="muted">אין מי שמחכה בבית.
+      זה יקרה במקרה — ערב התרמה, חבר שמסדר משהו, פגישה שלא תכננת.</div>
+      ${game.flag("heartbreak") ? `<div class="note"><span class="ico">💔</span>
+        <span>עוד ${game.flag("heartbreak")} שבועות עד שהראש יחזור למגרש
+        לגמרי.</span></div>` : ""}</div>
+    </div>`;
+
+  const actions = acts.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה אפשר לעשות</span></div>
+      <div class="panel-body actions">
+        ${acts.map(a => `<button class="btn" data-life="${esc(a.key)}"
+          ${a.cost > game.money ? "disabled" : ""}>
+          <span class="k">${esc(a.name)}</span>
+          <span class="hint">${a.cost ? "₪" + fmt(a.cost) : esc(a.note)}</span>
+        </button>`).join("")}
+      </div>
+    </div>` : "";
+
+  return `<div class="screen">${parentPanel}${partnerPanel}${actions}</div>`;
+}
+
+/**
+ * המאמן — איפה אתה עומד אצלו, ומה אפשר לבקש.
+ *
+ * זה מה שהיה חסר: `managerTrust` היה מספר, וכאן הוא הופך להחלטה.
+ * הסיכויים גלויים בכוונה — פגישה היא הימור מחושב, לא רולטה.
+ */
+function screenBoss() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אין לך מועדון.</div></div>`;
+  const [key, name] = managerStanding(game);
+  const promise = activePromise(game);
+  const meetings = meetingOptions(game);
+  const style = managerStyle(club);
+  const trust = Math.round(club.managerTrust);
+
+  return `<div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.managerName)}</span>
+        <span class="r">${esc(style[1])}</span></div>
+      <div class="panel-body">
+        <div class="dash-head" style="padding:0">
+          <span class="who"><span class="nm">${esc(name)}</span>
+            <span class="sub">${esc(style[2])}</span></span>
+          ${ring(trust, { size: 56, label: "אמון", tone: ratingTone(trust) })}
+        </div>
+        <div class="muted">${esc(standingLine(game))}</div>
+        ${game.flag("doghouse") ? `<div class="note"><span class="ico">⛔</span>
+          <span>אתה מתאמן עם הקבוצה השנייה. משחק אחד טוב לא יוציא אותך
+          מכאן — צריך זמן, או מאמן אחר.</span></div>` : ""}
+        ${game.flag("broken_promise") ? `<div class="note"><span class="ico">💢</span>
+          <span>הוא כבר הבטיח לך פעם אחת ולא קיים.</span></div>` : ""}
+      </div>
+    </div>
+
+    ${promise ? `
+    <div class="panel" style="border-color:var(--good)">
+      <div class="panel-head"><span class="t">הבטחה פתוחה</span>
+        <span class="r">${promise.weeks} שבועות</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc({ start: "הבטיח לך משחקים בהרכב.",
+          role: "הבטיח לך את העמדה שלך.", minutes: "הבטיח לך דקות.",
+          leave: "הבטיח לא לחסום מעבר." }[promise.kind] || "הבטיח לך משהו.")}</div>
+        ${meter("קוים עד עכשיו", (promise.starts || 0),
+                { max: Math.max(1, PROMISE_WEEKS), tone: "good",
+                  text: `${promise.starts || 0}/${PROMISE_WEEKS}` })}
+      </div>
+    </div>` : ""}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">פגישה בארבע עיניים</span>
+        <span class="r">${meetings.length ? "" : "לא עכשיו"}</span></div>
+      <div class="panel-body actions">
+        ${meetings.length ? meetings.map(m => `
+          <button class="btn" data-meet="${esc(m.key)}">
+            <span class="k">${esc(m.name)}</span>
+            <span class="hint">${Math.round(m.odds * 100)}% שיסכים</span>
+          </button>`).join("")
+        : `<div class="muted">היית אצלו לאחרונה. מאמן שדופקים לו על הדלת
+           כל שבוע מפסיק לפתוח אותה — חכה כמה שבועות.</div>`}
+        ${meetings.length ? `<div class="muted">בקשה שנדחית עולה באמון,
+          ובקשה גדולה שנדחית יכולה לשלוח אותך לקבוצה השנייה.</div>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
 function screenFame() {
   const offer = game.flag("venture");
   const ventures = ventureBook(game);
@@ -24115,6 +26983,44 @@ function bind() {
       const text = pressReact(game, el.dataset.press, game.rng);
       saveGame();
       showOutcome("התגובה שלך", text);
+    }));
+
+  // -- סוכן ------------------------------------------------------------
+  // בלי מסך ביניים: פתיחת השוק היא לא החלטה, היא רק פותחת את
+  // הרשימה — ומסך תוצאה באמצע היה זורק אותך חזרה לסקירה.
+  app.querySelectorAll("[data-agentmarket]").forEach(el =>
+    el.addEventListener("click", () => {
+      game.openAgentMarket();
+      saveGame();
+      go("agent");
+    }));
+  app.querySelectorAll("[data-agentsign]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.signAgent(+el.dataset.agentsign);
+      saveGame();
+      showOutcome("סוכן חדש", text);
+    }));
+  app.querySelectorAll("[data-agentfire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.fireAgent();
+      saveGame();
+      showOutcome("פרידה", text);
+    }));
+
+  // -- חיים אישיים -----------------------------------------------------
+  app.querySelectorAll("[data-life]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.doLifeAction(el.dataset.life);
+      saveGame();
+      showOutcome("הבית", text);
+    }));
+
+  // -- פגישה עם המאמן --------------------------------------------------
+  app.querySelectorAll("[data-meet]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.managerRequest(el.dataset.meet);
+      saveGame();
+      showOutcome("במשרד שלו", text);
     }));
 
   // -- מיזמים ---------------------------------------------------------

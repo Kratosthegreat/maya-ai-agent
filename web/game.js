@@ -23,6 +23,10 @@ function netIncome(gross) {
 // בן 13 מתאמן שלוש פעמים בשבוע ועוד הולך לבית ספר — לא עומס של מקצוען
 const YOUTH_LOAD = 0.52;
 
+// כמה "חום שוק" מתאדה בשבוע. כתבה אחת שווה 6-20, ולכן זה מחזיק
+// כשלושה שבועות — בערך כמה שכותרת מחזיקה במציאות.
+const HYPE_DECAY = 0.6;
+
 // כמה שינויי דירוג נשמרים לגרף. 200 מכסים כמה עונות של עלייה רצופה,
 // והם עולים בשמורה פחות מקילובייט.
 const OVERALL_LOG_LIMIT = 200;
@@ -378,6 +382,7 @@ class Game {
                      personal: null, eventId: null, seasonEnded: false, seasonSummary: null,
                      attendance: 0, finances: null };
     this.weekAttendance = 0;
+    this._playedThisWeek = false;
     if (this.gameOver) { report.notes.push({ icon: "🏁", text: "הקריירה הסתיימה." }); return report; }
     if (this.pendingEventId) { report.eventId = this.pendingEventId; return report; }
 
@@ -443,6 +448,28 @@ class Game {
       report.notes.push({ icon: "💼",
         text: `${venture.title}: ${venture.text} (בתפריט: 'שם')` });
     }
+
+    // הרעש בשוק דועך. בלי זה כתבה אחת מגיל 17 ממשיכה לנפח את
+    // ההצעות גם בגיל 23, וזה בדיוק ההפך מ"מה חם עכשיו".
+    const heat = Number(this.flags.hype || 0);
+    if (heat > 0) this.flags.hype = Math.max(0, heat - HYPE_DECAY);
+
+    // הסוכן — מה הוא עשה השבוע בלי לשאול אותך
+    for (const line of agentWeekly(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+
+    // הבית: הורים, בן/בת זוג, ומה שנשאר אחרי פרידה
+    for (const line of lifeWeekly(this, this.rng))
+      report.notes.push({ icon: "", text: line });
+    const broke = heartbreakTick(this);
+    if (broke) report.notes.push({ icon: "", text: broke });
+
+    // הבטחות המאמן, ומאמנים שמפוטרים
+    const keptPromise = promiseTick(this, this._playedThisWeek);
+    if (keptPromise) report.notes.push({ icon: "", text: keptPromise });
+    const swap = maybeReplaceManager(this, this.rng);
+    if (swap) report.notes.push({ icon: "", text: swap });
+
 
     this.weeklyIncome(report);
 
@@ -717,6 +744,9 @@ class Game {
       .filter(p => p && p.pid !== this.meId && isAvailable(p) && p.position === me.position);
     let myScore = effective(me) + (club.managerTrust - 50) * 0.14;
     if (this.flag("captain")) myScore += 4;
+    // הדעה של המאמן היא לא קישוט: שחקן בכלוב לא נכנס גם כשהוא הכי
+    // טוב בעמדה, ומועדף נכנס גם כשהוא לא.
+    myScore += selectionBonus(this);
     const bestRival = rivals.reduce((m, p) => Math.max(m, effective(p)), 0);
     return myScore >= bestRival - 1.0;
   }
@@ -726,6 +756,7 @@ class Game {
     if (["academy", "player", "veteran"].includes(this.stage)) {
       if (me.pid in result.ratings) {
         this.noStartStreak = 0;
+        this._playedThisWeek = true;
         report.personal = {
           status: "started",
           rating: result.ratings[me.pid],
@@ -870,8 +901,10 @@ class Game {
   weeklyIncome(report) {
     const me = this.me;
     if (this.stage === "youth") { /* בלי שכר — אתה עוד בבית ספר */ }
-    else if (["academy", "player", "veteran"].includes(this.stage))
-      this.earn(netIncome(me.contract.wage));
+    else if (["academy", "player", "veteran"].includes(this.stage)) {
+      // הסוכן גובה מהברוטו, לפני שהמדינה גובה משלה. ככה זה עובד.
+      this.earn(netIncome(me.contract.wage - agentCut(this, me.contract.wage)));
+    }
     else if (["coach", "manager", "director"].includes(this.stage)) {
       const club = this.myClub();
       let base = this.stage === "coach" ? 4000 : 12000;
@@ -1858,10 +1891,22 @@ class Game {
     for (const [club] of watchers(this, SCOUT_COURTED))
       if (this.rng.random() < 0.55) add(club);
 
+    // עילוי: כשהשוק בוער, מועדונים שלא ראו אותך מעולם נכנסים לרשימה.
+    // זה בדיוק ההבדל בין "שחקן טוב" ל"כולם רוצים אותו".
+    const boom = frenzy(this);
+    if (boom > 1) {
+      const elite = Object.values(this.clubs)
+        .filter(c => !seen.has(c.cid) && c.cid !== me.clubId && c.reputation >= 80)
+        .sort((a, b) => b.reputation - a.reputation);
+      for (const club of elite.slice(0, Math.floor((boom - 1) * 3.2) + 1))
+        if (this.rng.random() < 0.35 + (boom - 1) * 0.42) add(club);
+    }
+
     // ככל שאתה גדול יותר, כך יותר שמות עולים בישיבות שלא ראית
     let pool = candidateClubs(this).filter(c => !seen.has(c.cid));
     let extra = me.reputation >= 55 ? 1 : 0;
     if (me.reputation >= 75) extra += 1;
+    if (agentReach(this) >= 0.7) extra += 1;      // סוכן מקושר פותח דלת
     for (let i = 0; i < extra; i++) {
       if (pool.length && this.rng.random() < 0.55) {
         const club = pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b));
@@ -1871,7 +1916,7 @@ class Game {
     }
     if (!picked.length && pool.length && this.rng.random() < 0.35)
       add(pool.reduce((a, b) => (a.reputation >= b.reputation ? a : b)));
-    return picked.slice(0, 5);
+    return picked.slice(0, 7);
   }
 
   /** חותם על אחת ההצעות שעל השולחן. */
@@ -1887,15 +1932,90 @@ class Game {
     this.flags.squad_role = offer.role;
     if (offer.clause) this.flags.release_clause = offer.clause;
     if (offer.image) this.flags.image_share = offer.image;
+    if (offer.minutes) this.flags.minutes_clause = offer.minutes;
+    if (offer.loyalty) this.flags.loyalty_bonus = offer.loyalty;
+    if (offer.family) this.money += offer.family;
+    if (offer.promises && offer.promises.length)
+      this.flags.club_promises = offer.promises.slice();
+    const agentLines = agentOnDeal(this, offer);
     clearOffers(this);
     delete this.flags.wants_transfer;
+    delete this.flags.hype;              // הרעש נגמר ברגע שחתמת
     this.me.morale = clamp(this.me.morale + 8, 5, 99);
     const extra = offer.bonus ? ` ומענק ₪${fmt(offer.bonus)}` : "";
-    return `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
-         + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
+    let text = `חתמת ב${club.name} על ₪${fmt(offer.wage)} לשבוע${extra}. `
+             + `הובטח לך תפקיד: ${ROLE_NAMES[offer.role] || offer.role}.`;
+    for (const promise of (offer.promises || [])) text += `\n   • ${promise}`;
+    for (const line of agentLines) text += `\n${line}`;
+    return text;
   }
 
-  /** מבקש שיפור בסעיף אחד בהצעה של מועדון מסוים. */
+  // -- סוכן -------------------------------------------------------------
+
+  /** מי מוכן לייצג אותך. נבנה פעם אחת ונשמר עד שבוחרים. */
+  agentCandidates() {
+    let rows = this.flags.agent_offers;
+    if (!Array.isArray(rows) || !rows.length) {
+      rows = agentMarket(this, this.rng);
+      this.flags.agent_offers = rows;
+    }
+    return rows;
+  }
+
+  /** מחפש סוכן ביוזמתך — בלי לחכות שמישהו ייגש אליך בבית קפה. */
+  openAgentMarket() {
+    this.flags.agent_offers = agentMarket(this, this.rng);
+    return "שלושה סוכנים הסכימו להיפגש.";
+  }
+
+  signAgent(index) {
+    const rows = this.agentCandidates();
+    if (index < 0 || index >= rows.length) return "אין סוכן כזה.";
+    const text = signAgent(this, rows[index]);
+    delete this.flags.agent_offers;
+    this.log(text);
+    return text;
+  }
+
+  /** מפטר. סוכן שמפוטר לא נשאר חבר, ולפעמים זה עולה בדלת סגורה. */
+  fireAgent() {
+    const row = agentRow(this);
+    if (!row) return "אין לך סוכן.";
+    let text = agentLeave(this, "\"בהצלחה. תזכור מי פתח לך את הדלתות.\"");
+    if (agentType(row)[5] >= 0.6 && this.rng.random() < 0.45) {
+      const book = this.flags.scout_interest || {};
+      const keys = Object.keys(book);
+      if (keys.length) {
+        const cid = keys.reduce((a, b) => (book[b] > book[a] ? b : a));
+        book[cid] = 0;
+        const club = this.clubs[cid];
+        if (club) text += `\n🕳️ פתאום ב${club.name} הפסיקו לענות.`;
+      }
+    }
+    this.log(text);
+    return text;
+  }
+
+  // -- חיים אישיים ------------------------------------------------------
+
+  lifeActions() { return lifeActions(this); }
+
+  doLifeAction(key) {
+    const text = doLifeAction(this, key);
+    if (typeof text === "string" && text) this.log(text);
+    return text;
+  }
+
+  // -- פגישה עם המאמן ---------------------------------------------------
+
+  managerMeetings() { return meetingOptions(this); }
+
+  managerRequest(key) {
+    const text = managerRequest(this, key, this.rng);
+    this.log(text.split("\n")[0]);
+    return text;
+  }
+
   negotiateOffer(cid, term) {
     return negotiate(this, cid, term, this.rng).text;
   }

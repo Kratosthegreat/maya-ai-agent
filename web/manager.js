@@ -154,3 +154,203 @@ function trustMove(club, delta) {
   club.managerTrust = clamp(club.managerTrust + delta * managerStyle(club)[3], 0, 100);
   return club.managerTrust;
 }
+
+
+// ---------------------------------------------------------------------------
+// למאמן יש דעה עליך, ולדעה יש משקל
+//
+// עד כאן `managerTrust` היה מספר שהשפיע קצת על ההרכב וזהו. מאמן אמיתי
+// הוא לא מד־חום: יש לו מועדפים, יש לו כלב שלא מקבל דקות, הוא מבטיח
+// ולפעמים שובר, ואפשר לדפוק לו על הדלת ולשאול למה.
+// ---------------------------------------------------------------------------
+
+// [מפתח, שם, סף אמון, מה זה שווה בהרכב]
+//
+// הבונוס נכנס ישירות לבחירת ההרכב, ולכן "בכלוב" הוא לא תווית — הוא
+// שמונה נקודות דירוג שנעלמות, וזה מורגש בכל שבוע.
+const STANDINGS = [
+  ["favourite", "המועדף שלו", 78, 6.0],
+  ["trusted", "בתוך התוכנית", 58, 2.5],
+  ["neutral", "עוד אחד בסגל", 40, 0.0],
+  ["doubted", "מסומן בשאלה", 24, -3.5],
+  ["frozen", "בכלוב", 0, -8.0],
+];
+
+// [מפתח, שם, משפט, קושי, אמון אם הצליח, אמון אם נכשל]
+const MEETINGS = [
+  ["role", "לבקש מקום קבוע בהרכב", "\"אני צריך לדעת אם אני משחק כאן.\"", 0.55, 6, -8],
+  ["why", "לשאול למה אתה לא משחק", "\"תסביר לי מה חסר לי.\"", 0.30, 3, -3],
+  ["promise", "להבטיח לו עונה", "\"תן לי שלושה משחקים ואני אראה לך.\"", 0.45, 8, -6],
+  ["position", "לבקש לשחק בעמדה שלך",
+   "\"אני לא שחקן שאתה מכניס לאן שחסר.\"", 0.50, 5, -6],
+  ["leave", "לבקש רשות לעזוב", "\"אני רוצה לשמוע הצעות. בלי מלחמות.\"", 0.60, -2, -12],
+];
+const MEETING_NAMES = Object.fromEntries(MEETINGS.map(r => [r[0], r[1]]));
+
+const PROMISE_WEEKS = 5;
+const PROMISE_TRUST_BREAK = -14.0;
+const MEETING_COOLDOWN = 6;
+
+/** איפה אתה עומד אצלו: מפתח, שם, ומה זה שווה בהרכב. */
+function managerStanding(game) {
+  const club = game.myClub();
+  let trust = club ? club.managerTrust : 50;
+  if (game.flag("doghouse")) trust -= 22;
+  if (game.flag("captain")) trust += 8;
+  for (const [key, name, threshold, bonus] of STANDINGS)
+    if (trust >= threshold) return [key, name, bonus];
+  const last = STANDINGS[STANDINGS.length - 1];
+  return [last[0], last[1], last[3]];
+}
+
+/**
+ * כמה נקודות המאמן מוסיף או מוריד לך בבחירת ההרכב. זה מה שהופך את
+ * היחסים איתו למשהו שמרגישים.
+ */
+function selectionBonus(game) {
+  let bonus = managerStanding(game)[2];
+  const promise = activePromise(game);
+  if (promise && (promise.kind === "start" || promise.kind === "role")) bonus += 9;
+  return bonus;
+}
+
+function standingLine(game) {
+  const club = game.myClub();
+  if (!club) return "";
+  const [key] = managerStanding(game);
+  const who = club.managerName;
+  if (key === "favourite")
+    return `⭐ ${who} רואה בך את הציר. אתה משחק גם כשאתה לא בכושר.`;
+  if (key === "trusted") return `✅ ${who} סופר אותך. המקום שלך תלוי בך.`;
+  if (key === "neutral") return `⚖️ ${who} עוד לא החליט לגביך.`;
+  if (key === "doubted")
+    return `⚠️ ${who} מסתכל עליך אחרת. עוד משחק חלש וזה ייסגר.`;
+  return `⛔ אתה מחוץ לתוכניות של ${who}. גם אימון מצוין לא יזיז את זה מהר.`;
+}
+
+/** המאמן מבטיח משהו. מרגע זה הוא נמדד לפיו. */
+function givePromise(game, kind, weeks = PROMISE_WEEKS) {
+  game.flags.promise = { kind, weeks, made: game.week, starts: 0 };
+  const club = game.myClub();
+  const who = club ? club.managerName : "המאמן";
+  const text = { start: `${who} הבטיח לך ${weeks} משחקים בהרכב.`,
+                 role: `${who} הבטיח לך את העמדה שלך.`,
+                 minutes: `${who} הבטיח לך דקות.`,
+                 leave: `${who} הבטיח לא לחסום מעבר בקיץ.` }[kind]
+             || `${who} הבטיח לך משהו.`;
+  return `🤝 ${text}`;
+}
+
+function activePromise(game) {
+  const row = game.flags.promise;
+  if (!row || typeof row !== "object" || (row.weeks || 0) <= 0) return null;
+  return row;
+}
+
+/** שבוע עובר על הבטחה. שבורה — זה עולה לו, לא לך. */
+function promiseTick(game, played) {
+  const row = activePromise(game);
+  if (!row) return null;
+  row.weeks -= 1;
+  if (played) row.starts = (row.starts || 0) + 1;
+  const club = game.myClub();
+  const who = club ? club.managerName : "המאמן";
+
+  if (row.weeks > 0) return null;
+  const kept = (row.starts || 0) >= Math.max(1, Math.floor(PROMISE_WEEKS / 2));
+  delete game.flags.promise;
+  if (kept) {
+    game.me.morale = clamp(game.me.morale + 8, 5, 99);
+    return `✅ ${who} עמד במילה שלו.`;
+  }
+  game.me.morale = clamp(game.me.morale - 12, 5, 99);
+  if (club) club.managerTrust = clamp(club.managerTrust + PROMISE_TRUST_BREAK, 0, 100);
+  game.setFlag("broken_promise", true);
+  return `💢 ${who} הבטיח ולא קיים. אתה זוכר בדיוק מה הוא אמר ובאיזה יום.`;
+}
+
+/** כמה סיכוי שהוא יגיד כן. גלוי לשחקן — זו החלטה, לא הימור עיוור. */
+function meetingOdds(game, difficulty) {
+  const club = game.myClub();
+  const trust = club ? club.managerTrust : 50;
+  const me = game.me;
+  let chance = 0.9 - difficulty;
+  chance += (trust - 50) / 145;
+  chance += (me.reputation - 40) / 320;
+  if (me.season.apps >= 5)
+    chance += clamp((avgRating(me.season) - 6.7) * 0.14, -0.12, 0.16);
+  if (game.flag("doghouse")) chance -= 0.22;
+  chance += (managerStyle(club)[4] - 1.0) * 0.18;   // מאמן שסולח יותר
+  return clamp(chance, 0.05, 0.92);
+}
+
+function meetingOptions(game) {
+  const club = game.myClub();
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return [];
+  const last = Number(game.flag("meeting_week", -99));
+  if (game.week - last < MEETING_COOLDOWN) return [];
+  return MEETINGS.map(([key, name, line, difficulty]) =>
+    ({ key, name, line, odds: meetingOdds(game, difficulty) }));
+}
+
+/** נכנס אליו למשרד ומבקש. יוצא עם משהו, או עם פחות ממה שנכנסת. */
+function managerRequest(game, key, rng) {
+  const club = game.myClub();
+  if (!club) return "אין לך מועדון.";
+  const row = MEETINGS.find(r => r[0] === key);
+  if (!row) return "לא ידוע.";
+  const [, , , difficulty, gain, cost] = row;
+  game.setFlag("meeting_week", game.week);
+  const who = club.managerName;
+
+  if (rng.random() < meetingOdds(game, difficulty)) {
+    club.managerTrust = clamp(club.managerTrust + gain, 0, 100);
+    game.setFlag("doghouse", false);
+    if (key === "role")
+      return givePromise(game, "start") + `\n${who}: "תוכיח לי שצדקתי."`;
+    if (key === "position")
+      return givePromise(game, "role") + `\n${who}: "בסדר. העמדה שלך."`;
+    if (key === "promise")
+      return givePromise(game, "minutes") + `\n${who}: "שלושה משחקים. לא יותר."`;
+    if (key === "leave") {
+      game.setFlag("free_to_leave", true);
+      return `🤝 ${who}: "אני לא כולא אף אחד. תביא הצעה נורמלית ואני לא אעמוד בדרך."`;
+    }
+    return `🎙️ ${who} הסביר בדיוק מה חסר לך, בלי לרכך. `
+         + `יצאת עם רשימה ולא עם תירוץ.`;
+  }
+
+  club.managerTrust = clamp(club.managerTrust + cost, 0, 100);
+  game.me.morale = clamp(game.me.morale - 5, 5, 99);
+  if ((key === "role" || key === "leave") && rng.random() < 0.45) {
+    game.setFlag("doghouse", true);
+    return `⛔ ${who}: "אתה לא במצב לבקש." מהשבוע הבא אתה מתאמן עם הקבוצה השנייה.`;
+  }
+  return `🚫 ${who} שמע עד הסוף ואמר "לא עכשיו". זה לא נשמע כמו "אחר כך".`;
+}
+
+/**
+ * הנהלה מאבדת סבלנות — ומאמן חדש הוא דף חדש, לטוב ולרע. כל היחסים
+ * שבנית חצי שנה נמחקים ברביעי בבוקר, והחדש לא חייב לך כלום.
+ */
+function maybeReplaceManager(game, rng) {
+  const club = game.myClub();
+  if (!club || !["academy", "player", "veteran"].includes(game.stage)) return null;
+  let pressure = 0;
+  if (club.boardConfidence < 35) pressure += 0.05;
+  if (club.boardConfidence < 22) pressure += 0.07;
+  if (club.fanSupport < 30) pressure += 0.02;
+  if (pressure <= 0 || rng.random() > pressure) return null;
+
+  const old = club.managerName;
+  club.managerName = rng.choice(D.MANAGER_NAMES.filter(n => n !== old));
+  // אמון מתאפס לאמצע, וכל מה שנצבר — הבטחות, כלוב, סרט — יורד לטמיון
+  club.managerTrust = clamp(rng.uniform(38, 58), 0, 100);
+  club.boardConfidence = clamp(club.boardConfidence + 12, 0, 100);
+  delete game.flags.promise;
+  game.setFlag("doghouse", false);
+  game.setFlag("new_manager", true);
+  const style = managerStyle(club);
+  return `📣 ${old} פוטר. ${club.managerName} נכנס — ${style[1]}. ${style[2]}\n`
+       + `   כל מה שבנית מול הקודם — מתחיל מאפס.`;
+}

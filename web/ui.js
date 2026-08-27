@@ -635,7 +635,12 @@ function screenMenu() {
         <div class="note"><span class="ico">⚽</span><span>3 ליגות, 32 מועדונים, סימולציה מלאה של כל משחק בעונה.</span></div>
         <div class="note"><span class="ico">👀</span><span>אקדמיות שולחות צופים כבר בגיל 13 — ואם כמה רבות עליך, הערך שלך עולה עוד לפני שהוכחת משהו.</span></div>
         <div class="note"><span class="ico">👪</span><span>בגיל הנוער ההחלטה היא של המשפחה. להורים יש דעה משלהם, ואפשר לנסות לשכנע.</span></div>
-        <div class="note"><span class="ico">🤝</span><span>שוק העברות עם משא ומתן על שכר, שנים, מענק, סעיף שחרור ותפקיד — ומועדון שמאבד סבלנות קם מהשולחן.</span></div>
+        <div class="note"><span class="ico">📞</span><span>סוכנים אמיתיים: כריש שמייצר לך הצעות ומחסל עסקאות של אחרים, סוכן משפחה שלא יעשה נזק ולא נס. הוא פועל לבד, וגובה אחוזים.</span></div>
+        <div class="note"><span class="ico">🎙️</span><span>למאמן יש משקל: מועדף או בכלוב, הבטחות שנשמרות או נשברות, ופגישה בארבע עיניים שאפשר לצאת ממנה עם הרכב — או בלי.</span></div>
+        <div class="note"><span class="ico">☕</span><span>30 פגישות מקריות: מנהל ספורטיבי באותו מלון, אגדה שמתקשרת, יאכטה של איל הון, והצעה אחת שאסור לשמוע.</span></div>
+        <div class="note"><span class="ico">🏡</span><span>ההורים לא נעלמים כשמצליחים — יש להם בקשות וגאווה. ובן/בת זוג עם תמיכה, זרקור, ולפעמים פרידה שנמשכת חודשיים.</span></div>
+        <div class="note"><span class="ico">💎</span><span>עילוי? כל אירופה על הדלת: שכר כפול, מענקים, התחייבות לדקות והבטחות בכתב.</span></div>
+        <div class="note"><span class="ico">🤝</span><span>שוק העברות עם משא ומתן על שכר, שנים, מענק, סעיף שחרור, דקות, מענק נאמנות ותפקיד — ומועדון שמאבד סבלנות קם מהשולחן.</span></div>
         <div class="note"><span class="ico">📰</span><span>עיתונות עם מקורות באמינות שונה. לא כל שמועה נכונה, ואתה מחליט אם להכחיש.</span></div>
         <div class="note"><span class="ico">💼</span><span>ככל שהשם גדל: חסויות, שותפויות עסקיות, קמפיינים והצעות מליגות זרות.</span></div>
         <div class="note"><span class="ico">📈</span><span>47 תכונות בסולם 1-20, 42 תפקידים, ומסך שמסביר לכל תכונה אם אתה צריך אותה עכשיו.</span></div>
@@ -874,7 +879,7 @@ const TAB_ICONS = {
   main: "🏠", mentor: "🧭", plan: "🗺️", growth: "📈", club: "🏟️",
   tactics: "♟️", system: "🧩", squad: "👥", table: "📊", money: "💰",
   press: "📰", fame: "⭐", offers: "🤝", academies: "🎓", profile: "🪪",
-  news: "📬", editor: "✏️",
+  news: "📬", editor: "✏️", agent: "📞", life: "🏡", boss: "🎙️",
 };
 
 function tabsBar() {
@@ -891,14 +896,24 @@ function tabsBar() {
   const offers = ["player", "veteran"].includes(game.stage) ? liveOffers(game).length : 0;
   const question = openQuestion(game) ? 1 : 0;
   const venture = game.flag("venture") ? 1 : 0;
-  if (["academy", "player", "veteran"].includes(game.stage))
+  if (["academy", "player", "veteran"].includes(game.stage)) {
+    // סוכן/מאמן/חיים בראש הרשימה בכוונה: סרגל הטאבים נגלל, ומה
+    // שיושב בסוף שלו פשוט לא נראה — וזה כמו שהמערכת לא קיימת.
+    items.splice(1, 0, ["agent", "סוכן"], ["boss", "מאמן"], ["life", "חיים"]);
     items.splice(items.length - 1, 0, ["press", "תקשורת"], ["fame", "שם"]);
+  }
   if (offers) items.splice(1, 0, ["offers", "הצעות"]);
   // בגיל הנוער הטאב הזה הוא כל הסיפור: מי מסתכל עליך, ומי כבר פנה
   const academies = game.stage === "youth" ? liveYouthOffers(game).length : 0;
   const looking = game.stage === "youth" ? youthWatchers(game).length : 0;
   if (game.stage === "youth") items.splice(1, 0, ["academies", "אקדמיות"]);
+  // תג על "סוכן" כשמחכים לך מועמדים, ועל "חיים" כשההורים ביקשו משהו
+  const agentWaiting = Array.isArray(game.flags.agent_offers)
+    && game.flags.agent_offers.length ? 1 : 0;
+  const homeWaiting = ["academy", "player", "veteran"].includes(game.stage)
+    && parents(game).ask ? 1 : 0;
   const badges = { offers, press: question, fame: venture,
+                   agent: agentWaiting, life: homeWaiting,
                    academies: academies || (looking ? 0 : 0) };
   return `<nav class="tabs">${items.map(([k, l]) => {
     const n = badges[k] || 0;
@@ -937,6 +952,9 @@ function screenMain() {
   if (view === "press") return appbar() + screenPress();
   if (view === "fame") return appbar() + screenFame();
   if (view === "academies") return appbar() + screenAcademies();
+  if (view === "agent") return appbar() + screenAgent();
+  if (view === "life") return appbar() + screenLife();
+  if (view === "boss") return appbar() + screenBoss();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -1631,6 +1649,56 @@ function screenHub() {
       </div>`;
   }
 
+  // --- מי מסביבך: סוכן, מאמן, בית ורעש בשוק ---
+  // מערכת בלי מסך היא "לא קרה כלום". הפאנל הזה הוא הדלת לשלושת
+  // המסכים החדשים, והוא מציג את השורה האחת שחשובה מכל אחד מהם.
+  const around = isPlayer && game.stage !== "youth" ? (() => {
+    const agent = agentRow(game);
+    const boom = frenzy(game);
+    const heat = frenzyWord(game);
+    const promise = activePromise(game);
+    const par = parents(game);
+    const mate = partner(game);
+    const rows = [];
+    rows.push(`<div class="row link" data-go="agent">
+      <span class="msg-ico">📞</span>
+      <span class="grow"><span class="nm">${agent
+        ? esc(agent.name) + " · " + esc(agentType(agent)[1])
+        : "אין לך סוכן"}</span>
+        <span class="sub">${agent
+          ? (agent.target && game.clubs[agent.target]
+              ? "עובד על " + esc(game.clubs[agent.target].name)
+              : "עמלה " + agent.cut + "%")
+          : "מועדון לא מרים טלפון לשחקן שאף אחד לא מדבר עליו"}</span></span>
+      <span class="val">›</span></div>`);
+    if (club) {
+      const [, standName] = managerStanding(game);
+      rows.push(`<div class="row link" data-go="boss">
+        <span class="msg-ico">🎙️</span>
+        <span class="grow"><span class="nm">${esc(standName)}</span>
+          <span class="sub">${promise
+            ? "הבטחה פתוחה — עוד " + promise.weeks + " שבועות"
+            : esc(club.managerName)}</span></span>
+        <span class="val">›</span></div>`);
+    }
+    rows.push(`<div class="row link" data-go="life">
+      <span class="msg-ico">🏡</span>
+      <span class="grow"><span class="nm">${mate
+        ? esc(mate.name) + " · " + esc(partnerStageName(mate))
+        : "הבית"}</span>
+        <span class="sub">${par.ask
+          ? "אבא שלך ביקש: " + esc(par.ask.name)
+          : esc(homeLine(game))}</span></span>
+      <span class="val">›</span></div>`);
+    return `
+    <div class="panel wide">
+      <div class="panel-head"><span class="t">מי מסביבך</span>
+        ${boom > 1.05 ? `<span class="r gold">שוק בוער ×${boom.toFixed(1)}</span>` : ""}</div>
+      <div class="panel-body tight">${rows.join("")}</div>
+      ${heat ? `<div class="panel-body"><div class="muted">🔥 ${esc(heat)}</div></div>` : ""}
+    </div>`;
+  })() : "";
+
   // --- גרף ההתפתחות ---
   // שני מספרים אינם קו. עד שיש שלוש נקודות עדיף לא להראות כלום מאשר
   // להראות גרף שטוח שנראה כאילו נתקעת.
@@ -1726,6 +1794,7 @@ function screenHub() {
     ${systemSnip()}
     ${scoutSnip()}
     ${clubSnip()}
+    ${around}
     ${tableSnip}
     ${trendPanel}
     ${messages}
@@ -2494,6 +2563,228 @@ function pressRow(item) {
 // שם — מה השם שלך שווה מחוץ למגרש
 // ---------------------------------------------------------------------------
 
+/**
+ * הסוכן — מי מייצג אותך, מה הוא עשה השבוע, וכמה הוא לוקח.
+ *
+ * זה המסך שהופך את הסוכן מטקסט בדוח לדמות: רואים את הטווח שלו, את
+ * מה שהוא חושב עליך, ואת רשימת המהלכים שהוא עשה בלי לשאול.
+ */
+function screenAgent() {
+  const row = agentRow(game);
+  const candidates = Array.isArray(game.flags.agent_offers)
+    ? game.flags.agent_offers : [];
+  const kind = agentType(row);
+
+  const card = row ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(kind[1])}</span>
+        <span class="r num">${row.cut}%</span></div>
+      <div class="panel-body">
+        <div class="dash-head" style="padding:0">
+          <span class="who"><span class="nm">${esc(row.name)}</span>
+            <span class="sub">${esc(kind[2])}</span></span>
+          ${ring(row.trust, { size: 52, label: "יחס", tone: ratingTone(row.trust) })}
+        </div>
+        <div class="meters">
+          ${meter("טווח", kind[4] * 100, { tone: "accent" })}
+          ${verdictRow("מגיע עד", reachWord(kind[4]), "")}
+          ${verdictRow("עמלה", row.cut + "% מהשכר ומהמענקים", "warn")}
+          ${verdictRow("עסקאות", String(row.deals), "")}
+        </div>
+        ${row.target && game.clubs[row.target] ? `<div class="note">
+          <span class="ico">🎯</span><span>עובד עכשיו על
+          <strong>${esc(game.clubs[row.target].name)}</strong> —
+          ${Math.round(Number((game.flags.scout_interest || {})[row.target] || 0))}%
+          מהדרך.</span></div>` : ""}
+        ${(row.moves || []).length ? `<hr class="rule">
+          <div class="muted">מה שהוא עשה לאחרונה</div>
+          <div class="notes">${row.moves.slice().reverse().map(m =>
+            `<div class="note"><span class="ico">·</span><span>${esc(m)}</span></div>`
+          ).join("")}</div>` : ""}
+        ${(row.burned || []).length ? `<div class="note"><span class="ico">🕳️</span>
+          <span>שרוף מול: ${esc((row.burned || [])
+            .map(c => game.clubs[c] && game.clubs[c].name).filter(Boolean)
+            .join(", "))}</span></div>` : ""}
+        <div class="btn-row">
+          <button class="btn" data-agentmarket="1">לשמוע סוכנים אחרים</button>
+          <button class="btn ghost" data-agentfire="1">לפטר</button>
+        </div>
+      </div>
+    </div>`
+  : `<div class="panel">
+      <div class="panel-head"><span class="t">אין לך סוכן</span></div>
+      <div class="panel-body">
+        <div class="muted">אתה מנהל את הקריירה שלך לבד. זה חוסך עמלה,
+        וזה נראה בכמות ההצעות שמגיעות — מועדון לא מרים טלפון לשחקן
+        שאף אחד לא מדבר עליו.</div>
+        <button class="btn primary wide" data-agentmarket="1">לחפש סוכן</button>
+      </div>
+    </div>`;
+
+  const list = candidates.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מי מוכן לייצג אותך</span>
+        <span class="r">${candidates.length}</span></div>
+      <div class="panel-body">
+        ${candidates.map((c, i) => {
+          const k = AGENT_BY_KEY[c.kind] || AGENT_BY_KEY.family;
+          return `<div class="card" style="border-color:var(--line)">
+            <div class="crest-row">
+              <span class="nm"><strong>${esc(c.name)}</strong> · ${esc(k[1])}</span>
+            </div>
+            <div class="muted">${esc(k[2])}</div>
+            <div class="meters">
+              ${meter("טווח", k[4] * 100, { tone: "accent" })}
+              ${meter("תוקפנות", k[5] * 100, { tone: k[5] > 0.6 ? "bad" : "warn" })}
+              ${verdictRow("עמלה", c.cut + "%", c.cut > 8 ? "bad" : "good")}
+            </div>
+            <button class="btn primary wide" data-agentsign="${i}">
+              לחתום עם ${esc(c.name)}</button>
+          </div>`;
+        }).join("")}
+        <div class="muted">כריש יביא לך הצעות שלא היית רואה אחרת — ויעשה
+        את זה בדרכים שיחזרו אליך. סוכן משפחה לא יעשה לך נזק, וגם לא נס.</div>
+      </div>
+    </div>` : "";
+
+  return `<div class="screen">${card}${list}</div>`;
+}
+
+/**
+ * החיים מחוץ למגרש: ההורים ובן/בת הזוג.
+ *
+ * המשפחה נכנסה למשחק בגיל שלוש־עשרה ונעלמה. כאן היא חוזרת — עם
+ * גאווה שאפשר לאבד, בקשות שעולות כסף, ובית שמחכה בסוף השבוע.
+ */
+function screenLife() {
+  const par = parents(game);
+  const row = partner(game);
+  const acts = lifeActions(game);
+
+  const parentPanel = `
+    <div class="panel">
+      <div class="panel-head"><span class="t">ההורים</span>
+        <span class="r">${esc(prideWord(par.pride))}</span></div>
+      <div class="panel-body">
+        <div class="meters">${meter("גאווה", par.pride)}</div>
+        ${par.ask ? `<div class="note"><span class="ico">📞</span>
+          <span><strong>${esc(par.ask.name)}</strong> — ${esc(par.ask.why)}
+          <br><span class="muted num">₪${fmt(par.ask.cost)}</span></span></div>` : ""}
+        ${par.given.length ? `<div class="muted">כבר עשית בשבילם:
+          ${esc(par.given.map(k => (PARENT_ASKS.find(r => r[0] === k) || ["", k])[1])
+            .join(" · "))}</div>` : ""}
+      </div>
+    </div>`;
+
+  const partnerPanel = row ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(row.name)}</span>
+        <span class="r">${esc(partnerStageName(row))}</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc((PARTNER_BY_KIND[row.kind] || [])[2] || "")}</div>
+        <div class="meters">
+          ${meter("מצב הקשר", row.mood)}
+          ${meter("תמיכה", row.support, { tone: "good" })}
+          ${meter("זרקור", row.spotlight, { tone: "accent" })}
+          ${row.kids ? verdictRow("ילדים", String(row.kids), "") : ""}
+        </div>
+        <div class="muted">${row.spotlight >= 60
+          ? "כל יציאה שלכם היא ידיעה. זה מגדיל את השם שלך, וגם את הרעש."
+          : "היא לא מביאה מצלמות, והיא מחזיקה אותך כשקשה."}</div>
+        ${row.mood < 40 ? `<div class="note"><span class="ico">⚠️</span>
+          <span>זה לא במקום טוב. עוד כמה שבועות כאלה וזה ייגמר.</span></div>` : ""}
+      </div>
+    </div>`
+  : `<div class="panel">
+      <div class="panel-head"><span class="t">לבד</span></div>
+      <div class="panel-body"><div class="muted">אין מי שמחכה בבית.
+      זה יקרה במקרה — ערב התרמה, חבר שמסדר משהו, פגישה שלא תכננת.</div>
+      ${game.flag("heartbreak") ? `<div class="note"><span class="ico">💔</span>
+        <span>עוד ${game.flag("heartbreak")} שבועות עד שהראש יחזור למגרש
+        לגמרי.</span></div>` : ""}</div>
+    </div>`;
+
+  const actions = acts.length ? `
+    <div class="panel">
+      <div class="panel-head"><span class="t">מה אפשר לעשות</span></div>
+      <div class="panel-body actions">
+        ${acts.map(a => `<button class="btn" data-life="${esc(a.key)}"
+          ${a.cost > game.money ? "disabled" : ""}>
+          <span class="k">${esc(a.name)}</span>
+          <span class="hint">${a.cost ? "₪" + fmt(a.cost) : esc(a.note)}</span>
+        </button>`).join("")}
+      </div>
+    </div>` : "";
+
+  return `<div class="screen">${parentPanel}${partnerPanel}${actions}</div>`;
+}
+
+/**
+ * המאמן — איפה אתה עומד אצלו, ומה אפשר לבקש.
+ *
+ * זה מה שהיה חסר: `managerTrust` היה מספר, וכאן הוא הופך להחלטה.
+ * הסיכויים גלויים בכוונה — פגישה היא הימור מחושב, לא רולטה.
+ */
+function screenBoss() {
+  const club = game.myClub();
+  if (!club) return `<div class="screen"><div class="card">אין לך מועדון.</div></div>`;
+  const [key, name] = managerStanding(game);
+  const promise = activePromise(game);
+  const meetings = meetingOptions(game);
+  const style = managerStyle(club);
+  const trust = Math.round(club.managerTrust);
+
+  return `<div class="screen">
+    <div class="panel">
+      <div class="panel-head"><span class="t">${esc(club.managerName)}</span>
+        <span class="r">${esc(style[1])}</span></div>
+      <div class="panel-body">
+        <div class="dash-head" style="padding:0">
+          <span class="who"><span class="nm">${esc(name)}</span>
+            <span class="sub">${esc(style[2])}</span></span>
+          ${ring(trust, { size: 56, label: "אמון", tone: ratingTone(trust) })}
+        </div>
+        <div class="muted">${esc(standingLine(game))}</div>
+        ${game.flag("doghouse") ? `<div class="note"><span class="ico">⛔</span>
+          <span>אתה מתאמן עם הקבוצה השנייה. משחק אחד טוב לא יוציא אותך
+          מכאן — צריך זמן, או מאמן אחר.</span></div>` : ""}
+        ${game.flag("broken_promise") ? `<div class="note"><span class="ico">💢</span>
+          <span>הוא כבר הבטיח לך פעם אחת ולא קיים.</span></div>` : ""}
+      </div>
+    </div>
+
+    ${promise ? `
+    <div class="panel" style="border-color:var(--good)">
+      <div class="panel-head"><span class="t">הבטחה פתוחה</span>
+        <span class="r">${promise.weeks} שבועות</span></div>
+      <div class="panel-body">
+        <div class="muted">${esc({ start: "הבטיח לך משחקים בהרכב.",
+          role: "הבטיח לך את העמדה שלך.", minutes: "הבטיח לך דקות.",
+          leave: "הבטיח לא לחסום מעבר." }[promise.kind] || "הבטיח לך משהו.")}</div>
+        ${meter("קוים עד עכשיו", (promise.starts || 0),
+                { max: Math.max(1, PROMISE_WEEKS), tone: "good",
+                  text: `${promise.starts || 0}/${PROMISE_WEEKS}` })}
+      </div>
+    </div>` : ""}
+
+    <div class="panel">
+      <div class="panel-head"><span class="t">פגישה בארבע עיניים</span>
+        <span class="r">${meetings.length ? "" : "לא עכשיו"}</span></div>
+      <div class="panel-body actions">
+        ${meetings.length ? meetings.map(m => `
+          <button class="btn" data-meet="${esc(m.key)}">
+            <span class="k">${esc(m.name)}</span>
+            <span class="hint">${Math.round(m.odds * 100)}% שיסכים</span>
+          </button>`).join("")
+        : `<div class="muted">היית אצלו לאחרונה. מאמן שדופקים לו על הדלת
+           כל שבוע מפסיק לפתוח אותה — חכה כמה שבועות.</div>`}
+        ${meetings.length ? `<div class="muted">בקשה שנדחית עולה באמון,
+          ובקשה גדולה שנדחית יכולה לשלוח אותך לקבוצה השנייה.</div>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
 function screenFame() {
   const offer = game.flag("venture");
   const ventures = ventureBook(game);
@@ -3259,6 +3550,44 @@ function bind() {
       const text = pressReact(game, el.dataset.press, game.rng);
       saveGame();
       showOutcome("התגובה שלך", text);
+    }));
+
+  // -- סוכן ------------------------------------------------------------
+  // בלי מסך ביניים: פתיחת השוק היא לא החלטה, היא רק פותחת את
+  // הרשימה — ומסך תוצאה באמצע היה זורק אותך חזרה לסקירה.
+  app.querySelectorAll("[data-agentmarket]").forEach(el =>
+    el.addEventListener("click", () => {
+      game.openAgentMarket();
+      saveGame();
+      go("agent");
+    }));
+  app.querySelectorAll("[data-agentsign]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.signAgent(+el.dataset.agentsign);
+      saveGame();
+      showOutcome("סוכן חדש", text);
+    }));
+  app.querySelectorAll("[data-agentfire]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.fireAgent();
+      saveGame();
+      showOutcome("פרידה", text);
+    }));
+
+  // -- חיים אישיים -----------------------------------------------------
+  app.querySelectorAll("[data-life]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.doLifeAction(el.dataset.life);
+      saveGame();
+      showOutcome("הבית", text);
+    }));
+
+  // -- פגישה עם המאמן --------------------------------------------------
+  app.querySelectorAll("[data-meet]").forEach(el =>
+    el.addEventListener("click", () => {
+      const text = game.managerRequest(el.dataset.meet);
+      saveGame();
+      showOutcome("במשרד שלו", text);
     }));
 
   // -- מיזמים ---------------------------------------------------------

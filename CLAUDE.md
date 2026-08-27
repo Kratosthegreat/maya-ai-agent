@@ -75,7 +75,10 @@ playwright מותקן ב-scratchpad, כרומיום ב-`/opt/pw-browsers/`.
 |---|---|---|
 | אימון, גדילה, הזדקנות | `progression.py` | `engine.js` |
 | הסבר תכונות, תחזיות | `coaching.py` | `coaching.js` |
-| **שוק העברות + משא ומתן** | `transfers.py` | `transfers.js` |
+| **שוק העברות + משא ומתן + עילוי** | `transfers.py` | `transfers.js` |
+| **סוכנים** | `agents.py` | `agents.js` |
+| **הורים ובן/בת זוג** | `life.py` | `life.js` |
+| **פגישות מקריות** (נתונים) | `encounter_pack.py` | דרך `data.js` |
 | **ציד ילדים + הורים** | `youth.py` | `youth.js` |
 | **עיתונות ושמועות** | `press.py` | `press.js` |
 | **שם עולמי, מיזמים** | `fame.py` | `fame.js` |
@@ -86,7 +89,7 @@ playwright מותקן ב-scratchpad, כרומיום ב-`/opt/pw-browsers/`.
 | מאמן והוראות | `manager.py` | `manager.js` |
 | מסלול פיתוח | `development.py` | `development.js` |
 | טקטיקה | `tactics.py` | `tacticsteam.js` |
-| עלילה | `story.py`, `story_pack.py`, `story_engine.py` | `story.js` |
+| עלילה ופגישות | `story.py`, `story_pack.py`, `story_engine.py`, `encounter_pack.py` | `story.js` |
 | שמירה ודחיסה | — | `save.js` |
 
 `web/build.py` מכיל את `JS_PARTS` — **קובץ JS חדש חייב להירשם שם
@@ -117,7 +120,16 @@ IndexedDB תוספת. לכל פנייה ל-IDB יש שעון עצר — פניי
 **דגלים:** מצב מערכות יושב ב-`game.flags` ונשמר אוטומטית. מפתחות
 בשימוש: `offers`, `youth_offers`, `youth_interest`, `family`, `press`,
 `venture`, `ventures`, `royalties`, `academy_deal`, `squad_role`,
-`release_clause`, `directive`, `school`.
+`release_clause`, `directive`, `school`, `agent`, `agent_offers`,
+`parents`, `partner`, `heartbreak`, `promise`, `doghouse`, `hype`,
+`minutes_clause`, `loyalty_bonus`, `club_promises`.
+
+**אירוע חדש נכתב כנתונים, לא כקוד.** `story_engine.py` הוא מפרש
+שרץ בשני המנועים; `story_pack.py` (תחנות בדרך, `once`) ו-
+`encounter_pack.py` (פגישות מקריות, `cooldown`) הן טבלאות. שורה
+חדשה עוברת דרך `gen_data.py` ל-`data.js` — **פעם אחת, שני מנועים**.
+אפקט או תנאי חדש כן צריך מימוש בשניהם: `EFFECT_KEYS`/`CONDITIONS`
+בפייתון ו-`EFFECT_KEYS`/`STORY_CONDITIONS` ב-`web/story.js`.
 
 ---
 

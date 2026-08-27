@@ -33,6 +33,9 @@ from football_manager import transfers as TR
 from football_manager import press as PR
 from football_manager import fame as FA
 from football_manager import youth as YT
+from football_manager import agents as AG
+from football_manager import life as LF
+from football_manager.encounter_pack import PACK as ENCOUNTERS
 from football_manager.engine import medical_care
 from football_manager.progression import (age_factor, end_of_season_development,
                                           weekly_training)
@@ -2608,3 +2611,414 @@ def test_a_foreign_approach_is_bigger_news_than_a_local_one():
         weights[foreign] = rows[0]["weight"] if rows else 0
     assert weights[True] > weights[False], (
         f"פנייה מחו\"ל שוקלת {weights[True]} מול מקומית {weights[False]}")
+
+
+# ---------------------------------------------------------------------------
+# סוכנים
+# ---------------------------------------------------------------------------
+
+def _pro(age=24, seed=5, overall_boost=True):
+    """שחקן בוגר עם מועדון — הבסיס לרוב הבדיקות של השוק."""
+    game = GameState.new_game("בודק", "ST", "maccabi_harel", age, seed)
+    return game
+
+
+def test_an_agent_takes_his_cut_out_of_every_wage():
+    game = _pro()
+    game.me.contract.wage = 100_000
+    before = game.money
+    game.advance_week()
+    without = game.money - before
+
+    game = _pro()
+    game.me.contract.wage = 100_000
+    game.flags["agent"] = AG.make_agent("shark", random.Random(1))
+    game.flags["agent"]["cut"] = 10.0
+    before = game.money
+    game.advance_week()
+    with_agent = game.money - before
+    assert with_agent < without, f"עם סוכן {with_agent}, בלי {without}"
+
+
+def test_a_bigger_agent_reaches_bigger_clubs():
+    game = _pro()
+    small = AG._candidate_clubs(game, AG.AGENT_BY_KEY["family"][4])
+    big = AG._candidate_clubs(game, AG.AGENT_BY_KEY["shark"][4])
+    top_small = max(c.reputation for c in small) if small else 0
+    top_big = max(c.reputation for c in big) if big else 0
+    assert top_big > top_small, f"כריש {top_big} מול סוכן משפחה {top_small}"
+
+
+def test_the_campaign_works_one_club_over_weeks():
+    game = _pro()
+    game.flags["agent"] = AG.make_agent("connected", random.Random(3))
+    row = game.flags["agent"]
+    rng = random.Random(9)
+    targets = set()
+    for _ in range(6):
+        AG._campaign(game, row, rng)
+        if row.get("target"):
+            targets.add(row["target"])
+    assert len(targets) == 1, f"הקמפיין קפץ בין {len(targets)} יעדים"
+    book = game.flags.get("scout_interest", {})
+    assert book.get(row["target"], 0) > 0, "הקמפיין לא הזיז את ההתעניינות"
+
+
+def test_the_campaign_moves_on_once_the_club_is_ready():
+    game = _pro()
+    game.flags["agent"] = AG.make_agent("connected", random.Random(3))
+    row = game.flags["agent"]
+    rng = random.Random(4)
+    AG._campaign(game, row, rng)              # פותח יעד
+    first = row["target"]
+    game.flags["scout_interest"][first] = 99.0
+    AG._campaign(game, row, rng)              # מכריז "מוכנים"
+    AG._campaign(game, row, rng)              # ועובר הלאה
+    assert row["target"] != first, "הסוכן נשאר על יעד שכבר בשל"
+
+
+def test_a_family_agent_never_sabotages():
+    game = _pro()
+    game.flags["agent"] = AG.make_agent("family", random.Random(2))
+    clubs = [c for c in game.clubs.values() if c.cid != game.me.club_id][:2]
+    TR.set_offers(game, [TR.build_offer(game, c, game.rng, 0.8) for c in clubs])
+    AG._sabotage(game, game.flags["agent"], random.Random(1), TR.live_offers(game))
+    assert len(TR.live_offers(game)) == 2, "סוכן המשפחה חיסל הצעה"
+
+
+def test_sabotage_kills_a_rival_offer_and_lifts_the_other():
+    game = _pro()
+    game.flags["agent"] = AG.make_agent("shark", random.Random(2))
+    clubs = [c for c in game.clubs.values() if c.cid != game.me.club_id][:2]
+    TR.set_offers(game, [TR.build_offer(game, c, game.rng, 0.8) for c in clubs])
+    live = TR.live_offers(game)
+    best_before = live[0]["wage"]
+    AG._sabotage(game, game.flags["agent"], random.Random(1), live)
+    after = TR.live_offers(game)
+    assert len(after) == 1, "החבלה לא הורידה הצעה מהשולחן"
+    assert after[0]["wage"] >= best_before, "מי שנשאר לא שיפר"
+
+
+def test_firing_a_shark_can_close_a_door():
+    game = _pro()
+    game.flags["agent"] = AG.make_agent("shark", random.Random(2))
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    closed = 0
+    for seed in range(30):
+        game = _pro(seed=seed)
+        game.flags["agent"] = AG.make_agent("shark", random.Random(2))
+        game.flags["scout_interest"] = {club.cid: 80.0}
+        game.rng = random.Random(seed)
+        game.fire_agent()
+        if game.flags["scout_interest"][club.cid] == 0.0:
+            closed += 1
+    assert 3 <= closed <= 27, f"{closed}/30 — פיטורים שהם ודאיים אינם סיכון"
+
+
+def test_you_cannot_sign_a_super_agent_as_a_nobody():
+    game = GameState.new_game("ילד", "ST", "hapoel_carmel", 13, 4)
+    kinds = {row["kind"] for row in AG.market(game, random.Random(7))}
+    assert "super" not in kinds and "shark" not in kinds, kinds
+
+
+# ---------------------------------------------------------------------------
+# חיים אישיים
+# ---------------------------------------------------------------------------
+
+def test_a_supportive_partner_lifts_you_and_a_broken_one_does_not():
+    game = _pro()
+    game.flags["partner"] = LF.make_partner("hometown", random.Random(1))
+    game.flags["partner"]["mood"] = 90
+    good = LF.support_bonus(game)
+    game.flags["partner"]["mood"] = 25
+    bad = LF.support_bonus(game)
+    assert good > 0 > bad, f"טוב {good}, רע {bad}"
+
+
+def test_neglect_wears_the_relationship_down():
+    game = _pro()
+    game.flags["partner"] = LF.make_partner("student", random.Random(1))
+    game.intensity = 1.3
+    start = game.flags["partner"]["mood"]
+    for _ in range(10):
+        LF._partner_week(game, random.Random(2))
+    assert game.flags["partner"]["mood"] < start - 5, "עצימות גבוהה לא נגבתה"
+
+
+def test_a_holiday_repairs_what_the_season_broke():
+    game = _pro()
+    game.money = 5_000_000
+    game.flags["partner"] = LF.make_partner("student", random.Random(1))
+    game.flags["partner"]["mood"] = 40
+    LF.do_action(game, "holiday")
+    assert game.flags["partner"]["mood"] > 55
+    assert game.money < 5_000_000
+
+
+def test_gifts_stop_working_when_you_only_send_gifts():
+    game = _pro()
+    game.money = 10_000_000
+    game.flags["partner"] = LF.make_partner("model", random.Random(1))
+    game.flags["partner"]["mood"] = 50
+    gains = []
+    for _ in range(4):
+        before = game.flags["partner"]["mood"]
+        LF.do_action(game, "gift")
+        gains.append(game.flags["partner"]["mood"] - before)
+    assert gains[0] > gains[-1], f"מתנה רביעית שווה כמו ראשונה: {gains}"
+
+
+def test_a_breakup_leaves_a_mark_for_weeks():
+    game = _pro()
+    game.flags["heartbreak"] = 4
+    before = game.me.morale
+    for _ in range(4):
+        LF.heartbreak_tick(game)
+    assert game.me.morale < before, "הפרידה לא נמדדה"
+    assert game.flags["heartbreak"] == 0
+
+
+def test_helping_your_parents_costs_money_and_buys_pride():
+    game = _pro()
+    game.money = 3_000_000
+    par = LF.parents(game)
+    par["ask"] = {"key": "house", "name": "בית להורים", "why": "כי כן",
+                  "cost": 1_400_000, "pride": 26}
+    before = par["pride"]
+    LF.grant_ask(game)
+    assert game.money < 3_000_000
+    assert LF.parents(game)["pride"] > before
+
+
+def test_saying_no_to_your_parents_costs_something_too():
+    game = _pro()
+    par = LF.parents(game)
+    par["ask"] = {"key": "car", "name": "אוטו", "why": "כי כן",
+                  "cost": 180_000, "pride": 12}
+    before = par["pride"]
+    LF.decline_ask(game)
+    assert LF.parents(game)["pride"] < before
+
+
+def test_you_cannot_propose_the_week_you_met():
+    game = _pro()
+    game.money = 50_000_000
+    game.flags["partner"] = LF.make_partner("hometown", random.Random(1))
+    keys = {row["key"] for row in LF.actions(game)}
+    assert "advance" not in keys, "אפשר להתארס בשבוע הראשון"
+    game.flags["partner"]["weeks"] = 40
+    game.flags["partner"]["mood"] = 80
+    keys = {row["key"] for row in LF.actions(game)}
+    assert "advance" in keys
+
+
+# ---------------------------------------------------------------------------
+# למאמן יש משקל
+# ---------------------------------------------------------------------------
+
+def test_the_manager_opinion_changes_who_plays():
+    game = _pro()
+    club = game.my_club
+    club.manager_trust = 90
+    high = MG.selection_bonus(game)
+    club.manager_trust = 15
+    game.set_flag("doghouse", True)
+    low = MG.selection_bonus(game)
+    assert high > 0 > low, f"מועדף {high}, בכלוב {low}"
+
+
+def test_being_frozen_out_keeps_you_out_of_the_side():
+    game = _pro()
+    club = game.my_club
+    club.manager_trust = 95
+    starts_high = sum(game._selected() for _ in range(10))
+    club.manager_trust = 8
+    game.set_flag("doghouse", True)
+    starts_low = sum(game._selected() for _ in range(10))
+    assert starts_high >= starts_low, f"{starts_high} מול {starts_low}"
+
+
+def test_a_kept_promise_pays_and_a_broken_one_costs():
+    game = _pro()
+    MG.give_promise(game, "start", weeks=2)
+    before = game.me.morale
+    MG.promise_tick(game, True)
+    MG.promise_tick(game, True)
+    assert game.me.morale > before, "הבטחה שקוימה לא הורגשה"
+
+    game = _pro()
+    MG.give_promise(game, "start", weeks=2)
+    before = game.me.morale
+    MG.promise_tick(game, False)
+    MG.promise_tick(game, False)
+    assert game.me.morale < before, "הבטחה שנשברה לא הורגשה"
+    assert game.flag("broken_promise")
+
+
+def test_a_promise_gets_you_into_the_team_while_it_lasts():
+    game = _pro()
+    plain = MG.selection_bonus(game)
+    MG.give_promise(game, "start")
+    assert MG.selection_bonus(game) > plain
+
+
+def test_asking_for_too_much_can_freeze_you_out():
+    frozen = 0
+    for seed in range(40):
+        game = _pro(seed=seed)
+        game.my_club.manager_trust = 20
+        MG.request(game, "role", random.Random(seed))
+        if game.flag("doghouse"):
+            frozen += 1
+    assert 3 <= frozen <= 37, f"{frozen}/40 — בקשה היא הימור, לא ודאות"
+
+
+def test_you_cannot_knock_on_his_door_every_week():
+    game = _pro()
+    assert MG.meeting_options(game), "אין פגישות בכלל"
+    MG.request(game, "why", random.Random(1))
+    assert not MG.meeting_options(game), "אפשר להיכנס אליו שוב מיד"
+
+
+def test_a_new_manager_wipes_the_slate():
+    game = _pro()
+    club = game.my_club
+    club.board_confidence = 10
+    club.manager_trust = 95
+    MG.give_promise(game, "start")
+    old = club.manager_name
+    swapped = False
+    for seed in range(60):
+        if MG.maybe_replace(game, random.Random(seed)):
+            swapped = True
+            break
+    assert swapped, "מאמן לא הוחלף גם כשההנהלה קרסה"
+    assert club.manager_name != old
+    assert game.flag("promise") is None, "הבטחה שרדה מאמן מפוטר"
+
+
+# ---------------------------------------------------------------------------
+# עילוי — כשכולם רוצים אותך
+# ---------------------------------------------------------------------------
+
+def _wonderkid(seed=5):
+    game = GameState.new_game("עילוי", "ST", "maccabi_harel", 19, seed)
+    set_all(game.me, 82)
+    game.me.potential = 95
+    game.me.ceiling = 97
+    game.me.reputation = 70
+    game.flags["hype"] = 80
+    return game
+
+
+def test_a_prodigy_moves_the_market():
+    plain = GameState.new_game("רגיל", "ST", "maccabi_harel", 28, 5)
+    assert TR.frenzy(plain) == 1.0, "שחקן בן 28 יצר טירוף"
+    kid = _wonderkid()
+    assert TR.frenzy(kid) > 1.5, TR.frenzy(kid)
+
+
+def test_the_world_is_offered_to_a_prodigy():
+    kid = _wonderkid()
+    club = [c for c in kid.clubs.values() if c.cid != kid.me.club_id][0]
+    big = TR.build_offer(kid, club, random.Random(1), 0.8)
+
+    plain = GameState.new_game("רגיל", "ST", "maccabi_harel", 28, 5)
+    set_all(plain.me, 82)
+    plain.me.reputation = 70
+    small = TR.build_offer(plain, plain.clubs[club.cid], random.Random(1), 0.8)
+
+    assert big["wage"] > small["wage"], f"{big['wage']} מול {small['wage']}"
+    assert big["bonus"] > small["bonus"]
+    assert big["promises"], "לעילוי לא הובטח כלום"
+
+
+def test_elite_clubs_join_the_race_for_a_prodigy():
+    kid = _wonderkid()
+    seen = set()
+    for seed in range(12):
+        kid.rng = random.Random(seed)
+        for club in kid._transfer_suitors():
+            seen.add(club.cid)
+    assert any(D.is_foreign(cid) for cid in seen), "אף מועדון זר לא נכנס למרוץ"
+
+
+def test_the_new_contract_terms_are_real_handles():
+    game = _pro()
+    club = [c for c in game.clubs.values() if c.cid != game.me.club_id][0]
+    TR.set_offers(game, [TR.build_offer(game, club, random.Random(1), 0.9)])
+    terms = {row["term"] for row in TR.ask_options(TR.offer_for(game, club.cid))}
+    assert {"minutes", "loyalty", "family"} <= terms, terms
+    offer = TR.offer_for(game, club.cid)
+    before = TR.offer_worth(offer)
+    TR._apply_ask(offer, "minutes", full=True)
+    assert offer["minutes"] > 0
+    assert TR.offer_worth(offer) > before, "התחייבות לדקות לא שווה כלום"
+
+
+# ---------------------------------------------------------------------------
+# פגישות
+# ---------------------------------------------------------------------------
+
+def test_every_encounter_is_wired_to_something_real():
+    ids = set()
+    for row in ENCOUNTERS:
+        assert row["eid"] not in ids, f"מזהה כפול: {row['eid']}"
+        ids.add(row["eid"])
+        for key in (row.get("when") or {}):
+            assert key in SE.CONDITIONS, f"{row['eid']}: תנאי לא מוכר {key}"
+        assert row["choices"], row["eid"]
+        for choice in row["choices"]:
+            for key in (choice.get("fx") or {}):
+                assert key in SE.EFFECT_KEYS, f"{row['eid']}: אפקט לא מוכר {key}"
+
+
+def test_encounters_can_happen_more_than_once():
+    repeatable = [r for r in ENCOUNTERS if not r.get("once")]
+    assert len(repeatable) >= len(ENCOUNTERS) - 2, "פגישות הן לא תחנות בדרך"
+    assert all(r.get("cooldown", 0) >= 20 for r in repeatable), "פגישה חוזרת מהר מדי"
+
+
+def test_a_meeting_can_put_a_club_on_your_trail():
+    game = _pro()
+    game.rng = random.Random(3)
+    SE.apply_effects(game, {"interest": ["elite", 40]})
+    book = game.flags.get("scout_interest", {})
+    assert book, "פגישה עם מנהל ספורטיבי לא הזיזה כלום"
+    cid = max(book, key=lambda k: book[k])
+    assert game.clubs[cid].reputation >= SE.ELITE_REPUTATION
+
+
+def test_a_meeting_can_put_an_offer_on_the_table_mid_season():
+    game = _pro()
+    game.rng = random.Random(3)
+    assert not TR.live_offers(game)
+    SE.apply_effects(game, {"open_offer": ["elite"]})
+    live = TR.live_offers(game)
+    assert live, "הצעה לא נחתה"
+    assert game.clubs[live[0]["cid"]].reputation >= SE.ELITE_REPUTATION
+
+
+def test_a_meeting_can_start_a_relationship():
+    game = _pro()
+    game.rng = random.Random(3)
+    SE.apply_effects(game, {"meet_partner": ["any"]})
+    assert LF.partner(game), "לא נוצר קשר"
+
+
+def test_encounters_actually_fire_over_a_career():
+    game = GameState.new_game("בודק", "ST", "hapoel_carmel", 18, 11)
+    game.open_agent_market()
+    game.sign_agent(0)
+    seen = set()
+    for _ in range(43 * 5):
+        if game.game_over:
+            break
+        report = game.advance_week()
+        if report.event_id:
+            event = game.pending_event()
+            if event:
+                if event.eid.startswith("e_"):
+                    seen.add(event.eid)
+                game.resolve_event(0)
+    assert len(seen) >= 6, f"רק {len(seen)} פגישות שונות בחמש עונות"

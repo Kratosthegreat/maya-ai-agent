@@ -19,6 +19,7 @@ from . import data as D
 from . import commercial as CM
 from . import scouting as SC
 from . import story_engine as SE
+from .encounter_pack import PACK as ENCOUNTERS
 from .story_pack import PACK
 from .models import clamp, gain_reputation
 
@@ -1393,3 +1394,7 @@ def register_pack(pack=PACK) -> int:
 
 
 PACK_COUNT = register_pack()
+
+# הפגישות רצות באותו מנוע ובאותו מרשם. ההבדל הוא באופי: אירוע עלילה
+# הוא תחנה בדרך, ופגישה היא משהו שקרה במקרה — ולכן היא חוזרת.
+PACK_COUNT += register_pack(ENCOUNTERS)
