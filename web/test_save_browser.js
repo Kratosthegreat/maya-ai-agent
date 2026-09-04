@@ -220,6 +220,89 @@ const start = async (p, weeks) => {
     await ctx.close();
   }
 
+  // -- 7. מהלך שהוא לא שבוע, וקריסה אמיתית ----------------------------
+  //
+  // התלונה הייתה "השמירה לא אוטומטית, אני צריך לעצור כדי לשמור".
+  // הבאג מאחוריה: בחירת אימון, עצימות או טקטיקה שינו את המצב בלי
+  // לכתוב אותו, ורק סגירה *מסודרת* של הדף הצילה אותם. קריסה — לא.
+  // chrome://crash הורג את התהליך בלי שאף אירוע מחזור חיים נורה,
+  // וזה בדיוק התרחיש שאבד בו מהלך.
+  {
+    const ctx = await b.newContext({ viewport: { width: 420, height: 900 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", e => console.log("PAGEERROR", String(e)));
+    await p.goto(PAGE);
+    await start(p, 14);
+
+    // אחרי סדרת שבועות אפשר לעמוד על מסך אירוע ולא על הסקירה, ושם
+    // אין צ'יפים בכלל. מתקדמים עד שהסקירה מוצגת.
+    for (let i = 0; i < 8 && !(await p.$("[data-focus]")); i++) await step(p);
+    // כל render בונה מחדש את ה-DOM, ולכן בוחרים לפי מפתח ולא לפי
+    // מצביע — מצביע ישן כבר לא מחובר לעמוד.
+    const picked = await p.evaluate(() => {
+      const key = (list, i) => (list[i] || list[0] || null);
+      const chips = [...document.querySelectorAll("[data-focus]")];
+      const ints = [...document.querySelectorAll("[data-int]")];
+      const chip = key(chips, 3), int = key(ints, 1);
+      return { focus: chip && chip.dataset.focus,
+               intensity: int && int.dataset.int };
+    });
+    if (picked.focus) { await p.click(`[data-focus="${picked.focus}"]`); await p.waitForTimeout(80); }
+    if (picked.intensity) { await p.click(`[data-int="${picked.intensity}"]`); await p.waitForTimeout(80); }
+    const before = await p.evaluate(() => ({ week: game.week,
+      focus: game.trainingFocus, intensity: game.intensity }));
+
+    try { await p.goto("chrome://crash", { timeout: 3000 }); } catch (err) {}
+    await new Promise(r => setTimeout(r, 500));
+
+    const p2 = await ctx.newPage();
+    await p2.goto(PAGE);
+    await p2.waitForTimeout(200);
+    const cont = await p2.$('[data-act="continue"]');
+    ok("יש שמורה גם אחרי קריסת דפדפן", !!cont, before);
+    if (cont) {
+      await cont.click(); await p2.waitForTimeout(600);
+      const after = await p2.evaluate(() => ({ week: game.week,
+        focus: game.trainingFocus, intensity: game.intensity }));
+      ok("בחירת האימון שרדה קריסה", after.focus === before.focus, after);
+      ok("העצימות שרדה קריסה", after.intensity === before.intensity, after);
+      ok("השבוע שרד קריסה", after.week === before.week, after);
+    }
+    await ctx.close();
+  }
+
+  // -- 8. כל בחירה נכתבת, ובחירה חוזרת לא ------------------------------
+  //
+  // אין השהיה: כל שינוי מצב נכתב מיד. מה שכן נחסך — לחיצה שלא
+  // משנה כלום (אותו צ'יפ פעמיים) לא גוררת דחיסה של קריירה שלמה.
+  {
+    const ctx = await b.newContext({ viewport: { width: 420, height: 900 } });
+    const p = await ctx.newPage();
+    p.on("pageerror", e => console.log("PAGEERROR", String(e)));
+    await p.goto(PAGE);
+    await start(p, 20);
+    for (let i = 0; i < 8 && !(await p.$("[data-focus]")); i++) await step(p);
+    const burst = await p.evaluate(async () => {
+      let writes = 0;
+      const real = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) {
+        if (k === "fm_career_save_v1") writes++;
+        return real.call(this, k, v);
+      };
+      const keys = [...document.querySelectorAll("[data-focus]")]
+        .slice(0, 4).map(el => el.dataset.focus);
+      for (const key of keys) document.querySelector(`[data-focus="${key}"]`).click();
+      const distinct = writes;
+      // אותה בחירה שוב — המצב לא זז, ולכן לא אמורה להיות כתיבה
+      document.querySelector(`[data-focus="${keys[keys.length - 1]}"]`).click();
+      const repeat = writes - distinct;
+      Storage.prototype.setItem = real;
+      return { distinct, repeat, want: keys.length, focus: game.trainingFocus };
+    });
+    ok("כל בחירה נכתבת מיד", burst.distinct >= burst.want, burst);
+    ok("בחירה שלא משנה כלום לא נכתבת", burst.repeat === 0, burst);
+  }
+
   await b.close();
   console.log(`\n${failures ? failures + " נכשלו" : "הכל עבר"}\n`);
   process.exit(failures ? 1 : 0);

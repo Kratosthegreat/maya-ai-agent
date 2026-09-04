@@ -26,6 +26,7 @@ from . import commercial as CM
 from . import agents as AG
 from . import life as LF
 from . import manager as MG
+from . import story_engine as SE
 from .engine import MENTALITIES, PRESSING
 
 LINE = "─" * 52
@@ -245,7 +246,8 @@ def play_event(game: GameState) -> None:
     out()
     labels = []
     for choice in event.choices:
-        labels.append(choice.label + (f"   ({choice.hint})" if choice.hint else ""))
+        labels.append(SE.fill(choice.label, game)
+                      + (f"   ({choice.hint})" if choice.hint else ""))
     idx = choose("מה אתה בוחר?", labels)
     outcome = game.resolve_event(idx)
     out()
@@ -622,7 +624,7 @@ def demo(argv: List[str]) -> int:
                 out(f"\n📖 {event.title}")
                 out(game.pending_event_text())
                 pick = rng.randrange(len(event.choices))
-                out(f"➡️  {event.choices[pick].label}")
+                out(f"➡️  {SE.fill(event.choices[pick].label, game)}")
                 out(game.resolve_event(pick))
                 continue
             actions = [key for key, _ in game.available_actions()]

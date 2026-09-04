@@ -1251,6 +1251,37 @@ input.edit-in:focus { border-color: var(--accent); background: var(--panel-3); }
   .dash-grid > .wide { grid-column: 1 / -1; }
 }
 
+/* ---------- סמן השמירה ---------- */
+
+/* מי שמשחק צריך לראות שנשמר, אחרת הוא מחפש כפתור "שמור" שלא קיים. */
+.save-dot {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--good) 20%, transparent);
+  color: var(--good);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+.save-dot.bad {
+  background: color-mix(in srgb, var(--bad) 22%, transparent);
+  color: var(--bad);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .save-dot.blip { animation: blip .5s ease-out; }
+  @keyframes blip {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 55%, transparent); }
+    35% { transform: scale(1.28); }
+    100% { transform: scale(1); box-shadow: 0 0 0 9px transparent; }
+  }
+}
+.save-line .row { padding: 9px 11px; }
+.save-line.warn { border-color: var(--bad); }
+
 </style>
 <div id="app"></div>
 <script>
@@ -21604,7 +21635,7 @@ class Game {
     if (!this.firedEvents.includes(event.eid)) this.firedEvents.push(event.eid);
     this.pendingEventId = null;
     this.pendingEventBody = null;
-    this.log(`${event.title} — ${choice.label}`);
+    this.log(`${fillStory(event.title, this)} — ${fillStory(choice.label, this)}`);
     return outcome;
   }
 
@@ -23465,6 +23496,52 @@ function saveMeta() {
 }
 
 /**
+ * שמירה לכל מהלך — מיד, בלי השהיה.
+ *
+ * ניסיתי כאן קודם השהיה קצרה שתאחד לחיצות קרובות. זו הייתה טעות:
+ * השהיה של חצי שנייה נשמעת כמו כלום, אבל אם הדפדפן נסגר בתוכה —
+ * המהלך שנעשה נעלם, ומבחינת מי שמשחק זה "השמירה לא עובדת". בדיקת
+ * הקריסה תפסה בדיוק את זה.
+ *
+ * ולמה זה בסדר לכתוב בכל לחיצה? כי הכתיבה **חוסמת** את הדפדפן.
+ * כל עוד היא רצה אי אפשר ללחוץ שוב, ולכן "רצף לחיצות מהיר" הוא
+ * תרחיש של סקריפט ולא של אצבע. מה שכן נחסך: אם שום דבר לא זז
+ * מאז השמירה האחרונה — לא כותבים בכלל.
+ */
+function saveSoon() {
+  if (!game) return;
+  if (stateStamp() === lastStamp) return;      // כלום לא השתנה
+  saveGame();
+}
+
+// כל כמה זמן בודקים אם המצב זז בלי שנשמר. 8 שניות הוא פשרה בין
+// "לא לאבד מהלך" לבין לא לדחוס קריירה שלמה סתם.
+const HEARTBEAT_MS = 8000;
+
+/**
+ * טביעת אצבע זולה של המצב.
+ *
+ * רשת ביטחון: אם מטפל כלשהו ישנה משהו וישכח לקרוא ל-saveSoon,
+ * פעימת הלב תבחין שהמצב זז ותשמור. היא לא מושלמת — היא לא סורקת
+ * את כל הקריירה — אבל היא מכסה כל דבר שהמשתמש יכול לשנות ממסך,
+ * והיא עולה מיקרו-שניות ולכן אפשר להריץ אותה כל כמה שניות.
+ */
+function stateStamp() {
+  if (!game) return "";
+  const me = game.me;
+  const t = game.tactics || {};
+  return [game.year, game.week, game.stage, game.money, game.trainingFocus,
+          game.intensity, t.formation, t.mentality, t.pressing,
+          me.number, me.role, me.duty, Math.round(me.morale), overall(me),
+          game.honours.length, game.news.length,
+          Object.keys(game.flags).length,
+          JSON.stringify(game.flags.agent || null).length,
+          JSON.stringify(game.flags.partner || null).length].join("|");
+}
+
+let lastStamp = "";
+
+/**
  * שמירה אוטומטית, אחרי כל פעולה. שני אחסונים, ובכוונה בסדר הזה:
  *
  * localStorage ראשון, כי הוא היחיד שמסתיים לפני שהשורה הבאה רצה.
@@ -23492,6 +23569,7 @@ function saveGame() {
   if (local) {
     saveState = { ok: true, at: Date.now(), error: "", store: "local" };
     savedCareer = { known: true, meta, exists: true };
+    lastStamp = stateStamp();
   }
 
   queueSave(bytes, meta, (ok, error) => {
@@ -23643,8 +23721,19 @@ function clearSave() {
 
 /** מרענן רק את חיווי השמירה, בלי לצייר מחדש את כל המסך. */
 function refreshSaveBadge() {
-  const badge = document.querySelector("[data-save-badge]");
-  if (badge) badge.textContent = saveState.ok ? savedAgo() : "לא נשמר";
+  // querySelectorAll ולא querySelector: הסמן מופיע גם בסרגל העליון
+  // וגם במסך השמירה, וקודם רק הראשון שבהם התעדכן.
+  document.querySelectorAll("[data-save-badge]").forEach(badge => {
+    const dot = badge.classList.contains("save-dot");
+    badge.textContent = dot ? (saveState.ok ? "✓" : "✕")
+                            : (saveState.ok ? savedAgo() : "לא נשמר");
+    badge.classList.toggle("bad", !saveState.ok);
+    if (!dot || !saveState.ok) return;
+    // הבהוב קצר: מי שמשחק צריך *לראות* שנשמר, אחרת הוא מחפש כפתור
+    badge.classList.remove("blip");
+    void badge.offsetWidth;
+    badge.classList.add("blip");
+  });
 }
 
 /**
@@ -23784,6 +23873,51 @@ function restoreCareer() {
 }
 
 /** פאנל השמורה: מה נשמר, לאן, ומה אפשר לעשות עם זה. */
+/**
+ * שורת המצב במסך הראשי.
+ *
+ * קודם ישב כאן פאנל שלם עם כפתורי קבצים, והוא נקרא כמו מטלה: מי
+ * שמשחק הבין שהוא צריך "לעצור ולשמור". השמירה אוטומטית לגמרי, ולכן
+ * מה שנשאר כאן הוא משפט אחד — וכל השאר עבר למסך נפרד.
+ */
+/** מסך השמירה: מה שהיה פאנל במסך הראשי, עכשיו במקום משלו. */
+function screenSave() {
+  return `<div class="screen">
+    ${savePanel()}
+    <div class="panel">
+      <div class="panel-head"><span class="t">איך זה עובד</span></div>
+      <div class="panel-body">
+        <div class="notes">
+          <div class="note"><span class="ico">✓</span><span>כל מהלך נשמר
+            ברגע שעשית אותו — שבוע, החלטה, בחירת אימון, טקטיקה.</span></div>
+          <div class="note"><span class="ico">✓</span><span>גם סגירה
+            פתאומית של הדפדפן לא מוחקת כלום. נבדק בקריסה אמיתית.</span></div>
+          <div class="note"><span class="ico">✓</span><span>אין כפתור
+            "שמור" ואין צורך בו. הכפתורים כאן הם לגיבוי בלבד.</span></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn ghost wide" data-go="main">חזרה</button>
+  </div>`;
+}
+
+function saveLine() {
+  const ok = saveState.ok;
+  return `
+  <div class="panel wide save-line ${ok ? "" : "warn"}">
+    <div class="row link" data-go="save">
+      <span class="msg-ico">${ok ? "✓" : "⚠️"}</span>
+      <span class="grow"><span class="nm">${ok
+        ? "הקריירה נשמרת מעצמה, אחרי כל מהלך"
+        : "השמירה נכשלה"}</span>
+        <span class="sub">${ok
+          ? esc(savedAgo() || "נשמר עכשיו") + " · אין צורך לשמור ידנית"
+          : esc(saveState.error)}</span></span>
+      <span class="val">›</span>
+    </div>
+  </div>`;
+}
+
 function savePanel() {
   const mode = saveFileState();
   const name = saveFile.handle ? saveFile.handle.name : "";
@@ -23808,7 +23942,7 @@ function savePanel() {
         <span class="grow"><span class="nm">${
           saveState.ok ? "הקריירה נשמרת מעצמה" : "השמירה נכשלה"}</span>
           <span class="sub">${saveState.ok
-            ? "אחרי כל שבוע, כל החלטה, וכשסוגרים את הדף — בלי לגעת בכלום."
+            ? "אחרי כל מהלך — שבוע, החלטה, בחירת אימון, טקטיקה. בלי לגעת בכלום."
             : esc(saveState.error)}</span></span>
         <span class="val ${saveState.ok ? "good" : "bad"}">${
           saveState.ok ? "✓" : "✕"}</span>
@@ -24292,6 +24426,9 @@ function appbar() {
         </span>
       </div>
       <span class="spacer"></span>
+      <span class="save-dot ${saveState.ok ? "" : "bad"}" data-save-badge
+        title="${saveState.ok ? "נשמר אוטומטית" : "השמירה נכשלה"}"
+        >${saveState.ok ? "✓" : "✕"}</span>
       <div class="date">
         <div class="d">${date.d}</div>
         <div class="w">${game.year}/${game.year + 1}</div>
@@ -24388,6 +24525,7 @@ function screenMain() {
   if (view === "agent") return appbar() + screenAgent();
   if (view === "life") return appbar() + screenLife();
   if (view === "boss") return appbar() + screenBoss();
+  if (view === "save") return appbar() + screenSave();
   return appbar() + screenHub() + dock(true);
 }
 
@@ -24893,7 +25031,7 @@ function screenTactics() {
         </div>
         <div class="muted">לחץ</div>
         <div class="chips">
-          ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-press="${k}"
+          ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-pressing="${k}"
             aria-pressed="${game.tactics.pressing === k}">${esc(v[0])}</button>`).join("")}
         </div>
       </div>
@@ -25233,7 +25371,7 @@ function screenHub() {
     ${messages}
     </div>
 
-    ${savePanel()}
+    ${saveLine()}
 
     <button class="btn ghost wide" data-act="menu">תפריט ראשי</button>
   </div>`;
@@ -26365,7 +26503,7 @@ function tacticsCard() {
         aria-pressed="${t.mentality === k}">${esc(v[0])}</button>`).join("")}
     </div>
     <div class="chips">
-      ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-press="${k}"
+      ${Object.entries(D.PRESSING).map(([k, v]) => `<button class="chip" data-pressing="${k}"
         aria-pressed="${t.pressing === k}">${esc(v[0])}</button>`).join("")}
     </div>
   </div>`;
@@ -26532,13 +26670,13 @@ function screenEvent() {
   <div class="takeover flush">
     <div class="scene-frame">${sceneFor(event.eid, game.stage)}</div>
     <div class="kicker">${esc(D.CAREER_STAGES_HE[game.stage] || "")} · שבוע ${game.week}</div>
-    <h2 class="display">${esc(event.title)}</h2>
+    <h2 class="display">${esc(fillStory(event.title, game))}</h2>
     <hr class="rule">
     <div class="body">${esc(game.pendingEventText())}</div>
     ${contextStrip()}
     <div class="actions" style="margin-top:auto">
       ${event.choices.map((c, i) => `<button class="btn" data-choice="${i}">
-        <span class="k">${esc(c.label)}</span>
+        <span class="k">${esc(fillStory(c.label, game))}</span>
         ${c.hint ? `<span class="hint">${esc(c.hint)}</span>` : ""}
       </button>`).join("")}
     </div>
@@ -27036,9 +27174,17 @@ function bind() {
       showOutcome(offer.title, text);
     }));
   app.querySelectorAll("[data-focus]").forEach(el =>
-    el.addEventListener("click", () => { game.setAction(el.dataset.focus); render(); }));
+    el.addEventListener("click", () => {
+      game.setAction(el.dataset.focus);
+      saveSoon();
+      render();
+    }));
   app.querySelectorAll("[data-int]").forEach(el =>
-    el.addEventListener("click", () => { game.intensity = +el.dataset.int; render(); }));
+    el.addEventListener("click", () => {
+      game.intensity = +el.dataset.int;
+      saveSoon();
+      render();
+    }));
   app.querySelectorAll("[data-pos]").forEach(el =>
     el.addEventListener("click", () => { viewData.position = el.dataset.pos; render(); }));
   app.querySelectorAll("[data-shirt]").forEach(el =>
@@ -27102,11 +27248,25 @@ function bind() {
   app.querySelectorAll("[data-league]").forEach(el =>
     el.addEventListener("click", () => go("table", { league: el.dataset.league })));
   app.querySelectorAll("[data-form]").forEach(el =>
-    el.addEventListener("click", () => { game.tactics.formation = el.dataset.form; render(); }));
+    el.addEventListener("click", () => {
+      game.tactics.formation = el.dataset.form;
+      saveSoon();
+      render();
+    }));
   app.querySelectorAll("[data-ment]").forEach(el =>
-    el.addEventListener("click", () => { game.tactics.mentality = el.dataset.ment; render(); }));
-  app.querySelectorAll("[data-press]").forEach(el =>
-    el.addEventListener("click", () => { game.tactics.pressing = el.dataset.press; render(); }));
+    el.addEventListener("click", () => {
+      game.tactics.mentality = el.dataset.ment;
+      saveSoon();
+      render();
+    }));
+  // data-pressing ולא data-press: שני המסכים חלקו את אותו שם, ולכן
+  // לחיצה על "להכחיש" בעיתונות גם שינתה את הלחץ הטקטי, ולהפך.
+  app.querySelectorAll("[data-pressing]").forEach(el =>
+    el.addEventListener("click", () => {
+      game.tactics.pressing = el.dataset.pressing;
+      saveSoon();
+      render();
+    }));
   app.querySelectorAll("[data-club]").forEach(el =>
     el.addEventListener("click", () => goDeep("clubinfo", { cid: el.dataset.club })));
   app.querySelectorAll("[data-player]:not(input)").forEach(el =>
@@ -27312,7 +27472,7 @@ function afterWeek() {
 
 function resolveChoice(index) {
   const event = game.pendingEvent();
-  const title = event.title;
+  const title = fillStory(event.title, game);
   const scene = sceneFor(event.eid, game.stage);
   const text = game.resolveEvent(index);
   saveGame();
@@ -27342,6 +27502,15 @@ function boot() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") saveNow();
   });
+
+  // פעימת לב: אירועי מחזור החיים לא נורים כשהדפדפן קורס או כשמערכת
+  // ההפעלה הורגת לשונית ברקע, ואז מהלך שנעשה ולא נשמר פשוט נעלם.
+  // הבדיקה עצמה זולה, ולכן היא רצה כל כמה שניות ושומרת רק כשזז משהו.
+  setInterval(() => {
+    if (!game) return;
+    const stamp = stateStamp();
+    if (stamp && stamp !== lastStamp) saveGame();
+  }, HEARTBEAT_MS);
 
   // refreshSavedCareer קובע את החלק מ-localStorage מיד, לפני go —
   // ולכן כפתור ההמשך מופיע כבר בציור הראשון ולא ממתין לכלום.

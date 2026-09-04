@@ -1272,7 +1272,8 @@ class GameState:
             self.fired_events.append(event.eid)
         self.pending_event_id = None
         self.pending_event_body = None
-        self.log(f"{event.title} — {choice.label}")
+        self.log(f"{ST.SE.fill(event.title, self)} — "
+                 f"{ST.SE.fill(choice.label, self)}")
         return outcome
 
     # ==================================================================

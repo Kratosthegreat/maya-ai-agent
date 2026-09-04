@@ -1135,7 +1135,7 @@ class Game {
     if (!this.firedEvents.includes(event.eid)) this.firedEvents.push(event.eid);
     this.pendingEventId = null;
     this.pendingEventBody = null;
-    this.log(`${event.title} — ${choice.label}`);
+    this.log(`${fillStory(event.title, this)} — ${fillStory(choice.label, this)}`);
     return outcome;
   }
 
